@@ -367,10 +367,12 @@ def _adapt_schema_for_datalab(schema: Any) -> Any:
 
 _CITATIONS_SUFFIX = "_citations"
 _SCORE_SUFFIX = "_score"
+_META_SUFFIX = "_meta"
+_SIDECAR_SUFFIXES = (_CITATIONS_SUFFIX, _SCORE_SUFFIX, _META_SUFFIX)
 
 
 def _strip_citation_and_score_keys(node: Any) -> Any:
-    """Return a copy of ``node`` with ``*_citations`` and ``*_score`` keys removed.
+    """Return a copy of ``node`` with ``*_citations``, ``*_score`` and ``*_meta`` keys removed.
 
     Datalab interleaves the citation/score metadata with the actual field
     values inside ``extraction_schema_json``. The bench schema stores those as
@@ -380,7 +382,7 @@ def _strip_citation_and_score_keys(node: Any) -> Any:
     if isinstance(node, Mapping):
         cleaned: dict[str, Any] = {}
         for key, value in node.items():
-            if isinstance(key, str) and (key.endswith(_CITATIONS_SUFFIX) or key.endswith(_SCORE_SUFFIX)):
+            if isinstance(key, str) and key.endswith(_SIDECAR_SUFFIXES):
                 continue
             cleaned[key] = _strip_citation_and_score_keys(value)
         return cleaned
@@ -515,7 +517,7 @@ def _collect_citations(
                         if citation is not None:
                             citations.append(citation)
                 continue
-            if key.endswith(_SCORE_SUFFIX):
+            if key.endswith(_SCORE_SUFFIX) or key.endswith(_META_SUFFIX):
                 continue
             _collect_citations(
                 value,

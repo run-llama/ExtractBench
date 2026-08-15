@@ -32,11 +32,11 @@ Models and prices reflect each provider's official documentation as of July 1, 2
 | 6 | Claude Code (Opus 4.8) | Coding Agents | 87.09 | 90.08 | 79.21 | 88.07 | 16.17¢ |
 | 7 | LlamaExtract Cost-Effective | LlamaExtract | 86.78 | 90.77 | 80.12 | 69.17 | 1.00¢ |
 | 8 | Extend (Max Context) | Specialized APIs | 86.29 | 91.98 | 78.78 | 51.33 | 10.00¢ |
-| 9 | Google Gemini 3.5 Flash | Commercial VLM | 79.84 | 87.87 | 69.76 | 27.90 | 1.00¢ |
-| 10 | Lift Datalab 9B | OSS | 77.31 | 87.17 | 62.59 | 25.26 | — |
-| 11 | OpenAI GPT-5.4 Nano | Commercial VLM | 74.90 | 77.43 | 76.37 | 35.81 | 0.21¢ |
-| 12 | Gemma4 26B | OSS | 66.24 | 80.55 | 40.47 | 12.16 | — |
-| 13 | Datalab (Accurate + Balanced) | Specialized APIs | 64.48 | 62.77 | 73.75 | 40.54 | 3.50¢ |
+| 9 | Datalab (Accurate + Balanced) | Specialized APIs | 85.70 | 89.40 | 85.08 | 42.04 | 3.50¢ |
+| 10 | Google Gemini 3.5 Flash | Commercial VLM | 79.84 | 87.87 | 69.76 | 27.90 | 1.00¢ |
+| 11 | Lift Datalab 9B | OSS | 77.31 | 87.17 | 62.59 | 25.26 | — |
+| 12 | OpenAI GPT-5.4 Nano | Commercial VLM | 74.90 | 77.43 | 76.37 | 35.81 | 0.21¢ |
+| 13 | Gemma4 26B | OSS | 66.24 | 80.55 | 40.47 | 12.16 | — |
 | 14 | NuExtract3 | OSS | 47.93 | 54.36 | 39.34 | 8.95 | — |
 <!-- LEADERBOARD:END -->
 
@@ -54,7 +54,7 @@ Models and prices reflect each provider's official documentation as of July 1, 2
     <tr><td align="right">3</td><td>Reducto Deep Extract</td><td align="right">43.30</td><td align="right"><u>42.84</u></td><td align="right">45.57</td><td align="right">41.13</td><td align="right"><u>71.71</u></td><td align="right"><u>72.60</u></td><td align="right"><u>70.42</u></td><td align="right">67.28</td></tr>
     <tr><td align="right">4</td><td>LlamaExtract Cost-Effective</td><td align="right">40.43</td><td align="right">40.20</td><td align="right">42.30</td><td align="right">36.67</td><td align="right">64.15</td><td align="right">68.90</td><td align="right">53.73</td><td align="right">56.55</td></tr>
     <tr><td align="right">5</td><td>Extend (Max Context)</td><td align="right">25.08</td><td align="right">33.91</td><td align="right">0.20</td><td align="right">0.02</td><td align="right">48.87</td><td align="right">61.71</td><td align="right">27.68</td><td align="right">0.02</td></tr>
-    <tr><td align="right">6</td><td>Datalab (Accurate + Balanced)</td><td align="right">2.02</td><td align="right">2.67</td><td align="right">0.23</td><td align="right">0.00</td><td align="right">48.50</td><td align="right">56.90</td><td align="right">38.56</td><td align="right">0.01</td></tr>
+    <tr><td align="right">6</td><td>Datalab (Accurate + Balanced)</td><td align="right">2.02</td><td align="right">2.67</td><td align="right">0.24</td><td align="right">0.00</td><td align="right">48.50</td><td align="right">56.90</td><td align="right">38.55</td><td align="right">0.01</td></tr>
     <tr><td align="right">—</td><td><em>All 8 other systems</em></td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td></tr>
   </tbody>
 </table>
