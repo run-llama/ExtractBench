@@ -119,6 +119,32 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
 
     register_fn(
         _pipeline_spec(
+            pipeline_name="gemini_3_6_flash_extract_oneshot_structured_output_file",
+            provider_name="gemini_extract",
+            config={
+                "model": "gemini-3.6-flash",
+                "additional_properties_false": True,
+                "thinking_level": "medium",
+                "max_tokens": 65536,
+            },
+        )
+    )
+
+    register_fn(
+        _pipeline_spec(
+            pipeline_name="gemini_3_7_flash_extract_oneshot_structured_output_file",
+            provider_name="gemini_extract",
+            config={
+                "model": "gemini-3.7-flash",
+                "additional_properties_false": True,
+                "thinking_level": "medium",
+                "max_tokens": 65536,
+            },
+        )
+    )
+
+    register_fn(
+        _pipeline_spec(
             pipeline_name="anthropic_haiku_4_5_extract_oneshot_structured_output_file",
             provider_name="anthropic_extract",
             config={
@@ -142,6 +168,16 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
         ("openai_gpt_5_4", "openai_extract", {"model": "gpt-5.4"}),
         ("openai_gpt_5_4_nano", "openai_extract", {"model": "gpt-5.4-nano"}),
         ("gemini_3_5_flash", "gemini_extract", {"model": "gemini-3.5-flash", "thinking_level": "low"}),
+        (
+            "gemini_3_6_flash",
+            "gemini_extract",
+            {"model": "gemini-3.6-flash", "thinking_level": "medium", "max_tokens": 65536},
+        ),
+        (
+            "gemini_3_7_flash",
+            "gemini_extract",
+            {"model": "gemini-3.7-flash", "thinking_level": "medium", "max_tokens": 65536},
+        ),
         (
             "anthropic_haiku_4_5",
             "anthropic_extract",

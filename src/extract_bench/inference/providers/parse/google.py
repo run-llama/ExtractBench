@@ -81,6 +81,7 @@ USER_PROMPT = (
 # Source: https://ai.google.dev/gemini-api/docs/pricing (2026-03-25)
 _GEMINI_PRICING_PER_M: dict[str, tuple[float, float]] = {
     # model-prefix: (input_per_M, output_per_M)
+    "gemini-3.7-flash": (0.75, 3.75),
     "gemini-3.6-flash": (1.50, 7.50),
     "gemini-3.5-flash": (1.50, 9.00),
     "gemini-3.5-flash-lite": (0.30, 2.50),
@@ -97,8 +98,12 @@ _GEMINI_PRICING_PER_M: dict[str, tuple[float, float]] = {
 # Source: https://ai.google.dev/gemini-api/docs/pricing (2026-04-05)
 _GEMINI_CONTEXT_CACHE_PRICING_PER_M: dict[str, tuple[float, float]] = {
     # model-prefix: (cache_hit_per_M, storage_per_M_token_hour)
+    "gemini-3.7-flash": (0.075, 0.50),
+    "gemini-3.6-flash": (0.15, 1.00),
+    "gemini-3.5-flash": (0.15, 1.00),
     "gemini-3-flash": (0.05, 1.00),
     "gemini-3.1-flash-lite": (0.025, 1.00),
+    "gemini-3.5-flash-lite": (0.03, 1.00),
     "gemini-2.5-flash": (0.03, 1.00),
     "gemini-2.5-flash-lite": (0.01, 1.00),
     "gemini-2.5-pro": (0.125, 4.50),

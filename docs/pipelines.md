@@ -21,7 +21,9 @@ uv run extract-bench run <pipeline_name>
 | `llamaextract_agentic_plus` | LlamaExtract V2 API | highest tier; returns word-level citation boxes natively, no parse pass needed |
 | `llamaextract_cost_effective_standard_bbox` / `llamaextract_agentic_standard_bbox` | LlamaExtract V2 API | same tiers with block-level citation boxes and no granular parse pass |
 | `openai_gpt_5_4_extract_oneshot_structured_output_file` (+ `_nano`) | OpenAI Responses | one-shot structured output over the uploaded file |
-| `gemini_3_5_flash_extract_oneshot_structured_output_file` | Gemini | one-shot structured output |
+| `gemini_3_5_flash_extract_oneshot_structured_output_file` | Gemini | one-shot structured output (thinking: low) |
+| `gemini_3_6_flash_extract_oneshot_structured_output_file` | Gemini | one-shot structured output (thinking: medium) |
+| `gemini_3_7_flash_extract_oneshot_structured_output_file` | Gemini | one-shot structured output (thinking: medium) |
 | `anthropic_haiku_4_5_extract_oneshot_structured_output_file` | Anthropic | one-shot structured output |
 | `*_extract_twostage_parse_agentic_structured_output_text` | OpenAI / Gemini / Anthropic | LlamaParse agentic markdown → text extract; cost totals parse + extract |
 | `deepseek_v4_pro_extract_twostage_parse_agentic_structured_output_text` | DeepSeek (Fireworks) | two-stage text extract |
@@ -129,6 +131,10 @@ These pipelines use hosted APIs. You only need an API key in your `.env` file.
 | **`google_gemini_3_5_flash_lite_parse_with_layout_file`** | Gemini 3.5 Flash Lite, layout + file mode (In paper: *Google Gemini 3.5 Flash Lite*) | `GOOGLE_GEMINI_API_KEY` |
 | **`google_gemini_3_6_flash_parse_with_layout_file`** | Gemini 3.6 Flash, default thinking + layout, file mode (In paper: *Google Gemini 3.6 Flash (Thinking Medium)*) | `GOOGLE_GEMINI_API_KEY` |
 | **`google_gemini_3_6_flash_no_thinking_parse_with_layout_file`** | Gemini 3.6 Flash, minimal thinking + layout, file mode (In paper: *Google Gemini 3.6 Flash (Thinking Minimal)*) | `GOOGLE_GEMINI_API_KEY` |
+| `google_gemini_3_7_flash_parse_with_layout` | Gemini 3.7 Flash, default thinking + layout | `GOOGLE_GEMINI_API_KEY` |
+| `google_gemini_3_7_flash_no_thinking_parse_with_layout` | Gemini 3.7 Flash, minimal thinking + layout | `GOOGLE_GEMINI_API_KEY` |
+| `google_gemini_3_7_flash_parse_with_layout_file` | Gemini 3.7 Flash, default thinking + layout, file mode | `GOOGLE_GEMINI_API_KEY` |
+| `google_gemini_3_7_flash_no_thinking_parse_with_layout_file` | Gemini 3.7 Flash, minimal thinking + layout, file mode | `GOOGLE_GEMINI_API_KEY` |
 
 ### Azure Document Intelligence
 

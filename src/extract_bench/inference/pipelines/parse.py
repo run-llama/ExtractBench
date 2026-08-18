@@ -1636,8 +1636,39 @@ def register_parse_pipelines(register_fn) -> None:  # type: ignore[no-untyped-de
     )
 
     # =========================================================================
-    # Gemini 3.6 Flash (GA) - Parse with Layout File
+    # Gemini 3.6 Flash (GA) - Parse with Layout & Image
     # =========================================================================
+
+    # Gemini 3.6 Flash - Parse with Layout (default thinking)
+    register_fn(
+        PipelineSpec(
+            pipeline_name="google_gemini_3_6_flash_parse_with_layout",
+            provider_name="google",
+            product_type=ProductType.PARSE,
+            config={
+                "model": "gemini-3.6-flash",
+                "dpi": 150,
+                "max_tokens": 32768,
+                "mode": "parse_with_layout",
+            },
+        )
+    )
+
+    # Gemini 3.6 Flash - Parse with Layout - Thinking Minimal
+    register_fn(
+        PipelineSpec(
+            pipeline_name="google_gemini_3_6_flash_no_thinking_parse_with_layout",
+            provider_name="google",
+            product_type=ProductType.PARSE,
+            config={
+                "model": "gemini-3.6-flash",
+                "dpi": 150,
+                "max_tokens": 32768,
+                "mode": "parse_with_layout",
+                "thinking_level": "minimal",
+            },
+        )
+    )
 
     # Gemini 3.6 Flash - Parse with Layout File (default thinking)
     register_fn(
@@ -1661,6 +1692,70 @@ def register_parse_pipelines(register_fn) -> None:  # type: ignore[no-untyped-de
             product_type=ProductType.PARSE,
             config={
                 "model": "gemini-3.6-flash",
+                "max_tokens": 32768,
+                "mode": "parse_with_layout_file",
+                "thinking_level": "minimal",
+            },
+        )
+    )
+
+    # =========================================================================
+    # Gemini 3.7 Flash - Parse with Layout & File
+    # =========================================================================
+
+    # Gemini 3.7 Flash - Parse with Layout (default thinking)
+    register_fn(
+        PipelineSpec(
+            pipeline_name="google_gemini_3_7_flash_parse_with_layout",
+            provider_name="google",
+            product_type=ProductType.PARSE,
+            config={
+                "model": "gemini-3.7-flash",
+                "dpi": 150,
+                "max_tokens": 32768,
+                "mode": "parse_with_layout",
+            },
+        )
+    )
+
+    # Gemini 3.7 Flash - Parse with Layout - Thinking Minimal
+    register_fn(
+        PipelineSpec(
+            pipeline_name="google_gemini_3_7_flash_no_thinking_parse_with_layout",
+            provider_name="google",
+            product_type=ProductType.PARSE,
+            config={
+                "model": "gemini-3.7-flash",
+                "dpi": 150,
+                "max_tokens": 32768,
+                "mode": "parse_with_layout",
+                "thinking_level": "minimal",
+            },
+        )
+    )
+
+    # Gemini 3.7 Flash - Parse with Layout File (default thinking)
+    register_fn(
+        PipelineSpec(
+            pipeline_name="google_gemini_3_7_flash_parse_with_layout_file",
+            provider_name="google",
+            product_type=ProductType.PARSE,
+            config={
+                "model": "gemini-3.7-flash",
+                "max_tokens": 32768,
+                "mode": "parse_with_layout_file",
+            },
+        )
+    )
+
+    # Gemini 3.7 Flash - Parse with Layout File - Thinking Minimal
+    register_fn(
+        PipelineSpec(
+            pipeline_name="google_gemini_3_7_flash_no_thinking_parse_with_layout_file",
+            provider_name="google",
+            product_type=ProductType.PARSE,
+            config={
+                "model": "gemini-3.7-flash",
                 "max_tokens": 32768,
                 "mode": "parse_with_layout_file",
                 "thinking_level": "minimal",
