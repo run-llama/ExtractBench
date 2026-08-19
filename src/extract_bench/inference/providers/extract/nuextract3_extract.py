@@ -9,10 +9,8 @@ as the parse pipeline — extraction is just a different ``chat_template_kwargs`
 The bench supplies a JSON Schema (``request.schema_override``). NuExtract expects
 its own template format whose leaves are type names (``"string"``, ``"integer"``,
 ``"number"``, ``"boolean"``, ``"date"``…) and whose enums are lists of options,
-so we convert the JSON Schema to a NuExtract template first. The conversion
-mirrors numind's official ``convert_json_schema_to_nuextract_template`` for the
-constructs the extract benchmark uses, and additionally tolerates nullable enums
-(``enum`` containing ``null``) — which the official converter rejects.
+so we convert the JSON Schema to a NuExtract template first with numind's
+official ``convert_json_schema_to_nuextract_template`` utility.
 
 Like lift, NuExtract3 emits schema-shaped JSON with no per-field citations /
 bboxes, so ``field_citations`` is always empty (evidence-bbox metrics are N/A);
@@ -29,6 +27,11 @@ from pathlib import Path
 from typing import Any
 
 import aiohttp
+
+try:
+    from numind.nuextract_utils import convert_json_schema_to_nuextract_template
+except ImportError:  # Optional runner dependency; checked when the provider runs.
+    convert_json_schema_to_nuextract_template = None  # type: ignore[assignment]
 
 from extract_bench.inference.providers.base import (
     Provider,
@@ -122,60 +125,24 @@ def _repair_truncated_json_object(text: str) -> dict[str, Any] | None:
     return None
 
 
-# JSON Schema leaf type -> NuExtract template type (matches numind's converter).
-_LEAF_TYPES = {
-    "integer": "integer",
-    "number": "number",
-    "boolean": "boolean",
-    "string": "string",
-}
-# JSON Schema string "format" -> NuExtract specific type (valid NuExtract types).
-_FORMAT_TYPES = {
-    "date": "date",
-    "date-time": "date-time",
-    "time": "time",
-    "email": "email",
-    "uri": "url",
-}
 
-
-def _json_schema_to_nuextract_template(node: Any) -> Any:
-    """Convert a JSON Schema node into a NuExtract template node.
-
-    Leaves become type-name strings; objects become dicts; arrays become a
-    single-element ``[item]`` list; enums become a list of their (non-null)
-    options. Nullable unions (``"type": ["string", "null"]``) collapse to the
-    non-null type. Unknown/missing types default to ``"string"``.
-    """
+def _json_schema_to_nuextract_template_and_instructions(node: Any) -> tuple[Any, str]:
+    """Convert a JSON Schema and render the converter's descriptions as instructions."""
     if not isinstance(node, dict):
-        return "string"
+        raise ProviderPermanentError("JSON Schema must be an object")
+    if convert_json_schema_to_nuextract_template is None:
+        raise ProviderConfigError(
+            "The numind SDK is required for NuExtract template conversion. "
+            "Install the 'runners' extra or run `pip install numind`."
+        )
 
-    # Enum -> list of string options (drop null; the model returns null anyway
-    # when a field is absent, so the null option is not needed).
-    enum = node.get("enum")
-    if isinstance(enum, list):
-        options = [str(v) for v in enum if v is not None]
-        return options if options else "string"
-
-    node_type = node.get("type")
-    if isinstance(node_type, list):  # nullable union -> first non-null member
-        node_type = next((t for t in node_type if t != "null"), "string")
-
-    if node_type == "object" or "properties" in node:
-        props = node.get("properties") or {}
-        return {key: _json_schema_to_nuextract_template(sub) for key, sub in props.items()}
-
-    if node_type == "array" or "items" in node:
-        items = node.get("items") or {}
-        if isinstance(items, list):  # tuple-typed arrays -> use the first item schema
-            items = items[0] if items else {}
-        return [_json_schema_to_nuextract_template(items)]
-
-    if node_type == "string":
-        fmt = node.get("format")
-        return _FORMAT_TYPES.get(fmt, "string") if isinstance(fmt, str) else "string"
-
-    return _LEAF_TYPES.get(node_type, "string") if isinstance(node_type, str) else "string"
+    try:
+        processed_schema = convert_json_schema_to_nuextract_template(node)
+        template = processed_schema["template"]
+        descriptions = processed_schema["descriptions"]
+    except (KeyError, TypeError, ValueError) as e:
+        raise ProviderPermanentError(f"Could not convert JSON Schema to a NuExtract template: {e}") from e
+    return template, "\n".join(descriptions)
 
 
 @register_provider("nuextract3_extract")
@@ -190,7 +157,7 @@ class NuExtract3ExtractProvider(Provider):
         - timeout (int, default=1800): per-request timeout in seconds (large
           extractions generate a lot of tokens and can run for many minutes).
         - dpi (int, default=150): DPI for PDF-to-image rendering.
-        - max_pages (int, default=30): cap on rendered pages per document (keeps
+        - max_pages (int, default=100): cap on rendered pages per document (keeps
           the request within the server's image / context limits).
         - max_tokens (int, default=100000): max output tokens — large enough for
           a long holdings array (server context is 262144).
@@ -220,7 +187,7 @@ class NuExtract3ExtractProvider(Provider):
         self._model = self.base_config.get("model", DEFAULT_SERVED_MODEL_NAME)
         self._timeout = int(self.base_config.get("timeout", 1800))
         self._dpi = int(self.base_config.get("dpi", 150))
-        self._max_pages = int(self.base_config.get("max_pages", 30))
+        self._max_pages = int(self.base_config.get("max_pages", 100))
         self._max_tokens = int(self.base_config.get("max_tokens", 100000))
         self._temperature = float(self.base_config.get("temperature", 0.2))
         self._enable_thinking = bool(self.base_config.get("enable_thinking", False))
@@ -266,7 +233,12 @@ class NuExtract3ExtractProvider(Provider):
     # API call
     # ------------------------------------------------------------------
 
-    async def _extract_async(self, images_b64: list[str], template: dict[str, Any]) -> dict[str, Any]:
+    async def _extract_async(
+        self,
+        images_b64: list[str],
+        template: dict[str, Any],
+        instructions: str,
+    ) -> dict[str, Any]:
         api_url = f"{self._server_url.rstrip('/')}/v1/chat/completions"
 
         content = [{"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}"}} for b64 in images_b64]
@@ -280,6 +252,7 @@ class NuExtract3ExtractProvider(Provider):
             # (vLLM OpenAI extension — top-level request field).
             "chat_template_kwargs": {
                 "template": json.dumps(template),
+                "instructions": instructions,
                 "enable_thinking": self._enable_thinking,
             },
         }
@@ -313,6 +286,7 @@ class NuExtract3ExtractProvider(Provider):
         return {
             "content": str(raw_content),
             "template": template,
+            "instructions": instructions,
             "_config": {
                 "server_url": self._server_url,
                 "model": self._model,
@@ -335,13 +309,13 @@ class NuExtract3ExtractProvider(Provider):
         if not file_path.exists():
             raise ProviderPermanentError(f"File not found: {file_path}")
 
-        template = _json_schema_to_nuextract_template(request.schema_override)
+        template, instructions = _json_schema_to_nuextract_template_and_instructions(request.schema_override)
         if not isinstance(template, dict):
             raise ProviderPermanentError("Top-level schema must be an object (produced a non-dict template)")
 
         try:
             images_b64 = self._render_images_b64(file_path)
-            raw_output = asyncio.run(self._extract_async(images_b64, template))
+            raw_output = asyncio.run(self._extract_async(images_b64, template, instructions))
 
             completed_at = datetime.now()
             latency_ms = int((completed_at - started_at).total_seconds() * 1000)

@@ -48,6 +48,7 @@ runners = [
     "infinity-parser2>=0.3.0",
     "landingai-ade>=1.4.0",
     "llama-cloud>=1.4.1",
+    "numind>=0.3.2",
     "openai>=1.0.0",
     "pdf2image>=1.16.0",
     "pillow>=10.0.0",
