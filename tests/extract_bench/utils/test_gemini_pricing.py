@@ -24,4 +24,3 @@ def test_gemini_context_cache_pricing_3_7_flash() -> None:
 
 def test_gemini_context_cache_pricing_3_6_flash() -> None:
     assert gemini_context_cache_pricing_per_million("gemini-3.6-flash") == (0.15, 1.00)
-
