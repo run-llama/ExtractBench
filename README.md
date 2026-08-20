@@ -33,11 +33,11 @@ Models and prices reflect each provider's official documentation as of July 1, 2
 | 7 | LlamaExtract Cost-Effective | LlamaExtract | 86.78 | 90.77 | 80.12 | 69.17 | 1.00¢ |
 | 8 | Extend (Max Context) | Specialized APIs | 86.29 | 91.98 | 78.78 | 51.33 | 10.00¢ |
 | 9 | Datalab (Accurate + Balanced) | Specialized APIs | 85.70 | 89.40 | 85.08 | 42.04 | 3.50¢ |
-| 10 | Google Gemini 3.5 Flash | Commercial VLM | 79.84 | 87.87 | 69.76 | 27.90 | 1.00¢ |
-| 11 | Lift Datalab 9B | OSS | 77.31 | 87.17 | 62.59 | 25.26 | — |
-| 12 | OpenAI GPT-5.4 Nano | Commercial VLM | 74.90 | 77.43 | 76.37 | 35.81 | 0.21¢ |
-| 13 | Gemma4 26B | OSS | 66.24 | 80.55 | 40.47 | 12.16 | — |
-| 14 | NuExtract3 | OSS | 47.93 | 54.36 | 39.34 | 8.95 | — |
+| 10 | NuExtract3 | OSS | 82.35 | 88.06 | 76.76 | 37.72 | — |
+| 11 | Google Gemini 3.5 Flash | Commercial VLM | 79.84 | 87.87 | 69.76 | 27.90 | 1.00¢ |
+| 12 | Lift Datalab 9B | OSS | 77.31 | 87.17 | 62.59 | 25.26 | — |
+| 13 | OpenAI GPT-5.4 Nano | Commercial VLM | 74.90 | 77.43 | 76.37 | 35.81 | 0.21¢ |
+| 14 | Gemma4 26B | OSS | 66.24 | 80.55 | 40.47 | 12.16 | — |
 <!-- LEADERBOARD:END -->
 
 <!-- GROUNDING:START -->
