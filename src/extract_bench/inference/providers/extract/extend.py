@@ -8,9 +8,10 @@ import hashlib
 import json
 import os
 import threading
+import time
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from extend_ai import Extend
 from extend_ai.core.api_error import ApiError
@@ -338,6 +339,23 @@ class ExtendProvider(Provider):
         self._processor_name_prefix = self.base_config.get("processor_name_prefix", "bench_")
         timeout = self.base_config.get("timeout", 300)
 
+        # Async run mode. When enabled, the processor run is created WITHOUT
+        # sync=True and we poll the get endpoint until it reaches a terminal
+        # status. This sidesteps two problems with the synchronous path:
+        #   1. Extend's sync API has a hard 5-minute server cap, so any run
+        #      slower than that can never return a result synchronously.
+        #   2. A sync call that outlives the client timeout raises a client-side
+        #      ReadTimeout, which the harness treats as transient and retries —
+        #      and every retry re-uploads and starts a NEW billed run
+        #      server-side while the original keeps running. One slow document
+        #      can be billed several times and still be recorded as a failure.
+        # Polling a single created run to completion fixes both, and transient
+        # errors while polling re-poll the SAME run instead of creating another.
+        # Enabled per-pipeline via config {"async_run": true}.
+        self._async_run = bool(self.base_config.get("async_run", False))
+        self._async_poll_interval = float(self.base_config.get("async_poll_interval", 5.0))
+        self._async_max_poll_errors = int(self.base_config.get("async_max_poll_errors", 15))
+
         # Initialize the Extend client
         client_kwargs: dict[str, Any] = {
             "token": api_key,
@@ -575,6 +593,42 @@ class ExtendProvider(Provider):
             self._processor_cache[config_hash] = processor_id
             return processor_id
 
+    @staticmethod
+    def _run_response_to_dict(run_response: Any) -> dict[str, Any]:
+        """Convert an SDK processor-run response into a plain dict for storage.
+
+        Both the sync create response and the async get response are
+        ProcessorRun*Response models carrying a top-level ``processor_run``,
+        so normalize()'s ``processor_run.output.value`` lookup works either way.
+        """
+        if hasattr(run_response, "model_dump"):
+            return cast(dict[str, Any], run_response.model_dump())
+        elif hasattr(run_response, "dict"):
+            return cast(dict[str, Any], run_response.dict())
+        elif isinstance(run_response, dict):
+            return run_response
+        # Try to extract attributes manually
+        result: dict[str, Any] = {}
+        for attr in [
+            "id",
+            "status",
+            "output",
+            "extracted_data",
+            "extractedData",
+            "data",
+            "result",
+            "error",
+            "processorId",
+            "fileId",
+            "processor_run",
+            "success",
+        ]:
+            if hasattr(run_response, attr):
+                value = getattr(run_response, attr)
+                if not callable(value):
+                    result[attr] = value
+        return result
+
     def _run_processor(self, processor_id: str, file_id: str) -> dict[str, Any]:
         """
         Run a processor on a file synchronously.
@@ -590,34 +644,7 @@ class ExtendProvider(Provider):
                 file={"fileId": file_id},  # type: ignore[arg-type]
                 sync=True,  # Synchronous processing - waits for completion
             )
-
-            # Convert response to dict for storage
-            if hasattr(run_response, "model_dump"):
-                return run_response.model_dump()
-            elif hasattr(run_response, "dict"):
-                return run_response.dict()
-            elif isinstance(run_response, dict):
-                return run_response
-            else:
-                # Try to extract attributes manually
-                result: dict[str, Any] = {}
-                for attr in [
-                    "id",
-                    "status",
-                    "output",
-                    "extracted_data",
-                    "extractedData",
-                    "data",
-                    "result",
-                    "error",
-                    "processorId",
-                    "fileId",
-                ]:
-                    if hasattr(run_response, attr):
-                        value = getattr(run_response, attr)
-                        if not callable(value):
-                            result[attr] = value
-                return result
+            return self._run_response_to_dict(run_response)
 
         except ApiError as e:
             self._handle_api_error(e, "processor run")
@@ -627,6 +654,100 @@ class ExtendProvider(Provider):
             if any(kw in error_str for kw in ["timeout", "timed out", "connection", "network", "readtimeout"]):
                 raise ProviderTransientError(f"Transient error during processor run: {e}") from e
             raise ProviderPermanentError(f"Unexpected error during processor run: {e}") from e
+
+    @staticmethod
+    def _extract_run_id(create_response: Any) -> str | None:
+        """Pull the processor-run id out of an async create response."""
+        run = getattr(create_response, "processor_run", None)
+        run_id = getattr(run, "id", None)
+        if run_id:
+            return str(run_id)
+        if isinstance(create_response, dict):
+            run_obj = create_response.get("processor_run") or create_response.get("processorRun") or {}
+            if isinstance(run_obj, dict) and run_obj.get("id"):
+                return str(run_obj["id"])
+        return None
+
+    def _run_processor_async(self, processor_id: str, file_id: str) -> dict[str, Any]:
+        """
+        Run a processor asynchronously: create the run, then poll to completion.
+
+        Unlike the sync path this imposes no client-side wall clock on the
+        extraction — it polls the get endpoint until the run reaches a terminal
+        status. Transient errors while polling re-poll the SAME run rather than
+        creating a new (billed) one, and a terminal FAILED/CANCELLED is a
+        permanent error so the harness does not retry into a fresh billed run.
+
+        :param processor_id: ID of the processor to run
+        :param file_id: ID of the uploaded file
+        :return: Raw get-response for the completed run
+        :raises ProviderError: For any run errors
+        """
+        # Step 1: create the run (async — returns immediately with PROCESSING)
+        try:
+            create_response = self._client.processor_run.create(
+                processor_id=processor_id,
+                file={"fileId": file_id},  # type: ignore[arg-type]
+                sync=False,  # Asynchronous — poll for completion below
+            )
+        except ApiError as e:
+            self._handle_api_error(e, "processor run create")
+            raise  # Should not reach here, but satisfies type checker
+        except Exception as e:
+            error_str = str(e).lower()
+            if any(kw in error_str for kw in ["timeout", "timed out", "connection", "network", "readtimeout"]):
+                raise ProviderTransientError(f"Transient error during processor run create: {e}") from e
+            raise ProviderPermanentError(f"Unexpected error during processor run create: {e}") from e
+
+        run_id = self._extract_run_id(create_response)
+        if not run_id:
+            raise ProviderPermanentError(f"No processor run id in async create response: {create_response}")
+
+        # Step 2: poll until terminal. No overall deadline by design — a slow
+        # run is allowed to finish. `consecutive_poll_errors` only guards
+        # against a persistently unreachable polling channel, never against a
+        # legitimately long extraction.
+        consecutive_poll_errors = 0
+        while True:
+            time.sleep(self._async_poll_interval)
+            try:
+                get_response = self._client.processor_run.get(id=run_id)
+                consecutive_poll_errors = 0
+            except ApiError as e:
+                status_code = getattr(e, "status_code", None)
+                # A hiccup polling an already-created run must NOT spawn a new
+                # billed run — swallow retriable statuses and keep polling.
+                if status_code == 429 or status_code in (500, 502, 503, 504):
+                    consecutive_poll_errors += 1
+                    if consecutive_poll_errors > self._async_max_poll_errors:
+                        self._handle_api_error(e, "processor run poll")
+                    time.sleep(self._async_poll_interval * 2)
+                    continue
+                self._handle_api_error(e, "processor run poll")
+                raise  # Should not reach here, but satisfies type checker
+            except Exception as e:
+                error_str = str(e).lower()
+                if any(kw in error_str for kw in ["timeout", "timed out", "connection", "network", "readtimeout"]):
+                    consecutive_poll_errors += 1
+                    if consecutive_poll_errors > self._async_max_poll_errors:
+                        raise ProviderTransientError(f"Transient error while polling processor run: {e}") from e
+                    time.sleep(self._async_poll_interval * 2)
+                    continue
+                raise ProviderPermanentError(f"Unexpected error while polling processor run: {e}") from e
+
+            run = getattr(get_response, "processor_run", None)
+            status = str(getattr(run, "status", "") or "")
+            if status == "PROCESSED":
+                return self._run_response_to_dict(get_response)
+            if status in ("FAILED", "CANCELLED"):
+                reason = getattr(run, "failure_reason", None)
+                message = getattr(run, "failure_message", None)
+                detail = " ".join(part for part in (reason, message) if part).strip()
+                raise ProviderPermanentError(
+                    f"Extend processor run {run_id} ended with status {status}"
+                    + (f": {detail}" if detail else "")
+                )
+            # PENDING / PROCESSING / unrecognized → keep polling.
 
     def _extract_document(
         self,
@@ -655,8 +776,11 @@ class ExtendProvider(Provider):
         # Step 3: Get or create processor for this config
         processor_id = self._get_or_create_processor(processor_config)
 
-        # Step 4: Run processor synchronously
-        result = self._run_processor(processor_id, file_id)
+        # Step 4: Run processor (async poll-to-completion, or sync per config)
+        if self._async_run:
+            result = self._run_processor_async(processor_id, file_id)
+        else:
+            result = self._run_processor(processor_id, file_id)
 
         # Add metadata (including schema adaptation info for normalization)
         result["_extend_metadata"] = {

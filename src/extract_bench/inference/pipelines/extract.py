@@ -254,12 +254,19 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
         )
     )
 
+    # Runs via Extend's async API (create + poll) rather than sync=True. The
+    # large_array_max_context multi-pass is exactly the workload that outlives
+    # the synchronous 5-minute cap; the sync path's client-timeout -> retry loop
+    # would start a fresh billed run per attempt, so long documents timed out
+    # and were recorded as failures. Polling a single created run to completion
+    # removes both the wall-clock cap and the re-billing.
     register_fn(
         _pipeline_spec(
             pipeline_name="extend_extract_max",
             provider_name="extend",
             config={
                 "baseProcessor": "extraction_performance",
+                "async_run": True,
                 "advancedOptions": {
                     "citationsEnabled": True,
                     "advancedFigureParsingEnabled": True,

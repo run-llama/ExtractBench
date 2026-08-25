@@ -28,10 +28,10 @@ Models and prices reflect each provider's official documentation as of July 1, 2
 | 2 | Codex (GPT-5.5) | Coding Agents | <u>93.57</u> | <u>95.68</u> | <u>91.15</u> | 78.88 | 27.83¢ |
 | 3 | Reducto Deep Extract | Specialized APIs | 90.44 | 94.20 | 80.47 | <u>92.01</u> | 34.44¢ |
 | 4 | LlamaExtract Agentic | LlamaExtract | 89.55 | 92.03 | 85.41 | 78.62 | 3.12¢ |
-| 5 | Qwen3.6 35B | OSS | 87.33 | 93.11 | 84.85 | 26.75 | — |
-| 6 | Claude Code (Opus 4.8) | Coding Agents | 87.09 | 90.08 | 79.21 | 88.07 | 16.17¢ |
-| 7 | LlamaExtract Cost-Effective | LlamaExtract | 86.78 | 90.77 | 80.12 | 69.17 | 1.00¢ |
-| 8 | Extend (Max Context) | Specialized APIs | 86.29 | 91.98 | 78.78 | 51.33 | 10.00¢ |
+| 5 | Extend (Max Context) | Specialized APIs | 88.62 | 92.32 | 78.75 | 90.46 | 10.00¢ |
+| 6 | Qwen3.6 35B | OSS | 87.33 | 93.11 | 84.85 | 26.75 | — |
+| 7 | Claude Code (Opus 4.8) | Coding Agents | 87.09 | 90.08 | 79.21 | 88.07 | 16.17¢ |
+| 8 | LlamaExtract Cost-Effective | LlamaExtract | 86.78 | 90.77 | 80.12 | 69.17 | 1.00¢ |
 | 9 | Datalab (Accurate + Balanced) | Specialized APIs | 85.70 | 89.40 | 85.08 | 42.04 | 3.50¢ |
 | 10 | Google Gemini 3.5 Flash | Commercial VLM | 79.84 | 87.87 | 69.76 | 27.90 | 1.00¢ |
 | 11 | Lift Datalab 9B | OSS | 77.31 | 87.17 | 62.59 | 25.26 | — |
@@ -53,7 +53,7 @@ Models and prices reflect each provider's official documentation as of July 1, 2
     <tr><td align="right">2</td><td>LlamaExtract Agentic</td><td align="right"><u>44.14</u></td><td align="right">42.30</td><td align="right"><u>50.47</u></td><td align="right"><u>45.68</u></td><td align="right">66.12</td><td align="right">69.73</td><td align="right">56.59</td><td align="right"><u>67.60</u></td></tr>
     <tr><td align="right">3</td><td>Reducto Deep Extract</td><td align="right">43.30</td><td align="right"><u>42.84</u></td><td align="right">45.57</td><td align="right">41.13</td><td align="right"><u>71.71</u></td><td align="right"><u>72.60</u></td><td align="right"><u>70.42</u></td><td align="right">67.28</td></tr>
     <tr><td align="right">4</td><td>LlamaExtract Cost-Effective</td><td align="right">40.43</td><td align="right">40.20</td><td align="right">42.30</td><td align="right">36.67</td><td align="right">64.15</td><td align="right">68.90</td><td align="right">53.73</td><td align="right">56.55</td></tr>
-    <tr><td align="right">5</td><td>Extend (Max Context)</td><td align="right">25.08</td><td align="right">33.91</td><td align="right">0.20</td><td align="right">0.02</td><td align="right">48.87</td><td align="right">61.71</td><td align="right">27.68</td><td align="right">0.02</td></tr>
+    <tr><td align="right">5</td><td>Extend (Max Context)</td><td align="right">25.20</td><td align="right">33.93</td><td align="right">0.21</td><td align="right">0.02</td><td align="right">49.04</td><td align="right">61.71</td><td align="right">27.68</td><td align="right">0.03</td></tr>
     <tr><td align="right">6</td><td>Datalab (Accurate + Balanced)</td><td align="right">2.02</td><td align="right">2.67</td><td align="right">0.24</td><td align="right">0.00</td><td align="right">48.50</td><td align="right">56.90</td><td align="right">38.55</td><td align="right">0.01</td></tr>
     <tr><td align="right">—</td><td><em>All 8 other systems</em></td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td></tr>
   </tbody>
