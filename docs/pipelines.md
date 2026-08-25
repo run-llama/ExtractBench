@@ -47,6 +47,7 @@ uv run extract-bench run <pipeline_name>
 | `kimi_vl_a3b_vllm_extract_oneshot_structured_output_file` | Self-hosted vLLM | Kimi-VL-A3B-Instruct, json_object mode; requires `KIMI_VL_SERVER_URL` |
 | `glm_4_6v_flash_vllm_extract_oneshot_structured_output_file` | Self-hosted vLLM | GLM-4.6V-Flash, json_object mode; requires `GLM_4_6V_SERVER_URL` |
 | `qwen3_8_27b_fp8_vllm_extract_oneshot_structured_output_file` | Self-hosted vLLM | Qwen3.8-27B-FP8, json_object mode; requires `QWEN3_8_27B_SERVER_URL` |
+| `qwen3_5_2b_vllm_extract_oneshot_structured_output_file` | Self-hosted vLLM | Qwen3.5-2B, json_object mode; requires `QWEN3_5_2B_SERVER_URL` |
 | `nuextract3_extract` | Self-hosted vLLM | schema converted to a NuExtract template; requires `NUEXTRACT3_SERVER_URL` |
 
 ## Parse Pipelines
