@@ -40,6 +40,7 @@ uv run extract-bench run <pipeline_name>
 | `internvl3_5_8b_vllm_extract_oneshot_structured_output_file` | Self-hosted vLLM | InternVL3.5-8B, json_object mode; requires `INTERNVL35_8B_SERVER_URL` |
 | `internvl3_5_14b_vllm_extract_oneshot_structured_output_file` | Self-hosted vLLM | InternVL3.5-14B, json_object mode; requires `INTERNVL35_14B_SERVER_URL` |
 | `minicpm_v_4_5_vllm_extract_oneshot_structured_output_file` | Self-hosted vLLM | MiniCPM-V-4.5, json_object mode; requires `MINICPM_V_SERVER_URL` |
+| `qwen3_5_35b_a3b_fp8_vllm_extract_oneshot_structured_output_file` | Self-hosted vLLM | Qwen3.5-35B-A3B-FP8, json_object mode; requires `QWEN3_5_35B_SERVER_URL` |
 | `nuextract3_extract` | Self-hosted vLLM | schema converted to a NuExtract template; requires `NUEXTRACT3_SERVER_URL` |
 
 ## Parse Pipelines

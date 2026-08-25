@@ -29,19 +29,20 @@ Models and prices reflect each provider's official documentation as of July 1, 2
 | 3 | Reducto Deep Extract | Specialized APIs | 90.44 | 94.20 | 80.47 | <u>92.01</u> | 34.44¢ |
 | 4 | LlamaExtract Agentic | LlamaExtract | 89.55 | 92.03 | 85.41 | 78.62 | 3.12¢ |
 | 5 | Extend (Max Context) | Specialized APIs | 88.62 | 92.32 | 78.75 | 90.46 | 10.00¢ |
-| 6 | Qwen3.6 35B | OSS | 87.33 | 93.11 | 84.85 | 26.75 | — |
-| 7 | Claude Code (Opus 4.8) | Coding Agents | 87.09 | 90.08 | 79.21 | 88.07 | 16.17¢ |
-| 8 | LlamaExtract Cost-Effective | LlamaExtract | 86.78 | 90.77 | 80.12 | 69.17 | 1.00¢ |
-| 9 | Datalab (Accurate + Balanced) | Specialized APIs | 85.70 | 89.40 | 85.08 | 42.04 | 3.50¢ |
-| 10 | NuExtract3 | OSS | 82.35 | 88.06 | 76.76 | 37.72 | — |
-| 11 | Google Gemini 3.5 Flash | Commercial VLM | 79.84 | 87.87 | 69.76 | 27.90 | 1.00¢ |
-| 12 | Lift Datalab 9B | OSS | 77.31 | 87.17 | 62.59 | 25.26 | — |
-| 13 | OpenAI GPT-5.4 Nano | Commercial VLM | 74.90 | 77.43 | 76.37 | 35.81 | 0.21¢ |
-| 14 | InternVL3.5 14B | OSS | 66.35 | 80.70 | 39.04 | 19.41 | — |
-| 15 | Gemma4 26B | OSS | 66.24 | 80.55 | 40.47 | 12.16 | — |
-| 16 | InternVL3.5 8B | OSS | 64.63 | 79.26 | 36.62 | 17.57 | — |
-| 17 | NuExtract 2.0 8B | OSS | 49.42 | 62.92 | 23.50 | 6.39 | — |
-| 18 | MiniCPM-V 4.5 | OSS | 45.85 | 57.39 | 25.30 | 1.13 | — |
+| 6 | Qwen3.5 35B | OSS | 88.00 | 93.52 | 85.27 | 31.73 | — |
+| 7 | Qwen3.6 35B | OSS | 87.33 | 93.11 | 84.85 | 26.75 | — |
+| 8 | Claude Code (Opus 4.8) | Coding Agents | 87.09 | 90.08 | 79.21 | 88.07 | 16.17¢ |
+| 9 | LlamaExtract Cost-Effective | LlamaExtract | 86.78 | 90.77 | 80.12 | 69.17 | 1.00¢ |
+| 10 | Datalab (Accurate + Balanced) | Specialized APIs | 85.70 | 89.40 | 85.08 | 42.04 | 3.50¢ |
+| 11 | NuExtract3 | OSS | 82.35 | 88.06 | 76.76 | 37.72 | — |
+| 12 | Google Gemini 3.5 Flash | Commercial VLM | 79.84 | 87.87 | 69.76 | 27.90 | 1.00¢ |
+| 13 | Lift Datalab 9B | OSS | 77.31 | 87.17 | 62.59 | 25.26 | — |
+| 14 | OpenAI GPT-5.4 Nano | Commercial VLM | 74.90 | 77.43 | 76.37 | 35.81 | 0.21¢ |
+| 15 | InternVL3.5 14B | OSS | 66.35 | 80.70 | 39.04 | 19.41 | — |
+| 16 | Gemma4 26B | OSS | 66.24 | 80.55 | 40.47 | 12.16 | — |
+| 17 | InternVL3.5 8B | OSS | 64.63 | 79.26 | 36.62 | 17.57 | — |
+| 18 | NuExtract 2.0 8B | OSS | 49.42 | 62.92 | 23.50 | 6.39 | — |
+| 19 | MiniCPM-V 4.5 | OSS | 45.85 | 57.39 | 25.30 | 1.13 | — |
 <!-- LEADERBOARD:END -->
 
 <!-- GROUNDING:START -->
@@ -59,7 +60,7 @@ Models and prices reflect each provider's official documentation as of July 1, 2
     <tr><td align="right">4</td><td>LlamaExtract Cost-Effective</td><td align="right">40.43</td><td align="right">40.20</td><td align="right">42.30</td><td align="right">36.67</td><td align="right">64.15</td><td align="right">68.90</td><td align="right">53.73</td><td align="right">56.55</td></tr>
     <tr><td align="right">5</td><td>Extend (Max Context)</td><td align="right">25.20</td><td align="right">33.93</td><td align="right">0.21</td><td align="right">0.02</td><td align="right">49.04</td><td align="right">61.71</td><td align="right">27.68</td><td align="right">0.03</td></tr>
     <tr><td align="right">6</td><td>Datalab (Accurate + Balanced)</td><td align="right">2.02</td><td align="right">2.67</td><td align="right">0.24</td><td align="right">0.00</td><td align="right">48.50</td><td align="right">56.90</td><td align="right">38.55</td><td align="right">0.01</td></tr>
-    <tr><td align="right">—</td><td><em>All 12 other systems</em></td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td></tr>
+    <tr><td align="right">—</td><td><em>All 13 other systems</em></td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td></tr>
   </tbody>
 </table>
 <!-- GROUNDING:END -->
