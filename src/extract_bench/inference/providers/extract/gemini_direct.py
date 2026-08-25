@@ -38,6 +38,8 @@ _GEMINI_EXTRACT_PRICING_PER_M: dict[str, tuple[float, float]] = {
     "gemini-3-flash": (0.50, 3.00),
     "gemini-3.1-flash-lite": (0.25, 1.50),
     "gemini-3.5-flash": (1.50, 9.00),
+    "gemini-3.6-flash": (1.50, 7.50),
+    "gemini-3.7-flash": (0.75, 3.75),
 }
 
 
@@ -69,7 +71,7 @@ class GeminiDirectExtractProvider(Provider):
         self._system_prompt: str = self.base_config.get("system_prompt", DEFAULT_SYSTEM_PROMPT)
         self._user_instruction: str = self.base_config.get("user_instruction", DEFAULT_USER_INSTRUCTION)
         self._max_cost_usd: float | None = self.base_config.get("max_cost_usd")
-        max_tokens_cfg = self.base_config.get("max_tokens")
+        max_tokens_cfg = self.base_config.get("max_tokens", 65536)
         self._max_tokens: int | None = int(max_tokens_cfg) if max_tokens_cfg is not None else None
         self._thinking_level: str | None = self.base_config.get("thinking_level")
 

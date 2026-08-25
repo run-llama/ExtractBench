@@ -138,6 +138,43 @@ def _cell_match(
 _UNHASHABLE = object()
 
 
+def _eq_key(value: Any) -> Any:
+    """Hashable snapshot of Python ``==`` for intern (not the string-cell rule).
+
+    JSON containers freeze to tagged tuples so intern keys stay plain hashable
+    values (no FrozenDict) and JSON-dump after replacing tuples with lists:
+    lists as ``("l", items...)`` in order, dicts as ``("d", sorted (key, value)
+    pairs)`` because ``dict ==`` is key-order independent. Nested strings stay
+    exact: ``["Moscow "]`` and ``["Moscow"]`` are different keys. The top-level
+    string branch of ``_cell_key`` still whitespace-folds. Anything that cannot
+    freeze (mixed incomparable dict keys, a set, ...) stays ``_UNHASHABLE`` so
+    that column falls back to pairwise compare.
+    """
+    if isinstance(value, list):
+        parts = tuple(_eq_key(item) for item in value)
+        if any(part is _UNHASHABLE for part in parts):
+            return _UNHASHABLE
+        return ("l", parts)
+    if isinstance(value, dict):
+        items: list[tuple[Any, Any]] = []
+        for key, item in value.items():
+            frozen_key = _eq_key(key)
+            frozen_item = _eq_key(item)
+            if frozen_key is _UNHASHABLE or frozen_item is _UNHASHABLE:
+                return _UNHASHABLE
+            items.append((frozen_key, frozen_item))
+        try:
+            items.sort()
+        except TypeError:
+            return _UNHASHABLE
+        return ("d", tuple(items))
+    try:
+        hash(value)
+    except TypeError:
+        return _UNHASHABLE
+    return ("v", value)
+
+
 def _cell_key(value: Any, field_schema: Any = None) -> Any:
     """Hashable interning key that mirrors ``_cell_match`` for non-fuzzy fields.
 
@@ -145,9 +182,10 @@ def _cell_key(value: Any, field_schema: Any = None) -> Any:
     whitespace-insensitively, everything else by ``==``). Strings are tagged
     apart from non-strings so a normalized string can never collide with a
     look-alike scalar, exactly as ``_cell_match`` keeps its str/str branch
-    distinct from the ``==`` fallback. Returns ``_UNHASHABLE`` for values that
-    cannot be interned (e.g. list/dict cells) -> caller scores that column
-    pairwise instead.
+    distinct from the ``==`` fallback. List and dict cells freeze to tagged
+    tuples of exact nested values so opaque JSON arrays and objects intern
+    the same way scalars already do. Returns ``_UNHASHABLE`` when a cell still
+    cannot be interned -> caller scores that column pairwise.
 
     When ``field_schema`` is a nullable-numeric shape, ``0`` / ``0.0`` collapse
     to ``None`` in the key so that null-vs-zero cells intern to the same slot,
@@ -157,6 +195,8 @@ def _cell_key(value: Any, field_schema: Any = None) -> Any:
         return ("s", _normalize_ws(value))
     if _is_nullable_numeric_field(field_schema):
         value = _normalize_nullable_numeric(value)
+    if isinstance(value, (list, dict)):
+        return _eq_key(value)
     try:
         hash(value)
     except TypeError:
@@ -174,8 +214,8 @@ def _intern_field(
 
     Equal cells (per ``_cell_match``) receive the same id, so a single
     broadcasted integer ``!=`` reproduces the per-pair mismatch test while
-    normalizing each cell once instead of once per pair. Returns ``None`` if any
-    cell is unhashable (caller falls back to pairwise for this field).
+    normalizing each cell once, not once per pair. Returns ``None`` if any
+    cell cannot be interned so the caller scores that column pairwise.
     """
     keymap: dict[Any, int] = {}
     out: list[np.ndarray] = []

@@ -322,8 +322,26 @@ def test_public_extract_pipelines_registered() -> None:
     assert openai_oneshot.provider_name == "openai_extract"
     assert openai_oneshot.config["model"] == "gpt-5.4"
 
-    gemini = get_pipeline("gemini_3_5_flash_extract_oneshot_structured_output_file")
-    assert gemini.provider_name == "gemini_extract"
+    gemini_3_5 = get_pipeline("gemini_3_5_flash_extract_oneshot_structured_output_file")
+    assert gemini_3_5.provider_name == "gemini_extract"
+
+    gemini_3_6 = get_pipeline("gemini_3_6_flash_extract_oneshot_structured_output_file")
+    assert gemini_3_6.provider_name == "gemini_extract"
+    assert gemini_3_6.config["model"] == "gemini-3.6-flash"
+    assert gemini_3_6.config["thinking_level"] == "medium"
+
+    gemini_3_7 = get_pipeline("gemini_3_7_flash_extract_oneshot_structured_output_file")
+    assert gemini_3_7.provider_name == "gemini_extract"
+    assert gemini_3_7.config["model"] == "gemini-3.7-flash"
+    assert gemini_3_7.config["thinking_level"] == "medium"
+
+    gemini_3_6_twostage = get_pipeline("gemini_3_6_flash_extract_twostage_parse_agentic_structured_output_text")
+    assert gemini_3_6_twostage.provider_name == "gemini_extract"
+    assert gemini_3_6_twostage.config["model"] == "gemini-3.6-flash"
+
+    gemini_3_7_twostage = get_pipeline("gemini_3_7_flash_extract_twostage_parse_agentic_structured_output_text")
+    assert gemini_3_7_twostage.provider_name == "gemini_extract"
+    assert gemini_3_7_twostage.config["model"] == "gemini-3.7-flash"
 
     twostage = get_pipeline("openai_gpt_5_4_extract_twostage_parse_agentic_structured_output_text")
     assert twostage.config["input_mode"] == "parsed_text"
