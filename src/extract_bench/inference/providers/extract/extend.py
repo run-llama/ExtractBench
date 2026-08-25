@@ -744,8 +744,7 @@ class ExtendProvider(Provider):
                 message = getattr(run, "failure_message", None)
                 detail = " ".join(part for part in (reason, message) if part).strip()
                 raise ProviderPermanentError(
-                    f"Extend processor run {run_id} ended with status {status}"
-                    + (f": {detail}" if detail else "")
+                    f"Extend processor run {run_id} ended with status {status}" + (f": {detail}" if detail else "")
                 )
             # PENDING / PROCESSING / unrecognized → keep polling.
 
