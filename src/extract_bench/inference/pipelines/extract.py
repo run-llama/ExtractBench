@@ -394,6 +394,30 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
         )
     )
 
+    # Additional open-weight VLMs, same one-shot vLLM contract as qwen/gemma
+    # above (rasterize pages -> schema in prompt -> json_object). Each reads its
+    # own deployment URL from the env var named below.
+    register_fn(
+        _pipeline_spec(
+            pipeline_name="nuextract_2_8b_vllm_extract_oneshot_structured_output_file",
+            provider_name="vllm_extract",
+            config={
+                "model": "nuextract-2-8b",
+                # numind/NuExtract-2.0-8B (Qwen2.5-VL extraction tune). 128k ctx.
+                "endpoint_env_var": "NUEXTRACT2_SERVER_URL",
+                "additional_properties_false": True,
+                # Large multi-page docs produce large JSON.
+                "max_tokens": 32768,
+                # Long documents decode for a while on small self-hosted GPUs.
+                "timeout_s": 3600,
+                # json_object (not full-schema guided decoding): compiling a
+                # full-schema grammar for the large extract schemas starves the
+                # GPU. Same reasoning as the gemma4 pipeline above.
+                "structured_output": False,
+            },
+        )
+    )
+
     # NuExtract3 extracts natively from a template rather than a JSON Schema;
     # the provider converts the schema before the call (NUEXTRACT3_SERVER_URL).
     register_fn(

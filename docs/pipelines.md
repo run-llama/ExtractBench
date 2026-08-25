@@ -36,6 +36,7 @@ uv run extract-bench run <pipeline_name>
 | `lift_extract` | Self-hosted lift SDK | requires `LIFT_ENDPOINT_URL` |
 | `qwen3_6_35b_a3b_fp8_vllm_extract_oneshot_structured_output_file` | Self-hosted vLLM | JSON Schema guided decoding; requires `QWEN35_SERVER_URL` |
 | `gemma4_26b_vllm_extract_oneshot_structured_output_file` | Self-hosted vLLM | JSON Schema guided decoding; requires `GEMMA4_SERVER_URL` |
+| `nuextract_2_8b_vllm_extract_oneshot_structured_output_file` | Self-hosted vLLM | NuExtract-2.0-8B, json_object mode; requires `NUEXTRACT2_SERVER_URL` |
 | `nuextract3_extract` | Self-hosted vLLM | schema converted to a NuExtract template; requires `NUEXTRACT3_SERVER_URL` |
 
 ## Parse Pipelines

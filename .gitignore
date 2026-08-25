@@ -216,6 +216,10 @@ scripts/build_hf_dataset.py
 CLAUDE.md
 .DS_Store
 
+# Internal research documentation and local working notes
+internal_docs/
+thoughts/
+
 # Local datasets and run artifacts
 data/
 !src/extract_bench/data/
