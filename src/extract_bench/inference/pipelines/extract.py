@@ -435,6 +435,23 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
         )
     )
 
+    register_fn(
+        _pipeline_spec(
+            pipeline_name="internvl3_5_14b_vllm_extract_oneshot_structured_output_file",
+            provider_name="vllm_extract",
+            config={
+                "model": "internvl3-5-14b",
+                # OpenGVLab/InternVL3_5-14B (InternVLChatModel).
+                "endpoint_env_var": "INTERNVL35_14B_SERVER_URL",
+                "additional_properties_false": True,
+                "dpi": 100,
+                "max_tokens": 32768,
+                "timeout_s": 3600,
+                "structured_output": False,
+            },
+        )
+    )
+
     # NuExtract3 extracts natively from a template rather than a JSON Schema;
     # the provider converts the schema before the call (NUEXTRACT3_SERVER_URL).
     register_fn(
