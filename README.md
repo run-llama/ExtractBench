@@ -38,7 +38,8 @@ Models and prices reflect each provider's official documentation as of July 1, 2
 | 12 | Lift Datalab 9B | OSS | 77.31 | 87.17 | 62.59 | 25.26 | — |
 | 13 | OpenAI GPT-5.4 Nano | Commercial VLM | 74.90 | 77.43 | 76.37 | 35.81 | 0.21¢ |
 | 14 | Gemma4 26B | OSS | 66.24 | 80.55 | 40.47 | 12.16 | — |
-| 15 | NuExtract 2.0 8B | OSS | 49.42 | 62.92 | 23.50 | 6.39 | — |
+| 15 | InternVL3.5 8B | OSS | 64.63 | 79.26 | 36.62 | 17.57 | — |
+| 16 | NuExtract 2.0 8B | OSS | 49.42 | 62.92 | 23.50 | 6.39 | — |
 <!-- LEADERBOARD:END -->
 
 <!-- GROUNDING:START -->
@@ -56,7 +57,7 @@ Models and prices reflect each provider's official documentation as of July 1, 2
     <tr><td align="right">4</td><td>LlamaExtract Cost-Effective</td><td align="right">40.43</td><td align="right">40.20</td><td align="right">42.30</td><td align="right">36.67</td><td align="right">64.15</td><td align="right">68.90</td><td align="right">53.73</td><td align="right">56.55</td></tr>
     <tr><td align="right">5</td><td>Extend (Max Context)</td><td align="right">25.20</td><td align="right">33.93</td><td align="right">0.21</td><td align="right">0.02</td><td align="right">49.04</td><td align="right">61.71</td><td align="right">27.68</td><td align="right">0.03</td></tr>
     <tr><td align="right">6</td><td>Datalab (Accurate + Balanced)</td><td align="right">2.02</td><td align="right">2.67</td><td align="right">0.24</td><td align="right">0.00</td><td align="right">48.50</td><td align="right">56.90</td><td align="right">38.55</td><td align="right">0.01</td></tr>
-    <tr><td align="right">—</td><td><em>All 9 other systems</em></td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td></tr>
+    <tr><td align="right">—</td><td><em>All 10 other systems</em></td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td></tr>
   </tbody>
 </table>
 <!-- GROUNDING:END -->
