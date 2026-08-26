@@ -566,6 +566,27 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
         )
     )
 
+    # GLM-4.6V-Flash is a GLM-V thinking model; the server keeps the final
+    # answer as message.content (reasoning is separated out).
+    register_fn(
+        _pipeline_spec(
+            pipeline_name="glm_4_6v_flash_vllm_extract_oneshot_structured_output_file",
+            provider_name="vllm_extract",
+            config={
+                "model": "glm-4.6v-flash",
+                # zai-org/GLM-4.6V-Flash. 131k native context.
+                "endpoint_env_var": "GLM_4_6V_SERVER_URL",
+                "additional_properties_false": True,
+                "dpi": 100,
+                # Large multi-page docs produce large JSON.
+                "max_tokens": 32768,
+                # Long documents decode for a while on small self-hosted GPUs.
+                "timeout_s": 3600,
+                "structured_output": False,
+            },
+        )
+    )
+
     # NuExtract3 extracts natively from a template rather than a JSON Schema;
     # the provider converts the schema before the call (NUEXTRACT3_SERVER_URL).
     register_fn(
