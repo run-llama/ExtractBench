@@ -679,6 +679,25 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
         )
     )
 
+    # Kimi K3 one-shot vision extract via Fireworks. Unlike the self-hosted vLLM
+    # one-shots above, Kimi is a hosted cloud VLM on Fireworks' OpenAI-compatible
+    # API (kimi_extract provider). Pages are rasterized and sent as images in one
+    # call; output is json_object because Kimi does not honor json_schema guided
+    # decoding on Fireworks, and Fireworks rejects PDF file inputs. max_tokens is
+    # Kimi's max output so a long-list doc is never truncated even with the
+    # model's default chain-of-thought; pricing is flat across the 1M context.
+    register_fn(
+        _pipeline_spec(
+            pipeline_name="kimi_k3_extract_oneshot_structured_output_file",
+            provider_name="kimi_extract",
+            config={
+                "model": "accounts/fireworks/models/kimi-k3",
+                "additional_properties_false": True,
+                "max_tokens": 131072,
+            },
+        )
+    )
+
     # NuExtract3 extracts natively from a template rather than a JSON Schema;
     # the provider converts the schema before the call (NUEXTRACT3_SERVER_URL).
     register_fn(
