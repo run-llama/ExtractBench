@@ -35,8 +35,8 @@ uv run extract-bench run <pipeline_name>
 | `landingai_extract` | LandingAI ADE | |
 | `datalab_parse_accurate_extract_fast` / `_balanced` | Datalab | accurate parse + fast or balanced extraction, JSON tree citations |
 | `lift_extract` | Self-hosted lift SDK | requires `LIFT_ENDPOINT_URL` |
-| `qwen3_6_35b_a3b_fp8_vllm_extract_oneshot_structured_output_file` | Self-hosted vLLM | JSON Schema guided decoding; requires `QWEN35_SERVER_URL` |
-| `gemma4_26b_vllm_extract_oneshot_structured_output_file` | Self-hosted vLLM | JSON Schema guided decoding; requires `GEMMA4_SERVER_URL` |
+| `qwen3_6_35b_a3b_fp8_vllm_extract_oneshot_structured_output_file` | Self-hosted vLLM | Qwen3.6-35B-A3B-FP8, json_object mode; requires `QWEN35_SERVER_URL` |
+| `gemma4_26b_vllm_extract_oneshot_structured_output_file` | Self-hosted vLLM | Gemma-4-26B-A4B, json_object mode; requires `GEMMA4_SERVER_URL` |
 | `nuextract_2_8b_vllm_extract_oneshot_structured_output_file` | Self-hosted vLLM | NuExtract-2.0-8B, json_object mode; requires `NUEXTRACT2_SERVER_URL` |
 | `internvl3_5_8b_vllm_extract_oneshot_structured_output_file` | Self-hosted vLLM | InternVL3.5-8B, json_object mode; requires `INTERNVL35_8B_SERVER_URL` |
 | `internvl3_5_14b_vllm_extract_oneshot_structured_output_file` | Self-hosted vLLM | InternVL3.5-14B, json_object mode; requires `INTERNVL35_14B_SERVER_URL` |

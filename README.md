@@ -30,17 +30,17 @@ Models and prices reflect each provider's official documentation as of July 1, 2
 | 4 | Qwen3.8 27B | OSS | 89.75 | 94.68 | 87.54 | 38.45 | — |
 | 5 | LlamaExtract Agentic | LlamaExtract | 89.55 | 92.03 | 85.41 | 78.62 | 3.12¢ |
 | 6 | Extend (Max Context) | Specialized APIs | 88.62 | 92.32 | 78.75 | 90.46 | 10.00¢ |
-| 7 | Qwen3.5 35B | OSS | 88.00 | 93.52 | 85.27 | 31.73 | — |
-| 8 | Qwen3.6 35B | OSS | 87.33 | 93.11 | 84.85 | 26.75 | — |
+| 7 | Qwen3.6 35B | OSS | 88.11 | 92.86 | 86.37 | 36.90 | — |
+| 8 | Qwen3.5 35B | OSS | 88.00 | 93.52 | 85.27 | 31.73 | — |
 | 9 | Claude Code (Opus 4.8) | Coding Agents | 87.09 | 90.08 | 79.21 | 88.07 | 16.17¢ |
 | 10 | LlamaExtract Cost-Effective | LlamaExtract | 86.78 | 90.77 | 80.12 | 69.17 | 1.00¢ |
 | 11 | Qwen3.5 9B | OSS | 86.10 | 92.31 | 81.12 | 32.22 | — |
 | 12 | Datalab (Accurate + Balanced) | Specialized APIs | 85.70 | 89.40 | 85.08 | 42.04 | 3.50¢ |
 | 13 | Kimi K3 | Commercial VLM | 83.17 | 94.64 | 69.64 | 4.99 | 6.75¢ |
-| 14 | Qwen3.5 4B | OSS | 83.01 | 88.92 | 77.94 | 33.40 | — |
-| 15 | NuExtract3 | OSS | 82.35 | 88.06 | 76.76 | 37.72 | — |
+| 14 | Qwen3.5 4B | OSS | 82.43 | 89.06 | 76.64 | 27.31 | — |
+| 15 | NuExtract3 | OSS | 81.02 | 86.41 | 77.01 | 32.71 | — |
 | 16 | Google Gemini 3.5 Flash | Commercial VLM | 79.84 | 87.87 | 69.76 | 27.90 | 1.00¢ |
-| 17 | Lift Datalab 9B | OSS | 77.31 | 87.17 | 62.59 | 25.26 | — |
+| 17 | Lift Datalab 9B | OSS | 78.43 | 87.64 | 65.69 | 24.78 | — |
 | 18 | OpenAI GPT-5.4 Nano | Commercial VLM | 74.90 | 77.43 | 76.37 | 35.81 | 0.21¢ |
 | 19 | Gemma4 E4B | OSS | 69.64 | 81.10 | 48.93 | 26.82 | — |
 | 20 | InternVL3.5 14B | OSS | 66.35 | 80.70 | 39.04 | 19.41 | — |
@@ -53,7 +53,7 @@ Models and prices reflect each provider's official documentation as of July 1, 2
 | 27 | Qwen3.5 0.8B | OSS | 46.63 | 57.44 | 26.98 | 6.65 | — |
 | 28 | MiniCPM-V 4.5 | OSS | 45.85 | 57.39 | 25.30 | 1.13 | — |
 | 29 | Gemma4 12B | OSS | 45.39 | 53.62 | 30.82 | 13.16 | — |
-| 30 | GLM-4.6V Flash | OSS | 41.76 | 47.31 | 32.71 | 16.16 | — |
+| 30 | GLM-4.6V Flash | OSS | 45.19 | 47.28 | 44.52 | 22.17 | — |
 <!-- LEADERBOARD:END -->
 
 <!-- GROUNDING:START -->

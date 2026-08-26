@@ -690,6 +690,8 @@ class VLLMExtractProvider(Provider):
                 "enginecore",
                 "internal server error",
                 "internalservererror",
+                "terminated by signal",
+                "lost track of input",
             )
             if any(keyword in error_str for keyword in transient_keywords):
                 raise ProviderTransientError(f"Transient error during vLLM extraction: {e}") from e
