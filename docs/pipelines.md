@@ -50,6 +50,7 @@ uv run extract-bench run <pipeline_name>
 | `qwen3_5_2b_vllm_extract_oneshot_structured_output_file` | Self-hosted vLLM | Qwen3.5-2B, json_object mode; requires `QWEN3_5_2B_SERVER_URL` |
 | `qwen3_5_0_8b_vllm_extract_oneshot_structured_output_file` | Self-hosted vLLM | Qwen3.5-0.8B, json_object mode; requires `QWEN3_5_0_8B_SERVER_URL` |
 | `gemma4_12b_vllm_extract_oneshot_structured_output_file` | Self-hosted vLLM | Gemma-4-12B, json_object mode; requires `GEMMA4_12B_SERVER_URL` |
+| `qwen3_5_4b_vllm_extract_oneshot_structured_output_file` | Self-hosted vLLM | Qwen3.5-4B, json_object mode; requires `QWEN3_5_4B_SERVER_URL` |
 | `nuextract3_extract` | Self-hosted vLLM | schema converted to a NuExtract template; requires `NUEXTRACT3_SERVER_URL` |
 
 ## Parse Pipelines

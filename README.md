@@ -36,22 +36,23 @@ Models and prices reflect each provider's official documentation as of July 1, 2
 | 10 | LlamaExtract Cost-Effective | LlamaExtract | 86.78 | 90.77 | 80.12 | 69.17 | 1.00¢ |
 | 11 | Qwen3.5 9B | OSS | 86.10 | 92.31 | 81.12 | 32.22 | — |
 | 12 | Datalab (Accurate + Balanced) | Specialized APIs | 85.70 | 89.40 | 85.08 | 42.04 | 3.50¢ |
-| 13 | NuExtract3 | OSS | 82.35 | 88.06 | 76.76 | 37.72 | — |
-| 14 | Google Gemini 3.5 Flash | Commercial VLM | 79.84 | 87.87 | 69.76 | 27.90 | 1.00¢ |
-| 15 | Lift Datalab 9B | OSS | 77.31 | 87.17 | 62.59 | 25.26 | — |
-| 16 | OpenAI GPT-5.4 Nano | Commercial VLM | 74.90 | 77.43 | 76.37 | 35.81 | 0.21¢ |
-| 17 | Gemma4 E4B | OSS | 69.64 | 81.10 | 48.93 | 26.82 | — |
-| 18 | InternVL3.5 14B | OSS | 66.35 | 80.70 | 39.04 | 19.41 | — |
-| 19 | Gemma4 26B | OSS | 66.24 | 80.55 | 40.47 | 12.16 | — |
-| 20 | InternVL3.5 8B | OSS | 64.63 | 79.26 | 36.62 | 17.57 | — |
-| 21 | Qwen3.5 2B | OSS | 63.40 | 71.22 | 50.93 | 25.93 | — |
-| 22 | Kimi-VL A3B | OSS | 57.77 | 69.86 | 34.61 | 18.94 | — |
-| 23 | Gemma4 E2B | OSS | 51.85 | 63.71 | 28.96 | 14.58 | — |
-| 24 | NuExtract 2.0 8B | OSS | 49.42 | 62.92 | 23.50 | 6.39 | — |
-| 25 | Qwen3.5 0.8B | OSS | 46.63 | 57.44 | 26.98 | 6.65 | — |
-| 26 | MiniCPM-V 4.5 | OSS | 45.85 | 57.39 | 25.30 | 1.13 | — |
-| 27 | Gemma4 12B | OSS | 45.39 | 53.62 | 30.82 | 13.16 | — |
-| 28 | GLM-4.6V Flash | OSS | 41.76 | 47.31 | 32.71 | 16.16 | — |
+| 13 | Qwen3.5 4B | OSS | 83.01 | 88.92 | 77.94 | 33.40 | — |
+| 14 | NuExtract3 | OSS | 82.35 | 88.06 | 76.76 | 37.72 | — |
+| 15 | Google Gemini 3.5 Flash | Commercial VLM | 79.84 | 87.87 | 69.76 | 27.90 | 1.00¢ |
+| 16 | Lift Datalab 9B | OSS | 77.31 | 87.17 | 62.59 | 25.26 | — |
+| 17 | OpenAI GPT-5.4 Nano | Commercial VLM | 74.90 | 77.43 | 76.37 | 35.81 | 0.21¢ |
+| 18 | Gemma4 E4B | OSS | 69.64 | 81.10 | 48.93 | 26.82 | — |
+| 19 | InternVL3.5 14B | OSS | 66.35 | 80.70 | 39.04 | 19.41 | — |
+| 20 | Gemma4 26B | OSS | 66.24 | 80.55 | 40.47 | 12.16 | — |
+| 21 | InternVL3.5 8B | OSS | 64.63 | 79.26 | 36.62 | 17.57 | — |
+| 22 | Qwen3.5 2B | OSS | 63.40 | 71.22 | 50.93 | 25.93 | — |
+| 23 | Kimi-VL A3B | OSS | 57.77 | 69.86 | 34.61 | 18.94 | — |
+| 24 | Gemma4 E2B | OSS | 51.85 | 63.71 | 28.96 | 14.58 | — |
+| 25 | NuExtract 2.0 8B | OSS | 49.42 | 62.92 | 23.50 | 6.39 | — |
+| 26 | Qwen3.5 0.8B | OSS | 46.63 | 57.44 | 26.98 | 6.65 | — |
+| 27 | MiniCPM-V 4.5 | OSS | 45.85 | 57.39 | 25.30 | 1.13 | — |
+| 28 | Gemma4 12B | OSS | 45.39 | 53.62 | 30.82 | 13.16 | — |
+| 29 | GLM-4.6V Flash | OSS | 41.76 | 47.31 | 32.71 | 16.16 | — |
 <!-- LEADERBOARD:END -->
 
 <!-- GROUNDING:START -->
@@ -69,7 +70,7 @@ Models and prices reflect each provider's official documentation as of July 1, 2
     <tr><td align="right">4</td><td>LlamaExtract Cost-Effective</td><td align="right">40.43</td><td align="right">40.20</td><td align="right">42.30</td><td align="right">36.67</td><td align="right">64.15</td><td align="right">68.90</td><td align="right">53.73</td><td align="right">56.55</td></tr>
     <tr><td align="right">5</td><td>Extend (Max Context)</td><td align="right">25.20</td><td align="right">33.93</td><td align="right">0.21</td><td align="right">0.02</td><td align="right">49.04</td><td align="right">61.71</td><td align="right">27.68</td><td align="right">0.03</td></tr>
     <tr><td align="right">6</td><td>Datalab (Accurate + Balanced)</td><td align="right">2.02</td><td align="right">2.67</td><td align="right">0.24</td><td align="right">0.00</td><td align="right">48.50</td><td align="right">56.90</td><td align="right">38.55</td><td align="right">0.01</td></tr>
-    <tr><td align="right">—</td><td><em>All 22 other systems</em></td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td></tr>
+    <tr><td align="right">—</td><td><em>All 23 other systems</em></td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td></tr>
   </tbody>
 </table>
 <!-- GROUNDING:END -->
