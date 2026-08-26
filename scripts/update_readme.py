@@ -56,11 +56,15 @@ def table(header: str, aligns: str, rows: list[list[str]]) -> str:
     return "\n".join([header, aligns, *(f"| {' | '.join(r)} |" for r in rows)])
 
 
+# README shows only the top N; leaderboard.csv carries the full table.
+TOP_N = 10
+
+
 def value_table(rows: list[dict]) -> str:
-    ranked = sorted(rows, key=lambda r: float(r["Overall"]), reverse=True)
+    ranked = sorted(rows, key=lambda r: float(r["Overall"]), reverse=True)[:TOP_N]
     score_columns = ("Overall", "Short", "Medium", "Long")
     ranks = column_ranks(rows, score_columns)
-    return table(
+    body = table(
         "| Rank | Provider | Category | Overall | Short | Medium | Long | ¢ / Page |",
         "|---:|---|---|---:|---:|---:|---:|---:|",
         [
@@ -74,6 +78,7 @@ def value_table(rows: list[dict]) -> str:
             for i, r in enumerate(ranked, 1)
         ],
     )
+    return f"{body}\n\nTop {TOP_N} of {len(rows)} systems — full table in [leaderboard.csv](leaderboard.csv)."
 
 
 GROUNDING_PREFIXES = ("Word_Grounding", "Page_Grounding")

@@ -510,8 +510,8 @@ class NuExtract3ExtractProvider(Provider):
         - timeout (int, default=1800): per-request timeout in seconds (large
           extractions generate a lot of tokens and can run for many minutes).
         - dpi (int, default=150): DPI for PDF-to-image rendering.
-        - max_pages (int, default=100): cap on rendered pages per document (keeps
-          the request within the server's image / context limits).
+        - max_pages (int | None, default=None): optional page cap; uncapped by
+          default — server rejections are recovered by dropping trailing pages.
         - max_tokens (int, default=100000): max output tokens — large enough for
           a long holdings array (server context is 262144).
         - temperature (float, default=0.2): sampling temperature (non-thinking).
@@ -540,7 +540,8 @@ class NuExtract3ExtractProvider(Provider):
         self._model = self.base_config.get("model", DEFAULT_SERVED_MODEL_NAME)
         self._timeout = int(self.base_config.get("timeout", 1800))
         self._dpi = int(self.base_config.get("dpi", 150))
-        self._max_pages = int(self.base_config.get("max_pages", 100))
+        max_pages_cfg = self.base_config.get("max_pages")
+        self._max_pages: int | None = int(max_pages_cfg) if max_pages_cfg is not None else None
         self._max_tokens = int(self.base_config.get("max_tokens", 100000))
         self._temperature = float(self.base_config.get("temperature", 0.2))
         self._enable_thinking = bool(self.base_config.get("enable_thinking", False))
@@ -567,7 +568,8 @@ class NuExtract3ExtractProvider(Provider):
                 raise ProviderPermanentError(f"Error converting PDF to image: {e}") from e
             if not images:
                 raise ProviderPermanentError(f"No pages found in PDF: {file_path}")
-            images = images[: self._max_pages]
+            if self._max_pages is not None:
+                images = images[: self._max_pages]
             out: list[str] = []
             for img in images:
                 buf = io.BytesIO()
@@ -624,8 +626,8 @@ class NuExtract3ExtractProvider(Provider):
                 if resp.status != 200:
                     error_text = await resp.text()
                     if resp.status in (408, 429, 502, 503, 504):
-                        raise ProviderTransientError(f"HTTP {resp.status}: {error_text[:200]}")
-                    raise ProviderPermanentError(f"HTTP {resp.status}: {error_text[:200]}")
+                        raise ProviderTransientError(f"HTTP {resp.status}: {error_text[:2000]}")
+                    raise ProviderPermanentError(f"HTTP {resp.status}: {error_text[:2000]}")
 
                 result: dict[str, Any] = await resp.json()
 
@@ -646,6 +648,37 @@ class NuExtract3ExtractProvider(Provider):
                 "dpi": self._dpi,
             },
         }
+
+    _IMAGE_CAP_RE = re.compile(r"at most (\d+) image", re.IGNORECASE)
+    _CONTEXT_ERROR_MARKERS = ("maximum context length", "maximum model length", "context window")
+
+    def _extract_with_recovery(
+        self, images_b64: list[str], template: dict[str, Any], instructions: str
+    ) -> dict[str, Any]:
+        """Drop trailing pages on image-cap / context 400s instead of failing."""
+        pages = images_b64
+        dropped = 0
+        while True:
+            try:
+                out = asyncio.run(self._extract_async(pages, template, instructions))
+                if dropped:
+                    out["pages_truncated"] = dropped
+                    out["pages_sent"] = len(pages)
+                return out
+            except ProviderPermanentError as e:
+                msg = str(e)
+                cap_match = self._IMAGE_CAP_RE.search(msg)
+                if cap_match and 0 < int(cap_match.group(1)) < len(pages):
+                    keep = int(cap_match.group(1))
+                    dropped += len(pages) - keep
+                    pages = pages[:keep]
+                    continue
+                if any(marker in msg.lower() for marker in self._CONTEXT_ERROR_MARKERS) and len(pages) > 1:
+                    keep = max(1, (len(pages) * 3) // 4)
+                    dropped += len(pages) - keep
+                    pages = pages[:keep]
+                    continue
+                raise
 
     def run_inference(self, pipeline: PipelineSpec, request: InferenceRequest) -> RawInferenceResult:
         if request.product_type != ProductType.EXTRACT:
@@ -668,7 +701,7 @@ class NuExtract3ExtractProvider(Provider):
 
         try:
             images_b64 = self._render_images_b64(file_path)
-            raw_output = asyncio.run(self._extract_async(images_b64, template, instructions))
+            raw_output = self._extract_with_recovery(images_b64, template, instructions)
 
             completed_at = datetime.now()
             latency_ms = int((completed_at - started_at).total_seconds() * 1000)

@@ -359,9 +359,10 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
                 "model": "qwen3.6-35b-a3b-fp8",
                 "endpoint_env_var": "QWEN35_SERVER_URL",
                 "additional_properties_false": True,
-                # Large multi-page docs produce large JSON; server max_model_len
-                # is 1.01M (262k native, extended via YaRN).
-                "max_tokens": 65536,
+                # Shared open-weight one-shot config: 32k budget, json_object.
+                "max_tokens": 32768,
+                "timeout_s": 3600,
+                "structured_output": False,
             },
         )
     )
@@ -380,8 +381,8 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
                 # exhausting a memory-limited runner and taking long enough that
                 # the endpoint expired the request.
                 "dpi": 100,
-                # Large multi-page docs produce large JSON; server max_model_len is 256k.
-                "max_tokens": 65536,
+                # Shared open-weight 32k output budget (was 65536).
+                "max_tokens": 32768,
                 # Long documents need more than the provider's 15-minute
                 # default, and SDK retries are disabled to avoid duplicate work.
                 "timeout_s": 3600,
@@ -509,12 +510,205 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
         )
     )
 
+    register_fn(
+        _pipeline_spec(
+            pipeline_name="gemma4_e4b_vllm_extract_oneshot_structured_output_file",
+            provider_name="vllm_extract",
+            config={
+                "model": "gemma-4-e4b",
+                # google/gemma-4-E4B-it.
+                "endpoint_env_var": "GEMMA4_E4B_SERVER_URL",
+                "additional_properties_false": True,
+                "dpi": 100,
+                # Large multi-page docs produce large JSON.
+                "max_tokens": 32768,
+                # Long documents decode for a while on small self-hosted GPUs.
+                "timeout_s": 3600,
+                "structured_output": False,
+            },
+        )
+    )
+
+    register_fn(
+        _pipeline_spec(
+            pipeline_name="gemma4_e2b_vllm_extract_oneshot_structured_output_file",
+            provider_name="vllm_extract",
+            config={
+                "model": "gemma-4-e2b",
+                # google/gemma-4-E2B-it.
+                "endpoint_env_var": "GEMMA4_E2B_SERVER_URL",
+                "additional_properties_false": True,
+                "dpi": 100,
+                # Large multi-page docs produce large JSON.
+                "max_tokens": 32768,
+                # Long documents decode for a while on small self-hosted GPUs.
+                "timeout_s": 3600,
+                "structured_output": False,
+            },
+        )
+    )
+
+    register_fn(
+        _pipeline_spec(
+            pipeline_name="kimi_vl_a3b_vllm_extract_oneshot_structured_output_file",
+            provider_name="vllm_extract",
+            config={
+                "model": "kimi-vl-a3b-instruct",
+                # moonshotai/Kimi-VL-A3B-Instruct. 131k native context.
+                "endpoint_env_var": "KIMI_VL_SERVER_URL",
+                "additional_properties_false": True,
+                "dpi": 100,
+                # Large multi-page docs produce large JSON.
+                "max_tokens": 32768,
+                # Long documents decode for a while on small self-hosted GPUs.
+                "timeout_s": 3600,
+                "structured_output": False,
+            },
+        )
+    )
+
+    # GLM-4.6V-Flash is a GLM-V thinking model; the server keeps the final
+    # answer as message.content (reasoning is separated out).
+    register_fn(
+        _pipeline_spec(
+            pipeline_name="glm_4_6v_flash_vllm_extract_oneshot_structured_output_file",
+            provider_name="vllm_extract",
+            config={
+                "model": "glm-4.6v-flash",
+                # zai-org/GLM-4.6V-Flash. 131k native context.
+                "endpoint_env_var": "GLM_4_6V_SERVER_URL",
+                "additional_properties_false": True,
+                "dpi": 100,
+                # Thinking model: 32k answer + 32k reasoning allowance, one shot.
+                "max_tokens": 65536,
+                # Long documents decode for a while on small self-hosted GPUs.
+                "timeout_s": 3600,
+                "structured_output": False,
+            },
+        )
+    )
+
+    register_fn(
+        _pipeline_spec(
+            pipeline_name="qwen3_8_27b_fp8_vllm_extract_oneshot_structured_output_file",
+            provider_name="vllm_extract",
+            config={
+                "model": "qwen3.8-27b-fp8",
+                # Qwen/Qwen3.8-27B (served as the FP8 checkpoint,
+                # Qwen/Qwen3.8-27B-FP8).
+                "endpoint_env_var": "QWEN3_8_27B_SERVER_URL",
+                "additional_properties_false": True,
+                # Large multi-page docs produce large JSON.
+                "max_tokens": 32768,
+                # Long documents decode for a while on small self-hosted GPUs.
+                "timeout_s": 3600,
+                "structured_output": False,
+            },
+        )
+    )
+
+    register_fn(
+        _pipeline_spec(
+            pipeline_name="qwen3_5_2b_vllm_extract_oneshot_structured_output_file",
+            provider_name="vllm_extract",
+            config={
+                "model": "qwen3.5-2b",
+                # Qwen/Qwen3.5-2B (dense).
+                "endpoint_env_var": "QWEN3_5_2B_SERVER_URL",
+                "additional_properties_false": True,
+                # Large multi-page docs produce large JSON.
+                "max_tokens": 32768,
+                # Long documents decode for a while on small self-hosted GPUs.
+                "timeout_s": 3600,
+                "structured_output": False,
+            },
+        )
+    )
+
+    register_fn(
+        _pipeline_spec(
+            pipeline_name="qwen3_5_0_8b_vllm_extract_oneshot_structured_output_file",
+            provider_name="vllm_extract",
+            config={
+                "model": "qwen3.5-0.8b",
+                # Qwen/Qwen3.5-0.8B (dense).
+                "endpoint_env_var": "QWEN3_5_0_8B_SERVER_URL",
+                "additional_properties_false": True,
+                # Large multi-page docs produce large JSON.
+                "max_tokens": 32768,
+                # Long documents decode for a while on small self-hosted GPUs.
+                "timeout_s": 3600,
+                "structured_output": False,
+            },
+        )
+    )
+
+    register_fn(
+        _pipeline_spec(
+            pipeline_name="gemma4_12b_vllm_extract_oneshot_structured_output_file",
+            provider_name="vllm_extract",
+            config={
+                "model": "gemma-4-12b",
+                # google/gemma-4-12B-it.
+                "endpoint_env_var": "GEMMA4_12B_SERVER_URL",
+                "additional_properties_false": True,
+                "dpi": 100,
+                # Large multi-page docs produce large JSON.
+                "max_tokens": 32768,
+                # Long documents decode for a while on small self-hosted GPUs.
+                "timeout_s": 3600,
+                "structured_output": False,
+            },
+        )
+    )
+
+    register_fn(
+        _pipeline_spec(
+            pipeline_name="qwen3_5_4b_vllm_extract_oneshot_structured_output_file",
+            provider_name="vllm_extract",
+            config={
+                "model": "qwen3.5-4b",
+                # Qwen/Qwen3.5-4B (dense).
+                "endpoint_env_var": "QWEN3_5_4B_SERVER_URL",
+                "additional_properties_false": True,
+                # Large multi-page docs produce large JSON.
+                "max_tokens": 32768,
+                # Long documents decode for a while on small self-hosted GPUs.
+                "timeout_s": 3600,
+                "structured_output": False,
+            },
+        )
+    )
+
+    # Kimi K3 one-shot vision extract via Fireworks. Unlike the self-hosted vLLM
+    # one-shots above, Kimi is a hosted cloud VLM on Fireworks' OpenAI-compatible
+    # API (kimi_extract provider). Pages are rasterized and sent as images in one
+    # call; output is json_object because Kimi does not honor json_schema guided
+    # decoding on Fireworks, and Fireworks rejects PDF file inputs. max_tokens is
+    # Kimi's max output so a long-list doc is never truncated even with the
+    # model's default chain-of-thought; pricing is flat across the 1M context.
+    register_fn(
+        _pipeline_spec(
+            pipeline_name="kimi_k3_extract_oneshot_structured_output_file",
+            provider_name="kimi_extract",
+            config={
+                "model": "accounts/fireworks/models/kimi-k3",
+                "additional_properties_false": True,
+                "max_tokens": 131072,
+            },
+        )
+    )
+
     # NuExtract3 extracts natively from a template rather than a JSON Schema;
     # the provider converts the schema before the call (NUEXTRACT3_SERVER_URL).
     register_fn(
         _pipeline_spec(
             pipeline_name="nuextract3_extract",
             provider_name="nuextract3_extract",
-            config={"endpoint_env_var": "NUEXTRACT3_SERVER_URL"},
+            config={
+                "endpoint_env_var": "NUEXTRACT3_SERVER_URL",
+                # Shared open-weight 32k output budget (provider default is 100k).
+                "max_tokens": 32768,
+            },
         )
     )

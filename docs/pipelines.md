@@ -27,6 +27,7 @@ uv run extract-bench run <pipeline_name>
 | `anthropic_haiku_4_5_extract_oneshot_structured_output_file` | Anthropic | one-shot structured output |
 | `*_extract_twostage_parse_agentic_structured_output_text` | OpenAI / Gemini / Anthropic | LlamaParse agentic markdown → text extract; cost totals parse + extract |
 | `deepseek_v4_pro_extract_twostage_parse_agentic_structured_output_text` | DeepSeek (Fireworks) | two-stage text extract |
+| `kimi_k3_extract_oneshot_structured_output_file` | Kimi K3 (Fireworks) | one-shot vision (rasterized pages), json_object mode; uses `FIREWORKS_API_KEY` |
 | `claude_code_extract_opus_4_8` | Claude Code CLI | agentic extraction; cost from CLI `total_cost_usd` |
 | `codex_code_extract_gpt_5_4_low` / `codex_code_extract_gpt_5_5_low` / `codex_code_extract_gpt_5_5_high` | Codex CLI | agentic extraction; cost estimated from token usage |
 | `reducto_extract` / `reducto_deep_extract` | Reducto | deep variant adds citations |
@@ -34,14 +35,23 @@ uv run extract-bench run <pipeline_name>
 | `landingai_extract` | LandingAI ADE | |
 | `datalab_parse_accurate_extract_fast` / `_balanced` | Datalab | accurate parse + fast or balanced extraction, JSON tree citations |
 | `lift_extract` | Self-hosted lift SDK | requires `LIFT_ENDPOINT_URL` |
-| `qwen3_6_35b_a3b_fp8_vllm_extract_oneshot_structured_output_file` | Self-hosted vLLM | JSON Schema guided decoding; requires `QWEN35_SERVER_URL` |
-| `gemma4_26b_vllm_extract_oneshot_structured_output_file` | Self-hosted vLLM | JSON Schema guided decoding; requires `GEMMA4_SERVER_URL` |
+| `qwen3_6_35b_a3b_fp8_vllm_extract_oneshot_structured_output_file` | Self-hosted vLLM | Qwen3.6-35B-A3B-FP8, json_object mode; requires `QWEN35_SERVER_URL` |
+| `gemma4_26b_vllm_extract_oneshot_structured_output_file` | Self-hosted vLLM | Gemma-4-26B-A4B, json_object mode; requires `GEMMA4_SERVER_URL` |
 | `nuextract_2_8b_vllm_extract_oneshot_structured_output_file` | Self-hosted vLLM | NuExtract-2.0-8B, json_object mode; requires `NUEXTRACT2_SERVER_URL` |
 | `internvl3_5_8b_vllm_extract_oneshot_structured_output_file` | Self-hosted vLLM | InternVL3.5-8B, json_object mode; requires `INTERNVL35_8B_SERVER_URL` |
 | `internvl3_5_14b_vllm_extract_oneshot_structured_output_file` | Self-hosted vLLM | InternVL3.5-14B, json_object mode; requires `INTERNVL35_14B_SERVER_URL` |
 | `minicpm_v_4_5_vllm_extract_oneshot_structured_output_file` | Self-hosted vLLM | MiniCPM-V-4.5, json_object mode; requires `MINICPM_V_SERVER_URL` |
 | `qwen3_5_35b_a3b_fp8_vllm_extract_oneshot_structured_output_file` | Self-hosted vLLM | Qwen3.5-35B-A3B-FP8, json_object mode; requires `QWEN3_5_35B_SERVER_URL` |
 | `qwen3_5_9b_vllm_extract_oneshot_structured_output_file` | Self-hosted vLLM | Qwen3.5-9B, json_object mode; requires `QWEN3_5_9B_SERVER_URL` |
+| `gemma4_e4b_vllm_extract_oneshot_structured_output_file` | Self-hosted vLLM | Gemma-4-E4B, json_object mode; requires `GEMMA4_E4B_SERVER_URL` |
+| `gemma4_e2b_vllm_extract_oneshot_structured_output_file` | Self-hosted vLLM | Gemma-4-E2B, json_object mode; requires `GEMMA4_E2B_SERVER_URL` |
+| `kimi_vl_a3b_vllm_extract_oneshot_structured_output_file` | Self-hosted vLLM | Kimi-VL-A3B-Instruct, json_object mode; requires `KIMI_VL_SERVER_URL` |
+| `glm_4_6v_flash_vllm_extract_oneshot_structured_output_file` | Self-hosted vLLM | GLM-4.6V-Flash, json_object mode; requires `GLM_4_6V_SERVER_URL` |
+| `qwen3_8_27b_fp8_vllm_extract_oneshot_structured_output_file` | Self-hosted vLLM | Qwen3.8-27B-FP8, json_object mode; requires `QWEN3_8_27B_SERVER_URL` |
+| `qwen3_5_2b_vllm_extract_oneshot_structured_output_file` | Self-hosted vLLM | Qwen3.5-2B, json_object mode; requires `QWEN3_5_2B_SERVER_URL` |
+| `qwen3_5_0_8b_vllm_extract_oneshot_structured_output_file` | Self-hosted vLLM | Qwen3.5-0.8B, json_object mode; requires `QWEN3_5_0_8B_SERVER_URL` |
+| `gemma4_12b_vllm_extract_oneshot_structured_output_file` | Self-hosted vLLM | Gemma-4-12B, json_object mode; requires `GEMMA4_12B_SERVER_URL` |
+| `qwen3_5_4b_vllm_extract_oneshot_structured_output_file` | Self-hosted vLLM | Qwen3.5-4B, json_object mode; requires `QWEN3_5_4B_SERVER_URL` |
 | `nuextract3_extract` | Self-hosted vLLM | schema converted to a NuExtract template; requires `NUEXTRACT3_SERVER_URL` |
 
 ## Parse Pipelines
