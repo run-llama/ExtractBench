@@ -42,9 +42,9 @@ Models and prices reflect each provider's official documentation as of July 1, 2
 | 16 | Google Gemini 3.5 Flash | Commercial VLM | 79.84 | 87.87 | 69.76 | 27.90 | 1.00¢ |
 | 17 | Lift Datalab 9B | OSS | 78.43 | 87.64 | 65.69 | 24.78 | — |
 | 18 | OpenAI GPT-5.4 Nano | Commercial VLM | 74.90 | 77.43 | 76.37 | 35.81 | 0.21¢ |
-| 19 | Gemma4 E4B | OSS | 69.64 | 81.10 | 48.93 | 26.82 | — |
-| 20 | InternVL3.5 14B | OSS | 66.35 | 80.70 | 39.04 | 19.41 | — |
-| 21 | Gemma4 26B | OSS | 66.24 | 80.55 | 40.47 | 12.16 | — |
+| 19 | Gemma4 26B | OSS | 70.27 | 77.70 | 59.61 | 28.88 | — |
+| 20 | Gemma4 E4B | OSS | 69.64 | 81.10 | 48.93 | 26.82 | — |
+| 21 | InternVL3.5 14B | OSS | 66.35 | 80.70 | 39.04 | 19.41 | — |
 | 22 | InternVL3.5 8B | OSS | 64.63 | 79.26 | 36.62 | 17.57 | — |
 | 23 | Qwen3.5 2B | OSS | 63.40 | 71.22 | 50.93 | 25.93 | — |
 | 24 | Kimi-VL A3B | OSS | 57.77 | 69.86 | 34.61 | 18.94 | — |
