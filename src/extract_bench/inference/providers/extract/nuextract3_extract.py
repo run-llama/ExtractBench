@@ -626,8 +626,8 @@ class NuExtract3ExtractProvider(Provider):
                 if resp.status != 200:
                     error_text = await resp.text()
                     if resp.status in (408, 429, 502, 503, 504):
-                        raise ProviderTransientError(f"HTTP {resp.status}: {error_text[:200]}")
-                    raise ProviderPermanentError(f"HTTP {resp.status}: {error_text[:200]}")
+                        raise ProviderTransientError(f"HTTP {resp.status}: {error_text[:2000]}")
+                    raise ProviderPermanentError(f"HTTP {resp.status}: {error_text[:2000]}")
 
                 result: dict[str, Any] = await resp.json()
 

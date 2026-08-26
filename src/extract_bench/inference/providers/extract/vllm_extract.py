@@ -6,9 +6,10 @@ one image per page and sent directly to the model â€” no upstream parse stage â€
 mirroring the ``*_oneshot_structured_output_file`` cloud-API pipelines but for a
 self-hosted vLLM endpoint.
 
-Structured output is requested via the OpenAI ``response_format`` json_schema
-form, which vLLM turns into guided decoding (xgrammar). The extract schema is
-also inlined into the prompt so the model sees the field names/descriptions.
+Structured output uses the OpenAI ``response_format``: json_schema guided
+decoding when ``structured_output`` is true, json_object mode otherwise (what
+the registered pipelines use). The extract schema is also inlined into the
+prompt so the model sees the field names/descriptions.
 """
 
 from __future__ import annotations
@@ -122,6 +123,9 @@ def salvage_truncated_json(text: str, max_trims: int = 512) -> Any | None:
         in_str, _ = _scan_json_structure(cur)
         c = cur + ('"' if in_str else "")
         c = c.rstrip()
+        if not in_str:
+            # A trailing number may be cut mid-literal; drop it rather than keep a wrong value.
+            c = re.sub(r"[-+.eE\d]*\d[-+.eE\d]*$", "", c).rstrip()
         # Drop a trailing comma or a dangling ``"key":`` (value never arrived).
         if c.endswith(","):
             c = c[:-1].rstrip()
