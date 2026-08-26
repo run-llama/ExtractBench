@@ -587,6 +587,25 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
         )
     )
 
+    register_fn(
+        _pipeline_spec(
+            pipeline_name="qwen3_8_27b_fp8_vllm_extract_oneshot_structured_output_file",
+            provider_name="vllm_extract",
+            config={
+                "model": "qwen3.8-27b-fp8",
+                # Qwen/Qwen3.8-27B (served as the FP8 checkpoint,
+                # Qwen/Qwen3.8-27B-FP8).
+                "endpoint_env_var": "QWEN3_8_27B_SERVER_URL",
+                "additional_properties_false": True,
+                # Large multi-page docs produce large JSON.
+                "max_tokens": 32768,
+                # Long documents decode for a while on small self-hosted GPUs.
+                "timeout_s": 3600,
+                "structured_output": False,
+            },
+        )
+    )
+
     # NuExtract3 extracts natively from a template rather than a JSON Schema;
     # the provider converts the schema before the call (NUEXTRACT3_SERVER_URL).
     register_fn(
