@@ -359,9 +359,10 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
                 "model": "qwen3.6-35b-a3b-fp8",
                 "endpoint_env_var": "QWEN35_SERVER_URL",
                 "additional_properties_false": True,
-                # Large multi-page docs produce large JSON; server max_model_len
-                # is 1.01M (262k native, extended via YaRN).
-                "max_tokens": 65536,
+                # Shared open-weight one-shot config: 32k budget, json_object.
+                "max_tokens": 32768,
+                "timeout_s": 3600,
+                "structured_output": False,
             },
         )
     )
@@ -380,8 +381,8 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
                 # exhausting a memory-limited runner and taking long enough that
                 # the endpoint expired the request.
                 "dpi": 100,
-                # Large multi-page docs produce large JSON; server max_model_len is 256k.
-                "max_tokens": 65536,
+                # Shared open-weight 32k output budget (was 65536).
+                "max_tokens": 32768,
                 # Long documents need more than the provider's 15-minute
                 # default, and SDK retries are disabled to avoid duplicate work.
                 "timeout_s": 3600,
@@ -578,8 +579,8 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
                 "endpoint_env_var": "GLM_4_6V_SERVER_URL",
                 "additional_properties_false": True,
                 "dpi": 100,
-                # Large multi-page docs produce large JSON.
-                "max_tokens": 32768,
+                # Thinking model: 32k answer + 32k reasoning allowance, one shot.
+                "max_tokens": 65536,
                 # Long documents decode for a while on small self-hosted GPUs.
                 "timeout_s": 3600,
                 "structured_output": False,
@@ -704,6 +705,10 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
         _pipeline_spec(
             pipeline_name="nuextract3_extract",
             provider_name="nuextract3_extract",
-            config={"endpoint_env_var": "NUEXTRACT3_SERVER_URL"},
+            config={
+                "endpoint_env_var": "NUEXTRACT3_SERVER_URL",
+                # Shared open-weight 32k output budget (provider default is 100k).
+                "max_tokens": 32768,
+            },
         )
     )
