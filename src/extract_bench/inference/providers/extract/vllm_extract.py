@@ -87,6 +87,10 @@ def _scan_json_structure_detail(s: str) -> tuple[bool, list[str], int]:
     return in_str, stack, str_start
 
 
+# Thinking-model guard for servers without a reasoning parser (\Z: cut mid-think).
+_THINK_RE = re.compile(r"^\s*<think>.*?(?:</think>\s*|\Z)", re.DOTALL)
+
+
 def salvage_truncated_json(text: str, max_trims: int = 512) -> Any | None:
     """Best-effort parse of possibly-truncated JSON.
 
@@ -421,6 +425,7 @@ class VLLMExtractProvider(Provider):
         choice = response.choices[0]
         finish_reason = getattr(choice, "finish_reason", None)
         content = getattr(choice.message, "content", "") or ""
+        content = _THINK_RE.sub("", content, count=1)
 
         truncated = False
         try:
