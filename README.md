@@ -50,7 +50,8 @@ Models and prices reflect each provider's official documentation as of July 1, 2
 | 24 | NuExtract 2.0 8B | OSS | 49.42 | 62.92 | 23.50 | 6.39 | — |
 | 25 | Qwen3.5 0.8B | OSS | 46.63 | 57.44 | 26.98 | 6.65 | — |
 | 26 | MiniCPM-V 4.5 | OSS | 45.85 | 57.39 | 25.30 | 1.13 | — |
-| 27 | GLM-4.6V Flash | OSS | 41.76 | 47.31 | 32.71 | 16.16 | — |
+| 27 | Gemma4 12B | OSS | 45.39 | 53.62 | 30.82 | 13.16 | — |
+| 28 | GLM-4.6V Flash | OSS | 41.76 | 47.31 | 32.71 | 16.16 | — |
 <!-- LEADERBOARD:END -->
 
 <!-- GROUNDING:START -->
@@ -68,7 +69,7 @@ Models and prices reflect each provider's official documentation as of July 1, 2
     <tr><td align="right">4</td><td>LlamaExtract Cost-Effective</td><td align="right">40.43</td><td align="right">40.20</td><td align="right">42.30</td><td align="right">36.67</td><td align="right">64.15</td><td align="right">68.90</td><td align="right">53.73</td><td align="right">56.55</td></tr>
     <tr><td align="right">5</td><td>Extend (Max Context)</td><td align="right">25.20</td><td align="right">33.93</td><td align="right">0.21</td><td align="right">0.02</td><td align="right">49.04</td><td align="right">61.71</td><td align="right">27.68</td><td align="right">0.03</td></tr>
     <tr><td align="right">6</td><td>Datalab (Accurate + Balanced)</td><td align="right">2.02</td><td align="right">2.67</td><td align="right">0.24</td><td align="right">0.00</td><td align="right">48.50</td><td align="right">56.90</td><td align="right">38.55</td><td align="right">0.01</td></tr>
-    <tr><td align="right">—</td><td><em>All 21 other systems</em></td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td></tr>
+    <tr><td align="right">—</td><td><em>All 22 other systems</em></td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td></tr>
   </tbody>
 </table>
 <!-- GROUNDING:END -->
