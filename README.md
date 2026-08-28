@@ -35,7 +35,7 @@ Models and prices reflect each provider's official documentation as of July 1, 2
 | 9 | Claude Code (Opus 4.8) | Coding Agents | 87.09 | 90.08 | 79.21 | 88.07 | 16.17¢ |
 | 10 | LlamaExtract Cost-Effective | LlamaExtract | 86.78 | 90.77 | 80.12 | 69.17 | 1.00¢ |
 
-Top 10 of 32 systems — full table in [leaderboard.csv](leaderboard.csv).
+Top 10 of 33 systems — full table in [leaderboard.csv](leaderboard.csv).
 <!-- LEADERBOARD:END -->
 
 <!-- GROUNDING:START -->
@@ -52,7 +52,8 @@ Top 10 of 32 systems — full table in [leaderboard.csv](leaderboard.csv).
     <tr><td align="right">3</td><td>Reducto Deep Extract</td><td align="right">43.30</td><td align="right"><u>42.84</u></td><td align="right">45.57</td><td align="right">41.13</td><td align="right"><u>71.71</u></td><td align="right"><u>72.60</u></td><td align="right"><u>70.42</u></td><td align="right">67.28</td></tr>
     <tr><td align="right">4</td><td>LlamaExtract Cost-Effective</td><td align="right">40.43</td><td align="right">40.20</td><td align="right">42.30</td><td align="right">36.67</td><td align="right">64.15</td><td align="right">68.90</td><td align="right">53.73</td><td align="right">56.55</td></tr>
     <tr><td align="right">5</td><td>Extend (Max Context)</td><td align="right">25.20</td><td align="right">33.93</td><td align="right">0.21</td><td align="right">0.02</td><td align="right">49.04</td><td align="right">61.71</td><td align="right">27.68</td><td align="right">0.03</td></tr>
-    <tr><td align="right">6</td><td>Datalab (Accurate + Balanced)</td><td align="right">2.02</td><td align="right">2.67</td><td align="right">0.24</td><td align="right">0.00</td><td align="right">48.50</td><td align="right">56.90</td><td align="right">38.55</td><td align="right">0.01</td></tr>
+    <tr><td align="right">6</td><td>Extend Extract</td><td align="right">15.96</td><td align="right">21.13</td><td align="right">1.03</td><td align="right">0.01</td><td align="right">53.58</td><td align="right">64.50</td><td align="right">37.39</td><td align="right">0.03</td></tr>
+    <tr><td align="right">7</td><td>Datalab (Accurate + Balanced)</td><td align="right">2.02</td><td align="right">2.67</td><td align="right">0.24</td><td align="right">0.00</td><td align="right">48.50</td><td align="right">56.90</td><td align="right">38.55</td><td align="right">0.01</td></tr>
     <tr><td align="right">—</td><td><em>All 26 other systems</em></td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td></tr>
   </tbody>
 </table>
