@@ -156,6 +156,20 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
         )
     )
 
+    # GLM-5.3-flash (z.ai): the raw document goes straight to the VLM in a
+    # file_url block over the OpenAI-compatible chat API; structured output via
+    # response_format=json_object with the schema in the prompt.
+    register_fn(
+        _pipeline_spec(
+            pipeline_name="glm_5_3_flash_extract_oneshot_structured_output_file",
+            provider_name="glm_zai_extract",
+            config={
+                "model": "glm-5.3-flash",
+                "additional_properties_false": True,
+            },
+        )
+    )
+
     # =========================================================================
     # Two-stage baselines (LlamaParse agentic markdown -> text extract)
     # =========================================================================

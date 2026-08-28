@@ -25,7 +25,7 @@ Models and prices reflect each provider's official documentation as of July 1, 2
 | Rank | Provider | Category | Overall | Short | Medium | Long | ¢ / Page |
 |---:|---|---|---:|---:|---:|---:|---:|
 | 1 | LlamaExtract Agentic Plus | LlamaExtract | **95.59** | **96.56** | **93.34** | **94.41** | 8.11¢ |
-| 2 | Codex (GPT-5.5) | Coding Agents | <u>93.57</u> | <u>95.68</u> | <u>91.15</u> | 78.88 | 27.83¢ |
+| 2 | Codex (GPT-5.5) | Coding Agents | <u>93.57</u> | 95.68 | <u>91.15</u> | 78.88 | 27.83¢ |
 | 3 | Reducto Deep Extract | Specialized APIs | 90.44 | 94.20 | 80.47 | <u>92.01</u> | 34.44¢ |
 | 4 | Qwen3.8 27B | OSS | 89.75 | 94.68 | 87.54 | 38.45 | — |
 | 5 | LlamaExtract Agentic | LlamaExtract | 89.55 | 92.03 | 85.41 | 78.62 | 3.12¢ |
@@ -35,7 +35,7 @@ Models and prices reflect each provider's official documentation as of July 1, 2
 | 9 | Claude Code (Opus 4.8) | Coding Agents | 87.09 | 90.08 | 79.21 | 88.07 | 16.17¢ |
 | 10 | LlamaExtract Cost-Effective | LlamaExtract | 86.78 | 90.77 | 80.12 | 69.17 | 1.00¢ |
 
-Top 10 of 30 systems — full table in [leaderboard.csv](leaderboard.csv).
+Top 10 of 31 systems — full table in [leaderboard.csv](leaderboard.csv).
 <!-- LEADERBOARD:END -->
 
 <!-- GROUNDING:START -->
@@ -53,7 +53,7 @@ Top 10 of 30 systems — full table in [leaderboard.csv](leaderboard.csv).
     <tr><td align="right">4</td><td>LlamaExtract Cost-Effective</td><td align="right">40.43</td><td align="right">40.20</td><td align="right">42.30</td><td align="right">36.67</td><td align="right">64.15</td><td align="right">68.90</td><td align="right">53.73</td><td align="right">56.55</td></tr>
     <tr><td align="right">5</td><td>Extend (Max Context)</td><td align="right">25.20</td><td align="right">33.93</td><td align="right">0.21</td><td align="right">0.02</td><td align="right">49.04</td><td align="right">61.71</td><td align="right">27.68</td><td align="right">0.03</td></tr>
     <tr><td align="right">6</td><td>Datalab (Accurate + Balanced)</td><td align="right">2.02</td><td align="right">2.67</td><td align="right">0.24</td><td align="right">0.00</td><td align="right">48.50</td><td align="right">56.90</td><td align="right">38.55</td><td align="right">0.01</td></tr>
-    <tr><td align="right">—</td><td><em>All 24 other systems</em></td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td></tr>
+    <tr><td align="right">—</td><td><em>All 25 other systems</em></td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td></tr>
   </tbody>
 </table>
 <!-- GROUNDING:END -->
