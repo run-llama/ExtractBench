@@ -623,6 +623,26 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
 
     register_fn(
         _pipeline_spec(
+            pipeline_name="qwen3_8_flash_next_fp8_vllm_extract_oneshot_structured_output_file",
+            provider_name="vllm_extract",
+            config={
+                "model": "qwen3.8-flash-next-fp8",
+                # Qwen3.8-Flash-Next (served as the FP8 checkpoint).
+                "endpoint_env_var": "QWEN3_8_FLASH_NEXT_SERVER_URL",
+                "additional_properties_false": True,
+                # Large multi-page docs produce large JSON.
+                "max_tokens": 32768,
+                # Long documents decode for a while on self-hosted GPUs.
+                "timeout_s": 3600,
+                # json_object (not xgrammar): compiling a grammar for the large
+                # extract schemas hangs the endpoint (the server drops the request).
+                "structured_output": False,
+            },
+        )
+    )
+
+    register_fn(
+        _pipeline_spec(
             pipeline_name="qwen3_5_2b_vllm_extract_oneshot_structured_output_file",
             provider_name="vllm_extract",
             config={

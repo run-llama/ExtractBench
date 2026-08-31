@@ -49,6 +49,7 @@ uv run extract-bench run <pipeline_name>
 | `kimi_vl_a3b_vllm_extract_oneshot_structured_output_file` | Self-hosted vLLM | Kimi-VL-A3B-Instruct, json_object mode; requires `KIMI_VL_SERVER_URL` |
 | `glm_4_6v_flash_vllm_extract_oneshot_structured_output_file` | Self-hosted vLLM | GLM-4.6V-Flash, json_object mode; requires `GLM_4_6V_SERVER_URL` |
 | `qwen3_8_27b_fp8_vllm_extract_oneshot_structured_output_file` | Self-hosted vLLM | Qwen3.8-27B-FP8, json_object mode; requires `QWEN3_8_27B_SERVER_URL` |
+| `qwen3_8_flash_next_fp8_vllm_extract_oneshot_structured_output_file` | Self-hosted vLLM | Qwen3.8-Flash-Next-FP8, json_object mode; requires `QWEN3_8_FLASH_NEXT_SERVER_URL` |
 | `qwen3_5_2b_vllm_extract_oneshot_structured_output_file` | Self-hosted vLLM | Qwen3.5-2B, json_object mode; requires `QWEN3_5_2B_SERVER_URL` |
 | `qwen3_5_0_8b_vllm_extract_oneshot_structured_output_file` | Self-hosted vLLM | Qwen3.5-0.8B, json_object mode; requires `QWEN3_5_0_8B_SERVER_URL` |
 | `gemma4_12b_vllm_extract_oneshot_structured_output_file` | Self-hosted vLLM | Gemma-4-12B, json_object mode; requires `GEMMA4_12B_SERVER_URL` |
