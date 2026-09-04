@@ -145,6 +145,18 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
 
     register_fn(
         _pipeline_spec(
+            pipeline_name="gemini_3_8_flash_extract_oneshot_structured_output_file",
+            provider_name="gemini_extract",
+            config={
+                "model": "gemini-3.8-flash",
+                "additional_properties_false": True,
+                "thinking_level": "low",
+            },
+        )
+    )
+
+    register_fn(
+        _pipeline_spec(
             pipeline_name="anthropic_haiku_4_5_extract_oneshot_structured_output_file",
             provider_name="anthropic_extract",
             config={

@@ -24,6 +24,7 @@ uv run extract-bench run <pipeline_name>
 | `gemini_3_5_flash_extract_oneshot_structured_output_file` | Gemini | one-shot structured output (thinking: low) |
 | `gemini_3_6_flash_extract_oneshot_structured_output_file` | Gemini | one-shot structured output (thinking: medium) |
 | `gemini_3_7_flash_extract_oneshot_structured_output_file` | Gemini | one-shot structured output (thinking: medium) |
+| `gemini_3_8_flash_extract_oneshot_structured_output_file` | Gemini | one-shot structured output (thinking: low) |
 | `anthropic_haiku_4_5_extract_oneshot_structured_output_file` | Anthropic | one-shot structured output |
 | `glm_5_3_flash_extract_oneshot_structured_output_file` | GLM (z.ai) | one-shot structured output over the file, json_object mode; uses `GLM_ZAI_API_KEY` |
 | `*_extract_twostage_parse_agentic_structured_output_text` | OpenAI / Gemini / Anthropic | LlamaParse agentic markdown → text extract; cost totals parse + extract |
