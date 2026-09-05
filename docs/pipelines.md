@@ -21,6 +21,7 @@ uv run extract-bench run <pipeline_name>
 | `llamaextract_agentic_plus` | LlamaExtract V2 API | highest tier; returns word-level citation boxes natively, no parse pass needed |
 | `llamaextract_cost_effective_standard_bbox` / `llamaextract_agentic_standard_bbox` | LlamaExtract V2 API | same tiers with block-level citation boxes and no granular parse pass |
 | `openai_gpt_5_4_extract_oneshot_structured_output_file` (+ `_nano`) | OpenAI Responses | one-shot structured output over the uploaded file |
+| `openai_gpt_6_astra_reasoning_low_extract_oneshot_structured_output_file` | OpenAI Responses | one-shot structured output over the uploaded file (reasoning: low) |
 | `gemini_3_5_flash_extract_oneshot_structured_output_file` | Gemini | one-shot structured output (thinking: low) |
 | `gemini_3_6_flash_extract_oneshot_structured_output_file` | Gemini | one-shot structured output (thinking: medium) |
 | `gemini_3_7_flash_extract_oneshot_structured_output_file` | Gemini | one-shot structured output (thinking: medium) |

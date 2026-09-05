@@ -85,6 +85,18 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
 
     register_fn(
         _pipeline_spec(
+            pipeline_name="openai_gpt_6_astra_reasoning_low_extract_oneshot_structured_output_file",
+            provider_name="openai_extract",
+            config={
+                "model": "gpt-6-astra",
+                "additional_properties_false": True,
+                "reasoning_effort": "low",
+            },
+        )
+    )
+
+    register_fn(
+        _pipeline_spec(
             pipeline_name="openai_gpt_5_4_extract_oneshot_structured_output_file",
             provider_name="openai_extract",
             config={
