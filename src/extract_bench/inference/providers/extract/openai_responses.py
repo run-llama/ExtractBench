@@ -94,6 +94,7 @@ DEFAULT_USER_INSTRUCTION = (
 # OpenAI pricing: USD per million tokens (input, output).
 # Uses longest-prefix matching to support dated model ids.
 _OPENAI_RESPONSES_EXTRACT_PRICING_PER_M: dict[str, tuple[float, float]] = {
+    "gpt-6-astra": (10.00, 50.00),
     "gpt-5.4-nano": (0.20, 1.25),
     "gpt-5.4-mini": (0.75, 4.50),
     "gpt-5.4": (2.50, 15.00),
@@ -165,6 +166,10 @@ class OpenAIResponsesExtractProvider(Provider):
         self._additional_properties_false: bool = bool(self.base_config.get("additional_properties_false", True))
         self._system_prompt: str = self.base_config.get("system_prompt", DEFAULT_SYSTEM_PROMPT)
         self._user_instruction: str = self.base_config.get("user_instruction", DEFAULT_USER_INSTRUCTION)
+        # Reasoning effort for reasoning-capable models (gpt-6-astra: low/medium/
+        # high/xhigh/max). Only sent to the Responses API when set — non-reasoning
+        # models 400 on a reasoning param, so pipelines that omit it are unchanged.
+        self._reasoning_effort: str | None = self.base_config.get("reasoning_effort")
 
         self._input_mode: str = self.base_config.get("input_mode", "file")
         if self._input_mode not in ("file", "parsed_text"):
@@ -267,22 +272,25 @@ class OpenAIResponsesExtractProvider(Provider):
         # constructing the user content via a helper drops mypy's ability to
         # narrow it. The shape is correct at runtime, so silence the overload
         # mismatch here rather than duplicating both branches at the call site.
+        create_kwargs: dict[str, Any] = {
+            "model": self._model,
+            "input": [
+                {"role": "system", "content": self._system_prompt},
+                {"role": "user", "content": user_content},
+            ],
+            "text": {
+                "format": {
+                    "type": "json_schema",
+                    "name": self._schema_name,
+                    "schema": schema,
+                    "strict": self._strict,
+                }
+            },
+        }
+        if self._reasoning_effort is not None:
+            create_kwargs["reasoning"] = {"effort": self._reasoning_effort}
         try:
-            resp = self._client.responses.create(  # type: ignore[call-overload]
-                model=self._model,
-                input=[
-                    {"role": "system", "content": self._system_prompt},
-                    {"role": "user", "content": user_content},
-                ],
-                text={
-                    "format": {
-                        "type": "json_schema",
-                        "name": self._schema_name,
-                        "schema": schema,
-                        "strict": self._strict,
-                    }
-                },
-            )
+            resp = self._client.responses.create(**create_kwargs)
         finally:
             if uploaded_file_id is not None:
                 try:
