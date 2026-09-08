@@ -19,6 +19,7 @@ from extract_bench.evaluation.metrics.extract.confidence_scoped.scoring import b
 from extract_bench.evaluation.metrics.extract.confidence_scoped.summary import (
     DEFAULT_CONFIDENCE_THRESHOLDS,
     compute_confidence_threshold_rows,
+    confidence_signal_coverage_summary,
     summarize_confidence_rows,
 )
 from extract_bench.evaluation.metrics.extract.confidence_scoped.types import ConfidenceFieldRow
@@ -533,6 +534,16 @@ def build_doc_payload(
         expected_output=getattr(test_case, "expected_output", None),
         data_schema=eval_schema,
     )
+    signal_coverage = confidence_signal_coverage_summary(output.get("extracted_data", {}), field_citations)
+    signal_coverage_metrics = {
+        key: signal_coverage[key]
+        for key in (
+            "confidence_signal_coverage",
+            "confidence_signal_emitted_leaf_count",
+            "confidence_signal_scored_leaf_count",
+            "confidence_signal_missing_leaf_count",
+        )
+    }
     payload: GroundedDocumentPayload = {
         "id": record["id"],
         "description": record["description"],
@@ -548,7 +559,7 @@ def build_doc_payload(
         # Scoped metrics intentionally win over same-named report metrics
         # (e.g. "accuracy"): this payload is the confidence-scoped view, and
         # the report copy is only carried along for context.
-        "metrics": {**record["metrics_from_report"], **summary},
+        "metrics": {**record["metrics_from_report"], **summary, **signal_coverage_metrics},
         "thresholds": compute_confidence_threshold_rows(rows, DEFAULT_CONFIDENCE_THRESHOLDS),
         "field_count": len(rows),
         "correct_field_count": sum(1 for row in rows if row.correct),
@@ -599,8 +610,23 @@ def aggregate_rows_summary(
             int(doc.get("metrics", {}).get("confidence_full_gt_invalid_schema_fields") or 0) for doc in documents
         ),
     }
-    return summarize_confidence_rows(
+    aggregate = summarize_confidence_rows(
         rows,
         thresholds=DEFAULT_CONFIDENCE_THRESHOLDS,
         full_gt_totals=full_gt_totals,
     )
+    emitted_leaf_count = sum(
+        int(doc.get("metrics", {}).get("confidence_signal_emitted_leaf_count") or 0) for doc in documents
+    )
+    scored_leaf_count = sum(
+        int(doc.get("metrics", {}).get("confidence_signal_scored_leaf_count") or 0) for doc in documents
+    )
+    aggregate.update(
+        {
+            "confidence_signal_coverage": scored_leaf_count / emitted_leaf_count if emitted_leaf_count else 0.0,
+            "confidence_signal_emitted_leaf_count": emitted_leaf_count,
+            "confidence_signal_scored_leaf_count": scored_leaf_count,
+            "confidence_signal_missing_leaf_count": emitted_leaf_count - scored_leaf_count,
+        }
+    )
+    return aggregate
