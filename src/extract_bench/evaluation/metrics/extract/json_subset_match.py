@@ -35,9 +35,13 @@ def normalize_date_string(date_str: Any) -> Any:
     if re.search(r"\d{10,}", date_str):
         return date_str
 
-    # "March 28,1956" and "March 27 ,1956" are the same date as "March 27, 1956".
-    # Normalize on a probe copy only. Comma-only: this runs on every string leaf,
-    # and a wider rewrite would widen what counts as a date everywhere.
+    # Spacing around the comma carries no meaning: "March 28,1956" and
+    # "March 27 ,1956" name the same date as "March 27, 1956". Normalize the
+    # comma to ", " on a probe copy so these variants clear the pattern gate
+    # and parse; the original is still what we return unchanged when it is not
+    # a date. Comma-gated and comma-only on purpose: this function runs on
+    # every string leaf of every dataset, and a wider rewrite (e.g. collapsing
+    # doubled spaces) would silently widen what counts as a date everywhere.
     probe = _COMMA_WS_RE.sub(", ", date_str) if "," in date_str else date_str
 
     date_patterns = [
@@ -104,7 +108,10 @@ def _normalize_payment_details_entry(entry: Any) -> Any:
     if "checks" in out and "check" not in out:
         checks = out["checks"]
         if isinstance(checks, list) and checks and isinstance(checks[0], dict):
-            out["check"] = checks[0]
+            # Copy: ``out`` is only a shallow copy of ``entry``, so ``checks[0]``
+            # is still the caller's dict and later rewrites of ``out["check"]``
+            # would reach back into the input.
+            out["check"] = dict(checks[0])
             out.pop("checks", None)
 
     # Flat check_* fields -> nested check: {...}.
@@ -119,7 +126,13 @@ def _normalize_payment_details_entry(entry: Any) -> Any:
     # Top-level value (if already present) wins over the nested fallback.
     nested_check = out.get("check") if isinstance(out.get("check"), dict) else None
     if nested_check is not None and "check_number" in nested_check:
-        nested_value = nested_check.pop("check_number")
+        nested_value = nested_check["check_number"]
+        # Rebuild the nested check without check_number instead of pop()-ing it:
+        # ``out`` is only a shallow copy of ``entry``, so ``out["check"]`` may be
+        # the caller's dict. Popping mutates the caller's input, so a second score
+        # of the same objects sees ground truth that no longer carries the nested
+        # check_number. Assigning a fresh dict leaves ``entry`` untouched.
+        out["check"] = {k: v for k, v in nested_check.items() if k != "check_number"}
         if "check_number" not in out:
             out["check_number"] = nested_value
 
@@ -163,9 +176,9 @@ def normalize_field_aliases(obj: Any) -> Any:
     return obj
 
 
-# Field names that identify a record, so list elements pair by identity
-# instead of index. Only unambiguous identifiers: generic ``name`` or
-# ``date`` would false-pair.
+# Field names that identify a record so list elements can be paired by
+# identity instead of by index. Conservative on purpose: only keys that are
+# unambiguously identifiers — generic ``name`` or ``date`` would false-pair.
 _IDENTITY_FIELD_NAMES: tuple[str, ...] = (
     "claim_number",
     "claim_id",
@@ -465,7 +478,12 @@ def _compute_score_with_weight(
         if len(expected) == 0 and len(actual) == 0:
             return (1.0, 1)
         if len(expected) == 0:
-            return (1.0, 1)
+            # `actual` is non-empty here. Weighted mode (the default) keeps
+            # subset semantics: an empty expected list makes no claim about
+            # what the extractor returned. Unweighted mode mirrors upstream
+            # scoring, which divides by max(len(expected), len(actual)) and so
+            # scores the over-extraction 0.
+            return (1.0, 1) if weighted else (0.0, 1)
         if len(actual) == 0:
             # All expected items missing - weight by expected's full leaf
             # count so a dropped 15-claim array is penalized by 15 × per-claim
@@ -521,13 +539,10 @@ def _compute_score_with_weight(
         exp_identities = [_record_identity(item) for item in expected]
         if exp_identities and all(i is not None for i in exp_identities):
             actual_by_identity: dict[str, Any] = {}
-            unclaimed_actual: list[Any] = []
             for item in actual:
                 aid = _record_identity(item)
                 if aid is not None and aid not in actual_by_identity:
                     actual_by_identity[aid] = item
-                else:
-                    unclaimed_actual.append(item)
             list_results: list[tuple[float, int]] = []
             for i, exp_item in enumerate(expected):
                 eid = exp_identities[i]
