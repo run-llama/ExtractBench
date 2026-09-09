@@ -761,6 +761,52 @@ def test_hungarian_pairs_rows_by_nested_object_children() -> None:
     assert _val(arr, "array_record_recall") == 2 / 4
 
 
+def test_hungarian_pairing_fills_omitted_nested_defaults() -> None:
+    """Pairing must read omitted nested keys as schema defaults, not ``None``.
+
+    Gold row 0 omits ``city`` (default Austin); gold row 1 sets ``city`` to
+    explicit null. Pred list-order swaps those two issuer objects. A ``.get``
+    walk sees ``None`` on every city cell, so Hungarian keeps list order and
+    scores Austin vs null on both pairs (2/4). Lookup pairing crosses the
+    rows: omit matches omit, null matches null (4/4).
+    """
+    schema = {
+        "type": "object",
+        "properties": {
+            "holdings": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "class": {"type": ["string", "null"]},
+                        "issuer": {
+                            "type": "object",
+                            "properties": {
+                                "city": {"type": ["string", "null"], "default": "Austin"},
+                            },
+                        },
+                    },
+                },
+            }
+        },
+    }
+    expected = {
+        "holdings": [
+            {"class": "equity", "issuer": {}},
+            {"class": "equity", "issuer": {"city": None}},
+        ]
+    }
+    actual = {
+        "holdings": [
+            {"class": "equity", "issuer": {"city": None}},
+            {"class": "equity", "issuer": {}},
+        ]
+    }
+    uni = compute_unified_evidence_metrics(expected, actual, [], [], schema)
+    assert _val(uni, "extract_unified_value_recall") == 1.0
+    assert _val(uni, "extract_unified_value_precision") == 1.0
+
+
 def test_pairing_walks_schema_keys_that_contain_dots() -> None:
     """A key named ``a.b`` is one field, not a nested ``a`` then ``b``.
 

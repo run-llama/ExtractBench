@@ -26,11 +26,12 @@ three additions:
    array. A missing key uses that field's JSON Schema ``default`` when the
    keyword is present; without ``default`` the key is absent (one-sided miss),
    not an implicit ``null``. ``lookup`` fills values; it does not pick the
-   scorer. The same lookup is used at the root, inside nested objects, and on
-   object columns of array rows after Hungarian pairing. Opaque array cells
-   stay ``array_record``'s ``.get``. Row-pairing cost uses those same children
-   (and nested object-arrays) so Hungarian maximizes the cells F1 actually
-   scores. Scalar lists stay opaque.
+   scorer. The same lookup is used at the root, inside nested objects, on
+   object columns of array rows after Hungarian pairing, and when reading
+   nested leaves for pairing cost. Opaque array cells stay ``array_record``'s
+   ``.get``. Row-pairing cost uses those same children (and nested
+   object-arrays) so Hungarian maximizes the cells F1 actually scores.
+   Scalar lists stay opaque.
 3. **Grounding (bbox + page).** Two parallel sets of counters, both value-gated
    and both nesting under the value score. A cell is *grounded-correct* when the
    value matches AND the prediction's citation has a bbox that overlaps an
@@ -353,16 +354,29 @@ def _read_segments(
     row: Any,
     *,
     segments: Sequence[str],
+    item_sch: Mapping[str, Any],
 ) -> Any:
-    """Walk successive mapping keys; a missing step is an implicit ``None`` cell.
+    """Walk successive mapping keys, applying ``lookup`` at each step.
 
     Keys are not split, so a schema field named ``a.b`` is one step, not two.
+    Omitted keys use JSON Schema ``default`` when present, matching F1.
+    A missing key with no ``default`` stops the walk as ``None``. A present
+    non-object (including explicit ``null``) is coerced to ``{}`` before the
+    next step, the same way ``_score_node`` walks children.
     """
     cur: Any = row if isinstance(row, Mapping) else {}
-    for part in segments:
+    field_schema: Any = {}
+    for i, part in enumerate(segments):
+        if i == 0:
+            field_schema = item_sch.get(part, {})
+        else:
+            props = schema_properties(field_schema) if isinstance(field_schema, Mapping) else {}
+            field_schema = props.get(part, {})
         if not isinstance(cur, Mapping):
+            cur = {}
+        present, cur = lookup(cur, part, field_schema)
+        if not present:
             return None
-        cur = cur.get(part)
     return cur
 
 
@@ -419,8 +433,9 @@ def _flatten_pairing_rows(
     rows: Sequence[Any],
     *,
     paths: Sequence[PairingPath],
+    item_sch: Mapping[str, Any],
 ) -> Sequence[Mapping[PairingPath, Any]]:
-    return [{path: _read_segments(row, segments=path) for path in paths} for row in rows]
+    return [{path: _read_segments(row, segments=path, item_sch=item_sch) for path in paths} for row in rows]
 
 
 def _fuzzy_for_paths(
@@ -523,6 +538,7 @@ class Scorer:
         exp_rows: Sequence[Any],
         pairing_paths: Sequence[PairingPath],
         gt_field: str,
+        item_sch: Mapping[str, Any],
     ) -> bool:
         """True when this level's opaque pairing cells have a distinct alt or a normalizer.
 
@@ -538,7 +554,7 @@ class Scorer:
                 alt = self._alt.get(gt_path)
                 if not alt:
                     continue
-                canon = _read_segments(erow, segments=path)
+                canon = _read_segments(erow, segments=path, item_sch=item_sch)
                 if any(value != canon for value in alt):
                     return True
         return False
@@ -569,7 +585,9 @@ class Scorer:
             item_sch=item_sch,
             subfield_names=names,
             gt_field=gt_path,
-            use_alts=self._gold_needs_configured_match(exp_rows=exp_rows, pairing_paths=inner_paths, gt_field=gt_path),
+            use_alts=self._gold_needs_configured_match(
+                exp_rows=exp_rows, pairing_paths=inner_paths, gt_field=gt_path, item_sch=item_sch
+            ),
         )
         row_ind, col_ind = linear_sum_assignment(inner)
         paired = int(inner[row_ind, col_ind].sum())
@@ -611,7 +629,7 @@ class Scorer:
             for i, erow in enumerate(exp_rows):
                 row_cands = []
                 for path in paths:
-                    canon = _read_segments(erow, segments=path)
+                    canon = _read_segments(erow, segments=path, item_sch=item_sch)
                     alt = self._alt.get(f"{gt_field}[{i}].{_gt_rel_path(path)}")
                     cand = [canon]
                     if alt:
@@ -619,7 +637,7 @@ class Scorer:
                     row_cands.append(cand)
                 exp_cands.append(row_cands)
             for j, arow in enumerate(act_rows):
-                avals = [_read_segments(arow, segments=path) for path in paths]
+                avals = [_read_segments(arow, segments=path, item_sch=item_sch) for path in paths]
                 for i, cands in enumerate(exp_cands):
                     cost[j, i] = sum(
                         not any(
@@ -635,8 +653,8 @@ class Scorer:
                     )
         elif paths:
             cost = mismatch_cost_matrix(
-                _flatten_pairing_rows(act_rows, paths=paths),
-                _flatten_pairing_rows(exp_rows, paths=paths),
+                _flatten_pairing_rows(act_rows, paths=paths, item_sch=item_sch),
+                _flatten_pairing_rows(exp_rows, paths=paths, item_sch=item_sch),
                 subfields=paths,
                 fuzzy_field_thresholds=path_fuzzy,
                 field_schemas=path_schemas,
@@ -649,8 +667,8 @@ class Scorer:
                 for i, erow in enumerate(exp_rows):
                     extra[j, i] = sum(
                         self._object_array_pair_cost(
-                            _read_segments(erow, segments=path),
-                            _read_segments(arow, segments=path),
+                            _read_segments(erow, segments=path, item_sch=item_sch),
+                            _read_segments(arow, segments=path, item_sch=item_sch),
                             schema=array_schema,
                             gt_path=f"{gt_field}[{i}].{_gt_rel_path(path)}",
                         )
@@ -866,7 +884,9 @@ class Scorer:
             # Distinct alts / normalizers on *this* level's opaque cells expand the
             # zero-cost graph, so skip the exact-row peel. Nested object-arrays
             # detect configured match for themselves when they add their cost.
-            if self._gold_needs_configured_match(exp_rows=exp_rows, pairing_paths=pairing_paths, gt_field=gt_field):
+            if self._gold_needs_configured_match(
+                exp_rows=exp_rows, pairing_paths=pairing_paths, gt_field=gt_field, item_sch=item_sch
+            ):
                 cost = self._pairing_cost_matrix(
                     act_rows,
                     exp_rows,
