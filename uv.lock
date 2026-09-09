@@ -833,7 +833,6 @@ wheels = [
 
 [[package]]
 name = "extract-bench"
-version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "aiohttp" },
@@ -859,19 +858,77 @@ dependencies = [
     { name = "rich" },
     { name = "scikit-learn" },
     { name = "scipy" },
-    { name = "tqdm" },
     { name = "unidecode" },
 ]
 
 [package.optional-dependencies]
+anthropic = [
+    { name = "anthropic" },
+    { name = "pdf2image" },
+    { name = "pillow" },
+    { name = "pymupdf" },
+    { name = "pypdf" },
+]
+aws = [
+    { name = "amazon-textract-textractor" },
+    { name = "boto3" },
+]
+azure = [
+    { name = "azure-ai-documentintelligence" },
+    { name = "httpx" },
+]
+datalab = [
+    { name = "datalab-python-sdk" },
+]
 dev = [
     { name = "mypy" },
     { name = "numba" },
     { name = "pytest" },
     { name = "ruff" },
 ]
+extend = [
+    { name = "extend-ai" },
+]
 fast = [
     { name = "numba" },
+]
+google = [
+    { name = "google-genai" },
+    { name = "pdf2image" },
+    { name = "pillow" },
+    { name = "pymupdf" },
+    { name = "pypdf" },
+]
+landingai = [
+    { name = "landingai-ade" },
+]
+llamaextract = [
+    { name = "httpx" },
+    { name = "llama-cloud" },
+]
+local = [
+    { name = "pdf2image" },
+    { name = "pillow" },
+    { name = "pymupdf" },
+    { name = "pypdf" },
+    { name = "pytesseract" },
+]
+openai = [
+    { name = "openai" },
+    { name = "pdf2image" },
+    { name = "pillow" },
+    { name = "pymupdf" },
+    { name = "pypdf" },
+]
+openweights = [
+    { name = "openai" },
+    { name = "pdf2image" },
+    { name = "pillow" },
+    { name = "pymupdf" },
+    { name = "pypdf" },
+]
+reducto = [
+    { name = "reductoai" },
 ]
 runners = [
     { name = "amazon-textract-textractor" },
@@ -902,27 +959,38 @@ runners = [
 [package.metadata]
 requires-dist = [
     { name = "aiohttp", specifier = ">=3.9.0" },
+    { name = "amazon-textract-textractor", marker = "extra == 'aws'", specifier = ">=1.7.0" },
     { name = "amazon-textract-textractor", marker = "extra == 'runners'", specifier = ">=1.7.0" },
     { name = "anls-star", specifier = ">=0.1.0" },
+    { name = "anthropic", marker = "extra == 'anthropic'", specifier = ">=0.77.1" },
     { name = "anthropic", marker = "extra == 'runners'", specifier = ">=0.77.1" },
     { name = "apted", specifier = ">=1.0.3" },
     { name = "autoevals", specifier = ">=0.0.20" },
+    { name = "azure-ai-documentintelligence", marker = "extra == 'azure'", specifier = ">=1.0.0" },
     { name = "azure-ai-documentintelligence", marker = "extra == 'runners'", specifier = ">=1.0.0" },
     { name = "beautifulsoup4", specifier = ">=4.12.0" },
     { name = "bleach", specifier = ">=6.0.0" },
+    { name = "boto3", marker = "extra == 'aws'", specifier = ">=1.34.0" },
     { name = "boto3", marker = "extra == 'runners'", specifier = ">=1.34.0" },
     { name = "chunkr-ai", marker = "extra == 'runners'", specifier = ">=0.0.43" },
+    { name = "datalab-python-sdk", marker = "extra == 'datalab'" },
     { name = "datalab-python-sdk", marker = "extra == 'runners'" },
     { name = "docling-core", marker = "extra == 'runners'", specifier = ">=2.71.0" },
+    { name = "extend-ai", marker = "extra == 'extend'", specifier = ">=1.16.0" },
     { name = "extend-ai", marker = "extra == 'runners'", specifier = ">=1.16.0" },
     { name = "fire", specifier = ">=0.7.1" },
     { name = "fuzzysearch", specifier = ">=0.7.3" },
     { name = "google-cloud-documentai", marker = "extra == 'runners'", specifier = ">=2.20.0" },
+    { name = "google-genai", marker = "extra == 'google'", specifier = ">=1.0.0" },
     { name = "google-genai", marker = "extra == 'runners'", specifier = ">=1.0.0" },
+    { name = "httpx", marker = "extra == 'azure'", specifier = ">=0.28.0" },
+    { name = "httpx", marker = "extra == 'llamaextract'", specifier = ">=0.28.0" },
     { name = "httpx", marker = "extra == 'runners'", specifier = ">=0.28.0" },
     { name = "huggingface-hub", specifier = ">=0.20.0" },
     { name = "infinity-parser2", marker = "extra == 'runners'", specifier = ">=0.3.0" },
+    { name = "landingai-ade", marker = "extra == 'landingai'", specifier = ">=1.4.0" },
     { name = "landingai-ade", marker = "extra == 'runners'", specifier = ">=1.4.0" },
+    { name = "llama-cloud", marker = "extra == 'llamaextract'", specifier = ">=1.4.1" },
     { name = "llama-cloud", marker = "extra == 'runners'", specifier = ">=1.4.1" },
     { name = "lxml", specifier = ">=5.0.0" },
     { name = "markdown", specifier = ">=3.0" },
@@ -931,31 +999,54 @@ requires-dist = [
     { name = "numba", marker = "extra == 'dev'", specifier = ">=0.59.0" },
     { name = "numba", marker = "extra == 'fast'", specifier = ">=0.59.0" },
     { name = "numpy", specifier = ">=1.24.0" },
+    { name = "openai", marker = "extra == 'openai'", specifier = ">=1.0.0" },
+    { name = "openai", marker = "extra == 'openweights'", specifier = ">=1.0.0" },
     { name = "openai", marker = "extra == 'runners'", specifier = ">=1.0.0" },
     { name = "pandas", specifier = ">=2.0.0" },
+    { name = "pdf2image", marker = "extra == 'anthropic'", specifier = ">=1.16.0" },
+    { name = "pdf2image", marker = "extra == 'google'", specifier = ">=1.16.0" },
+    { name = "pdf2image", marker = "extra == 'local'", specifier = ">=1.16.0" },
+    { name = "pdf2image", marker = "extra == 'openai'", specifier = ">=1.16.0" },
+    { name = "pdf2image", marker = "extra == 'openweights'", specifier = ">=1.16.0" },
     { name = "pdf2image", marker = "extra == 'runners'", specifier = ">=1.16.0" },
+    { name = "pillow", marker = "extra == 'anthropic'", specifier = ">=10.0.0" },
+    { name = "pillow", marker = "extra == 'google'", specifier = ">=10.0.0" },
+    { name = "pillow", marker = "extra == 'local'", specifier = ">=10.0.0" },
+    { name = "pillow", marker = "extra == 'openai'", specifier = ">=10.0.0" },
+    { name = "pillow", marker = "extra == 'openweights'", specifier = ">=10.0.0" },
     { name = "pillow", marker = "extra == 'runners'", specifier = ">=10.0.0" },
     { name = "pydantic", specifier = ">=2.0.0" },
+    { name = "pymupdf", marker = "extra == 'anthropic'", specifier = ">=1.24.0" },
+    { name = "pymupdf", marker = "extra == 'google'", specifier = ">=1.24.0" },
+    { name = "pymupdf", marker = "extra == 'local'", specifier = ">=1.24.0" },
+    { name = "pymupdf", marker = "extra == 'openai'", specifier = ">=1.24.0" },
+    { name = "pymupdf", marker = "extra == 'openweights'", specifier = ">=1.24.0" },
     { name = "pymupdf", marker = "extra == 'runners'", specifier = ">=1.24.0" },
+    { name = "pypdf", marker = "extra == 'anthropic'", specifier = ">=6.4.0" },
+    { name = "pypdf", marker = "extra == 'google'", specifier = ">=6.4.0" },
+    { name = "pypdf", marker = "extra == 'local'", specifier = ">=6.4.0" },
+    { name = "pypdf", marker = "extra == 'openai'", specifier = ">=6.4.0" },
+    { name = "pypdf", marker = "extra == 'openweights'", specifier = ">=6.4.0" },
     { name = "pypdf", marker = "extra == 'runners'", specifier = ">=6.4.0" },
+    { name = "pytesseract", marker = "extra == 'local'", specifier = ">=0.3.10" },
     { name = "pytesseract", marker = "extra == 'runners'", specifier = ">=0.3.10" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0.0" },
     { name = "python-dateutil", specifier = ">=2.9.0" },
     { name = "python-dotenv", specifier = ">=1.0.0" },
     { name = "python-levenshtein", specifier = ">=0.25.0" },
     { name = "rapidfuzz", specifier = ">=3.0.0" },
+    { name = "reductoai", marker = "extra == 'reducto'", specifier = ">=0.13.0" },
     { name = "reductoai", marker = "extra == 'runners'", specifier = ">=0.13.0" },
     { name = "requests", specifier = ">=2.31.0" },
     { name = "rich", specifier = ">=13.7.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.14.5" },
     { name = "scikit-learn", specifier = ">=1.8.0" },
     { name = "scipy", specifier = ">=1.16.3" },
-    { name = "tqdm", specifier = ">=4.67.1" },
     { name = "unidecode", specifier = ">=1.3.0" },
     { name = "unstructured-client", marker = "extra == 'runners'", specifier = ">=0.26.0" },
     { name = "warp-ingest", extras = ["ocr"], marker = "extra == 'runners'", specifier = ">=2.0.1" },
 ]
-provides-extras = ["runners", "fast", "dev"]
+provides-extras = ["anthropic", "aws", "azure", "datalab", "dev", "extend", "fast", "google", "landingai", "llamaextract", "local", "openai", "openweights", "reducto", "runners"]
 
 [[package]]
 name = "fastapi"

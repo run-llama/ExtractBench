@@ -10,6 +10,8 @@ from typing import TYPE_CHECKING
 import fire
 from dotenv import load_dotenv
 
+from extract_bench import __version__
+
 if TYPE_CHECKING:
     # Lazy import/instantiate CLIs to minimize startup time and dependency load.
     from extract_bench.analysis.cli import AnalysisCLI
@@ -53,6 +55,7 @@ class BenchCLI:
     """Unified CLI for extract-bench.
 
     Top-level commands (recommended):
+        version      Print the installed extract-bench version
         run          Run end-to-end benchmark pipeline
         download     Download dataset from HuggingFace
         status       Check if dataset is ready
@@ -108,6 +111,10 @@ class BenchCLI:
         return DatasetCLI()
 
     # ── Top-level convenience commands ──────────────────────────────
+
+    def version(self) -> str:
+        """Print the installed extract-bench version."""
+        return __version__
 
     def run(
         self,

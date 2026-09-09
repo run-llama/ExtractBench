@@ -73,10 +73,15 @@ Top 10 of 37 systems — full table in [leaderboard.csv](leaderboard.csv).
 **Prerequisites:** Create a `.env` file with the API key for the extraction system you want to evaluate (see [Configuration](#configuration)).
 
 ```bash
-# Install
+# Install from PyPI (pick the extras for the systems you want to run)
+pip install "extract-bench[runners]"          # every provider SDK
+pip install "extract-bench[llamaextract]"     # or just one, e.g. llamaextract / openai / anthropic / google
+
+# Or, from a checkout of this repo
 uv sync --extra runners
 
 # Quick test run (6 documents — good for trying things out)
+# (drop the `uv run` prefix if you installed from PyPI)
 uv run extract-bench run llamaextract_agentic --test
 
 # Full benchmark run (replace with any pipeline name, see "Available Pipelines" below)
