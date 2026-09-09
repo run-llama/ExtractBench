@@ -13,6 +13,7 @@ from extract_bench.evaluation.metrics.extract.unified_evidence_metric import (
     compute_unified_evidence_metrics,
     index_citations,
     iou_xywh,
+    lookup,
     path_leaf,
 )
 from extract_bench.test_cases.schema import ExtractFieldTestRule, FieldEvidence
@@ -327,15 +328,49 @@ def test_omitted_object_is_null_children_not_one_miss() -> None:
     rules = [_rule("vendor.name", "Acme"), _rule("vendor.city", "Austin")]
     uni = compute_unified_evidence_metrics(expected, actual, rules, [], schema)
     assert _val(uni, "extract_unified_value_recall") == 0.0
-    assert _val(uni, "extract_unified_value_precision") == 0.0
-    # Two implicit-null children (root ``.get``), not one opaque cell.
-    assert _val(uni, "extract_unified_value_recall") == _val(uni, "extract_unified_value_precision")
+    # No field ``default`` → omit is not an implicit null prediction.
+    explicit_nulls = compute_unified_evidence_metrics(
+        expected, {"vendor": {"name": None, "city": None}}, rules, [], schema
+    )
+    omitted_meta = next(m.metadata for m in uni if m.metric_name == "extract_unified_value_recall")
+    explicit_meta = next(m.metadata for m in explicit_nulls if m.metric_name == "extract_unified_value_recall")
+    assert omitted_meta["expected_cells"] == 2
+    assert omitted_meta["predicted_cells"] == 0
+    assert explicit_meta["predicted_cells"] == 2
+
+
+def test_omitted_object_uses_schema_field_defaults() -> None:
+    schema = {
+        "type": "object",
+        "$defs": {
+            "Vendor": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "default": "Acme"},
+                    "city": {"type": "string", "default": None},
+                },
+            }
+        },
+        "properties": {
+            "vendor": {"anyOf": [{"$ref": "#/$defs/Vendor"}, {"type": "null"}], "default": None},
+        },
+    }
+    expected = {"vendor": {"name": "Acme", "city": "Austin"}}
+    actual: dict[str, Any] = {}
+    rules = [_rule("vendor.name", "Acme"), _rule("vendor.city", "Austin")]
+    uni = compute_unified_evidence_metrics(expected, actual, rules, [], schema)
+    # name matches the explicit schema default; city default is null ≠ Austin.
+    assert _val(uni, "extract_unified_value_recall") == 0.5
+    assert _val(uni, "extract_unified_value_precision") == 0.5
+    meta = next(m.metadata for m in uni if m.metric_name == "extract_unified_value_recall")
+    assert meta["expected_cells"] == 2
+    assert meta["predicted_cells"] == 2
 
 
 def test_null_object_matches_omitted_and_explicit_null() -> None:
     schema = {
         "type": "object",
-        "properties": {"vendor": {"type": ["object", "null"]}},
+        "properties": {"vendor": {"type": ["object", "null"], "default": None}},
     }
     expected = {"vendor": None}
     rules = [_rule("vendor", None)]
@@ -343,6 +378,35 @@ def test_null_object_matches_omitted_and_explicit_null() -> None:
     explicit = compute_unified_evidence_metrics(expected, {"vendor": None}, rules, [], schema)
     assert _val(omitted, "extract_unified_value_f1") == 1.0
     assert _val(explicit, "extract_unified_value_f1") == 1.0
+
+
+def test_nested_object_scalar_array_is_one_opaque_cell() -> None:
+    # Schema-typed primitive arrays on nested objects are one opaque cell (same
+    # as a string field), not a Hungarian table and not a skip. Disagreeing
+    # lists are 0/0; matching lists are 1/1. Per-element scoring of ["a","b"] vs
+    # ["a","c"] would be 0.5, so these bounds also pin "one cell".
+    schema = {
+        "type": "object",
+        "properties": {
+            "vendor": {
+                "type": "object",
+                "properties": {
+                    "tags": {
+                        "type": "array",
+                        "items": {"type": ["string", "null"]},
+                    }
+                },
+            }
+        },
+    }
+    expected = {"vendor": {"tags": ["a", "b"]}}
+    rules = [_rule("vendor.tags", ["a", "b"])]
+    miss = compute_unified_evidence_metrics(expected, {"vendor": {"tags": ["a", "c"]}}, rules, [], schema)
+    hit = compute_unified_evidence_metrics(expected, expected, rules, [], schema)
+    assert _val(miss, "extract_unified_value_recall") == 0.0
+    assert _val(miss, "extract_unified_value_precision") == 0.0
+    assert _val(hit, "extract_unified_value_recall") == 1.0
+    assert _val(hit, "extract_unified_value_precision") == 1.0
 
 
 def test_object_inside_array_row_recurses_to_child_cells() -> None:
@@ -647,6 +711,157 @@ def test_array_records_with_nested_object_and_nested_object_array() -> None:
     assert _val(uni, "extract_unified_value_recall") > _val(arr, "array_record_recall")
 
 
+def test_hungarian_pairs_rows_by_nested_object_children() -> None:
+    """Same opaque scalars, nested objects that only partially overlap.
+
+    Whole-dict pairing cost is 1 for every gold/pred pair (no issuer dict is
+    identical), so Hungarian can follow list order and score children under the
+    wrong partner: 2 scalar hits, 0 nested hits → 2/6. Child-level cost prefers
+    the crossed pairing (each row matches city, misses zip) → 4/6.
+    """
+    schema = {
+        "type": "object",
+        "properties": {
+            "holdings": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "class": {"type": ["string", "null"]},
+                        "issuer": {
+                            "type": "object",
+                            "properties": {
+                                "city": {"type": ["string", "null"]},
+                                "zip": {"type": ["string", "null"]},
+                            },
+                        },
+                    },
+                },
+            }
+        },
+    }
+    expected = {
+        "holdings": [
+            {"class": "equity", "issuer": {"city": "NYC", "zip": "10001"}},
+            {"class": "equity", "issuer": {"city": "SF", "zip": "94105"}},
+        ]
+    }
+    actual = {
+        "holdings": [
+            {"class": "equity", "issuer": {"city": "SF", "zip": "00000"}},
+            {"class": "equity", "issuer": {"city": "NYC", "zip": "00000"}},
+        ]
+    }
+    uni = compute_unified_evidence_metrics(expected, actual, [], [], schema)
+    assert _val(uni, "extract_unified_value_recall") == 4 / 6
+    assert _val(uni, "extract_unified_value_precision") == 4 / 6
+    arr = ArrayRecordMatchMetric().compute(expected=expected, actual=actual, data_schema=schema)
+    # array_record still treats issuer as one opaque cell: list-order pairing,
+    # class matches, issuer dicts all miss → 2/4.
+    assert _val(arr, "array_record_recall") == 2 / 4
+
+
+def test_pairing_walks_schema_keys_that_contain_dots() -> None:
+    """A key named ``a.b`` is one field, not a nested ``a`` then ``b``.
+
+    Same opaque scalar, nested objects that only overlap on that dotted key.
+    Splitting the path on ``.`` would read missing children and list-order pair
+    (2/6). Segment walks pair on ``a.b`` (4/6).
+    """
+    schema = {
+        "type": "object",
+        "properties": {
+            "holdings": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "class": {"type": ["string", "null"]},
+                        "issuer": {
+                            "type": "object",
+                            "properties": {
+                                "a.b": {"type": ["string", "null"]},
+                                "zip": {"type": ["string", "null"]},
+                            },
+                        },
+                    },
+                },
+            }
+        },
+    }
+    expected = {
+        "holdings": [
+            {"class": "equity", "issuer": {"a.b": "NYC", "zip": "10001"}},
+            {"class": "equity", "issuer": {"a.b": "SF", "zip": "94105"}},
+        ]
+    }
+    actual = {
+        "holdings": [
+            {"class": "equity", "issuer": {"a.b": "SF", "zip": "00000"}},
+            {"class": "equity", "issuer": {"a.b": "NYC", "zip": "00000"}},
+        ]
+    }
+    uni = compute_unified_evidence_metrics(expected, actual, [], [], schema)
+    assert _val(uni, "extract_unified_value_recall") == 4 / 6
+    assert _val(uni, "extract_unified_value_precision") == 4 / 6
+
+
+def test_nested_object_array_alts_participate_in_parent_pairing() -> None:
+    """Alts on nested object-array leaves must affect parent Hungarian cost.
+
+    Parent scalars tie. Without alts, list-order nested cost is worse than the
+    crossed pairing, so the solver swaps and gold[1] misses applez (3/4). With
+    alts in the nested cost, list order is free and both names match (4/4).
+    """
+    schema = {
+        "type": "object",
+        "properties": {
+            "rows": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "cls": {"type": ["string", "null"]},
+                        "loc": {
+                            "type": "object",
+                            "properties": {
+                                "aliases": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {"name": {"type": ["string", "null"]}},
+                                    },
+                                }
+                            },
+                        },
+                    },
+                },
+            }
+        },
+    }
+    expected = {
+        "rows": [
+            {"cls": "x", "loc": {"aliases": [{"name": "apple"}]}},
+            {"cls": "x", "loc": {"aliases": [{"name": "apples"}]}},
+        ]
+    }
+    actual = {
+        "rows": [
+            {"cls": "x", "loc": {"aliases": [{"name": "applez"}]}},
+            {"cls": "x", "loc": {"aliases": [{"name": "apple"}]}},
+        ]
+    }
+    rules = [
+        _rule("rows[0].cls", "x"),
+        _rule("rows[0].loc.aliases[0].name", "apple", "applez"),
+        _rule("rows[1].cls", "x"),
+        _rule("rows[1].loc.aliases[0].name", "apples", "apple"),
+    ]
+    uni = compute_unified_evidence_metrics(expected, actual, rules, [], schema)
+    assert _val(uni, "extract_unified_value_recall") == 1.0
+    assert _val(uni, "extract_unified_value_precision") == 1.0
+
+
 # ------------------------------------------------------------- grounding
 def _bbox_rules(expected: dict[str, Any], page: int, bbox: list[float]) -> list[ExtractFieldTestRule]:
     rules = [_rule("as_of", expected.get("as_of"))]
@@ -685,6 +900,37 @@ def test_iou_xywh_clamps_identical_non_dyadic_boxes_to_one() -> None:
     box = (0.1, 0.2, 0.3, 0.4)
     assert iou_xywh(box, box) == 1.0
     assert iou_xywh(box, (0.9, 0.9, 0.05, 0.05)) == 0.0
+
+
+def test_iou_xywh_identical_malformed_boxes_are_not_perfect_hits() -> None:
+    nan = float("nan")
+    inf = float("inf")
+    assert iou_xywh((nan, nan, nan, nan), (nan, nan, nan, nan)) == 0.0
+    assert iou_xywh((0.0, 0.0, inf, inf), (0.0, 0.0, inf, inf)) == 0.0
+    assert iou_xywh((0.1, 0.2, 0.0, 0.4), (0.1, 0.2, 0.0, 0.4)) == 0.0
+    assert iou_xywh((0.1, 0.2, 0.3, 0.0), (0.1, 0.2, 0.3, 0.0)) == 0.0
+
+
+def test_indexers_drop_non_finite_or_non_positive_bboxes() -> None:
+    nan = float("nan")
+    inf = float("inf")
+    rules = [
+        _rule("as_of", "x", page=1, bbox=[0.1, 0.2, nan, 0.4]),
+        _rule("holdings[0].security", "AAA", page=1, bbox=[0.1, 0.2, inf, 0.4]),
+        _rule("holdings[0].coupon", 1.0, page=1, bbox=[0.1, 0.2, 0.0, 0.4]),
+        _rule("holdings[0].note", "n", page=1, bbox=[0.1, 0.2, 0.3, -0.1]),
+    ]
+    _, ev_boxes, _, *_ = build_rule_indexes(rules)
+    pred_boxes, _ = index_citations(
+        [
+            {"field_path": "as_of", "page": 1, "bbox": [0.1, 0.2, nan, 0.4]},
+            {"field_path": "holdings[0].security", "page": 1, "bbox": [0.1, 0.2, inf, 0.4]},
+            {"field_path": "holdings[0].coupon", "page": 1, "bbox": [0.1, 0.2, 0.0, 0.4]},
+            {"field_path": "holdings[0].note", "page": 1, "bbox": [0.1, 0.2, 0.3, -0.1]},
+        ]
+    )
+    assert ev_boxes == {}
+    assert pred_boxes == {}
 
 
 def test_no_citations_yields_zero_grounded() -> None:
@@ -1068,7 +1314,10 @@ def _scalar_schema(field: str, typ: str = "string") -> dict[str, Any]:
 
 
 def test_null_equals_false_normalizer_accepts_blank_checkbox_both_ways() -> None:
-    schema = _scalar_schema("swr37_bw_hearing", "boolean")
+    schema = {
+        "type": "object",
+        "properties": {"swr37_bw_hearing": {"type": ["boolean", "null"], "default": None}},
+    }
 
     # GT False, model omitted the field entirely.
     omitted = compute_unified_evidence_metrics(
@@ -1245,22 +1494,147 @@ def test_punctuation_spacing_normalizer_is_opt_in() -> None:
     assert _val(different, "extract_unified_value_f1") == 0.0
 
 
-def test_omitted_scalar_counts_as_implicit_null_prediction_right_or_wrong() -> None:
-    """Omission is scored exactly like an explicit null: it always enters the
-    precision denominator, so dropping an uncertain field cannot outscore
-    asserting it."""
+def test_omitted_scalar_without_default_is_not_implicit_null() -> None:
+    """A missing key with no schema ``default`` is absent, not predicted null."""
     schema = {
         "type": "object",
         "properties": {"a": {"type": ["string", "null"]}, "b": {"type": ["string", "null"]}},
     }
     rules = [_rule("a", "x"), _rule("b", None)]
-
     omitted = compute_unified_evidence_metrics({"a": "x", "b": None}, {}, rules, [], schema)
     explicit = compute_unified_evidence_metrics({"a": "x", "b": None}, {"a": None, "b": None}, rules, [], schema)
+    omitted_meta = next(m.metadata for m in omitted if m.metric_name == "extract_unified_value_recall")
+    explicit_meta = next(m.metadata for m in explicit if m.metric_name == "extract_unified_value_recall")
+    assert omitted_meta["expected_cells"] == 2
+    assert omitted_meta["predicted_cells"] == 0
+    assert explicit_meta["predicted_cells"] == 2
 
+
+def test_omitted_scalar_with_null_default_matches_explicit_null() -> None:
+    schema = {
+        "type": "object",
+        "properties": {
+            "a": {"type": ["string", "null"], "default": None},
+            "b": {"type": ["string", "null"], "default": None},
+        },
+    }
+    rules = [_rule("a", "x"), _rule("b", None)]
+    omitted = compute_unified_evidence_metrics({"a": "x", "b": None}, {}, rules, [], schema)
+    explicit = compute_unified_evidence_metrics({"a": "x", "b": None}, {"a": None, "b": None}, rules, [], schema)
     assert _val(omitted, "extract_unified_value_precision") == 0.5
     assert _val(omitted, "extract_unified_value_precision") == _val(explicit, "extract_unified_value_precision")
     assert _val(omitted, "extract_unified_value_recall") == _val(explicit, "extract_unified_value_recall")
+
+
+def test_lookup_present_key_wins_including_explicit_null() -> None:
+    schema = {"type": ["string", "null"], "default": "x"}
+    assert lookup({"a": None}, "a", schema) == (True, None)
+    assert lookup({"a": "y"}, "a", schema) == (True, "y")
+    assert lookup({}, "a", schema) == (True, "x")
+    assert lookup({}, "a", {"type": "string"}) == (False, None)
+    assert lookup({}, "a", {"default": None}) == (True, None)
+
+
+def test_explicit_null_vs_omit_without_default_is_one_sided() -> None:
+    schema = {"type": "object", "properties": {"a": {"type": ["string", "null"]}}}
+    rules = [_rule("a", None)]
+    omit_pred = compute_unified_evidence_metrics({"a": None}, {}, rules, [], schema)
+    omit_gold = compute_unified_evidence_metrics({}, {"a": None}, rules, [], schema)
+    both = compute_unified_evidence_metrics({"a": None}, {"a": None}, rules, [], schema)
+    omit_pred_meta = next(m.metadata for m in omit_pred if m.metric_name == "extract_unified_value_recall")
+    omit_gold_meta = next(m.metadata for m in omit_gold if m.metric_name == "extract_unified_value_recall")
+    assert omit_pred_meta["expected_cells"] == 1
+    assert omit_pred_meta["predicted_cells"] == 0
+    assert omit_gold_meta["expected_cells"] == 0
+    assert omit_gold_meta["predicted_cells"] == 1
+    assert _val(both, "extract_unified_value_f1") == 1.0
+
+
+def test_omitted_scalar_with_non_null_default_is_a_real_value() -> None:
+    schema = {"type": "object", "properties": {"name": {"type": "string", "default": "Acme"}}}
+    match = compute_unified_evidence_metrics({"name": "Acme"}, {}, [_rule("name", "Acme")], [], schema)
+    miss = compute_unified_evidence_metrics({"name": "Beta"}, {}, [_rule("name", "Beta")], [], schema)
+    assert _val(match, "extract_unified_value_f1") == 1.0
+    assert _val(miss, "extract_unified_value_recall") == 0.0
+    assert _val(miss, "extract_unified_value_precision") == 0.0
+    miss_meta = next(m.metadata for m in miss if m.metric_name == "extract_unified_value_recall")
+    assert miss_meta["expected_cells"] == 1
+    assert miss_meta["predicted_cells"] == 1
+
+
+def test_both_sides_omit_defaulted_root_field() -> None:
+    """Schema names, not instance keys, are the cell universe (plus lookup)."""
+    schema = {"type": "object", "properties": {"name": {"type": "string", "default": "Acme"}}}
+    uni = compute_unified_evidence_metrics({}, {}, [_rule("name", "Acme")], [], schema)
+    assert _val(uni, "extract_unified_value_f1") == 1.0
+    meta = next(m.metadata for m in uni if m.metric_name == "extract_unified_value_recall")
+    assert meta["expected_cells"] == 1
+    assert meta["predicted_cells"] == 1
+
+
+def test_both_sides_omit_root_field_without_default_is_not_a_cell() -> None:
+    schema = {"type": "object", "properties": {"name": {"type": "string"}}}
+    uni = compute_unified_evidence_metrics({}, {}, [_rule("name", "Acme")], [], schema)
+    assert uni == []
+
+
+def test_nested_object_child_omit_uses_field_default() -> None:
+    schema = {
+        "type": "object",
+        "properties": {
+            "vendor": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "default": "Acme"},
+                    "city": {"type": ["string", "null"]},
+                },
+            }
+        },
+    }
+    expected = {"vendor": {"name": "Acme", "city": "Austin"}}
+    actual = {"vendor": {}}
+    rules = [_rule("vendor.name", "Acme"), _rule("vendor.city", "Austin")]
+    uni = compute_unified_evidence_metrics(expected, actual, rules, [], schema)
+    meta = next(m.metadata for m in uni if m.metric_name == "extract_unified_value_recall")
+    # name defaulted to Acme (match); city absent (recall-only, not a null prediction).
+    assert meta["expected_cells"] == 2
+    assert meta["predicted_cells"] == 1
+    assert _val(uni, "extract_unified_value_recall") == 0.5
+    assert _val(uni, "extract_unified_value_precision") == 1.0
+
+
+def test_in_row_object_child_omit_uses_schema_default() -> None:
+    schema = {
+        "type": "object",
+        "properties": {
+            "rows": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "id": {"type": ["string", "null"]},
+                        "addr": {
+                            "type": "object",
+                            "properties": {
+                                "city": {"type": "string", "default": "Austin"},
+                                "zip": {"type": ["string", "null"]},
+                            },
+                        },
+                    },
+                },
+            }
+        },
+    }
+    expected = {"rows": [{"id": "1", "addr": {"city": "Austin", "zip": "1"}}]}
+    actual = {"rows": [{"id": "1", "addr": {}}]}
+    rules = [_rule("rows[0].id", "1"), _rule("rows[0].addr.city", "Austin"), _rule("rows[0].addr.zip", "1")]
+    uni = compute_unified_evidence_metrics(expected, actual, rules, [], schema)
+    meta = next(m.metadata for m in uni if m.metric_name == "extract_unified_value_recall")
+    # id match + city default match; zip absent (recall-only).
+    assert meta["expected_cells"] == 3
+    assert meta["predicted_cells"] == 2
+    assert _val(uni, "extract_unified_value_recall") == 2 / 3
+    assert _val(uni, "extract_unified_value_precision") == 1.0
 
 
 def test_supported_normalizers_match_schema_vocabulary() -> None:
@@ -1321,7 +1695,7 @@ def test_giant_grounded_array_skips_grounding_value_exact_and_peels(monkeypatch:
 
 def test_giant_threshold_does_not_touch_nested_or_below_threshold(monkeypatch: Any) -> None:
     """The skip must not fire for arrays with nested object arrays (peel would shift
-    nested TP -- the #1537 hazard), nor below the threshold."""
+    nested TP), nor below the threshold."""
     box = [0.0, 0.0, 10.0, 10.0]
     expected = {"as_of": None, "holdings": [{"security": "A", "coupon": 1.0, "note": "n"}]}
     rules = _bbox_rules(expected, page=1, bbox=box)

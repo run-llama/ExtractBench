@@ -47,6 +47,10 @@ DEFAULT_FUZZY_FIELD_THRESHOLDS: dict[str, float] = {
     "court": 0.85,
 }
 
+# Intern / Hungarian column id: a JSON key on a raw row (`str`) or a flattened
+# pairing path (`tuple[str, ...]`). A singleton tuple is not a JSON key.
+type CellKey = str | tuple[str, ...]
+
 
 @dataclass(frozen=True)
 class ArrayRecordMatchCounts:
@@ -117,12 +121,12 @@ def normalize_ws(value: str) -> str:
     return _WS_RE.sub(" ", value).strip()
 
 
-def cell_match(
+def cell_match[K: CellKey](
     expected: Any,
     actual: Any,
-    field: str,
+    field: K,
     *,
-    fuzzy_field_thresholds: Mapping[str, float],
+    fuzzy_field_thresholds: Mapping[K, float],
     field_schema: Any = None,
 ) -> bool:
     threshold = fuzzy_field_thresholds.get(field)
@@ -216,10 +220,10 @@ def _cell_key(
     return ("v", value)
 
 
-def _intern_field(
+def _intern_field[K: CellKey](
     actual_list: Sequence[Any],
     expected_list: Sequence[Any],
-    field: str,
+    field: K,
     field_schema: Any = None,
 ) -> tuple[np.ndarray, np.ndarray] | None:
     """Map each row's ``field`` cell to an int id shared across both sides.
@@ -318,13 +322,13 @@ def peel_exact_row_matches(
     )
 
 
-def mismatch_cost_matrix(
-    actual_list: list[Any],
-    expected_list: list[Any],
+def mismatch_cost_matrix[K: CellKey](
+    actual_list: Sequence[Any],
+    expected_list: Sequence[Any],
     *,
-    subfields: Sequence[str],
-    fuzzy_field_thresholds: Mapping[str, float],
-    field_schemas: Mapping[str, Any] | None = None,
+    subfields: Sequence[K],
+    fuzzy_field_thresholds: Mapping[K, float],
+    field_schemas: Mapping[K, Any] | None = None,
 ) -> np.ndarray:
     """Vectorized ``(n_actual, n_expected)`` matrix of mismatched-subfield counts.
 
