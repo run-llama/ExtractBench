@@ -7,13 +7,14 @@ import json
 import os
 import sys
 import unicodedata
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from concurrent.futures import (
+    FIRST_COMPLETED,
+    Future,
     ProcessPoolExecutor,
-    as_completed,
 )
 from concurrent.futures import (
-    TimeoutError as FuturesTimeoutError,
+    wait as futures_wait,
 )
 from datetime import datetime
 from pathlib import Path
@@ -195,6 +196,155 @@ def _build_failure_metric_metadata(
             }
         )
     return md
+
+
+# Longest a low-cost eval batch may go with NOTHING completing before the
+# collector gives up on the workers still in flight. A hung worker cannot be
+# cancelled once it is running, so this is the only cap that exists: without it
+# a single document stuck in a network call holds the whole run open. The window
+# restarts on every completion, so it only elapses when the pool has genuinely
+# stopped making progress, and the gate below only enables it when the ground
+# truth is small enough that eight silent minutes mean a hang, not real work.
+_EVAL_WORKER_STALL_TIMEOUT_SECONDS = 8 * 60
+# Ground truth is the stable input that determines evaluation complexity. Keep
+# the stall guard only when every selected sidecar is at most this large.
+_EVAL_STALL_TIMEOUT_MAX_GT_BYTES = 1 * 1024 * 1024
+# Grace period for a SIGTERMed eval worker to die before we stop waiting on it.
+_EVAL_WORKER_KILL_JOIN_SECONDS = 5
+# ProcessPoolExecutor keeps its call queue pre-fed, so the tasks sitting in the
+# pipe behind a hung worker are already flagged RUNNING and are indistinguishable
+# from it in the parent -- a stall would zero-score up to a poolful of documents
+# that never actually ran. Give a timed-out task one more shot on the fresh pool
+# when there was queued work to blame; the genuinely hung one dies on the second
+# strike, so this is bounded and the batch always shrinks.
+_EVAL_WORKER_MAX_ATTEMPTS = 2
+
+
+def _largest_selected_gt_file_bytes(
+    test_cases: Iterable[TestCase],
+    test_cases_dir: Path | None,
+) -> int:
+    """Largest GT sidecar among the test cases selected for this evaluation.
+
+    Return 0 when any selected case cannot be mapped back to a GT file. The
+    timeout gate treats 0 as unknown and stays disabled in that case.
+    """
+    if test_cases_dir is None:
+        return 0
+
+    sizes: list[int] = []
+    for test_case in test_cases:
+        source_path = Path(test_case.file_path)
+        test_id_stem = Path(test_case.test_id).name
+        candidates = [
+            source_path.parent / f"{source_path.stem}.test.json",
+            Path(test_cases_dir) / f"{test_id_stem}.test.json",
+            Path(test_cases_dir) / f"{test_case.test_id}.test.json",
+            source_path.parent / f"{source_path.parent.name}.test.json",
+        ]
+        gt_path = next((path for path in candidates if path.is_file()), None)
+        if gt_path is None:
+            return 0
+        try:
+            sizes.append(gt_path.stat().st_size)
+        except OSError:
+            return 0
+
+    return max(sizes, default=0)
+
+
+def _eval_stall_timeout_seconds(largest_gt_bytes: int) -> float | None:
+    """Return the stall guard only when the ground truth is demonstrably small.
+
+    An unconditional wall-clock limit cannot distinguish a hung network call
+    from legitimate work on a citation-heavy long document. Ground-truth
+    sidecars at or below the small-file limit retain the guard. Larger or
+    unmeasurable ground truth waits for workers without a timeout.
+    """
+    if 0 < largest_gt_bytes <= _EVAL_STALL_TIMEOUT_MAX_GT_BYTES:
+        return _EVAL_WORKER_STALL_TIMEOUT_SECONDS
+    return None
+
+
+def _drain_eval_futures(
+    futures: Iterable[Future],
+    timeout: float | None,
+    on_done: Callable[[Future], None],
+) -> tuple[set[Future], set[Future]]:
+    """Hand every finished future to ``on_done``, bailing out on a stalled pool.
+
+    Returns ``(timed_out, unstarted)``: the futures that were still *running*
+    when ``timeout`` seconds passed with nothing completing, and the ones that
+    had not started yet and were therefore cancelled cleanly. Both sets are
+    empty on the normal path, where every future is drained. ``None`` disables
+    the deadline and waits for every future.
+
+    This is deliberately NOT ``for f in as_completed(futures): f.result(timeout=...)``
+    -- that idiom looks like a per-worker cap but is a no-op, because
+    ``as_completed`` only ever yields futures that are already done, so the
+    ``result()`` timeout can never elapse. ``wait(..., FIRST_COMPLETED)`` puts
+    the deadline where the blocking actually happens.
+
+    The window is measured from the last completion rather than from each task's
+    start, because a ProcessPool gives the parent no way to see when a queued
+    task begins running. A slow document is only ever cut off once it is the
+    thing holding the batch up, and a task merely queued behind a hung one is
+    never mistaken for a hung task itself.
+    """
+    pending = set(futures)
+    while pending:
+        done, pending = futures_wait(pending, timeout=timeout, return_when=FIRST_COMPLETED)
+        for future in done:
+            on_done(future)
+        if not done:
+            # Nothing finished inside the window: the pool has stalled. Split
+            # what is left into "running (unreclaimable, give up on it)" and
+            # "never started (cancel and re-run on a fresh pool)". A future can
+            # still finish in the gap between the wait timing out and this
+            # sweep, so check for that first rather than failing a completed
+            # evaluation.
+            timed_out: set[Future] = set()
+            unstarted: set[Future] = set()
+            for future in pending:
+                if future.done():
+                    on_done(future)
+                elif future.cancel():
+                    unstarted.add(future)
+                else:
+                    timed_out.add(future)
+            return timed_out, unstarted
+    return set(), set()
+
+
+def _shutdown_eval_pool(executor: ProcessPoolExecutor, *, force: bool) -> None:
+    """Tear the eval pool down, killing stuck workers when ``force`` is set.
+
+    On the normal path this is just a blocking ``shutdown``. On the stall path a
+    blocking shutdown would re-create the very hang the timeout exists to escape
+    (``shutdown(wait=True)`` waits on the hung worker), and there is no public
+    API for evicting a running task -- so SIGTERM the worker processes and only
+    then wait. That breaks the executor, which is fine: the caller has already
+    cancelled everything still queued and re-submits it to a fresh pool.
+    """
+    if not force:
+        executor.shutdown(wait=True)
+        return
+    # Snapshot before shutdown; the executor drops its process map on teardown.
+    # Private attribute by necessity -- ProcessPoolExecutor exposes no way to
+    # reach its workers -- so tolerate it being absent or reshaped.
+    processes = list((getattr(executor, "_processes", None) or {}).values())
+    executor.shutdown(wait=False, cancel_futures=True)
+    for proc in processes:
+        try:
+            if proc.is_alive():
+                proc.terminate()
+        except (OSError, ValueError):  # already reaped
+            pass
+    for proc in processes:
+        try:
+            proc.join(timeout=_EVAL_WORKER_KILL_JOIN_SECONDS)
+        except (OSError, ValueError, AssertionError):
+            pass
 
 
 # Module-level worker function for ProcessPoolExecutor (must be picklable)
@@ -489,6 +639,13 @@ class EvaluationRunner:
         result_files = []
         # Look for .result.json files (normalized results)
         for result_file in output_dir.rglob("*.result.json"):
+            # Per-document artifact bundles (inline-image crops a parser saved
+            # beside the document as ``<document>.images/``) can carry their own
+            # ``*.result.json``; they are dependencies of the parent result, not
+            # documents to score.
+            relative_parts = result_file.relative_to(output_dir).parts[:-1]
+            if any(part.endswith(".images") for part in relative_parts):
+                continue
             result_files.append(result_file)
         return sorted(result_files)
 
@@ -706,6 +863,11 @@ class EvaluationRunner:
         successful = 0
         failed = 0
         skipped = 0
+        # (pipeline, test_id) -> (error, failure metadata) for worker crashes and
+        # timeouts. Turned into one zero-scored row each once healthy results have
+        # established the metric set, so a document the evaluator could not score
+        # still counts against the pipeline instead of vanishing.
+        evaluation_failures: dict[tuple[str, str], tuple[str, dict[str, Any]]] = {}
 
         # Separate QA and non-QA evaluations
         qa_evaluation_tasks: list[tuple[InferenceResult, ParseTestCase, QAEvaluator]] = []
@@ -1105,43 +1267,128 @@ class EvaluationRunner:
                         )
                     )
 
-                # Use ProcessPoolExecutor for true parallelism (bypasses GIL)
-                with ProcessPoolExecutor(max_workers=num_workers) as executor:
-                    # Submit all tasks
-                    futures = [executor.submit(_evaluate_single_worker, *task) for task in worker_tasks]
+                task_pipelines = [
+                    inf_result.pipeline_name for inf_result, _tc, _eval_obj, _mode in parallelizable_evaluations
+                ]
+                task_labels = [tc.test_id for _inf_result, tc, _eval_obj, _mode in parallelizable_evaluations]
 
-                    # Per-worker timeout: 8 minutes per evaluation
-                    worker_timeout = 8 * 60
+                largest_gt_bytes = _largest_selected_gt_file_bytes(test_cases_dict.values(), self.test_cases_dir)
+                worker_timeout = _eval_stall_timeout_seconds(largest_gt_bytes)
+                if verbose:
+                    timeout_status = f"{worker_timeout:g}s" if worker_timeout is not None else "disabled"
+                    print(
+                        "ℹ️  Evaluation stall timeout "
+                        f"{timeout_status}: largest_gt={largest_gt_bytes / 1024**2:.1f} MiB, "
+                        f"limit={_EVAL_STALL_TIMEOUT_MAX_GT_BYTES / 1024**2:.1f} MiB"
+                    )
 
-                    # Collect results as they complete
-                    completed = 0
-                    for future in as_completed(futures):
-                        try:
-                            result_dict = future.result(timeout=worker_timeout)
-                            eval_result = EvaluationResult.model_validate(result_dict)
-                            evaluation_results.append(eval_result)
+                def _record_eval_result(result_dict: dict[str, Any]) -> None:
+                    nonlocal successful, failed, skipped
+                    eval_result = EvaluationResult.model_validate(result_dict)
+                    evaluation_results.append(eval_result)
 
-                            if eval_result.success:
-                                successful += 1
-                                log_progress(eval_result.test_id, "OK")
-                            elif _is_skipped_result(eval_result):
-                                skipped += 1
-                                log_progress(eval_result.test_id, "skipped (no layout data)")
-                            else:
-                                failed += 1
-                                log_progress(eval_result.test_id, "FAILED")
-                        except FuturesTimeoutError:
-                            failed += 1
-                            log_progress("unknown", f"FAILED (worker timed out after {worker_timeout}s)")
-                        except Exception:
-                            # Worker process error
-                            failed += 1
-                            log_progress("unknown", "FAILED (worker error)")
+                    if eval_result.success:
+                        successful += 1
+                        log_progress(eval_result.test_id, "OK")
+                    elif _is_skipped_result(eval_result):
+                        skipped += 1
+                        log_progress(eval_result.test_id, "skipped (no layout data)")
+                    else:
+                        failed += 1
+                        log_progress(eval_result.test_id, "FAILED")
 
-                        # Update progress (can't do this in worker due to separate processes)
-                        completed += 1
-                        if progress and total_task_id is not None:
-                            progress.update(total_task_id, completed=completed)  # type: ignore[arg-type]
+                # Collect results as they complete
+                completed = 0
+
+                def _note_completed() -> None:
+                    """Advance the shared progress bar by one finished document."""
+                    nonlocal completed
+                    completed += 1
+                    if progress and total_task_id is not None:
+                        progress.update(total_task_id, completed=completed)  # type: ignore[arg-type]
+
+                # (task, pipeline, progress label, attempts so far). Consumed a
+                # batch at a time: a stalled pool is torn down and whatever it did
+                # not finish is re-submitted to a fresh one, so a hung document
+                # costs its own evaluation and nothing else's.
+                TaskEntry = tuple[tuple[Any, ...], str, str, int]
+                pending_tasks: list[TaskEntry] = [
+                    (task, task_pipeline, label, 0)
+                    for task, task_pipeline, label in zip(worker_tasks, task_pipelines, task_labels, strict=True)
+                ]
+                # Refilled per batch (cleared + updated, never reassigned, so the
+                # handler below closes over a stable mapping).
+                future_tasks: dict[Future, TaskEntry] = {}
+
+                def _handle_future(future: Future) -> None:
+                    try:
+                        _record_eval_result(future.result())
+                    except Exception as exc:
+                        # Worker process error: recorded here, scored as a zero
+                        # row once the metric set is known.
+                        _task, task_pipeline, test_id, _attempts = future_tasks[future]
+                        evaluation_failures[(task_pipeline, test_id)] = (
+                            f"Evaluation worker error: {type(exc).__name__}: {exc}",
+                            {"evaluation_worker_error": True, "error_type": type(exc).__name__},
+                        )
+                        log_progress(test_id, "FAILED (worker error)")
+
+                    # Update progress (can't do this in worker due to separate processes)
+                    _note_completed()
+
+                def _fail_timed_out(entry: TaskEntry) -> None:
+                    assert worker_timeout is not None
+                    _task, task_pipeline, test_id, _attempts = entry
+                    evaluation_failures[(task_pipeline, test_id)] = (
+                        f"Evaluation timed out after {worker_timeout:g}s",
+                        {"evaluation_timeout": True, "timeout_seconds": worker_timeout},
+                    )
+                    log_progress(test_id, f"FAILED (worker timed out after {worker_timeout}s)")
+                    _note_completed()
+
+                while pending_tasks:
+                    # Use ProcessPoolExecutor for true parallelism (bypasses GIL)
+                    executor = ProcessPoolExecutor(max_workers=num_workers)
+                    stalled = False
+                    try:
+                        # Submit all tasks
+                        futures = [
+                            executor.submit(_evaluate_single_worker, *task)
+                            for task, _pipeline, _label, _n in pending_tasks
+                        ]
+                        future_tasks.clear()
+                        future_tasks.update(zip(futures, pending_tasks, strict=True))
+
+                        timed_out, unstarted = _drain_eval_futures(futures, worker_timeout, _handle_future)
+                        stalled = bool(timed_out or unstarted)
+
+                        # Keep submission order so a retried batch behaves like the
+                        # original one.
+                        retry: list[TaskEntry] = []
+                        for future, entry in future_tasks.items():
+                            if future in unstarted:
+                                retry.append(entry)
+                            elif future in timed_out:
+                                entry_task, entry_pipeline, label, attempts = entry
+                                # Only worth a re-run if something was queued behind
+                                # this batch: that is the case where the pool's
+                                # pre-fed call queue makes a never-started task look
+                                # like a running one. With nothing queued, a RUNNING
+                                # future really was running, so blame it directly.
+                                if unstarted and attempts + 1 < _EVAL_WORKER_MAX_ATTEMPTS:
+                                    retry.append((entry_task, entry_pipeline, label, attempts + 1))
+                                else:
+                                    _fail_timed_out(entry)
+                        if not timed_out and len(retry) == len(future_tasks):
+                            # The batch stalled without a single task completing or
+                            # even starting -- a pool that never came up. Retrying
+                            # the identical batch would spin forever, so fail it.
+                            for entry in retry:
+                                _fail_timed_out(entry)
+                            retry = []
+                        pending_tasks = retry
+                    finally:
+                        _shutdown_eval_pool(executor, force=stalled)
 
             # Process QA evaluations concurrently
             if qa_evaluation_tasks:
@@ -1168,26 +1415,63 @@ class EvaluationRunner:
             if tc is not None:
                 result.tags = list(tc.tags)
 
-        # Penalize inference failures: synthesize zero-scored EvaluationResults
-        # for test cases the pipeline tried but failed on (no .result.json).
+        # Penalize evaluation and inference failures with the same synthesis
+        # path. Evaluation failures go first so a stale inference error for the
+        # same pipeline/test pair cannot create a second row or failed count.
         # Without this, errored cases would be silently dropped from the
         # aggregation denominator, masking pipeline reliability problems.
         if test_cases_dict:
-            inference_errors = self._load_inference_errors(self.output_dir, pipeline_name=pipeline_name)
-            evaluated_test_ids = {r.test_id for r in evaluation_results}
-            synthesized_failures = self._synthesize_failure_results(
-                inference_errors=inference_errors,
-                evaluated_test_ids=evaluated_test_ids,
+            evaluation_failure_entries = [
+                {
+                    "example_id": test_id,
+                    "_pipeline_dir": failure_pipeline,
+                    "error": error,
+                    "_failure_metadata": metadata,
+                }
+                for (failure_pipeline, test_id), (error, metadata) in evaluation_failures.items()
+            ]
+            evaluated_result_keys = {(r.pipeline_name, r.test_id) for r in evaluation_results}
+            synthesized_evaluation_failures = self._synthesize_failure_results(
+                failure_entries=evaluation_failure_entries,
+                evaluated_result_keys=evaluated_result_keys,
                 test_cases_dict=test_cases_dict,
                 successful_results=evaluation_results,
                 pipeline_name=pipeline_name,
                 product_type=product_type,
             )
-            if synthesized_failures:
-                evaluation_results.extend(synthesized_failures)
-                failed += len(synthesized_failures)
+            if synthesized_evaluation_failures:
+                evaluation_results.extend(synthesized_evaluation_failures)
+                failed += len(synthesized_evaluation_failures)
                 if verbose:
-                    print(f"  Penalized {len(synthesized_failures)} inference failures with zero-scored results")
+                    print(
+                        f"  Penalized {len(synthesized_evaluation_failures)} evaluation failures "
+                        "with zero-scored results"
+                    )
+
+            # If no row could be synthesized for a failure, keep it in the
+            # operational failure count without counting it twice.
+            represented_evaluation_failures = {
+                (result.pipeline_name, result.test_id) for result in synthesized_evaluation_failures
+            }
+            failed += len(set(evaluation_failures) - represented_evaluation_failures)
+
+            inference_errors = self._load_inference_errors(self.output_dir, pipeline_name=pipeline_name)
+            evaluated_result_keys = {(r.pipeline_name, r.test_id) for r in evaluation_results}
+            synthesized_inference_failures = self._synthesize_failure_results(
+                failure_entries=inference_errors,
+                evaluated_result_keys=evaluated_result_keys,
+                test_cases_dict=test_cases_dict,
+                successful_results=evaluation_results,
+                pipeline_name=pipeline_name,
+                product_type=product_type,
+            )
+            if synthesized_inference_failures:
+                evaluation_results.extend(synthesized_inference_failures)
+                failed += len(synthesized_inference_failures)
+                if verbose:
+                    print(
+                        f"  Penalized {len(synthesized_inference_failures)} inference failures with zero-scored results"
+                    )
 
             # Penalize missing predictions: pipelines that never emitted a
             # ``*.result.json`` for a given test case AND have no entry in
@@ -1264,15 +1548,19 @@ class EvaluationRunner:
         output_dir: Path,
         pipeline_name: str | None = None,
     ) -> list[Path]:
-        """Discover top-level pipeline subdirectories under ``output_dir``.
+        """Discover pipeline roots at or immediately below ``output_dir``.
 
-        A directory is considered a pipeline directory when it contains either a
-        ``_metadata.json`` (preferred indicator written by the inference runner)
-        or at least one ``*.result.json`` file. The result is sorted by name and
+        A direct pipeline output root contains ``_metadata.json`` and wins over
+        child discovery; its children are document groups, not pipelines. When
+        ``output_dir`` is a multi-pipeline parent, a child is considered a
+        pipeline directory when it contains either ``_metadata.json`` or at
+        least one ``*.result.json`` file. The result is sorted by name and
         optionally filtered to a single pipeline.
         """
         if not output_dir.is_dir():
             return []
+        if (output_dir / "_metadata.json").exists() and (pipeline_name is None or output_dir.name == pipeline_name):
+            return [output_dir]
         candidates: list[Path] = []
         for child in sorted(output_dir.iterdir()):
             if not child.is_dir():
@@ -1334,68 +1622,88 @@ class EvaluationRunner:
     def _synthesize_failure_results(
         self,
         *,
-        inference_errors: list[dict[str, Any]],
-        evaluated_test_ids: set[str],
+        failure_entries: list[dict[str, Any]],
+        evaluated_result_keys: set[tuple[str, str]],
         test_cases_dict: dict[str, TestCase],
         successful_results: list[EvaluationResult],
         pipeline_name: str | None,
         product_type: str | None,
     ) -> list[EvaluationResult]:
-        """Synthesize zero-scored results for inference failures (penalize).
+        """Synthesize one zero-scored result per failed pipeline/test pair.
 
-        For every entry in ``inference_errors`` whose ``example_id`` matches a
-        test case but has no successful evaluation result, emit an
-        ``EvaluationResult`` with ``success=True`` and every metric set to
-        ``0.0`` so the aggregator includes the failure in macro averages.
-        Without this, pipelines that error out silently on a subset of cases
-        get the same score as if those cases had never existed.
+        For every test case named in ``failure_entries`` that has no evaluation
+        result for the same pipeline, emit exactly one ``EvaluationResult`` with
+        ``success=True`` and every metric set to ``0.0`` so the aggregator
+        includes the failure in macro averages. This handles both inference and
+        evaluation failures and deduplicates repeated attempts by
+        ``(pipeline_name, test_id)``: a retried inference logs one ``_errors.json``
+        entry per attempt, and each extra entry used to become an extra zero
+        row, turning "N documents failed" into a drop several times larger than
+        N warrants. Without any synthesis, pipelines that error out silently on a
+        subset of cases get the same score as if those cases had never existed.
 
-        Metric-name set is the union of metric names that appeared on
-        successful results. Diagnostic metrics get the same treatment so any
-        per-pipeline diagnostic averages also get penalized.
+        The metric-name set is the set of metric names that appeared on that
+        pipeline's successful results, falling back to the product's headline
+        metrics when the pipeline failed on every document. Diagnostic metrics
+        get the same treatment so any per-pipeline diagnostic averages also get
+        penalized.
         """
-        if not inference_errors:
+        if not failure_entries:
             return []
 
-        metric_names: set[str] = set()
-        diagnostic_metric_names: set[str] = set()
+        per_pipeline_metrics: dict[str, set[str]] = {}
+        per_pipeline_diagnostic_metrics: dict[str, set[str]] = {}
         for r in successful_results:
             if not r.success:
                 continue
             for m in r.metrics:
                 if _eligible_for_failure_synthesis(m.metric_name):
-                    metric_names.add(m.metric_name)
+                    per_pipeline_metrics.setdefault(r.pipeline_name, set()).add(m.metric_name)
             for m in r.diagnostic_metrics:
                 if _eligible_for_failure_synthesis(m.metric_name):
-                    diagnostic_metric_names.add(m.metric_name)
-
-        if not metric_names and not diagnostic_metric_names:
-            # Total failure: nothing succeeded, so there are no observed metric
-            # names to project zeros onto. Fall back to the always-emitted
-            # headline metrics for the product type so a pipeline that fails on
-            # every document scores 0.0 instead of vanishing from the report.
-            metric_names = set(_FALLBACK_METRIC_NAMES.get(product_type or "", ()))
-            if not metric_names:
-                return []
+                    per_pipeline_diagnostic_metrics.setdefault(r.pipeline_name, set()).add(m.metric_name)
 
         synthesized: list[EvaluationResult] = []
-        for entry in inference_errors:
+        penalized_result_keys: set[tuple[str, str]] = set()
+        for entry in failure_entries:
             example_id = entry.get("example_id")
             if not isinstance(example_id, str) or not example_id:
                 continue
             test_case = self._match_example_id_to_test_case(example_id, test_cases_dict)
             if test_case is None:
                 continue
-            if test_case.test_id in evaluated_test_ids:
+            failure_pipeline = str(pipeline_name or entry.get("_pipeline_dir") or "")
+            result_key = (failure_pipeline, test_case.test_id)
+            if result_key in evaluated_result_keys or result_key in penalized_result_keys:
                 continue
+            penalized_result_keys.add(result_key)
+
+            metric_names = set(per_pipeline_metrics.get(failure_pipeline, set()))
+            diagnostic_metric_names = set(per_pipeline_diagnostic_metrics.get(failure_pipeline, set()))
+            if not metric_names and not diagnostic_metric_names:
+                # Total failure: nothing succeeded for this pipeline, so there
+                # are no observed metric names to project zeros onto. Fall back
+                # to the always-emitted headline metrics for the product type so
+                # a pipeline that fails on every document scores 0.0 instead of
+                # vanishing from the report.
+                metric_names = set(_FALLBACK_METRIC_NAMES.get(product_type or "", ()))
+                if not metric_names:
+                    continue
+
             error_msg = str(entry.get("error", "inference_failed"))
-            failure_metadata = {"inference_failed": True, "error_type": entry.get("error_type")}
+            provided_metadata = entry.get("_failure_metadata")
+            if isinstance(provided_metadata, dict):
+                failure_metadata = dict(provided_metadata)
+                rendered_error = error_msg
+            else:
+                failure_metadata = {"inference_failed": True, "error_type": entry.get("error_type")}
+                rendered_error = f"Inference failed: {error_msg}"
             pooled_denom = self._failure_pooled_denominator(test_case)
             synthesized.append(
                 EvaluationResult(
                     test_id=test_case.test_id,
                     example_id=example_id,
-                    pipeline_name=pipeline_name or entry.get("_pipeline_dir") or "",
+                    pipeline_name=failure_pipeline,
                     product_type=product_type or "",
                     success=True,
                     metrics=[
@@ -1414,7 +1722,7 @@ class EvaluationRunner:
                         )
                         for name in sorted(diagnostic_metric_names)
                     ],
-                    error=f"Inference failed: {error_msg}",
+                    error=rendered_error,
                     job_id=entry.get("job_id"),
                     tags=list(test_case.tags),
                 )
