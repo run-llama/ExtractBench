@@ -2278,11 +2278,14 @@ class EvaluationRunner:
             metadata = test_case.metadata if isinstance(test_case, LayoutDetectionTestCase) else None
             # For multi-page documents, layout rules may span multiple pages
             # Create test case with all layout rules (page_index=0 as default)
+            # ``layout_rules`` is already layout-only; the mixed-rule list type is
+            # wider than the detector case's field and ``list`` is invariant.
+            layout_only_rules: list[Any] = list(layout_rules)
             temp_layout_test_case = LayoutDetectionTestCase(
                 test_id=test_case.test_id,
                 group=test_case.group,
                 file_path=test_case.file_path,
-                test_rules=layout_rules,
+                test_rules=layout_only_rules,
                 source_dataset=metadata.get("source_dataset") if metadata else None,
                 # Not used for multi-page; GT filtering is done by
                 # get_layout_annotations.

@@ -1162,10 +1162,11 @@ class InferenceRunner:
             for timeout_attempt in range(self.timeout_retries + 1):
                 future = self._thread_pool.submit(self._process_test_case, test_case, product_type)
                 try:
-                    raw_result, normalized_result, error_info = await asyncio.wait_for(
+                    outcome = await asyncio.wait_for(
                         asyncio.wrap_future(future),
                         timeout=self.per_file_timeout,
                     )
+                    raw_result, normalized_result, error_info = outcome
                     break  # Success (or handled provider error) - exit retry loop
                 except TimeoutError:
                     await self._cancel_inflight_and_drain_async(test_case.test_id, future)
@@ -1262,10 +1263,11 @@ class InferenceRunner:
             for timeout_attempt in range(self.timeout_retries + 1):
                 future = self._thread_pool.submit(self._process_document, pdf_path, example_id, product_type)
                 try:
-                    raw_result, normalized_result, error_info = await asyncio.wait_for(
+                    outcome = await asyncio.wait_for(
                         asyncio.wrap_future(future),
                         timeout=self.per_file_timeout,
                     )
+                    raw_result, normalized_result, error_info = outcome
                     break  # Success (or handled provider error) - exit retry loop
                 except TimeoutError:
                     await self._cancel_inflight_and_drain_async(example_id, future)
