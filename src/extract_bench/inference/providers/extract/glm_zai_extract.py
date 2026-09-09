@@ -16,6 +16,7 @@ Thinking is always on for GLM-5.3-flash; ``reasoning_tokens`` are part of
 from __future__ import annotations
 
 import base64
+import io
 import json
 import os
 from datetime import datetime
@@ -53,6 +54,16 @@ _GLM_ZAI_EXTRACT_PRICING_PER_M: dict[str, tuple[float, float, float]] = {
 }
 
 _ZAI_BASE_URL = "https://api.z.ai/api/paas/v4"
+
+_DEEPINFRA_BASE_URL = "https://api.deepinfra.com/v1/openai"
+_DEEPINFRA_GLM_5_3_FLASH_MODEL = "zai-org/GLM-5.3-Flash"
+
+# DeepInfra serverless pricing: USD per million tokens (input, cached input,
+# output). Source: https://deepinfra.com/dash/models/details?model=zai-org%2FGLM-5.3-Flash
+# (verified 2026-08-28).
+_GLM_DEEPINFRA_EXTRACT_PRICING_PER_M: dict[str, tuple[float, float, float]] = {
+    _DEEPINFRA_GLM_5_3_FLASH_MODEL: (0.15, 0.03, 0.50),
+}
 
 
 @register_provider("glm_zai_extract")
@@ -311,3 +322,102 @@ class GLMZaiExtractProvider(Provider):
 
     def normalize(self, raw_result: RawInferenceResult) -> InferenceResult:
         return normalize_extract_result(raw_result)
+
+
+@register_provider("glm_deepinfra_extract")
+class GLMDeepInfraExtractProvider(GLMZaiExtractProvider):
+    """One-shot GLM-5.3-Flash extraction through DeepInfra Chat Completions.
+
+    DeepInfra's documented multimodal Chat Completions shape accepts page
+    images through ``image_url`` content blocks. PDFs are therefore rasterized
+    once and all pages are sent in a single model request.
+    """
+
+    DEFAULT_MODEL = _DEEPINFRA_GLM_5_3_FLASH_MODEL
+
+    def __init__(self, provider_name: str, base_config: dict[str, Any] | None = None):
+        cfg = dict(base_config or {})
+        api_key = cfg.get("api_key") or os.getenv("DEEPINFRA_API_KEY")
+        if not api_key:
+            raise ProviderConfigError(
+                "DeepInfra API key is required. Set DEEPINFRA_API_KEY or pass api_key in base_config."
+            )
+        cfg["api_key"] = api_key
+        cfg.setdefault("model", self.DEFAULT_MODEL)
+        cfg.setdefault("base_url", _DEEPINFRA_BASE_URL)
+        super().__init__(provider_name, cfg)
+
+        self._dpi = int(self.base_config.get("dpi", 150))
+        max_pages_cfg = self.base_config.get("max_pages")
+        self._max_pages: int | None = int(max_pages_cfg) if max_pages_cfg is not None else None
+        self._api_max_retries = int(self.base_config.get("api_max_retries", 0))
+        self._client.close()
+        self._client = OpenAI(
+            api_key=self._api_key,
+            base_url=self._base_url,
+            timeout=self._api_timeout_s,
+            max_retries=self._api_max_retries,
+        )
+
+    @staticmethod
+    def _pricing_for_model(model: str) -> tuple[float, float, float]:
+        matches = [
+            (prefix, rates)
+            for prefix, rates in _GLM_DEEPINFRA_EXTRACT_PRICING_PER_M.items()
+            if model.startswith(prefix)
+        ]
+        return max(matches, key=lambda item: len(item[0]))[1] if matches else (0.0, 0.0, 0.0)
+
+    def _build_file_blocks(self, source_path: Path) -> list[dict[str, Any]]:
+        ext = source_path.suffix.lower()
+        if ext in IMAGE_EXTENSIONS:
+            mime = IMAGE_EXTENSIONS[ext]
+            b64 = base64.standard_b64encode(source_path.read_bytes()).decode("utf-8")
+            return [{"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}}]
+        if ext != ".pdf":
+            raise ProviderPermanentError(
+                f"glm_deepinfra_extract supports PDFs and {set(IMAGE_EXTENSIONS)}, got {source_path.suffix}"
+            )
+
+        try:
+            from pdf2image import convert_from_path
+        except ImportError as e:
+            raise ProviderPermanentError("pdf2image is required for glm_deepinfra_extract.") from e
+
+        try:
+            images = convert_from_path(str(source_path), dpi=self._dpi)
+        except Exception as e:
+            raise ProviderPermanentError(f"Error converting PDF to images: {e}") from e
+        if not images:
+            raise ProviderPermanentError(f"No pages found in PDF: {source_path}")
+        if self._max_pages is not None:
+            images = images[: self._max_pages]
+
+        blocks: list[dict[str, Any]] = []
+        for image in images:
+            buf = io.BytesIO()
+            image.save(buf, format="PNG")
+            b64 = base64.standard_b64encode(buf.getvalue()).decode("utf-8")
+            blocks.append({"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}"}})
+        return blocks
+
+    def _call_api(self, schema: dict[str, Any], source_path: Path) -> dict[str, Any]:
+        result = super()._call_api(schema, source_path)
+        result["_config"].update(
+            {
+                "provider": "glm_deepinfra",
+                "input_mode": "page_images",
+                "dpi": self._dpi,
+                "max_pages": self._max_pages,
+                "api_max_retries": self._api_max_retries,
+            }
+        )
+        return result
+
+    def _pricing_snapshot(self) -> dict[str, Any]:
+        return {
+            "pricing_basis": "glm_5_3_flash_deepinfra",
+            "input_price_per_1m": self._input_price_per_1m,
+            "cached_input_price_per_1m": self._cached_input_price_per_1m,
+            "output_price_per_1m": self._output_price_per_1m,
+        }

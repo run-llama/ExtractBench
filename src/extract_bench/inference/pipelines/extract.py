@@ -215,6 +215,24 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
         )
     )
 
+    # GLM-5.3-Flash served by DeepInfra: rasterize the document once, then send
+    # every page image in one OpenAI-compatible Chat Completions request.
+    # Structured output uses response_format=json_object with the schema in the
+    # prompt. A separate pipeline from the z.ai row above so the two vendors'
+    # numbers stay distinguishable (``DEEPINFRA_API_KEY``).
+    register_fn(
+        _pipeline_spec(
+            pipeline_name="glm_5_3_flash_deepinfra_extract_oneshot_structured_output_file",
+            provider_name="glm_deepinfra_extract",
+            config={
+                "model": "zai-org/GLM-5.3-Flash",
+                "additional_properties_false": True,
+                "dpi": 150,
+                "max_tokens": 131072,
+            },
+        )
+    )
+
     # =========================================================================
     # Two-stage baselines (LlamaParse agentic markdown -> text extract)
     # =========================================================================

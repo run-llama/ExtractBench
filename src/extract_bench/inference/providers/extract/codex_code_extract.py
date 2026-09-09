@@ -72,7 +72,9 @@ _DEFAULT_DISABLED_FEATURES = (
 
 # USD per million tokens (input, cached input, output); estimates use Codex CLI JSONL usage.
 _OPENAI_CODEX_PRICING_PER_M: dict[str, tuple[float, float, float]] = {
-    "gpt-5.6-sol": (5.00, 0.50, 30.00),
+    "gpt-5.6-sol": (4.00, 0.40, 20.00),
+    "gpt-5.6-terra": (2.00, 0.20, 12.00),
+    "gpt-5.6-luna": (0.20, 0.02, 1.20),
     "gpt-5.5": (5.00, 0.50, 30.00),
     "gpt-5.4-mini": (0.75, 0.075, 4.50),
     "gpt-5.4-nano": (0.20, 0.02, 1.25),
@@ -81,6 +83,23 @@ _OPENAI_CODEX_PRICING_PER_M: dict[str, tuple[float, float, float]] = {
 
 _LONG_CONTEXT_THRESHOLD_TOKENS = 272_000
 _LONG_CONTEXT_MODELS = ("gpt-5.6-sol", "gpt-5.5", "gpt-5.4")
+
+
+def _extraction_is_empty(data: Any) -> bool:
+    """True when a JSON tree holds no non-empty scalar at any depth.
+
+    None, "", empty lists/dicts and any nesting of them count as empty;
+    numbers (including 0), booleans and non-empty strings count as values.
+    """
+    if isinstance(data, dict):
+        return all(_extraction_is_empty(v) for v in data.values())
+    if isinstance(data, list):
+        return all(_extraction_is_empty(v) for v in data)
+    if data is None:
+        return True
+    if isinstance(data, str):
+        return data.strip() == ""
+    return False
 
 
 @register_provider("codex_code_extract")
@@ -110,6 +129,13 @@ class CodexCodeExtractProvider(Provider):
         self._disabled_features: list[str] = list(self.base_config.get("disabled_features", _DEFAULT_DISABLED_FEATURES))
         self._attach_images: bool = bool(self.base_config.get("attach_images", True))
         self._require_shell_access: bool = bool(self.base_config.get("require_shell_access", True))
+        # Optional pipeline-specific lines appended to the task prompt, e.g. to
+        # tell a model whether this environment can display images to it.
+        self._extra_instructions: str = str(self.base_config.get("extra_instructions") or "").strip()
+        # Treat an output.json with no non-empty values as a failed attempt and
+        # retry (observed: some proxied models occasionally write an all-null
+        # JSON that would otherwise count as success and score 0).
+        self._retry_empty_output: bool = bool(self.base_config.get("retry_empty_output", False))
 
         self._promote_repeated: bool = bool(self.base_config.get("promote_repeated_structure", True))
         self._additional_properties_false: bool = bool(self.base_config.get("additional_properties_false", True))
@@ -168,6 +194,7 @@ class CodexCodeExtractProvider(Provider):
             "- For forms, prefer direct field extraction from the document content.\n"
             "- Write the resulting JSON object to ./output.json and validate that it is valid JSON before stopping.\n"
             "- Do not print the JSON to your assistant output."
+            + (f"\n\n{self._extra_instructions}" if self._extra_instructions else "")
         )
 
     def _build_cmd(
@@ -541,6 +568,27 @@ class CodexCodeExtractProvider(Provider):
                 pass
         return payload
 
+    def recompute_cost(self, raw_output: dict[str, Any]) -> None:
+        """Re-derive the cost keys from the recorded usage and the current table.
+
+        Cost is estimated post-hoc from the Codex usage event, never reported by
+        the CLI, so it is a derived value: this is the override of the generic
+        re-pricing seam (see ``Provider.recompute_cost``). Everything is read back
+        off ``raw_output``, so a saved ``.raw.json`` re-prices on
+        ``extract-bench inference renormalize`` with no Codex calls. An artifact
+        with no usage predates token accounting; re-pricing it would overwrite a
+        real number with a zero, so leave it.
+        """
+        usage = raw_output.get("usage")
+        if not isinstance(usage, dict):
+            return
+        cost_usd = self._estimate_cost_usd(usage)
+        num_pages = raw_output.get("num_pages") or 0
+        raw_output["cost_usd"] = cost_usd
+        raw_output["cost_per_page_usd"] = (cost_usd / num_pages) if num_pages else None
+        raw_output["pricing"] = self._pricing_snapshot(usage)
+        raw_output["cost_exceeded_budget"] = self._max_cost_usd is not None and cost_usd > self._max_cost_usd
+
     def _estimate_cost_usd(self, usage: dict[str, int]) -> float:
         input_tokens = int(usage.get("input_tokens", 0) or 0)
         cached_input_tokens = int(usage.get("cached_input_tokens", 0) or 0)
@@ -644,6 +692,10 @@ class CodexCodeExtractProvider(Provider):
                 self._raise_for_status(returncode, lines, stderr_tail)
                 self._raise_for_sandbox_failures(lines)
                 data = self._read_output_json(output_path)
+                if self._retry_empty_output and _extraction_is_empty(data):
+                    raise ProviderTransientError(
+                        "codex_code_extract: output.json contains no non-empty values; retrying the document."
+                    )
                 last_message_tail = self._read_stderr_tail(last_message_path)
             except ProviderError as exc:
                 payload = self._failure_debug_payload(
@@ -663,16 +715,11 @@ class CodexCodeExtractProvider(Provider):
         latency_ms = int((completed_at - started_at).total_seconds() * 1000)
 
         usage = self._usage_from_events(lines)
-        cost_usd = self._estimate_cost_usd(usage)
         raw_output: dict[str, Any] = {
             "data": data,
             "model": self._model,
             "usage": usage,
             "num_pages": num_pages,
-            "cost_usd": cost_usd,
-            "cost_per_page_usd": (cost_usd / num_pages) if num_pages else None,
-            "pricing": self._pricing_snapshot(usage),
-            "cost_exceeded_budget": self._max_cost_usd is not None and cost_usd > self._max_cost_usd,
             "_config": self._config_snapshot(),
             "_command_execution": self._command_execution_diagnostics(lines),
             "_last_message_tail": last_message_tail,
@@ -684,6 +731,8 @@ class CodexCodeExtractProvider(Provider):
                 "last_message": last_message_tail,
             },
         }
+
+        self.recompute_cost(raw_output)
 
         return RawInferenceResult(
             request=request,
