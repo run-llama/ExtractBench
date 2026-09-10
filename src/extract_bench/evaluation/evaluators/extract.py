@@ -308,6 +308,7 @@ class ExtractEvaluator(BaseEvaluator):
             stats=stats,
         )
 
+
 def _identity_keys_by_path(field_rules: list[ExtractFieldTestRule]) -> dict[tuple[str, ...], list[str]]:
     """Dataset-declared identity keys per array path, from ``match_by`` rules.
 
@@ -331,4 +332,3 @@ def _identity_keys_by_path(field_rules: list[ExtractFieldTestRule]) -> dict[tupl
             continue
         identity_keys[tuple(str(token) for token in tokens)] = keys
     return identity_keys
-

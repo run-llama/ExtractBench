@@ -437,14 +437,12 @@ def _compute_v02_evidence_metrics(
     return metrics
 
 
-
 def _get_field_value(extracted_data: Any, field_path: str) -> Any:
     try:
         tokens = parse_field_path(field_path)
     except ValueError:
         return _MISSING
     return get_path(extracted_data, tokens, default=_MISSING)
-
 
 
 def _has_stray_tag(rule: ExtractFieldTestRule) -> bool:
@@ -775,5 +773,3 @@ def _as_int(value: Any) -> int | None:
         return int(value)
     except (TypeError, ValueError):
         return None
-
-
