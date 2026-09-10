@@ -807,6 +807,99 @@ def test_hungarian_pairing_fills_omitted_nested_defaults() -> None:
     assert _val(uni, "extract_unified_value_precision") == 1.0
 
 
+def test_hungarian_pairs_zero_and_null_as_distinct_cells() -> None:
+    """Reversed rows that differ only by 0 vs null pair on those values.
+
+    List-order pairing misses both numeric cells (2/4). Crossing matches 0 to 0
+    and null to null (4/4).
+    """
+    schema = {
+        "type": "object",
+        "properties": {
+            "rows": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "k": {"type": ["string", "null"]},
+                        "n": {"type": ["number", "null"]},
+                    },
+                },
+            }
+        },
+    }
+    expected = {"rows": [{"k": "a", "n": 0}, {"k": "a", "n": None}]}
+    actual = {"rows": [{"k": "a", "n": None}, {"k": "a", "n": 0}]}
+    uni = compute_unified_evidence_metrics(expected, actual, [], [], schema)
+    assert _val(uni, "extract_unified_value_f1") == 1.0
+
+
+def test_hungarian_pairs_omitted_nested_key_as_distinct_from_null() -> None:
+    """Same class, nested objects that differ in which child is explicit null.
+
+    Crossing: null matches null, absent matches absent. List order treats each
+    explicit null as a one-sided miss against the other child's omit.
+    """
+    schema = {
+        "type": "object",
+        "properties": {
+            "rows": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "cls": {"type": ["string", "null"]},
+                        "obj": {
+                            "type": "object",
+                            "properties": {
+                                "a": {"type": ["string", "null"]},
+                                "b": {"type": ["string", "null"]},
+                            },
+                        },
+                    },
+                },
+            }
+        },
+    }
+    expected = {
+        "rows": [
+            {"cls": "x", "obj": {"a": None}},
+            {"cls": "x", "obj": {"b": None}},
+        ]
+    }
+    actual = {
+        "rows": [
+            {"cls": "x", "obj": {"b": None}},
+            {"cls": "x", "obj": {"a": None}},
+        ]
+    }
+    uni = compute_unified_evidence_metrics(expected, actual, [], [], schema)
+    assert _val(uni, "extract_unified_value_f1") == 1.0
+
+
+def test_hungarian_pairs_omitted_default_with_explicit_default_on_array_columns() -> None:
+    """Omit with ``default: 0`` pairs with an explicit 0 on a reversed row."""
+    schema = {
+        "type": "object",
+        "properties": {
+            "rows": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "k": {"type": ["string", "null"]},
+                        "n": {"type": ["number", "null"], "default": 0},
+                    },
+                },
+            }
+        },
+    }
+    expected = {"rows": [{"k": "x"}, {"k": "x", "n": 1}]}
+    actual = {"rows": [{"k": "x", "n": 1}, {"k": "x", "n": 0}]}
+    uni = compute_unified_evidence_metrics(expected, actual, [], [], schema)
+    assert _val(uni, "extract_unified_value_f1") == 1.0
+
+
 def test_pairing_walks_schema_keys_that_contain_dots() -> None:
     """A key named ``a.b`` is one field, not a nested ``a`` then ``b``.
 
@@ -1278,9 +1371,9 @@ _NESTED_PEEL_SCHEMA: dict[str, Any] = {
 }
 
 
-def _spy_on_peel(monkeypatch: Any) -> list[list[str]]:
+def _spy_on_peel(monkeypatch: Any) -> list[list[Any]]:
     """Record the cost-subfields each exact-row peel call aligned on."""
-    calls: list[list[str]] = []
+    calls: list[list[Any]] = []
     original = unified_evidence_metric.peel_exact_row_matches
 
     def _spy(
@@ -1308,7 +1401,7 @@ def test_exact_peel_used_for_flat_ungrounded_arrays(monkeypatch: Any) -> None:
     calls = _spy_on_peel(monkeypatch)
     rows = [{"id": "1", "value": "a"}, {"id": "2", "value": "b"}]
     compute_unified_evidence_metrics({"rows": rows}, {"rows": rows}, [], [], _FLAT_PEEL_SCHEMA)
-    assert ["id", "value"] in calls, "flat un-grounded arrays must keep the fast exact-row peel"
+    assert [("id",), ("value",)] in calls, "flat un-grounded arrays take the exact-row peel"
 
 
 def test_exact_peel_skipped_for_object_array_subfields(monkeypatch: Any) -> None:
@@ -1316,10 +1409,10 @@ def test_exact_peel_skipped_for_object_array_subfields(monkeypatch: Any) -> None
     rows = [{"id": "A", "kids": [{"v": "x"}]}, {"id": "B", "kids": [{"v": "y"}]}]
     compute_unified_evidence_metrics({"rows": rows}, {"rows": rows}, [], [], _NESTED_PEEL_SCHEMA)
     # The outer array (identity cell "id") has a nested object array, so its
-    # alignment must use full assignment -- the peel must not see ["id"].
-    assert ["id"] not in calls, "outer array with object-array subfields must use full assignment"
-    # The inner flat "kids" arrays are opaque-cell-only, so they still peel.
-    assert ["v"] in calls, "flat inner sub-arrays should still use the fast peel"
+    # alignment uses full assignment -- the peel does not see [("id",)].
+    assert [("id",)] not in calls, "outer array with object-array subfields uses full assignment"
+    # The inner flat "kids" arrays are opaque-cell-only, so they peel.
+    assert [("v",)] in calls, "flat inner sub-arrays take the exact-row peel"
 
 
 def test_exact_peel_skipped_when_cell_grounding_present(monkeypatch: Any) -> None:
@@ -1683,6 +1776,105 @@ def test_in_row_object_child_omit_uses_schema_default() -> None:
     assert _val(uni, "extract_unified_value_precision") == 1.0
 
 
+def test_omitted_number_equals_zero_only_with_schema_default() -> None:
+    with_default = {
+        "type": "object",
+        "properties": {"n": {"type": ["number", "null"], "default": 0}},
+    }
+    without_default = {
+        "type": "object",
+        "properties": {"n": {"type": ["number", "null"]}},
+    }
+    rules = [_rule("n", 0)]
+    match = compute_unified_evidence_metrics({"n": 0}, {}, rules, [], with_default)
+    assert _val(match, "extract_unified_value_f1") == 1.0
+    miss = compute_unified_evidence_metrics({"n": 0}, {}, rules, [], without_default)
+    miss_meta = next(m.metadata for m in miss if m.metric_name == "extract_unified_value_recall")
+    assert miss_meta["expected_cells"] == 1
+    assert miss_meta["predicted_cells"] == 0
+    assert _val(miss, "extract_unified_value_recall") == 0.0
+    explicit_null = compute_unified_evidence_metrics({"n": 0}, {"n": None}, rules, [], with_default)
+    assert _val(explicit_null, "extract_unified_value_f1") == 0.0
+
+
+def test_array_row_omit_matches_object_lookup_rules() -> None:
+    """Schema-typed array item properties use the same lookup as objects."""
+    name_schema = {"type": ["string", "null"]}
+    object_schema = {"type": "object", "properties": {"name": name_schema}}
+    array_schema = {
+        "type": "object",
+        "properties": {
+            "rows": {
+                "type": "array",
+                "items": {"type": "object", "properties": {"name": name_schema}},
+            }
+        },
+    }
+    obj = compute_unified_evidence_metrics({"name": None}, {}, [_rule("name", None)], [], object_schema)
+    arr = compute_unified_evidence_metrics(
+        {"rows": [{"name": None}]}, {"rows": [{}]}, [_rule("rows[0].name", None)], [], array_schema
+    )
+    obj_meta = next(m.metadata for m in obj if m.metric_name == "extract_unified_value_recall")
+    arr_meta = next(m.metadata for m in arr if m.metric_name == "extract_unified_value_recall")
+    assert obj_meta["expected_cells"] == 1
+    assert arr_meta["expected_cells"] == 1
+    assert obj_meta["predicted_cells"] == 0
+    assert arr_meta["predicted_cells"] == 0
+    assert _val(obj, "extract_unified_value_f1") == _val(arr, "extract_unified_value_f1")
+
+    name_default = {"type": ["string", "null"], "default": None}
+    object_default = {"type": "object", "properties": {"name": name_default}}
+    array_default = {
+        "type": "object",
+        "properties": {
+            "rows": {
+                "type": "array",
+                "items": {"type": "object", "properties": {"name": name_default}},
+            }
+        },
+    }
+    obj_d = compute_unified_evidence_metrics({"name": None}, {}, [_rule("name", None)], [], object_default)
+    arr_d = compute_unified_evidence_metrics(
+        {"rows": [{"name": None}]}, {"rows": [{}]}, [_rule("rows[0].name", None)], [], array_default
+    )
+    assert _val(obj_d, "extract_unified_value_f1") == 1.0
+    assert _val(arr_d, "extract_unified_value_f1") == 1.0
+
+
+def test_one_sided_object_miss_skips_unasserted_schema_children() -> None:
+    """Gold never asserted ``tags``, so a missing vendor does not emit that cell."""
+    schema = {
+        "type": "object",
+        "properties": {
+            "vendor": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": ["string", "null"]},
+                    "tags": {"type": "array", "items": {"type": ["string", "null"]}},
+                },
+            }
+        },
+    }
+    gold_name = {"vendor": {"name": "Acme"}}
+    pred: dict[str, Any] = {}
+    name_only = compute_unified_evidence_metrics(gold_name, pred, [_rule("vendor.name", "Acme")], [], schema)
+    empty_vendor = compute_unified_evidence_metrics({"vendor": {}}, pred, [], [], schema)
+    name_meta = next(m.metadata for m in name_only if m.metric_name == "extract_unified_value_recall")
+    assert name_meta["expected_cells"] == 1
+    assert name_meta["predicted_cells"] == 0
+    assert empty_vendor == []
+    both_asserted = compute_unified_evidence_metrics(
+        {"vendor": {"name": "Acme", "tags": ["x"]}},
+        pred,
+        [_rule("vendor.name", "Acme"), _rule("vendor.tags", ["x"])],
+        [],
+        schema,
+    )
+    both_meta = next(m.metadata for m in both_asserted if m.metric_name == "extract_unified_value_recall")
+    assert both_meta["expected_cells"] == 2
+    assert both_meta["predicted_cells"] == 0
+
+
 def test_supported_normalizers_match_schema_vocabulary() -> None:
     from extract_bench.test_cases.schema import EXTRACT_FIELD_NORMALIZERS
 
@@ -1722,7 +1914,7 @@ def test_giant_grounded_array_skips_grounding_value_exact_and_peels(monkeypatch:
     calls = _spy_on_peel(monkeypatch)
     skipped = compute_unified_evidence_metrics(expected, actual, rules, cits, _schema())
 
-    assert ["security", "coupon", "note"] in calls, "giant grounded array must fall back to the peel"
+    assert [("security",), ("coupon",), ("note",)] in calls, "giant grounded array falls back to the peel"
     # Value metrics identical to the full-matrix reference.
     for name in (
         "extract_unified_value_precision",

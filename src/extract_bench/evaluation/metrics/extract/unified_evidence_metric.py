@@ -27,9 +27,11 @@ three additions:
    keyword is present; without ``default`` the key is absent (one-sided miss),
    not an implicit ``null``. ``lookup`` fills values; it does not pick the
    scorer. The same lookup is used at the root, inside nested objects, on
-   object columns of array rows after Hungarian pairing, and when reading
-   nested leaves for pairing cost. Opaque array cells stay ``array_record``'s
-   ``.get``. Row-pairing cost uses those same children (and nested
+   object columns of array rows after Hungarian pairing, on opaque array
+   cells, and when reading nested leaves for pairing cost. A missing key is
+   equal only to another missing key, unless ``default`` is present (then
+   missing also equals that default). Explicit ``0`` is never equal to
+   explicit ``null``. Row-pairing cost uses those same children (and nested
    object-arrays) so Hungarian maximizes the cells F1 actually scores.
    Scalar lists stay opaque.
 3. **Grounding (bbox + page).** Two parallel sets of counters, both value-gated
@@ -58,12 +60,12 @@ three additions:
    metric (excluded from the dataset average), rather than a 0.0 that would
    punish a document that simply cannot be graded for grounding.
 
-On a document with no object-array subfields, no object-valued cells, and no
-alternate evidence values, the ``*_value_*`` metrics are bit-identical to
-``array_record_*`` -- same alignment, subfields, cost matrix, and denominators
--- with no ``match_by`` rule anywhere. Object-array subfields and objects
-recursed as child cells
-make the value metrics diverge from array_record (per-child credit); the
+On a document with no object-array subfields, no object-valued cells, no
+alternate evidence values, and no omit/default split, the ``*_value_*``
+metrics match ``array_record_*`` alignment. ``array_record`` reads
+omitted keys with ``.get`` (implicit ``null``); this scorer uses ``lookup``.
+Object-array subfields and objects recursed as child cells make the value
+metrics diverge from array_record (per-child credit); the
 ``*_grounded_*`` metrics
 are the other new signal (0 for pipelines that emit no citations *on documents
 whose GT carries bboxes*; omitted entirely on documents whose GT has none).
@@ -350,6 +352,28 @@ def is_object_subfield(field_schema: Any) -> bool:
 type PairingPath = tuple[str, ...]
 
 
+class _Absent:
+    """Sentinel for a key that is missing and has no schema ``default``.
+
+    Distinct from JSON ``null`` so pairing can treat missing==missing and
+    missing!=null. A singleton so interned cost matrices hash it stably.
+    """
+
+    __slots__ = ()
+
+    def __repr__(self) -> str:
+        return "ABSENT"
+
+    def __eq__(self, other: object) -> bool:
+        return isinstance(other, _Absent)
+
+    def __hash__(self) -> int:
+        return 0xAB5E11D
+
+
+ABSENT = _Absent()
+
+
 def _read_segments(
     row: Any,
     *,
@@ -360,9 +384,10 @@ def _read_segments(
 
     Keys are not split, so a schema field named ``a.b`` is one step, not two.
     Omitted keys use JSON Schema ``default`` when present, matching F1.
-    A missing key with no ``default`` stops the walk as ``None``. A present
-    non-object (including explicit ``null``) is coerced to ``{}`` before the
-    next step, the same way ``_score_node`` walks children.
+    A missing key with no ``default`` stops the walk as ``ABSENT``, not
+    ``None`` (explicit null). A present non-object (including explicit
+    ``null``) is coerced to ``{}`` before the next step, the same way
+    ``_score_node`` walks children.
     """
     cur: Any = row if isinstance(row, Mapping) else {}
     field_schema: Any = {}
@@ -376,7 +401,7 @@ def _read_segments(
             cur = {}
         present, cur = lookup(cur, part, field_schema)
         if not present:
-            return None
+            return ABSENT
     return cur
 
 
@@ -465,7 +490,10 @@ def _value_leaf_count(
             for row in as_rows(value):
                 rd = row if isinstance(row, Mapping) else {}
                 for name in names:
-                    total += _value_leaf_count(rd.get(name), schema=item_sch.get(name, {}))
+                    child_schema = item_sch.get(name, {})
+                    in_side, child_val = lookup(rd, name, child_schema)
+                    if in_side:
+                        total += _value_leaf_count(child_val, schema=child_schema)
             return total
         return 1
     if is_object_schema(schema):
@@ -473,7 +501,12 @@ def _value_leaf_count(
         if len(props) == 0:
             return 1
         rd = value if isinstance(value, Mapping) else {}
-        return sum(_value_leaf_count(rd.get(key), schema=child) for key, child in props.items())
+        total = 0
+        for key, child in props.items():
+            in_side, child_val = lookup(rd, key, child)
+            if in_side:
+                total += _value_leaf_count(child_val, schema=child)
+        return total
     return 1
 
 
@@ -484,7 +517,13 @@ def _row_leaf_count(
     names: Sequence[str],
 ) -> int:
     rd = row if isinstance(row, Mapping) else {}
-    return sum(_value_leaf_count(rd.get(name), schema=item_sch.get(name, {})) for name in names)
+    total = 0
+    for name in names:
+        child_schema = item_sch.get(name, {})
+        in_side, child_val = lookup(rd, name, child_schema)
+        if in_side:
+            total += _value_leaf_count(child_val, schema=child_schema)
+    return total
 
 
 def iou_xywh(a: BBox, b: BBox) -> float:
@@ -542,17 +581,18 @@ class Scorer:
     ) -> bool:
         """True when this level's opaque pairing cells have a distinct alt or a normalizer.
 
-        Nested object-arrays detect this for themselves; do not inherit a parent flag.
+        Nested object-arrays check their own leaves.
         """
-        if not pairing_paths or (not self._alt and not self._normalizers):
+        if len(pairing_paths) == 0 or (len(self._alt) == 0 and len(self._normalizers) == 0):
             return False
         for i, erow in enumerate(exp_rows):
             for path in pairing_paths:
                 gt_path = f"{gt_field}[{i}].{_gt_rel_path(path)}"
-                if self._normalizers.get(gt_path):
+                normalizers = self._normalizers.get(gt_path)
+                if normalizers is not None and len(normalizers) > 0:
                     return True
                 alt = self._alt.get(gt_path)
-                if not alt:
+                if alt is None or len(alt) == 0:
                     continue
                 canon = _read_segments(erow, segments=path, item_sch=item_sch)
                 if any(value != canon for value in alt):
@@ -717,11 +757,9 @@ class Scorer:
     ) -> bool:
         """Score one aligned cell (value + page + grounding). Caller owns the denominators.
 
-        ``ground=False`` scores value only, for cells in a giant array whose
-        grounding-family scoring was skipped (their g_expected/g_claims and
-        p_expected/p_claims were not counted either, so g_correct/p_correct must
-        not be counted here or the grounded/page precision/recall would be
-        computed against a truncated denominator).
+        ``ground=False`` scores value only: giant arrays skip grounding-family
+        counters (g_expected/g_claims and p_expected/p_claims), and this keeps
+        g_correct/p_correct on the same skipped set.
         """
         matched = self._value_match(gt_path, canonical, actual, field)
         if matched:
@@ -733,12 +771,14 @@ class Scorer:
                     c.p_correct += 1
         return matched
 
-    def _count_subtree(self, path: str, value: Any, schema: Mapping[str, Any], c: _Counts, *, expected: bool) -> None:
+    def _count_subtree(
+        self, path: str, value: Any, schema: Mapping[str, Any], c: _Counts, *, expected: bool, ground: bool = True
+    ) -> None:
         """Count a one-sided subtree's leaves (recall-only or precision-only miss).
 
-        Used for unmatched rows and for a key present on only one side with no
-        schema ``default``. Do not route these through ``_score_node``: there is
-        no partner value, so every leaf is a miss.
+        Unmatched rows and a key present on only one side have no partner, so
+        every leaf ``lookup`` reports present is a miss. Children ``lookup``
+        reports absent (no ``default``) are not cells.
         """
         if is_array_schema(schema):
             if is_object_array_schema(schema):
@@ -747,22 +787,30 @@ class Scorer:
                 for i, row in enumerate(as_rows(value)):
                     rd = row if isinstance(row, Mapping) else {}
                     for s in subfield_names:
-                        self._count_subtree(f"{path}[{i}].{s}", rd.get(s), item_sch.get(s, {}), c, expected=expected)
+                        child_schema = item_sch.get(s, {})
+                        in_side, child_val = lookup(rd, s, child_schema)
+                        if in_side:
+                            self._count_subtree(
+                                f"{path}[{i}].{s}", child_val, child_schema, c, expected=expected, ground=ground
+                            )
                 return
         elif is_object_schema(schema):
             props = schema_properties(schema)
             if len(props) > 0:
                 rd = value if isinstance(value, Mapping) else {}
                 for key, child_schema in props.items():
-                    child = f"{path}.{key}" if path else key
+                    child = f"{path}.{key}" if len(path) > 0 else key
                     in_side, child_val = lookup(rd, key, child_schema)
-                    self._count_subtree(child, child_val if in_side else None, child_schema, c, expected=expected)
+                    if in_side:
+                        self._count_subtree(child, child_val, child_schema, c, expected=expected, ground=ground)
                 return
         if expected:
             c.expected += 1
-            self._note_grounded_expected(path, c)
-            if self._ev_pages.get(path):
-                c.p_expected += 1
+            if ground:
+                self._note_grounded_expected(path, c)
+                pages = self._ev_pages.get(path)
+                if pages is not None and len(pages) > 0:
+                    c.p_expected += 1
         else:
             # Extra predicted subtree: no GT counterpart exists, so its citation
             # bboxes are ungradeable and do not enter the grounded precision
@@ -778,14 +826,24 @@ class Scorer:
         c: _Counts,
         *,
         expected: bool,
+        ground: bool = True,
     ) -> None:
         for s in nested_names:
             child_schema = item_sch.get(s, {})
             in_side, child_val = lookup(row, s, child_schema)
-            self._count_subtree(f"{base}.{s}", child_val if in_side else None, child_schema, c, expected=expected)
+            if in_side:
+                self._count_subtree(f"{base}.{s}", child_val, child_schema, c, expected=expected, ground=ground)
 
     def _score_array(
-        self, gt_field: str, pred_field: str, exp_rows: Any, act_rows: Any, schema: Mapping[str, Any], c: _Counts
+        self,
+        gt_field: str,
+        pred_field: str,
+        exp_rows: Any,
+        act_rows: Any,
+        schema: Mapping[str, Any],
+        c: _Counts,
+        *,
+        ground: bool = True,
     ) -> None:
         # gt_field / pred_field are separate base paths: ground-truth cells (alt
         # values, evidence boxes) key off gt_field; predicted cells (citations)
@@ -805,10 +863,8 @@ class Scorer:
             s for s in subfield_names if s not in object_array_names and is_object_subfield(item_sch.get(s, {}))
         ]
         cell_names = [s for s in subfield_names if s not in object_array_names and s not in object_names]
-        # Opaque-cell denominators: array_record-exact (rows x cell subfields).
-        # Object and object-array fields are counted by the recursion below.
-        c.expected += len(exp_rows) * len(cell_names)
-        c.predicted += len(act_rows) * len(cell_names)
+        # Opaque, object, and object-array cells are counted via ``lookup`` /
+        # ``_score_pair`` below (omit with no ``default`` is not a cell).
         c.expected_rows += len(exp_rows)
         c.predicted_rows += len(act_rows)
         # A flat array whose full grounded matrix would be multi-GB: skip its
@@ -817,7 +873,8 @@ class Scorer:
         # (value-identical for opaque cells), and not counting
         # g_expected/g_claims/p_expected/p_claims here keeps the grounded and
         # page denominators consistent with the skipped g_correct/p_correct.
-        # ``not object_array_names and not object_names`` guarantees no nested recursion, so the peel cannot
+        # ``len(object_array_names) == 0 and len(object_names) == 0`` guarantees
+        # no nested recursion, so the peel cannot
         # shift nested TP. The memory win only lands on the plain peel path: an
         # array with genuine alternate values (``multi``) or field normalizers
         # still builds the full candidate matrix below regardless of ``giant`` --
@@ -833,6 +890,7 @@ class Scorer:
             and len(object_names) == 0
             and len(exp_rows) * len(act_rows) > _GROUNDED_MAX_CELLS
         )
+        score_ground = ground and not giant
         # Page presence drives both the grounded-family denominators and the
         # pairing-sensitive branch selection below. It is a SUPERSET of bbox
         # presence (every bbox-bearing evidence/citation also carries a page), so
@@ -844,19 +902,36 @@ class Scorer:
             # grounding-family scoring was actually dropped -- only then is the
             # document's grounded/page score incomplete and must be withheld
             # entirely. Pages are the superset, so this covers dropped bboxes too.
-            dropped_grounding = any(
-                self._ev_pages.get(f"{gt_field}[{i}].{s}") for i in range(len(exp_rows)) for s in cell_names
-            ) or any(self._pred_pages.get(f"{pred_field}[{j}].{s}") for j in range(len(act_rows)) for s in cell_names)
+            dropped_grounding = False
+            for i in range(len(exp_rows)):
+                for s in cell_names:
+                    pages = self._ev_pages.get(f"{gt_field}[{i}].{s}")
+                    if pages is not None and len(pages) > 0:
+                        dropped_grounding = True
+                        break
+                if dropped_grounding:
+                    break
+            if not dropped_grounding:
+                for j in range(len(act_rows)):
+                    for s in cell_names:
+                        pages = self._pred_pages.get(f"{pred_field}[{j}].{s}")
+                        if pages is not None and len(pages) > 0:
+                            dropped_grounding = True
+                            break
+                    if dropped_grounding:
+                        break
             if dropped_grounding:
                 c.grounded_incomplete = True
         else:
             for i in range(len(exp_rows)):
                 for s in cell_names:
                     gt_path = f"{gt_field}[{i}].{s}"
-                    self._note_grounded_expected(gt_path, c)
-                    if self._ev_pages.get(gt_path):
-                        c.p_expected += 1
+                    pages = self._ev_pages.get(gt_path)
+                    if pages is not None and len(pages) > 0:
                         has_ev_page = True
+                        break
+                if has_ev_page:
+                    break
             # Flag-only scan: g_claims/p_claims are counted per aligned pair
             # below, and only for cells whose GT side carries a bbox/page
             # (ungradeable claims stay out of the precision denominator). The flag
@@ -864,7 +939,8 @@ class Scorer:
             # the pairing-sensitive branch selection below covers both families.
             for j in range(len(act_rows)):
                 for s in cell_names:
-                    if self._pred_pages.get(f"{pred_field}[{j}].{s}"):
+                    pages = self._pred_pages.get(f"{pred_field}[{j}].{s}")
+                    if pages is not None and len(pages) > 0:
                         has_pred_page = True
                         break
                 if has_pred_page:
@@ -876,11 +952,8 @@ class Scorer:
             # Align on the same leaves F1 scores: opaque cells plus nested-object
             # children (not a 0/1 ``==`` on the whole object). Object-arrays add
             # their nested Hungarian cost. Scalar arrays stay one opaque cell.
-            pairing_paths, _, _ = _item_pairing_fields(item_sch=item_sch, subfield_names=subfield_names)
-            # Peel still keys original row dicts by schema column name (not nested
-            # segment tuples). Pairing-sensitive branches use pairing_paths.
-            cost_names: Sequence[str] = cell_names if cell_names else subfield_names
-            fuzzy = self._fuzzy
+            pairing_paths, path_schemas, _ = _item_pairing_fields(item_sch=item_sch, subfield_names=subfield_names)
+            path_fuzzy = _fuzzy_for_paths(pairing_paths, fuzzy=self._fuzzy)
             # Distinct alts / normalizers on *this* level's opaque cells expand the
             # zero-cost graph, so skip the exact-row peel. Nested object-arrays
             # detect configured match for themselves when they add their cost.
@@ -919,14 +992,20 @@ class Scorer:
             else:
                 # Opaque-cell-only, un-grounded: the value score is pairing-
                 # independent (n_pairs*k - total_cost), so peeling exact rows is
-                # safe. Reuse the vectorized interned matrix on the residual rows.
+                # safe. Flatten through ``lookup`` so omit/default/null match F1.
+                flat_act = list(_flatten_pairing_rows(act_rows, paths=pairing_paths, item_sch=item_sch))
+                flat_exp = list(_flatten_pairing_rows(exp_rows, paths=pairing_paths, item_sch=item_sch))
                 assignment = peel_exact_row_matches(
-                    act_rows, exp_rows, subfields=cost_names, fuzzy_field_thresholds=fuzzy
+                    flat_act,
+                    flat_exp,
+                    subfields=pairing_paths,
+                    fuzzy_field_thresholds=path_fuzzy,
+                    field_schemas=path_schemas,
                 )
                 match_for_exp = {int(i): int(j) for j, i in assignment.pairs}
                 if len(assignment.unmatched_actual_indices) > 0 and len(assignment.unmatched_expected_indices) > 0:
-                    residual_actual = [act_rows[idx] for idx in assignment.unmatched_actual_indices]
-                    residual_expected = [exp_rows[idx] for idx in assignment.unmatched_expected_indices]
+                    residual_actual = [flat_act[idx] for idx in assignment.unmatched_actual_indices]
+                    residual_expected = [flat_exp[idx] for idx in assignment.unmatched_expected_indices]
                     # Memory ceiling on the residual assignment matrix (parallel to
                     # the _GROUNDED_MAX_CELLS grounding guard above). After the
                     # exact-row peel, a flat array whose prediction diverges leaves
@@ -942,8 +1021,9 @@ class Scorer:
                         cost = mismatch_cost_matrix(
                             residual_actual,
                             residual_expected,
-                            subfields=cost_names,
-                            fuzzy_field_thresholds=fuzzy,
+                            subfields=pairing_paths,
+                            fuzzy_field_thresholds=path_fuzzy,
+                            field_schemas=path_schemas,
                         )
                         row_ind, col_ind = linear_sum_assignment(cost)
                         match_for_exp.update(
@@ -960,19 +1040,7 @@ class Scorer:
             mj = match_for_exp.get(i)
             if mj is not None:
                 ad = act_rows[mj] if isinstance(act_rows[mj], Mapping) else {}
-                for s in cell_names:
-                    gt_path = f"{gt_field}[{i}].{s}"
-                    pred_path = f"{pred_field}[{mj}].{s}"
-                    if not giant:
-                        self._note_grounded_claim(gt_path, pred_path, c)
-                        if self._ev_pages.get(gt_path) and self._pred_pages.get(pred_path):
-                            c.p_claims += 1
-                    self._score_cell(gt_path, pred_path, ed.get(s), ad.get(s), s, c, ground=not giant)
-                for s in object_array_names:  # recurse with the matched predicted index, not the GT index
-                    self._score_array(
-                        f"{gt_field}[{i}].{s}", f"{pred_field}[{mj}].{s}", ed.get(s), ad.get(s), item_sch.get(s, {}), c
-                    )
-                for s in object_names:
+                for s in subfield_names:
                     child_schema = item_sch.get(s, {})
                     in_e, child_ev = lookup(ed, s, child_schema)
                     in_a, child_av = lookup(ad, s, child_schema)
@@ -985,29 +1053,47 @@ class Scorer:
                         child_av,
                         child_schema,
                         c,
+                        ground=score_ground,
                     )
-            else:  # unmatched GT row: cell subfields already counted; recurse nested as recall misses
+            else:
                 self._count_unmatched_nested(
-                    f"{gt_field}[{i}]", ed, item_sch, object_array_names + object_names, c, expected=True
+                    f"{gt_field}[{i}]",
+                    ed,
+                    item_sch,
+                    subfield_names,
+                    c,
+                    expected=True,
+                    ground=score_ground,
                 )
-        for j, arow in enumerate(act_rows):  # extra predicted rows: nested fields are precision misses
+        for j, arow in enumerate(act_rows):
             if j in matched_act:
                 continue
             ad = arow if isinstance(arow, Mapping) else {}
             self._count_unmatched_nested(
-                f"{pred_field}[{j}]", ad, item_sch, object_array_names + object_names, c, expected=False
+                f"{pred_field}[{j}]",
+                ad,
+                item_sch,
+                subfield_names,
+                c,
+                expected=False,
+                ground=score_ground,
             )
 
-    def _score_scalar_cell(self, gt_path: str, pred_path: str, ev: Any, av: Any, c: _Counts) -> None:
+    def _score_scalar_cell(
+        self, gt_path: str, pred_path: str, ev: Any, av: Any, c: _Counts, *, ground: bool = True
+    ) -> None:
         leaf = path_leaf(gt_path)
         c.expected += 1
-        self._note_grounded_expected(gt_path, c)
-        self._note_grounded_claim(gt_path, pred_path, c)
-        if self._ev_pages.get(gt_path):
-            c.p_expected += 1
-            if self._pred_pages.get(pred_path):
-                c.p_claims += 1
-        self._score_cell(gt_path, pred_path, ev, av, leaf, c)
+        if ground:
+            self._note_grounded_expected(gt_path, c)
+            self._note_grounded_claim(gt_path, pred_path, c)
+            ev_pages = self._ev_pages.get(gt_path)
+            if ev_pages is not None and len(ev_pages) > 0:
+                c.p_expected += 1
+                pred_pages = self._pred_pages.get(pred_path)
+                if pred_pages is not None and len(pred_pages) > 0:
+                    c.p_claims += 1
+        self._score_cell(gt_path, pred_path, ev, av, leaf, c, ground=ground)
         c.predicted += 1
 
     def _score_pair(
@@ -1020,33 +1106,41 @@ class Scorer:
         av: Any,
         schema: Mapping[str, Any],
         c: _Counts,
+        *,
+        ground: bool = True,
     ) -> None:
-        # Presence after schema ``default``. The scorer itself is still chosen
-        # from ``schema`` in ``_score_node`` / ``_count_subtree``, not from
-        # whether ``ev``/``av`` is a list or dict.
+        # ``in_e``/``in_a`` are ``lookup`` presence (schema ``default`` already
+        # applied). ``_score_node`` / ``_count_subtree`` pick the scorer from
+        # ``schema``.
         if in_e and in_a:
-            self._score_node(gt_path, pred_path, ev, av, schema, c)
+            self._score_node(gt_path, pred_path, ev, av, schema, c, ground=ground)
         elif in_e:
-            self._count_subtree(gt_path, ev, schema, c, expected=True)
+            self._count_subtree(gt_path, ev, schema, c, expected=True, ground=ground)
         elif in_a:
-            self._count_subtree(pred_path, av, schema, c, expected=False)
-        # neither: no-op — do not treat "both missing" as a precision claim.
+            self._count_subtree(pred_path, av, schema, c, expected=False, ground=ground)
+        # neither: both absent is not a cell.
 
     def _score_node(
-        self, gt_path: str, pred_path: str, ev: Any, av: Any, schema: Mapping[str, Any], c: _Counts
+        self,
+        gt_path: str,
+        pred_path: str,
+        ev: Any,
+        av: Any,
+        schema: Mapping[str, Any],
+        c: _Counts,
+        *,
+        ground: bool = True,
     ) -> None:
-        # Schema-only dispatch: gold/pred Python types do not select Hungarian
-        # vs object-walk vs scalar. ``as_rows`` / ``{}`` only coerce a mismatched
-        # instance once that scorer is already chosen.
+        # Schema type chooses Hungarian vs object-walk vs scalar. ``as_rows`` /
+        # ``{}`` coerce a mismatched instance after that choice.
         if is_array_schema(schema):
-            # List-of-objects: Hungarian table. Array of primitives (string[] /
-            # number[] / …, incl. null combinators): one opaque cell, same as a
-            # string field. Empty items.properties is the primitive-array shape,
-            # not a skip — that used to drop nested lists like vendor.tags.
+            # List-of-objects: Hungarian table. Primitive arrays (string[] /
+            # number[] / …, including null combinators and empty
+            # items.properties) are one opaque cell, the same as a string field.
             if is_object_array_schema(schema):
-                self._score_array(gt_path, pred_path, ev, av, schema, c)
+                self._score_array(gt_path, pred_path, ev, av, schema, c, ground=ground)
             else:
-                self._score_scalar_cell(gt_path, pred_path, ev, av, c)
+                self._score_scalar_cell(gt_path, pred_path, ev, av, c, ground=ground)
             return
         if is_object_schema(schema):
             props = schema_properties(schema)
@@ -1054,17 +1148,17 @@ class Scorer:
             ad = av if isinstance(av, Mapping) else {}
             keys = list(props.keys())
             if len(keys) == 0:
-                self._score_scalar_cell(gt_path, pred_path, ev, av, c)
+                self._score_scalar_cell(gt_path, pred_path, ev, av, c, ground=ground)
                 return
             for key in keys:
-                child_gt = f"{gt_path}.{key}" if gt_path else key
-                child_pred = f"{pred_path}.{key}" if pred_path else key
+                child_gt = f"{gt_path}.{key}" if len(gt_path) > 0 else key
+                child_pred = f"{pred_path}.{key}" if len(pred_path) > 0 else key
                 child_schema = props.get(key, {})
                 in_e, child_ev = lookup(ed, key, child_schema)
                 in_a, child_av = lookup(ad, key, child_schema)
-                self._score_pair(child_gt, child_pred, in_e, child_ev, in_a, child_av, child_schema, c)
+                self._score_pair(child_gt, child_pred, in_e, child_ev, in_a, child_av, child_schema, c, ground=ground)
             return
-        self._score_scalar_cell(gt_path, pred_path, ev, av, c)
+        self._score_scalar_cell(gt_path, pred_path, ev, av, c, ground=ground)
 
     def score_root(
         self, expected: Mapping[str, Any], actual: Mapping[str, Any], schema_props: Mapping[str, Any]

@@ -275,6 +275,14 @@ def test_array_record_match_keeps_punctuation_spacing_significant_by_default() -
     assert cell_match("R. L.\nUnderwood", "R. L. Underwood", "operator", fuzzy_field_thresholds=fuzzy)
 
 
+def test_cell_match_zero_is_not_null() -> None:
+    fuzzy: dict[str, float] = {}
+    assert cell_match(0, None, "n", fuzzy_field_thresholds=fuzzy) is False
+    assert cell_match(None, 0, "n", fuzzy_field_thresholds=fuzzy) is False
+    assert cell_match(0, 0, "n", fuzzy_field_thresholds=fuzzy) is True
+    assert cell_match(None, None, "n", fuzzy_field_thresholds=fuzzy) is True
+
+
 def test_array_record_match_date_normalization_can_be_disabled() -> None:
     actual = {
         "account": "1234",
