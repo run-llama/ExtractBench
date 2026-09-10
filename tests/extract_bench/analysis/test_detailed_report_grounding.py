@@ -35,7 +35,7 @@ def test_normalize_grounding_rule_maps_keys_and_bboxes() -> None:
 
 def test_select_grounding_rules_prefers_priority_metric() -> None:
     low_priority = SimpleNamespace(
-        metric_name="extract_attribution_pass_rate",
+        metric_name="extract_evidence_page_pass_rate",
         metadata={
             "rule_results": [
                 {"field_path": "from_attr", "value_pass": True},

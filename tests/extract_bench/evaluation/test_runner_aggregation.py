@@ -18,16 +18,20 @@ def test_runner_uses_avg_for_macro_and_micro_for_pooled_extract_metrics() -> Non
             product_type="extract",
             success=True,
             metrics=[
-                MetricValue(metric_name="extract_value_precision", value=0.5, metadata={"tp": 1, "fp": 1, "fn": 1}),
-                MetricValue(metric_name="extract_value_recall", value=0.5, metadata={"tp": 1, "fp": 1, "fn": 1}),
-                MetricValue(metric_name="extract_value_f1", value=0.5, metadata={"tp": 1, "fp": 1, "fn": 1}),
                 MetricValue(
-                    metric_name="extract_element_pass_rate",
+                    metric_name="extract_unified_value_precision", value=0.5, metadata={"tp": 1, "fp": 1, "fn": 1}
+                ),
+                MetricValue(
+                    metric_name="extract_unified_value_recall", value=0.5, metadata={"tp": 1, "fp": 1, "fn": 1}
+                ),
+                MetricValue(metric_name="extract_unified_value_f1", value=0.5, metadata={"tp": 1, "fp": 1, "fn": 1}),
+                MetricValue(
+                    metric_name="extract_evidence_value_pass_rate",
                     value=0.5,
                     metadata={"passed": 1, "total": 2, "tp": 1, "fp": 1, "fn": 0},
                 ),
                 MetricValue(
-                    metric_name="extract_bbox_iou",
+                    metric_name="extract_evidence_bbox_IOU_alignment",
                     value=0.25,
                     metadata={
                         "score_sum": 0.5,
@@ -37,7 +41,7 @@ def test_runner_uses_avg_for_macro_and_micro_for_pooled_extract_metrics() -> Non
                     },
                 ),
                 MetricValue(
-                    metric_name="extract_bbox_recall",
+                    metric_name="extract_evidence_bbox_coverage",
                     value=0.5,
                     metadata={
                         "score_sum": 1.0,
@@ -80,16 +84,20 @@ def test_runner_uses_avg_for_macro_and_micro_for_pooled_extract_metrics() -> Non
             product_type="extract",
             success=True,
             metrics=[
-                MetricValue(metric_name="extract_value_precision", value=1.0, metadata={"tp": 3, "fp": 0, "fn": 0}),
-                MetricValue(metric_name="extract_value_recall", value=1.0, metadata={"tp": 3, "fp": 0, "fn": 0}),
-                MetricValue(metric_name="extract_value_f1", value=1.0, metadata={"tp": 3, "fp": 0, "fn": 0}),
                 MetricValue(
-                    metric_name="extract_element_pass_rate",
+                    metric_name="extract_unified_value_precision", value=1.0, metadata={"tp": 3, "fp": 0, "fn": 0}
+                ),
+                MetricValue(
+                    metric_name="extract_unified_value_recall", value=1.0, metadata={"tp": 3, "fp": 0, "fn": 0}
+                ),
+                MetricValue(metric_name="extract_unified_value_f1", value=1.0, metadata={"tp": 3, "fp": 0, "fn": 0}),
+                MetricValue(
+                    metric_name="extract_evidence_value_pass_rate",
                     value=1.0,
                     metadata={"passed": 3, "total": 3, "tp": 3, "fp": 0, "fn": 0},
                 ),
                 MetricValue(
-                    metric_name="extract_bbox_iou",
+                    metric_name="extract_evidence_bbox_IOU_alignment",
                     value=1.0,
                     metadata={
                         "score_sum": 3.0,
@@ -99,7 +107,7 @@ def test_runner_uses_avg_for_macro_and_micro_for_pooled_extract_metrics() -> Non
                     },
                 ),
                 MetricValue(
-                    metric_name="extract_bbox_recall",
+                    metric_name="extract_evidence_bbox_coverage",
                     value=1.0,
                     metadata={
                         "score_sum": 3.0,
@@ -139,18 +147,18 @@ def test_runner_uses_avg_for_macro_and_micro_for_pooled_extract_metrics() -> Non
 
     aggregate = runner._aggregate_metrics(results)
 
-    assert aggregate["avg_extract_value_f1"] == 0.75
-    assert aggregate["micro_extract_value_precision"] == pytest.approx(0.8)
-    assert aggregate["micro_extract_value_recall"] == pytest.approx(0.8)
-    assert aggregate["micro_extract_value_f1"] == pytest.approx(0.8)
-    assert aggregate["avg_extract_element_pass_rate"] == 0.75
-    assert aggregate["micro_extract_element_pass_rate"] == pytest.approx(0.8)
-    assert aggregate["avg_extract_bbox_iou"] == 0.625
-    assert aggregate["micro_extract_bbox_iou"] == pytest.approx(3.5 / 5.0)
-    assert aggregate["micro_extract_bbox_iou"] != pytest.approx(10.0 / 13.0)
-    assert aggregate["avg_extract_bbox_recall"] == 0.75
-    assert aggregate["micro_extract_bbox_recall"] == pytest.approx(4.0 / 5.0)
-    assert aggregate["micro_extract_bbox_recall"] != pytest.approx(5.0 / 7.0)
+    assert aggregate["avg_extract_unified_value_f1"] == 0.75
+    assert aggregate["micro_extract_unified_value_precision"] == pytest.approx(0.8)
+    assert aggregate["micro_extract_unified_value_recall"] == pytest.approx(0.8)
+    assert aggregate["micro_extract_unified_value_f1"] == pytest.approx(0.8)
+    assert aggregate["avg_extract_evidence_value_pass_rate"] == 0.75
+    assert aggregate["micro_extract_evidence_value_pass_rate"] == pytest.approx(0.8)
+    assert aggregate["avg_extract_evidence_bbox_IOU_alignment"] == 0.625
+    assert aggregate["micro_extract_evidence_bbox_IOU_alignment"] == pytest.approx(3.5 / 5.0)
+    assert aggregate["micro_extract_evidence_bbox_IOU_alignment"] != pytest.approx(10.0 / 13.0)
+    assert aggregate["avg_extract_evidence_bbox_coverage"] == 0.75
+    assert aggregate["micro_extract_evidence_bbox_coverage"] == pytest.approx(4.0 / 5.0)
+    assert aggregate["micro_extract_evidence_bbox_coverage"] != pytest.approx(5.0 / 7.0)
     assert aggregate["avg_parse_field_iou"] == 0.625
     assert aggregate["micro_parse_field_iou"] == pytest.approx(3.5 / 5.0)
     assert aggregate["micro_parse_field_iou"] != pytest.approx(100.0 / 200.0)
@@ -159,7 +167,7 @@ def test_runner_uses_avg_for_macro_and_micro_for_pooled_extract_metrics() -> Non
     assert aggregate["micro_parse_field_bbox_recall"] != pytest.approx(100.0 / 200.0)
     assert aggregate["avg_parse_field_text_similarity"] == 0.75
     assert aggregate["micro_parse_field_text_similarity"] == pytest.approx(0.875)
-    assert "macro_extract_element_pass_rate" not in aggregate
+    assert "macro_extract_evidence_value_pass_rate" not in aggregate
 
 
 # ---------------------------------------------------------------------------
@@ -268,13 +276,11 @@ def test_diagnostic_count_metrics_are_not_padded() -> None:
     diag = [
         MetricValue(metric_name="tables_unmatched_expected", value=1.0),
         MetricValue(metric_name="num_predictions", value=1.0),
-        MetricValue(metric_name="null_hallucination_rate", value=1.0),
         MetricValue(metric_name="rule_pass_rate", value=1.0),  # control: a real score
     ]
     diag_zero = [
         MetricValue(metric_name="tables_unmatched_expected", value=0.0),
         MetricValue(metric_name="num_predictions", value=0.0),
-        MetricValue(metric_name="null_hallucination_rate", value=0.0),
         MetricValue(metric_name="rule_pass_rate", value=0.0),
     ]
     results = [
@@ -289,7 +295,6 @@ def test_diagnostic_count_metrics_are_not_padded() -> None:
     # Diagnostics unchanged by failures
     assert aggregate["avg_tables_unmatched_expected"] == pytest.approx(0.5)
     assert aggregate["avg_num_predictions"] == pytest.approx(0.5)
-    assert aggregate["avg_null_hallucination_rate"] == pytest.approx(0.5)
     # The real score is padded
     assert aggregate["avg_rule_pass_rate"] == pytest.approx(0.25)
 

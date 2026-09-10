@@ -411,17 +411,6 @@ class ExtractTestCase(BaseTestCase):
             return self.data_schema
         return {**self.data_schema, "repeated_structure": self.row_identity}
 
-    schema_field_metric_groups: dict[str, list[str]] | None = Field(
-        default=None,
-        alias="_schema_field_metric_groups",
-        description=(
-            "Named groups of dot-separated field paths (from test.json "
-            "_schema_field_metric_groups). Each group is scored as 'schema_field_accuracy_<name>' "
-            "by projecting expected_output onto the group's paths and running the "
-            "JSON subset match."
-        ),
-    )
-
     @field_validator("test_rules", mode="before")
     @classmethod
     def _coerce_extract_rules(cls, value: list[dict[str, Any]] | None) -> list[ExtractRuleUnion] | None:

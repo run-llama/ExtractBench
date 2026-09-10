@@ -108,7 +108,6 @@ _NON_SCORE_METRICS = frozenset(
         "parse_field_gt_count",
         "unmatched_gt_elements",
         "unmatched_pred_elements",
-        "null_hallucination_rate",  # lower is better: a synthetic 0 would reward failure
     }
 )
 
@@ -1714,9 +1713,7 @@ class EvaluationRunner:
             f1 = 2.0 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0.0
             if metric_name == "precision" or metric_name.endswith("_precision"):
                 aggregate[f"micro_{metric_name}"] = precision
-            elif metric_name == "recall" or (
-                metric_name.endswith("_recall") and metric_name != "record_grounded_recall"
-            ):
+            elif metric_name == "recall" or metric_name.endswith("_recall"):
                 aggregate[f"micro_{metric_name}"] = recall
             elif metric_name == "f1" or metric_name.endswith("_f1"):
                 aggregate[f"micro_{metric_name}"] = f1

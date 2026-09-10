@@ -233,47 +233,6 @@ class TestCoverage:
         assert metrics["extract_evidence_bbox_coverage"].value == 1.0
 
 
-class TestPerRuleIouThreshold:
-    def test_loose_threshold_lets_imperfect_iou_pass(self):
-        rule = ExtractFieldTestRule(
-            field_path="foo",
-            expected_value="bar",
-            bboxes=[ExtractFieldBbox(page=1, bbox=[0.1, 0.1, 0.4, 0.4])],
-            iou_threshold=0.2,
-        )
-        citations = [FieldCitation(field_path="foo", page=1, bbox=[0.15, 0.15, 0.4, 0.4], source="x")]
-        metrics = _named(
-            compute_extract_field_grounding_metrics(
-                extracted_data={"foo": "bar"},
-                field_rules=[rule],
-                field_citations=citations,
-                data_schema={"type": "object"},
-            )
-        )
-        assert metrics["extract_attribution_pass_rate"].value == 1.0
-
-
-class TestBackwardCompat:
-    def test_legacy_bboxes_path_unchanged(self):
-        """Legacy rules without v0.2 evidence keep producing the same bbox-gated results."""
-        rule = ExtractFieldTestRule(
-            field_path="foo",
-            expected_value="bar",
-            bboxes=[ExtractFieldBbox(page=1, bbox=[0.1, 0.1, 0.2, 0.2])],
-        )
-        citations = [FieldCitation(field_path="foo", page=1, bbox=[0.1, 0.1, 0.2, 0.2], source="x")]
-        metrics = _named(
-            compute_extract_field_grounding_metrics(
-                extracted_data={"foo": "bar"},
-                field_rules=[rule],
-                field_citations=citations,
-                data_schema={"type": "object"},
-            )
-        )
-        assert metrics["extract_attribution_pass_rate"].value == 1.0
-        assert metrics["f1"].value == 1.0
-
-
 class TestV02StrayAndNullSemantics:
     """v0.2 rules carry the canonical value in evidence, not expected_value.
 
@@ -314,8 +273,8 @@ class TestV02StrayAndNullSemantics:
         )
         assert "null_hallucination_rate" not in metrics
 
-    def test_no_evidence_no_expected_value_is_null_expected(self):
-        """Legacy null-expected behavior preserved when evidence is also empty."""
+    def test_no_evidence_legacy_rule_emits_nothing(self):
+        """Legacy extract_field rules with no evidence list emit no adapter metrics."""
         rule = ExtractFieldTestRule(
             field_path="adverse_reactions",
             expected_value=None,
@@ -329,7 +288,7 @@ class TestV02StrayAndNullSemantics:
                 data_schema={"type": "object"},
             )
         )
-        assert metrics["null_hallucination_rate"].value == 1.0
+        assert metrics == {}
 
     def test_explicit_stray_tag_still_treated_stray(self):
         rule = ExtractFieldTestRule(

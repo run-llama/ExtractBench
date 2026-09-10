@@ -1,10 +1,9 @@
 """Normalize list-rooted per_table_row extract predictions for evaluation.
 
 This module is a pure **shape adapter**. It does not emit any metrics of
-its own. The existing ``precision``, ``recall``, ``f1``, ``accuracy``, and
-``extract_field_value_pass_rate`` metrics are what score correctly once
-the prediction is normalized; downstream metadata on those metrics carries
-normalization state for debugging and dashboard drill-down.
+its own. ``accuracy``, ``array_record_*``, unified F1, and v0.2 evidence
+metrics score the normalized prediction; ``skip_field_paths`` on those
+evidence metrics records scalars the list-unwrap excluded.
 
 The v0.5 test cases were authored for ``extraction_target=per_doc``, so every
 ``ExtractFieldTestRule.field_path`` is dict-rooted (e.g. ``personnel[0].name``,

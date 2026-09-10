@@ -114,8 +114,6 @@ def _render_markdown_to_html(md_text: str) -> str:
 _GROUNDING_RULE_METRIC_PRIORITY = (
     "extract_evidence_bbox_IOU_pass_rate",
     "extract_evidence_bbox_covered_pass_rate",
-    "extract_localization_pass_rate",
-    "extract_attribution_pass_rate",
     "parse_field_grounding_pass_rate",
 )
 

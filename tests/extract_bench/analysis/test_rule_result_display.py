@@ -54,10 +54,10 @@ def test_coerce_rule_pass_reads_the_key_its_metric_counts() -> None:
 
 def test_coerce_rule_pass_metric_specific_keys_for_parse_and_localization() -> None:
     rule = {"field_path": "x", "loc_pass": True, "cls_pass": False, "attr_pass": True, "element_pass": False}
-    assert _coerce_rule_pass(rule, "extract_localization_pass_rate") is True
+    assert _coerce_rule_pass(rule, "parse_field_localization_pass_rate") is True
     assert _coerce_rule_pass(rule, "extract_field_classification_pass_rate") is False
-    assert _coerce_rule_pass(rule, "extract_attribution_pass_rate") is True
-    assert _coerce_rule_pass(rule, "extract_element_pass_rate") is False
+    assert _coerce_rule_pass(rule, "extract_field_attribution_pass_rate") is True
+    assert _coerce_rule_pass(rule, "extract_field_element_pass_rate") is False
 
 
 def test_coerce_rule_pass_unknown_metric_falls_back_to_generic_order() -> None:

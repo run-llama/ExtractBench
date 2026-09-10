@@ -424,61 +424,6 @@ METRIC_DEFINITIONS: dict[str, MetricInfo] = {
         "JSON subset match comparing expected vs actual extracted data. Supports date "
         "normalization and weighted scoring by leaf node count.",
     ),
-    "extract_value_precision": MetricInfo(
-        "Extract Value Precision",
-        "Native extract value precision using schema-aware typed comparison and "
-        "index-tolerant array matching: matched predicted values / predicted values.",
-    ),
-    "extract_value_recall": MetricInfo(
-        "Extract Value Recall",
-        "Native extract value recall using schema-aware typed comparison and "
-        "index-tolerant array matching: matched expected values / expected values.",
-    ),
-    "extract_value_f1": MetricInfo(
-        "Extract Value F1",
-        "Harmonic mean of native extract value precision and recall.",
-    ),
-    "extract_value_pass_rate": MetricInfo(
-        "Extract Value Pass Rate",
-        "Per-rule pass rate for native extract values using schema-aware typed comparison "
-        "with index-tolerant array matching.",
-    ),
-    "extract_bbox_iou": MetricInfo(
-        "Extract BBox IoU",
-        "Per-document metric: mean of per-field-rule intersection-over-union between ground-truth "
-        "extract-field bboxes and selected native extract field-citation bboxes.",
-    ),
-    "extract_bbox_recall": MetricInfo(
-        "Extract BBox Recall",
-        "Per-document metric: mean of per-field-rule ground-truth bbox area covered by selected "
-        "native extract field-citation bboxes.",
-    ),
-    "extract_element_pass_rate": MetricInfo(
-        "Extract Element Pass Rate",
-        "Native extract per-field pass rate where localization and typed attribution both pass.",
-    ),
-    "extract_localization_pass_rate": MetricInfo(
-        "Extract Localization Pass Rate",
-        "Native extract per-field pass rate where predicted field-citation bboxes meet strict "
-        "or relaxed localization criteria.",
-    ),
-    "extract_attribution_pass_rate": MetricInfo(
-        "Extract Attribution Pass Rate",
-        "Native extract per-field pass rate where the localized structured prediction matches "
-        "the expected value under typed comparison.",
-    ),
-    "extract_avg_iou": MetricInfo(
-        "Extract Avg IoU",
-        "Average per-rule IoU for extract field localization candidates.",
-    ),
-    "extract_avg_iou_matched": MetricInfo(
-        "Extract Avg IoU Matched",
-        "Average per-rule IoU across native extract fields that passed localization.",
-    ),
-    "extract_avg_iou_unmatched": MetricInfo(
-        "Extract Avg IoU Unmatched",
-        "Average per-rule IoU across native extract fields that failed localization.",
-    ),
     "parse_field_element_pass_rate": MetricInfo(
         "Parse Field Element Pass Rate",
         "Parse-side field grounding pass rate where localization, trivial classification, "

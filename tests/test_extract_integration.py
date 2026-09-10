@@ -46,13 +46,16 @@ def _legacy_two_rule_case(tmp_path: Path, *, second_rule_verified: bool = True) 
                 "field_path": "invoice.number",
                 "expected_value": "INV-001",
                 "bboxes": [{"page": 1, "bbox": [0.1, 0.2, 0.3, 0.1]}],
+                "evidence": [{"page": 1, "bbox": [0.1, 0.2, 0.3, 0.1], "value": "INV-001"}],
                 "verified": True,
             },
             {
                 "type": "extract_field",
                 "field_path": "invoice.date",
                 "expected_value": "2026-05-01",
+                "comparator": "date",
                 "bboxes": [{"page": 1, "bbox": [0.5, 0.2, 0.2, 0.1]}],
+                "evidence": [{"page": 1, "bbox": [0.5, 0.2, 0.2, 0.1], "value": "2026-05-01"}],
                 "verified": second_rule_verified,
             },
         ],
@@ -168,16 +171,9 @@ def test_extract_evaluator_emits_unified_value_metrics(tmp_path: Path) -> None:
     ):
         assert by_name[metric_name].value == pytest.approx(1.0)
 
-    # Value normalization: "May 1, 2026" matched "2026-05-01" via date canonicalization.
-    assert by_name["extract_field_value_pass_rate"].value == pytest.approx(1.0)
-
-    # Grounding diagnostics for legacy bbox rules.
-    for metric_name in (
-        "extract_localization_pass_rate",
-        "extract_attribution_pass_rate",
-        "extract_element_pass_rate",
-    ):
-        assert by_name[metric_name].value == pytest.approx(1.0)
+    # Unified F1 canonicalizes dates; the v0.2 date comparator matches
+    # "May 1, 2026" to evidence value "2026-05-01".
+    assert by_name["extract_evidence_value_pass_rate"].value == pytest.approx(1.0)
 
     assert evaluated.job_id == "ext-123"
 
@@ -214,9 +210,11 @@ def test_extract_evaluator_scores_filtered_verified_rules(tmp_path: Path) -> Non
     default_metrics = {m.metric_name: m for m in ExtractEvaluator().evaluate(result, case).metrics}
     verified_metrics = {m.metric_name: m for m in ExtractEvaluator().evaluate(result, verified_case).metrics}
 
-    # The unverified date rule (uncited) drags grounding down in the default
-    # run; the verified-only run scores the cited rule alone.
-    assert verified_metrics["extract_element_pass_rate"].value >= default_metrics["extract_element_pass_rate"].value
+    assert default_metrics["extract_evidence_value_pass_rate"].metadata["total"] == 1
+    assert verified_metrics["extract_evidence_value_pass_rate"].metadata["total"] == 1
+    default_score = default_metrics["extract_evidence_value_pass_rate"].value
+    verified_score = verified_metrics["extract_evidence_value_pass_rate"].value
+    assert verified_score >= default_score
 
 
 def test_parse_evaluator_scores_extract_field_grounding_rules(tmp_path: Path) -> None:
@@ -261,7 +259,7 @@ def test_extract_avg_micro_aggregation() -> None:
             success=True,
             metrics=[
                 MetricValue(
-                    metric_name="extract_element_pass_rate",
+                    metric_name="extract_evidence_value_pass_rate",
                     value=0.5,
                     metadata={"passed": 1, "total": 2, "tp": 1, "fp": 1, "fn": 0},
                 )
@@ -275,7 +273,7 @@ def test_extract_avg_micro_aggregation() -> None:
             success=True,
             metrics=[
                 MetricValue(
-                    metric_name="extract_element_pass_rate",
+                    metric_name="extract_evidence_value_pass_rate",
                     value=1.0,
                     metadata={"passed": 3, "total": 3, "tp": 3, "fp": 0, "fn": 0},
                 )
@@ -285,14 +283,14 @@ def test_extract_avg_micro_aggregation() -> None:
 
     aggregate = runner._aggregate_metrics(results)
 
-    assert aggregate["avg_extract_element_pass_rate"] == 0.75
-    assert aggregate["micro_extract_element_pass_rate"] == 0.8
-    assert "macro_extract_element_pass_rate" not in aggregate
-    assert aggregate["total_extract_element_pass_rate_passed"] == 4.0
-    assert aggregate["total_extract_element_pass_rate_evaluated"] == 5.0
-    assert aggregate["total_extract_element_pass_rate_tp"] == 4.0
-    assert aggregate["total_extract_element_pass_rate_fp"] == 1.0
-    assert aggregate["total_extract_element_pass_rate_fn"] == 0.0
+    assert aggregate["avg_extract_evidence_value_pass_rate"] == 0.75
+    assert aggregate["micro_extract_evidence_value_pass_rate"] == 0.8
+    assert "macro_extract_evidence_value_pass_rate" not in aggregate
+    assert aggregate["total_extract_evidence_value_pass_rate_passed"] == 4.0
+    assert aggregate["total_extract_evidence_value_pass_rate_evaluated"] == 5.0
+    assert aggregate["total_extract_evidence_value_pass_rate_tp"] == 4.0
+    assert aggregate["total_extract_evidence_value_pass_rate_fp"] == 1.0
+    assert aggregate["total_extract_evidence_value_pass_rate_fn"] == 0.0
 
 
 def test_public_extract_pipelines_registered() -> None:
@@ -368,4 +366,4 @@ def test_parallel_worker_respects_verified_only_flag(tmp_path: Path) -> None:
     by_name = {metric.metric_name: metric for metric in evaluated.metrics}
 
     # Only the single verified rule is scored.
-    assert by_name["extract_field_value_pass_rate"].metadata["total"] == 1
+    assert by_name["extract_evidence_value_pass_rate"].metadata["total"] == 1

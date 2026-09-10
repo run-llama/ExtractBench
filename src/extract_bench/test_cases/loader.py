@@ -7,7 +7,6 @@ Supports two data formats:
 
 import json
 import logging
-import re
 from pathlib import Path
 from typing import Any
 
@@ -59,29 +58,6 @@ def _row_identity_kwargs(payload: dict[str, Any], source: Any) -> dict[str, Any]
 SUPPORTED_EXTENSIONS = {".pdf", ".png", ".jpg", ".jpeg", ".jfif", ".docx"}
 
 _EXTRACT_RULE_TYPES = frozenset({"extract_field", "array_length", "array_head", "array_tail"})
-
-# Group names become 'schema_field_accuracy_<name>' metrics, so they must be
-# safe metric-name fragments.
-_METRIC_GROUP_NAME_RE = re.compile(r"^[a-z][a-z0-9_]*$")
-
-
-def _validate_schema_field_metric_groups(metric_groups: Any, test_json_path: Path) -> None:
-    """Validate the v0.2 ``_schema_field_metric_groups`` block (group name -> field paths)."""
-    if not isinstance(metric_groups, dict):
-        raise ValueError(
-            f"Invalid _schema_field_metric_groups in {test_json_path}: must be a dict of group name -> field paths"
-        )
-    for group_name, paths in metric_groups.items():
-        if not isinstance(group_name, str) or not _METRIC_GROUP_NAME_RE.match(group_name):
-            raise ValueError(
-                f"Invalid _schema_field_metric_groups group name {group_name!r} in {test_json_path}: "
-                "must match [a-z][a-z0-9_]* (it becomes the 'schema_field_accuracy_<name>' metric)"
-            )
-        if not isinstance(paths, list) or not paths or not all(isinstance(p, str) and p for p in paths):
-            raise ValueError(
-                f"Invalid _schema_field_metric_groups[{group_name!r}] in {test_json_path}: "
-                "must be a non-empty list of field paths"
-            )
 
 
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -356,9 +332,6 @@ def load_test_case(
     # mixed ParseTestCase for grounding and provenance.
     if data_schema and not prefer_parse_annotations:
         expected_output = test_config.get("expected_output")
-        metric_groups = test_config.get("_schema_field_metric_groups")
-        if metric_groups is not None:
-            _validate_schema_field_metric_groups(metric_groups, test_json_path)
         extract_case = ExtractTestCase(
             test_id=test_id,
             group=group,
@@ -369,7 +342,6 @@ def load_test_case(
             expected_output=expected_output,
             test_rules=test_rules,
             **({"_schema_version": test_config["_schema_version"]} if "_schema_version" in test_config else {}),
-            **({"_schema_field_metric_groups": metric_groups} if metric_groups is not None else {}),
             **_row_identity_kwargs(test_config, test_json_path),
         )
 
