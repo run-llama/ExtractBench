@@ -52,26 +52,38 @@ def test_precision_recall_f1_are_micro_aggregated_from_counts(tmp_path) -> None:
             _result(
                 [
                     MetricValue(
-                        metric_name="extract_unified_value_precision", value=1.0, metadata={"tp": 1, "fp": 0, "fn": 9}
+                        metric_name="extract_unified_value_precision",
+                        value=1.0,
+                        metadata={"tp": 1, "fp": 0, "fn": 9},
                     ),
                     MetricValue(
-                        metric_name="extract_unified_value_recall", value=0.1, metadata={"tp": 1, "fp": 0, "fn": 9}
+                        metric_name="extract_unified_value_recall",
+                        value=0.1,
+                        metadata={"tp": 1, "fp": 0, "fn": 9},
                     ),
                     MetricValue(
-                        metric_name="extract_unified_value_f1", value=0.1818, metadata={"tp": 1, "fp": 0, "fn": 9}
+                        metric_name="extract_unified_value_f1",
+                        value=0.1818,
+                        metadata={"tp": 1, "fp": 0, "fn": 9},
                     ),
                 ]
             ),
             _result(
                 [
                     MetricValue(
-                        metric_name="extract_unified_value_precision", value=0.5, metadata={"tp": 1, "fp": 1, "fn": 0}
+                        metric_name="extract_unified_value_precision",
+                        value=0.5,
+                        metadata={"tp": 1, "fp": 1, "fn": 0},
                     ),
                     MetricValue(
-                        metric_name="extract_unified_value_recall", value=1.0, metadata={"tp": 1, "fp": 1, "fn": 0}
+                        metric_name="extract_unified_value_recall",
+                        value=1.0,
+                        metadata={"tp": 1, "fp": 1, "fn": 0},
                     ),
                     MetricValue(
-                        metric_name="extract_unified_value_f1", value=0.6667, metadata={"tp": 1, "fp": 1, "fn": 0}
+                        metric_name="extract_unified_value_f1",
+                        value=0.6667,
+                        metadata={"tp": 1, "fp": 1, "fn": 0},
                     ),
                 ]
             ),
@@ -218,18 +230,50 @@ def test_array_record_metrics_report_macro_and_micro_aggregates(tmp_path) -> Non
         [
             _result(
                 [
-                    MetricValue(metric_name="array_record_precision", value=1.0, metadata={"tp": 1, "fp": 0, "fn": 9}),
-                    MetricValue(metric_name="array_record_recall", value=0.1, metadata={"tp": 1, "fp": 0, "fn": 9}),
-                    MetricValue(metric_name="array_record_f1", value=0.1818, metadata={"tp": 1, "fp": 0, "fn": 9}),
-                    MetricValue(metric_name="array_record_accuracy", value=0.1, metadata={"tp": 1, "fp": 0, "fn": 9}),
+                    MetricValue(
+                        metric_name="array_record_precision",
+                        value=1.0,
+                        metadata={"tp": 1, "fp": 0, "fn": 9},
+                    ),
+                    MetricValue(
+                        metric_name="array_record_recall",
+                        value=0.1,
+                        metadata={"tp": 1, "fp": 0, "fn": 9},
+                    ),
+                    MetricValue(
+                        metric_name="array_record_f1",
+                        value=0.1818,
+                        metadata={"tp": 1, "fp": 0, "fn": 9},
+                    ),
+                    MetricValue(
+                        metric_name="array_record_accuracy",
+                        value=0.1,
+                        metadata={"tp": 1, "fp": 0, "fn": 9},
+                    ),
                 ]
             ),
             _result(
                 [
-                    MetricValue(metric_name="array_record_precision", value=0.5, metadata={"tp": 1, "fp": 1, "fn": 0}),
-                    MetricValue(metric_name="array_record_recall", value=1.0, metadata={"tp": 1, "fp": 1, "fn": 0}),
-                    MetricValue(metric_name="array_record_f1", value=0.6667, metadata={"tp": 1, "fp": 1, "fn": 0}),
-                    MetricValue(metric_name="array_record_accuracy", value=0.5, metadata={"tp": 1, "fp": 1, "fn": 0}),
+                    MetricValue(
+                        metric_name="array_record_precision",
+                        value=0.5,
+                        metadata={"tp": 1, "fp": 1, "fn": 0},
+                    ),
+                    MetricValue(
+                        metric_name="array_record_recall",
+                        value=1.0,
+                        metadata={"tp": 1, "fp": 1, "fn": 0},
+                    ),
+                    MetricValue(
+                        metric_name="array_record_f1",
+                        value=0.6667,
+                        metadata={"tp": 1, "fp": 1, "fn": 0},
+                    ),
+                    MetricValue(
+                        metric_name="array_record_accuracy",
+                        value=0.5,
+                        metadata={"tp": 1, "fp": 1, "fn": 0},
+                    ),
                 ]
             ),
         ]

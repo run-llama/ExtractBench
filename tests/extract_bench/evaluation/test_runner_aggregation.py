@@ -19,12 +19,20 @@ def test_runner_uses_avg_for_macro_and_micro_for_pooled_extract_metrics() -> Non
             success=True,
             metrics=[
                 MetricValue(
-                    metric_name="extract_unified_value_precision", value=0.5, metadata={"tp": 1, "fp": 1, "fn": 1}
+                    metric_name="extract_unified_value_precision",
+                    value=0.5,
+                    metadata={"tp": 1, "fp": 1, "fn": 1},
                 ),
                 MetricValue(
-                    metric_name="extract_unified_value_recall", value=0.5, metadata={"tp": 1, "fp": 1, "fn": 1}
+                    metric_name="extract_unified_value_recall",
+                    value=0.5,
+                    metadata={"tp": 1, "fp": 1, "fn": 1},
                 ),
-                MetricValue(metric_name="extract_unified_value_f1", value=0.5, metadata={"tp": 1, "fp": 1, "fn": 1}),
+                MetricValue(
+                    metric_name="extract_unified_value_f1",
+                    value=0.5,
+                    metadata={"tp": 1, "fp": 1, "fn": 1},
+                ),
                 MetricValue(
                     metric_name="extract_evidence_value_pass_rate",
                     value=0.5,
@@ -85,12 +93,20 @@ def test_runner_uses_avg_for_macro_and_micro_for_pooled_extract_metrics() -> Non
             success=True,
             metrics=[
                 MetricValue(
-                    metric_name="extract_unified_value_precision", value=1.0, metadata={"tp": 3, "fp": 0, "fn": 0}
+                    metric_name="extract_unified_value_precision",
+                    value=1.0,
+                    metadata={"tp": 3, "fp": 0, "fn": 0},
                 ),
                 MetricValue(
-                    metric_name="extract_unified_value_recall", value=1.0, metadata={"tp": 3, "fp": 0, "fn": 0}
+                    metric_name="extract_unified_value_recall",
+                    value=1.0,
+                    metadata={"tp": 3, "fp": 0, "fn": 0},
                 ),
-                MetricValue(metric_name="extract_unified_value_f1", value=1.0, metadata={"tp": 3, "fp": 0, "fn": 0}),
+                MetricValue(
+                    metric_name="extract_unified_value_f1",
+                    value=1.0,
+                    metadata={"tp": 3, "fp": 0, "fn": 0},
+                ),
                 MetricValue(
                     metric_name="extract_evidence_value_pass_rate",
                     value=1.0,
