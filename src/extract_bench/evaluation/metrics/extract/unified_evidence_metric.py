@@ -44,8 +44,7 @@ three additions:
    per-cell superset of bbox (a box match requires equal pages, and page
    evidence/claims are supersets of bbox evidence/claims), so the three F1s nest:
    ``value_f1 >= page_f1 >= grounded_f1``. Together ``*_grounded_*`` and
-   ``*_page_*`` replace the old ``extract_evidence_bbox_*`` and
-   ``extract_evidence_page_*`` families as one nested precision/recall/F1 trio.
+   ``*_page_*`` are one nested precision/recall/F1 trio.
    Grounding is only defined where the GT carries the corresponding annotation
    (a page for ``*_page_*``, a bbox for ``*_grounded_*``), on
    BOTH sides of the P/R pair: recall's denominator is the GT cells that carry

@@ -224,8 +224,6 @@ def test_top_level_field_accuracy_diagnostics_remain() -> None:
     assert "field_accuracy_po_number" not in metrics
     assert "field_accuracy_po_number" in diagnostics
     assert diagnostics["field_accuracy_po_number"].value == 1.0
-    assert "extract_field_value_pass_rate" not in metrics
-    assert "field_accuracy[po_number]" not in diagnostics
 
 
 def test_list_unwrap_applied_on_list_rooted_prediction() -> None:
@@ -240,7 +238,6 @@ def test_list_unwrap_applied_on_list_rooted_prediction() -> None:
     result = ExtractEvaluator().evaluate(ir, tc)
     metrics = _metrics_by_name(result.metrics)
 
-    assert "extract_list_unwrap_applied" not in metrics
     evidence = metrics["extract_evidence_value_pass_rate"]
     assert evidence.metadata.get("skipped_field_paths") == ["client_id"]
     assert evidence.metadata["total"] == 1
@@ -332,7 +329,6 @@ def test_list_unwrap_ambiguous_multi_array_not_applied() -> None:
     ir = _make_inference_result_list([{"name": "Alice"}])
     result = ExtractEvaluator().evaluate(ir, tc)
     metrics = _metrics_by_name(result.metrics)
-    assert "extract_list_unwrap_applied" not in metrics
     assert metrics["extract_evidence_value_pass_rate"].metadata.get("skipped_field_paths") == []
 
 

@@ -145,7 +145,6 @@ class TestPageGroundedMetric:
                 extracted_data={"ndc": ["37000-439"]},
                 field_rules=[rule],
                 field_citations=citations,
-                data_schema={"type": "object"},
             )
         )
         assert metrics["extract_evidence_page_pass_rate"].value == 1.0
@@ -169,7 +168,6 @@ class TestPageGroundedMetric:
                 extracted_data={"foo": "bar"},
                 field_rules=[rule],
                 field_citations=citations,
-                data_schema={"type": "object"},
             )
         )
         assert metrics["extract_evidence_page_pass_rate"].value == 0.0
@@ -190,7 +188,6 @@ class TestCoarseParentPrefixWalk:
                 extracted_data={"warnings": [{"text": "Do not use"}]},
                 field_rules=[rule],
                 field_citations=citations,
-                data_schema={"type": "object"},
             )
         )
         assert metrics["extract_evidence_page_pass_rate"].value == 1.0
@@ -206,7 +203,6 @@ class TestCoverage:
                 extracted_data={"foo": "bar"},
                 field_rules=[rule],
                 field_citations=[],
-                data_schema={"type": "object"},
             )
         )
         # No citations -> nothing is page-qualified, so value+page cannot pass.
@@ -226,21 +222,16 @@ class TestCoverage:
                 extracted_data={"foo": "bar"},
                 field_rules=[rule],
                 field_citations=citations,
-                data_schema={"type": "object"},
             )
         )
         assert metrics["extract_evidence_page_pass_rate"].value == 1.0
         assert metrics["extract_evidence_bbox_coverage"].value == 1.0
 
 
-class TestV02StrayAndNullSemantics:
-    """v0.2 rules carry the canonical value in evidence, not expected_value.
+class TestEvidenceValueSemantics:
+    """Evidence values are the scored candidates, including when ``expected_value`` is unset."""
 
-    A rule with ``expected_value=None`` but populated ``evidence[].value`` is
-    NOT stray and NOT null-expected — it prescribes the value via evidence.
-    """
-
-    def test_v02_evidence_only_rule_scores_value_f1(self):
+    def test_evidence_value_pass_when_expected_value_unset(self):
         rule = ExtractFieldTestRule(
             field_path="drug_name",
             expected_value=None,
@@ -252,29 +243,11 @@ class TestV02StrayAndNullSemantics:
                 extracted_data={"drug_name": "Aspirin"},
                 field_rules=[rule],
                 field_citations=[],
-                data_schema={"type": "object"},
             )
         )
         assert metrics["extract_evidence_value_pass_rate"].value == 1.0
 
-    def test_v02_evidence_only_rule_not_treated_as_hallucination(self):
-        rule = ExtractFieldTestRule(
-            field_path="drug_name",
-            expected_value=None,
-            evidence=[FieldEvidence(page=1, value="Aspirin")],
-        )
-        metrics = _named(
-            compute_extract_field_grounding_metrics(
-                extracted_data={"drug_name": "Aspirin"},
-                field_rules=[rule],
-                field_citations=[],
-                data_schema={"type": "object"},
-            )
-        )
-        assert "null_hallucination_rate" not in metrics
-
-    def test_no_evidence_legacy_rule_emits_nothing(self):
-        """Legacy extract_field rules with no evidence list emit no adapter metrics."""
+    def test_rule_without_evidence_list_is_not_scored(self):
         rule = ExtractFieldTestRule(
             field_path="adverse_reactions",
             expected_value=None,
@@ -285,7 +258,6 @@ class TestV02StrayAndNullSemantics:
                 extracted_data={"adverse_reactions": "made up"},
                 field_rules=[rule],
                 field_citations=[],
-                data_schema={"type": "object"},
             )
         )
         assert metrics == {}
@@ -302,10 +274,8 @@ class TestV02StrayAndNullSemantics:
                 extracted_data={"foo": "bar"},
                 field_rules=[rule],
                 field_citations=[],
-                data_schema={"type": "object"},
             )
         )
-        assert "f1" not in metrics
         assert "extract_evidence_value_pass_rate" not in metrics
 
     def test_evidence_not_required_excluded(self):
@@ -320,7 +290,6 @@ class TestV02StrayAndNullSemantics:
                 extracted_data={"paper_type": "research"},
                 field_rules=[rule],
                 field_citations=[],
-                data_schema={"type": "object"},
             )
         )
         assert "extract_evidence_value_pass_rate" not in metrics
@@ -332,7 +301,6 @@ class TestV02StrayAndNullSemantics:
                 extracted_data={"unused": None},
                 field_rules=[rule],
                 field_citations=[],
-                data_schema={"type": "object"},
             )
         )
         assert metrics["extract_evidence_value_pass_rate"].value == 1.0
@@ -432,7 +400,6 @@ class TestCoarseParentNearestOnly:
                 extracted_data={"warnings": [{"text": "Do not use"}]},
                 field_rules=[rule],
                 field_citations=citations,
-                data_schema={"type": "object"},
             )
         )
         rule_results = metrics["extract_evidence_page_pass_rate"].metadata["rule_results"]
@@ -467,7 +434,6 @@ class TestBBoxDiagnostics:
                 extracted_data={"drug_name": "Aspirin"},
                 field_rules=[rule],
                 field_citations=citations,
-                data_schema={"type": "object"},
             )
         )
         assert metrics["extract_evidence_page_pass_rate"].value == 1.0
@@ -492,7 +458,6 @@ class TestBBoxDiagnostics:
                 extracted_data={"drug_name": "Aspirin"},
                 field_rules=[rule],
                 field_citations=citations,
-                data_schema={"type": "object"},
             )
         )
         assert metrics["extract_evidence_page_pass_rate"].value == 0.0
@@ -522,7 +487,6 @@ class TestBBoxDiagnostics:
                 extracted_data={"ingredient": "LABEL-NAME"},
                 field_rules=[rule],
                 field_citations=citations,
-                data_schema={"type": "object"},
             )
         )
         assert metrics["extract_evidence_value_pass_rate"].value == 1.0
@@ -544,7 +508,6 @@ class TestStructuralRules:
                 extracted_data={"codes": ["1463", "UN1463"]},
                 field_rules=[rule],
                 field_citations=[FieldCitation(field_path="codes", page=1, bbox=None, source="x")],
-                data_schema={"type": "object"},
             )
         )
         assert metrics["extract_evidence_value_pass_rate"].value == 1.0
@@ -571,7 +534,6 @@ class TestStructuralRules:
                 },
                 field_rules=[rule],
                 field_citations=[FieldCitation(field_path="warnings", page=2, bbox=None, source="x")],
-                data_schema={"type": "object"},
             )
         )
         assert metrics["extract_evidence_value_pass_rate"].value == 1.0
@@ -618,7 +580,6 @@ class TestDescendantCitationPairing:
                 extracted_data={"grants": [{"recipient_name": "ACME FOUNDATION", "amount": 5000}]},
                 field_rules=[rule],
                 field_citations=leaf_citations,
-                data_schema={"type": "object"},
             )
         )
         rule_results = metrics["extract_evidence_page_pass_rate"].metadata["rule_results"]
@@ -657,7 +618,6 @@ class TestDescendantCitationPairing:
                 extracted_data={"grants": [{"name": "X"}]},
                 field_rules=[rule],
                 field_citations=citations,
-                data_schema={"type": "object"},
             )
         )
         rule_results = metrics["extract_evidence_page_pass_rate"].metadata["rule_results"]
@@ -684,7 +644,6 @@ class TestVacuousNullPagePass:
                 extracted_data={"amendment_type": None},
                 field_rules=[rule],
                 field_citations=[],  # No citation for null fields.
-                data_schema={"type": "object"},
             )
         )
         rule_results = metrics["extract_evidence_page_pass_rate"].metadata["rule_results"]
@@ -723,7 +682,6 @@ class TestMixedEvidenceNullFiltering:
                 extracted_data={"drug_name": "Aspirin"},
                 field_rules=[rule],
                 field_citations=citations,
-                data_schema={"type": "object"},
             )
         )
         rule_results = metrics["extract_evidence_page_pass_rate"].metadata["rule_results"]
@@ -750,7 +708,6 @@ class TestMixedEvidenceNullFiltering:
                 extracted_data={"drug_name": "Aspirin"},
                 field_rules=[rule],
                 field_citations=citations,
-                data_schema={"type": "object"},
             )
         )
         rule_results = metrics["extract_evidence_page_pass_rate"].metadata["rule_results"]

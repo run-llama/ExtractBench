@@ -33,7 +33,7 @@ def _extract_schema() -> dict:
     }
 
 
-def _legacy_two_rule_case(tmp_path: Path, *, second_rule_verified: bool = True) -> ExtractTestCase:
+def _two_rule_case(tmp_path: Path, *, second_rule_verified: bool = True) -> ExtractTestCase:
     return ExtractTestCase(
         test_id="docs/payroll_7",
         group="docs",
@@ -157,7 +157,7 @@ def test_extract_sidecar_loader_reads_v02_field_rules(tmp_path: Path) -> None:
 
 
 def test_extract_evaluator_emits_unified_value_metrics(tmp_path: Path) -> None:
-    case = _legacy_two_rule_case(tmp_path)
+    case = _two_rule_case(tmp_path)
     result = _extract_inference_result(case)
 
     evaluated = ExtractEvaluator().evaluate(result, case)
@@ -197,7 +197,7 @@ def test_verified_only_filter_removes_unverified_rules_generically(tmp_path: Pat
 
 
 def test_extract_evaluator_scores_filtered_verified_rules(tmp_path: Path) -> None:
-    case = _legacy_two_rule_case(tmp_path, second_rule_verified=False)
+    case = _two_rule_case(tmp_path, second_rule_verified=False)
     result = _extract_inference_result(case, cite_both=False)
 
     default_rules = case.get_extract_field_rules()
@@ -219,7 +219,7 @@ def test_extract_evaluator_scores_filtered_verified_rules(tmp_path: Path) -> Non
 
 def test_parse_evaluator_scores_extract_field_grounding_rules(tmp_path: Path) -> None:
     """Parse pipelines are cross-evaluated on extract_field rules (extract_field_* namespace)."""
-    case = _legacy_two_rule_case(tmp_path)
+    case = _two_rule_case(tmp_path)
     now = datetime.now()
     result = InferenceResult(
         request=InferenceRequest(
@@ -351,7 +351,7 @@ def test_public_extract_pipelines_registered() -> None:
 
 
 def test_parallel_worker_respects_verified_only_flag(tmp_path: Path) -> None:
-    case = _legacy_two_rule_case(tmp_path, second_rule_verified=False)
+    case = _two_rule_case(tmp_path, second_rule_verified=False)
     result = _extract_inference_result(case, cite_both=False)
 
     worker_result = _evaluate_single_worker(

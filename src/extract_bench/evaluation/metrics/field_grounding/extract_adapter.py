@@ -33,7 +33,6 @@ def compute_extract_field_grounding_metrics(
     extracted_data: Any,
     field_rules: list[ExtractFieldTestRule],
     field_citations: list[Any],
-    data_schema: dict[str, Any] | None = None,
     skip_field_paths: Iterable[str] = (),
 ) -> list[MetricValue]:
     """Compute v0.2 evidence metrics for extract outputs.
@@ -42,9 +41,6 @@ def compute_extract_field_grounding_metrics(
     to be scorable against the current ``extracted_data`` shape (typically
     scalar rules excluded after a per_table_row list-unwrap). They are
     dropped from the evidence-metric denominators.
-
-    ``data_schema`` is accepted for call-site compatibility; v0.2 value matching
-    reads comparators off each rule rather than the schema object.
     """
     if not field_rules:
         return []
@@ -470,9 +466,8 @@ def _field_pattern(field_path: str) -> tuple[str | None, ...] | None:
     """Return a path pattern with array indices wildcarded.
 
     Exact index matching is too brittle for table extraction: if a provider
-    skips one row, all later rows shift and would falsely fail. The source export's
-    text metrics are field-family metrics, so `rows[3].amount` and
-    `rows[4].amount` are compared within the same `rows[].amount` pool.
+    skips one row, later rows shift. Citations are pooled by field family, so
+    ``rows[3].amount`` and ``rows[4].amount`` share the ``rows[].amount`` pool.
     """
     try:
         tokens = parse_field_path(field_path)
@@ -496,8 +491,7 @@ def _build_match_by_alignments(
 
     Exact-index leaf lookup is too brittle for long lists: one dropped or
     reordered row shifts every later index and falsely fails every subsequent
-    per-row leaf rule (the same brittleness ``_field_pattern`` documents for
-    the legacy field-family metrics). When an array's parent rule declares
+    per-row leaf rule. When an array's parent rule declares
     ``match_by:<keys>`` semantics — rows are identified by key, order is
     irrelevant — leaf rules are graded against the predicted row carrying the
     matching identity rather than the row at the same position.
@@ -659,8 +653,8 @@ def _align_family_rows(
         pending = still_pending
 
     # Pass 3: positional fallback. A GT row whose identity never matched keeps
-    # today's exact-index behavior when that position is still unclaimed, so a
-    # mis-extracted identity cell degrades to the legacy semantics instead of
+    # exact-index pairing when that position is still unclaimed, so a
+    # mis-extracted identity cell is still compared at that index instead of
     # grading the whole row as missing.
     for row_index in pending:
         if 0 <= row_index < len(pred_rows) and row_index not in used:

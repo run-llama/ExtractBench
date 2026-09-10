@@ -1711,11 +1711,11 @@ class EvaluationRunner:
             precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
             recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
             f1 = 2.0 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0.0
-            if metric_name == "precision" or metric_name.endswith("_precision"):
+            if metric_name.endswith("_precision"):
                 aggregate[f"micro_{metric_name}"] = precision
-            elif metric_name == "recall" or metric_name.endswith("_recall"):
+            elif metric_name.endswith("_recall"):
                 aggregate[f"micro_{metric_name}"] = recall
-            elif metric_name == "f1" or metric_name.endswith("_f1"):
+            elif metric_name.endswith("_f1"):
                 aggregate[f"micro_{metric_name}"] = f1
             elif metric_name.endswith("accuracy"):
                 total = tp + fp + fn

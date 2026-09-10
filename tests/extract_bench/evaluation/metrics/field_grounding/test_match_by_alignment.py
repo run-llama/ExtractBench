@@ -184,7 +184,6 @@ def _value_pass_metric(rules, extracted_data):
             extracted_data=extracted_data,
             field_rules=rules,
             field_citations=[],
-            data_schema={"type": "object"},
         )
     )
     return metrics["extract_evidence_value_pass_rate"]
