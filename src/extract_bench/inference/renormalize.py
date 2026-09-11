@@ -115,6 +115,12 @@ def renormalize_results(
                     raw_data = json.load(f)
                 raw_result = RawInferenceResult.model_validate(raw_data)
 
+                # Re-derive cost from the recorded usage and the provider's
+                # current rates, so a pricing-table correction lands on
+                # renormalize without re-running inference. Provider-agnostic:
+                # a provider that cannot re-price leaves cost as recorded.
+                provider.recompute_cost(raw_result.raw_output)
+
                 # Normalize
                 normalized_result = provider.normalize(raw_result)
 

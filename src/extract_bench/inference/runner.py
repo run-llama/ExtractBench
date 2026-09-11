@@ -3,9 +3,12 @@
 import asyncio
 import concurrent.futures
 import json
+import secrets
 import shutil
+import tempfile
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -110,6 +113,43 @@ class JobStatus:
     completed_at: datetime | None = None
 
 
+# Providers that receive the benchmark's own filenames. Every other provider is
+# handed a same-content file under a random basename (see
+# ``InferenceRunner._provider_request_context``): a filename such as
+# ``acme_invoice_2024.pdf`` is visible to the model (and to agent-style
+# providers in their prompt), and must not leak what the document is or let a
+# hosted service key its behaviour on names it has seen before.
+LLAMACLOUD_PROVIDER_PREFIXES = (
+    "llamaparse",
+    "llamaextract",
+    "llamasplit",
+)
+EXTERNAL_FILENAME_STEMS = (
+    "document",
+    "file",
+    "input",
+    "pages",
+    "record",
+    "report",
+    "scan",
+    "upload",
+)
+
+
+def _randomized_external_filename(suffix: str) -> str:
+    token = secrets.token_hex(8)
+    stem = secrets.choice(EXTERNAL_FILENAME_STEMS)
+    pattern = secrets.choice(
+        (
+            f"{stem}-{token}",
+            f"{stem}_{token}",
+            f"{token}-{stem}",
+            token,
+        )
+    )
+    return f"{pattern}{suffix}"
+
+
 class InferenceRunner:
     """
     Runs inference on PDFs with concurrency control and saves structured results.
@@ -191,6 +231,57 @@ class InferenceRunner:
 
         # Track current summary for interrupt handling
         self._current_summary: RunSummary | None = None
+
+    def _should_randomize_external_filename(self) -> bool:
+        """Whether this pipeline's provider receives randomized source filenames.
+
+        On by default for every provider outside LlamaCloud; a pipeline opts out
+        with ``randomize_external_filename: false`` in its config. Recorded in
+        ``_metadata.json`` as ``randomize_external_filenames`` so a run can be
+        told apart from one that exposed the dataset's filenames.
+        """
+        if self.pipeline.provider_name.startswith(LLAMACLOUD_PROVIDER_PREFIXES):
+            return False
+        return bool(self.pipeline.config.get("randomize_external_filename", True))
+
+    def _stage_randomized_external_source_file(self, source_file_path: Path) -> Path:
+        """Create a temporary same-content file with a random, provider-visible basename."""
+        suffix = source_file_path.suffix or ".pdf"
+        temp_dir = Path(tempfile.mkdtemp())
+        staged_path = temp_dir / _randomized_external_filename(suffix)
+        source_resolved = source_file_path.resolve()
+
+        try:
+            staged_path.symlink_to(source_resolved)
+        except OSError:
+            shutil.copy2(source_resolved, staged_path)
+
+        return staged_path
+
+    @contextmanager
+    def _provider_request_context(self, request: InferenceRequest) -> Iterator[InferenceRequest]:
+        """Yield the provider-facing request while preserving the saved benchmark request."""
+        staged_dir: Path | None = None
+        provider_request = request
+
+        if self._should_randomize_external_filename():
+            randomized_path = self._stage_randomized_external_source_file(Path(request.source_file_path))
+            staged_dir = randomized_path.parent
+            provider_request = request.model_copy(update={"source_file_path": str(randomized_path)})
+
+        try:
+            yield provider_request
+        finally:
+            if staged_dir is not None:
+                shutil.rmtree(staged_dir, ignore_errors=True)
+
+    def _run_provider_inference(self, request: InferenceRequest) -> RawInferenceResult:
+        """Run inference, rewriting the stored request back to the benchmark source path."""
+        with self._provider_request_context(request) as provider_request:
+            raw_result = self.provider.run_inference(self.pipeline, provider_request)
+        if raw_result.request != request:
+            raw_result = raw_result.model_copy(update={"request": request})
+        return raw_result
 
     def shutdown(self) -> None:
         """Shutdown the thread pool. Call this when done with the runner.
@@ -549,7 +640,7 @@ class InferenceRunner:
             last_error: Exception | None = None
             for attempt in range(MAX_RETRIES + 1):
                 try:
-                    raw_result = self.provider.run_inference(self.pipeline, request)
+                    raw_result = self._run_provider_inference(request)
                     break
                 except (ProviderTransientError, ProviderRateLimitError) as e:
                     last_error = e
@@ -643,7 +734,7 @@ class InferenceRunner:
             last_error: Exception | None = None
             for attempt in range(MAX_RETRIES + 1):
                 try:
-                    raw_result = self.provider.run_inference(self.pipeline, request)
+                    raw_result = self._run_provider_inference(request)
                     break
                 except (ProviderTransientError, ProviderRateLimitError) as e:
                     last_error = e
@@ -832,6 +923,7 @@ class InferenceRunner:
                 "save_raw": self.save_raw,
                 "save_normalized": self.save_normalized,
                 "force": self.force,
+                "randomize_external_filenames": self._should_randomize_external_filename(),
             },
             "summary": summary.to_dict(),
         }
@@ -1021,6 +1113,7 @@ class InferenceRunner:
                 "save_raw": self.save_raw,
                 "save_normalized": self.save_normalized,
                 "force": self.force,
+                "randomize_external_filenames": self._should_randomize_external_filename(),
             },
             "summary": summary.to_dict(),
         }
@@ -1579,6 +1672,7 @@ class InferenceRunner:
                 "save_raw": self.save_raw,
                 "save_normalized": self.save_normalized,
                 "force": self.force,
+                "randomize_external_filenames": self._should_randomize_external_filename(),
             },
             "summary": summary.to_dict(),
         }
@@ -1870,6 +1964,7 @@ class InferenceRunner:
                 "save_raw": self.save_raw,
                 "save_normalized": self.save_normalized,
                 "force": self.force,
+                "randomize_external_filenames": self._should_randomize_external_filename(),
             },
             "summary": summary.to_dict(),
         }

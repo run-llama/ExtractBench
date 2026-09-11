@@ -106,8 +106,21 @@ class ClaudeCodeExtractProvider(Provider):
         # Track live subprocesses for cancel(): example_id -> Popen
         self._procs: dict[str, subprocess.Popen[str]] = {}
         self._procs_lock = threading.Lock()
-        # API key is optional here: claude may be authed via a logged-in session.
-        self._api_key = self.base_config.get("api_key") or os.getenv("ANTHROPIC_API_KEY")
+        # non_zdr: authenticate with ANTHROPIC_NON_ZDR_API_KEY (a key from a
+        # data-retention-enabled workspace); required for models unavailable
+        # under zero-data-retention. The key is exported to the subprocess as
+        # ANTHROPIC_API_KEY, which is what the CLI reads.
+        self._non_zdr: bool = bool(self.base_config.get("non_zdr", False))
+        if self._non_zdr:
+            self._api_key = self.base_config.get("api_key") or os.getenv("ANTHROPIC_NON_ZDR_API_KEY")
+            if not self._api_key:
+                raise ProviderConfigError(
+                    "ANTHROPIC_NON_ZDR_API_KEY environment variable not set "
+                    "(required when non_zdr=true; falling back to a ZDR key would fail at request time)"
+                )
+        else:
+            # API key is optional here: claude may be authed via a logged-in session.
+            self._api_key = self.base_config.get("api_key") or os.getenv("ANTHROPIC_API_KEY")
 
     # ------------------------------------------------------------------
     # Schema + prompt + command construction
@@ -436,6 +449,7 @@ class ClaudeCodeExtractProvider(Provider):
             "timeout_s": self._timeout_s,
             "max_cost_usd": self._max_cost_usd,
             "bare": self._bare,
+            "non_zdr": self._non_zdr,
             "effort": self._effort,
             "promote_repeated_structure": self._promote_repeated,
             "additional_properties_false": self._additional_properties_false,
