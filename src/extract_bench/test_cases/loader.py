@@ -254,7 +254,7 @@ def _load_jsonl_dataset(root_dir: Path) -> list[TestCase]:
 
         if layout_rules and not parse_rules:
             # Pure layout test case
-            tc = LayoutDetectionTestCase(
+            tc: ParseTestCase | LayoutDetectionTestCase = LayoutDetectionTestCase(
                 test_id=test_id,
                 group=category,
                 file_path=pdf_path,
@@ -265,7 +265,9 @@ def _load_jsonl_dataset(root_dir: Path) -> list[TestCase]:
             )
         else:
             # Parse test case — only coerce parse rules (layout rules handled separately)
-            typed_rules = coerce_parse_rule_list(parse_rules)
+            # ``ParseTestCase.test_rules`` is the wider mixed-rule list; ``list`` is
+            # invariant, so widen the element type explicitly.
+            typed_rules: list[Any] = list(coerce_parse_rule_list(parse_rules))
             tc = ParseTestCase(
                 test_id=test_id,
                 group=category,
