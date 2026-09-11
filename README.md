@@ -35,7 +35,7 @@ Models and prices reflect each provider's official documentation as of July 1, 2
 | 9 | Qwen3.6 35B | OSS | 88.11 | 92.86 | 86.37 | 36.90 | — |
 | 10 | Qwen3.5 35B | OSS | 88.00 | 93.52 | 85.27 | 31.73 | — |
 
-Top 10 of 36 systems — full table in [leaderboard.csv](leaderboard.csv).
+Top 10 of 37 systems — full table in [leaderboard.csv](leaderboard.csv).
 <!-- LEADERBOARD:END -->
 
 <!-- GROUNDING:START -->
@@ -54,7 +54,7 @@ Top 10 of 36 systems — full table in [leaderboard.csv](leaderboard.csv).
     <tr><td align="right">5</td><td>Extend (Max Context)</td><td align="right">25.20</td><td align="right">33.93</td><td align="right">0.21</td><td align="right">0.02</td><td align="right">49.04</td><td align="right">61.71</td><td align="right">27.68</td><td align="right">0.03</td></tr>
     <tr><td align="right">6</td><td>Extend Extract</td><td align="right">15.96</td><td align="right">21.13</td><td align="right">1.03</td><td align="right">0.01</td><td align="right">53.58</td><td align="right">64.50</td><td align="right">37.39</td><td align="right">0.03</td></tr>
     <tr><td align="right">7</td><td>Datalab (Accurate + Balanced)</td><td align="right">2.02</td><td align="right">2.67</td><td align="right">0.24</td><td align="right">0.00</td><td align="right">48.50</td><td align="right">56.90</td><td align="right">38.55</td><td align="right">0.01</td></tr>
-    <tr><td align="right">—</td><td><em>All 29 other systems</em></td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td></tr>
+    <tr><td align="right">—</td><td><em>All 30 other systems</em></td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td></tr>
   </tbody>
 </table>
 <!-- GROUNDING:END -->
