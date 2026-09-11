@@ -194,6 +194,27 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
         )
     )
 
+    # DeepSeek-V4.1-Flash: rasterize the document once, then send every page
+    # image in one OpenAI-compatible Chat Completions request (its image input
+    # takes JPEG/PNG/GIF/WebP only -- there is no PDF content block). Structured
+    # output uses response_format=json_object with the schema in the prompt;
+    # DeepSeek has no strict json_schema response format. Thinking is on by
+    # default and is disabled here, so the model answers with the JSON directly
+    # instead of spending the max_tokens budget on a chain of thought first.
+    register_fn(
+        _pipeline_spec(
+            pipeline_name="deepseek_v4_1_flash_extract_oneshot_structured_output_file",
+            provider_name="deepseek_oneshot_extract",
+            config={
+                "model": "deepseek-flash",
+                "additional_properties_false": True,
+                "thinking": "disabled",
+                "dpi": 150,
+                "max_tokens": 65536,
+            },
+        )
+    )
+
     # =========================================================================
     # Two-stage baselines (LlamaParse agentic markdown -> text extract)
     # =========================================================================

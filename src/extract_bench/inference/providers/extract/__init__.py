@@ -19,6 +19,7 @@ _PROVIDER_MODULES = [
     "collaborative_direct",
     "datalab",
     "deepseek_extract",
+    "deepseek_oneshot_extract",
     "extend",
     "gemini_direct",
     "glm_extract",

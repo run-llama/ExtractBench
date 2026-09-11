@@ -131,6 +131,28 @@ class GLMZaiExtractProvider(Provider):
         # ride in a file_url block.
         return {"type": "file_url", "file_url": {"url": f"data:application/pdf;base64,{b64}"}}
 
+    def _build_file_blocks(self, source_path: Path) -> list[dict[str, Any]]:
+        """Content blocks carrying the document, in order.
+
+        One block for z.ai, which ingests the file directly. Subclasses on
+        vendors that accept images only return one block per rendered page.
+        """
+        return [self._build_file_block(source_path)]
+
+    def _extra_request_kwargs(self) -> dict[str, Any]:
+        """Vendor-specific request kwargs merged into the chat-completions call.
+
+        Empty for z.ai; subclasses on other OpenAI-compatible vendors use it for
+        off-spec parameters (e.g. DeepSeek's ``thinking`` toggle, which the SDK
+        only passes through ``extra_body``).
+        """
+        return {}
+
+    @staticmethod
+    def _vendor_label() -> str:
+        """Vendor name used in error messages."""
+        return "GLM"
+
     def _build_prompt(self, schema: dict[str, Any]) -> str:
         return (
             "Extract every field from the attached document according to the JSON schema.\n\n"
@@ -149,7 +171,7 @@ class GLMZaiExtractProvider(Provider):
                 {
                     "role": "user",
                     "content": [
-                        self._build_file_block(source_path),
+                        *self._build_file_blocks(source_path),
                         {"type": "text", "text": self._build_prompt(schema)},
                     ],
                 },
@@ -160,17 +182,21 @@ class GLMZaiExtractProvider(Provider):
             kwargs["max_tokens"] = self._max_tokens
         if self._reasoning_effort:
             kwargs["reasoning_effort"] = self._reasoning_effort
+        kwargs.update(self._extra_request_kwargs())
 
         response = self._client.chat.completions.create(**kwargs)
         choice = response.choices[0]
+        label = self._vendor_label()
         if getattr(choice, "finish_reason", None) == "length":
-            raise ProviderPermanentError("GLM hit max_tokens before completing the JSON response. Increase max_tokens.")
+            raise ProviderPermanentError(
+                f"{label} hit max_tokens before completing the JSON response. Increase max_tokens."
+            )
 
         content = getattr(choice.message, "content", "") or ""
         try:
             data = json.loads(content)
         except json.JSONDecodeError as e:
-            raise ProviderPermanentError(f"GLM returned non-JSON output despite response_format: {e}") from e
+            raise ProviderPermanentError(f"{label} returned non-JSON output despite response_format: {e}") from e
 
         usage = self._extract_usage(response)
         return {
