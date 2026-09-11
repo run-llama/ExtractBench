@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     from extract_bench.evaluation.cli import EvaluationCLI
     from extract_bench.inference.cli import InferenceCLI
     from extract_bench.pipeline.cli import PipelineCLI
+    from extract_bench.test_cases.cli import DatasetCLI
 
 
 # Load .env file if it exists (look in current directory and project root)
@@ -65,6 +66,7 @@ class BenchCLI:
         analysis     Generate reports, dashboards, comparisons
         pipeline     End-to-end pipeline (same as 'run')
         data         Dataset management (same as 'download'/'status')
+        dataset      Gate a test-case tree before it ships (lint)
     """
 
     # ── Subcommand ──────────────────────────────────────────────────
@@ -98,6 +100,12 @@ class BenchCLI:
         from extract_bench.data.cli import DataCLI
 
         return DataCLI()
+
+    @cached_property
+    def dataset(self) -> DatasetCLI:
+        from extract_bench.test_cases.cli import DatasetCLI
+
+        return DatasetCLI()
 
     # ── Top-level convenience commands ──────────────────────────────
 

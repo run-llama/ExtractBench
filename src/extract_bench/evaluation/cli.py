@@ -21,6 +21,10 @@ from extract_bench.evaluation.reports import (
     export_rule_csv as export_rule_csv_report,
 )
 from extract_bench.evaluation.runner import EvaluationRunner
+from extract_bench.evaluation.score_case import (
+    load_extract_test_case,
+    score_extract_prediction,
+)
 from extract_bench.schemas.evaluation import EvaluationSummary
 
 
@@ -350,6 +354,39 @@ class EvaluationCLI:
 
             traceback.print_exc()
             return 1
+
+    def score_case(
+        self,
+        test_json: str | Path,
+        prediction: str | Path,
+        source_file: str | Path | None = None,
+        output: str | Path | None = None,
+    ) -> None:
+        """Score one extraction prediction against one test case, printing JSON.
+
+        For interactive harnesses that produce a single prediction rather than a
+        results directory. `run` remains the entry point for a whole benchmark.
+
+        Returns None rather than an exit code so stdout carries the JSON alone
+        and a caller can parse it directly; failures exit non-zero.
+
+        Args:
+            test_json: Path to the case's `.test.json`
+            prediction: Path to a JSON file holding the extracted data
+            source_file: The document the case describes (default: the file
+                beside `test_json` sharing its stem)
+            output: Write the JSON here as well as to stdout
+        """
+        try:
+            case = load_extract_test_case(Path(test_json), Path(source_file) if source_file else None)
+            result = score_extract_prediction(case, json.loads(Path(prediction).read_text()))
+        except (OSError, ValueError) as error:
+            print(f"{error}", file=sys.stderr)
+            raise SystemExit(1) from error
+        payload = json.dumps(result, ensure_ascii=False, indent=2)
+        if output is not None:
+            Path(output).write_text(payload + "\n")
+        print(payload)
 
     def _print_summary(self, summary: EvaluationSummary) -> None:
         """Print evaluation summary to console."""

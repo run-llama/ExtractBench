@@ -52,3 +52,23 @@ harness ahead of the first PyPI release.
   (`DEEPSEEK_API_KEY`).
 - `test_rules` entries typed `layout_line` / `layout_word` load as layout rules
   with the matching granularity.
+- `extract-bench dataset lint <dir>`: fail-closed gate over every extract
+  `.test.json` in a tree. Ground truth must conform to its `data_schema`, field
+  rules must live in one `_field_rules` container with resolvable paths, and row
+  identity must sit beside the schema as `_eval_row_identity`. Exit 1 on any
+  finding, exit 2 when the tree holds no extract sidecar.
+- `extract-bench evaluation score_case <test.json> <prediction.json>`: score a
+  single prediction against one test case and print the value-F1 metrics as
+  JSON, for interactive harnesses that do not produce a results directory.
+- `confidence_signal_coverage` metric: the share of emitted scalar leaves that
+  carry a finite confidence score, with per-document and aggregate counts in the
+  grounded-confidence payloads.
+
+### Fixed
+- Dataset discovery keeps one input per stem and directory. A sibling `.png`
+  saved beside `<stem>.pdf` used to collide on `test_id` and on the shared
+  `.test.json`, so which twin was scored depended on iteration order.
+- Per-document artifact directories (`<stem>.parse/`, `<stem>.pdf.images/`,
+  `<stem>.v2.screenshots/`) no longer flip a flat dataset into grouped mode.
+- Dataset names split into base and version at the last version-like segment,
+  so `extract/short/v0.2` files under `extract/short` instead of `extract`.
