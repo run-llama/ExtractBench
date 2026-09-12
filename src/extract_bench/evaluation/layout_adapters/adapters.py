@@ -3091,7 +3091,7 @@ class KdlFrontierNanoLayoutAdapter(LayoutAdapter):
 class PulseLayoutAdapter(LayoutAdapter):
     """Adapter that extracts LayoutOutput from Pulse ParseOutput.layout_pages.
 
-    Enables cross-evaluation: the ``pulse`` PARSE pipeline can be evaluated
+    Enables cross-evaluation: the ``pulse_ultra_2`` PARSE pipeline can be evaluated
     against layout detection datasets using the bounding_boxes from the
     Pulse API response.
     """

@@ -392,6 +392,23 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
             )
         )
 
+    pulse_schema_common = {
+        "model": "pulse-ultra-2",
+        "extensions": {"altOutputs": {"wlbb": True}},
+        "schema_prompt": (
+            "Extract the document into the provided JSON schema. Use only information present in the document."
+        ),
+        "async_run": True,
+    }
+    for _mode, _effort in (("non_effort", False), ("effort", True)):
+        register_fn(
+            _pipeline_spec(
+                pipeline_name=f"pulse_schema_{_mode}",
+                provider_name="pulse_extract",
+                config={**pulse_schema_common, "effort": _effort},
+            )
+        )
+
     # =========================================================================
     # Open-weight pipelines (self-hosted)
     # =========================================================================

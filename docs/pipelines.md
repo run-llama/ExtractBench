@@ -38,6 +38,7 @@ uv run extract-bench run <pipeline_name>
 | `extend_extract` / `extend_extract_max` | Extend | citations enabled; max-context array strategy variant |
 | `landingai_extract` | LandingAI ADE | |
 | `datalab_parse_accurate_extract_fast` / `_balanced` | Datalab | accurate parse + fast or balanced extraction, JSON tree citations |
+| `pulse_schema_non_effort` / `pulse_schema_effort` | Pulse | Pulse Ultra 2, WLBB enabled, then `/schema` with effort off/on (`PULSE_API_KEY`) |
 | `lift_extract` | Self-hosted lift SDK | requires `LIFT_ENDPOINT_URL` |
 | `qwen3_6_35b_a3b_fp8_vllm_extract_oneshot_structured_output_file` | Self-hosted vLLM | Qwen3.6-35B-A3B-FP8, json_object mode; requires `QWEN35_SERVER_URL` |
 | `gemma4_26b_vllm_extract_oneshot_structured_output_file` | Self-hosted vLLM | Gemma-4-26B-A4B, json_object mode; requires `GEMMA4_SERVER_URL` |
@@ -190,8 +191,7 @@ These pipelines use hosted APIs. You only need an API key in your `.env` file.
 
 | Pipeline | Description | Env Var |
 |---|---|---|
-| `pulse` | Default model with native markdown output, `/tables` reconstruction on every document, no refinement | `PULSE_API_KEY` |
-| `pulse_ultra_2` | `pulse-ultra-2` hosted tier with native markdown output and refinement enabled | `PULSE_API_KEY` |
+| `pulse_ultra_2` | Pulse Ultra 2 with native markdown output and refinement enabled | `PULSE_API_KEY` |
 
 ### Chunkr
 
