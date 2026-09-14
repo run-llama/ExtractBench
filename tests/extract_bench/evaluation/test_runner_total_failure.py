@@ -42,8 +42,8 @@ class TestTotalInferenceFailure:
         errors = [{"example_id": f"short/doc{i}", "error": "401 unauthorized"} for i in range(3)]
 
         synthesized = runner._synthesize_failure_results(
-            inference_errors=errors,
-            evaluated_test_ids=set(),
+            failure_entries=errors,
+            evaluated_result_keys=set(),
             test_cases_dict=test_cases,
             successful_results=[],  # nothing succeeded
             pipeline_name="my_pipeline",
@@ -62,8 +62,8 @@ class TestTotalInferenceFailure:
         test_cases = {"short/doc0": _extract_test_case("short/doc0")}
 
         synthesized = runner._synthesize_failure_results(
-            inference_errors=[{"example_id": "short/doc0", "error": "boom"}],
-            evaluated_test_ids=set(),
+            failure_entries=[{"example_id": "short/doc0", "error": "boom"}],
+            evaluated_result_keys=set(),
             test_cases_dict=test_cases,
             successful_results=[],
             pipeline_name="my_pipeline",
@@ -89,8 +89,8 @@ class TestTotalInferenceFailure:
         )
 
         synthesized = runner._synthesize_failure_results(
-            inference_errors=[{"example_id": "short/doc1", "error": "boom"}],
-            evaluated_test_ids={"short/doc0"},
+            failure_entries=[{"example_id": "short/doc1", "error": "boom"}],
+            evaluated_result_keys={("my_pipeline", "short/doc0")},
             test_cases_dict=test_cases,
             successful_results=[success],
             pipeline_name="my_pipeline",

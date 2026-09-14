@@ -40,6 +40,19 @@ harness ahead of the first PyPI release.
   `rule_pass_rate` / `rule_array_*`, and `association_f1`. `extract_unified_*`,
   `extract_evidence_*`, `accuracy`, `array_record_*` and
   `confidence_scoped_*` are unchanged.
+- Evaluation failures count. A document whose evaluator worker crashes or
+  times out becomes one zero-scored row for that pipeline, with
+  `evaluation_worker_error` or `evaluation_timeout` in the metric metadata,
+  instead of being dropped from the denominator. Failure rows are keyed by
+  `(pipeline, test_id)`, so a retried inference that logged one `_errors.json`
+  entry per attempt is penalized once, not once per attempt.
+- The per-worker evaluation timeout now fires. It was written against
+  `as_completed`, which only yields finished futures, so it could never elapse
+  and one hung document held a run open indefinitely. The pool is drained with
+  a progress-based stall window (8 minutes with nothing completing), stalled
+  workers are terminated, and queued work is re-submitted to a fresh pool. The
+  guard is enabled only when every selected ground-truth sidecar is at most
+  1 MiB, so citation-heavy long documents are never cut off.
 
 ### Added
 - `FieldEvidence.layer` names the bbox geometry when the same location is
@@ -72,3 +85,7 @@ harness ahead of the first PyPI release.
   `<stem>.v2.screenshots/`) no longer flip a flat dataset into grouped mode.
 - Dataset names split into base and version at the last version-like segment,
   so `extract/short/v0.2` files under `extract/short` instead of `extract`.
+- `evaluation run` pointed directly at a pipeline output root (one holding
+  `_metadata.json`) treats it as that pipeline rather than scanning its document
+  groups as if they were pipelines. `*.result.json` files inside
+  `<document>.images/` artifact bundles are no longer scored as documents.
