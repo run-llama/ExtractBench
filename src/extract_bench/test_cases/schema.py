@@ -198,6 +198,20 @@ EXTRACT_FIELD_NORMALIZERS: frozenset[str] = frozenset(
 )
 
 
+# Named grounding geometries on a FieldEvidence bbox. Headline
+# extract_unified_grounded_f1 ORs every box regardless of layer. Unknown names
+# are rejected at load time so a typo cannot silently create a new layer.
+EVIDENCE_LAYERS: frozenset[str] = frozenset(
+    {
+        "word",  # tight ink of the value
+        "structural",  # the enclosed form/table cell holding the value
+        "checkbox",  # boolean true: the mark glyph / square only
+        "checkbox_label",  # boolean true: the printed option label only
+        "checkbox_with_label",  # boolean true: mark + label together
+    }
+)
+
+
 class FieldEvidence(BaseModel):
     """One accepted location for a field's value (v0.2 evidence list entry).
 
@@ -222,8 +236,35 @@ class FieldEvidence(BaseModel):
     )
     coarse: bool = Field(
         default=False,
-        description="True when this is a parent-level cite or page-only evidence.",
+        description=(
+            "True for a coarser location: the envelope of the precise entries it "
+            "encloses on its page (a value printed on several lines carries one "
+            "entry per line plus their union, flagged coarse), a parent-level "
+            "cite, or page-only evidence. The default envelope grounding mode "
+            "grades a citation against the whole envelope, never one of its lines."
+        ),
     )
+    layer: str | None = Field(
+        default=None,
+        description=(
+            "Optional named bbox geometry when the same location is annotated "
+            "more than once. None = unlabeled gold. Unknown names are rejected "
+            "at load time (see EVIDENCE_LAYERS)."
+        ),
+    )
+
+    @field_validator("layer")
+    @classmethod
+    def _validate_layer(cls, value: str | None) -> str | None:
+        # Keep the field typed as str, not a Literal of current layer names. A
+        # Literal would export as a JSON Schema enum and freeze the layer list
+        # for any consumer of the dumped schema. Load-time membership in
+        # EVIDENCE_LAYERS still rejects typos; adding a layer is a set update.
+        if value is None:
+            return None
+        if value not in EVIDENCE_LAYERS:
+            raise ValueError(f"Unknown evidence layer {value!r}; supported: {sorted(EVIDENCE_LAYERS)}")
+        return value
 
 
 class ExtractFieldTestRule(BaseModel):
@@ -454,8 +495,19 @@ def _coerce_mixed_rule_list(
 
         if isinstance(rule, dict):
             rule_type = rule.get("type")
-            if rule_type == "layout":
-                typed_rules.append(LayoutTestRule.model_validate(rule))
+            if rule_type in {"layout", "layout_line", "layout_word"}:
+                if rule_type == "layout":
+                    typed_rules.append(LayoutTestRule.model_validate(rule))
+                    continue
+
+                granularity = "line" if rule_type == "layout_line" else "word"
+                normalized_rule = {
+                    **rule,
+                    "type": "layout",
+                    "granularity": rule.get("granularity") or granularity,
+                }
+                normalized_rule.setdefault("canonical_class", "Text")
+                typed_rules.append(LayoutTestRule.model_validate(normalized_rule))
             elif rule_type == "extract_field":
                 typed_rules.append(ExtractFieldTestRule.model_validate(rule))
             else:

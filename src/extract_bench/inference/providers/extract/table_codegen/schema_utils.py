@@ -9,6 +9,8 @@ any`` and the validity gate either silently passes any field under such a node o
 all of those shapes so the renderer and gate can descend into the real structure:
 
   * ``resolve_refs`` — inline local ``$ref``/``$defs`` (cycle-guarded).
+  * ``schema_properties`` / ``schema_items`` — flatten ``properties`` / ``items``
+    across ``anyOf`` / ``oneOf`` / ``allOf`` on an already-inlined node.
   * ``_effective`` — merge ``allOf`` and collapse ``anyOf``/``oneOf`` wrappers.
   * ``render_output_schema`` — render a schema as an indented field tree.
   * ``unknown_output_fields`` / ``missing_required_fields`` — gate checks.
@@ -92,6 +94,11 @@ def _effective(schema: dict[str, Any]) -> dict[str, Any]:
     if types:
         merged["type"] = types
     return merged
+
+
+def effective_schema(schema: dict[str, Any]) -> dict[str, Any]:
+    """Public entry point for :func:`_effective`, for callers outside this module."""
+    return _effective(schema)
 
 
 def resolve_refs(schema: Any, root: dict[str, Any] | None = None, _seen: frozenset[str] = frozenset()) -> Any:

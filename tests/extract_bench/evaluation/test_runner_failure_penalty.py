@@ -74,6 +74,19 @@ class TestLoadInferenceErrors:
         assert [e["example_id"] for e in errors] == ["doc-1"]
 
 
+class TestFindResultFiles:
+    def test_excludes_inline_image_crop_parse_artifacts(self, tmp_path: Path) -> None:
+        runner = _runner_with_output(tmp_path)
+        expected = tmp_path / "group" / "document.result.json"
+        crop = tmp_path / "document.pdf.images" / "page_1_image_1_v2.result.json"
+        expected.parent.mkdir()
+        crop.parent.mkdir()
+        expected.write_text("{}")
+        crop.write_text("{}")
+
+        assert runner._find_result_files(tmp_path) == [expected]
+
+
 class TestSynthesizeFailureResults:
     def test_synthesizes_zero_row_per_unmatched_error(self, tmp_path):
         runner = _runner_with_output(tmp_path)
@@ -85,8 +98,8 @@ class TestSynthesizeFailureResults:
         errors = [{"example_id": "doc-b", "error": "OOM", "error_type": "PipelineError"}]
 
         synthesized = runner._synthesize_failure_results(
-            inference_errors=errors,
-            evaluated_test_ids={"g/doc-a"},
+            failure_entries=errors,
+            evaluated_result_keys={("my-pipeline", "g/doc-a")},
             test_cases_dict=test_cases,
             successful_results=successful,
             pipeline_name="my-pipeline",
@@ -105,6 +118,131 @@ class TestSynthesizeFailureResults:
         assert {m.metric_name for m in row.diagnostic_metrics} == {"field_accuracy_x"}
         assert "Inference failed: OOM" in (row.error or "")
 
+    def test_retried_failure_is_penalized_once_not_once_per_attempt(self, tmp_path):
+        """A retried inference logs one _errors.json entry per attempt.
+
+        Each extra entry used to become an extra zero row, so N failed
+        documents pulled the macro average down as if several times N had
+        failed. Prod 2026-08-08: 7 layout_attribution documents each logged
+        two attempts, turning a 43/50 run into a 43/57 denominator and
+        reading as a 23pp regression instead of the ~14pp the failures
+        warranted.
+        """
+        runner = _runner_with_output(tmp_path)
+        test_cases = {
+            "g/doc-a": _extract_test_case("g/doc-a"),
+            "g/doc-b": _extract_test_case("g/doc-b"),
+        }
+        successful = [_success_result("g/doc-a", "doc-a", 1.0)]
+        retried = [
+            {"example_id": "doc-b", "error": "500 metadata", "error_type": "ProviderTransientError"},
+            {"example_id": "doc-b", "error": "500 metadata", "error_type": "ProviderTransientError"},
+        ]
+
+        synthesized = runner._synthesize_failure_results(
+            failure_entries=retried,
+            evaluated_result_keys={("my-pipeline", "g/doc-a")},
+            test_cases_dict=test_cases,
+            successful_results=successful,
+            pipeline_name="my-pipeline",
+            product_type="extract",
+        )
+
+        assert [row.test_id for row in synthesized] == ["g/doc-b"]
+        # One success + one failure, not one success + two failures.
+        assert runner._aggregate_metrics(successful + synthesized)["avg_accuracy"] == 0.5
+
+    def test_distinct_failures_are_each_penalized(self, tmp_path):
+        runner = _runner_with_output(tmp_path)
+        test_cases = {
+            "g/doc-a": _extract_test_case("g/doc-a"),
+            "g/doc-b": _extract_test_case("g/doc-b"),
+            "g/doc-c": _extract_test_case("g/doc-c"),
+        }
+        successful = [_success_result("g/doc-a", "doc-a", 1.0)]
+        errors = [
+            {"example_id": "doc-b", "error": "boom"},
+            {"example_id": "doc-c", "error": "boom"},
+            {"example_id": "doc-b", "error": "boom"},
+        ]
+
+        synthesized = runner._synthesize_failure_results(
+            failure_entries=errors,
+            evaluated_result_keys={("my-pipeline", "g/doc-a")},
+            test_cases_dict=test_cases,
+            successful_results=successful,
+            pipeline_name="my-pipeline",
+            product_type="extract",
+        )
+
+        assert sorted(row.test_id for row in synthesized) == ["g/doc-b", "g/doc-c"]
+
+    def test_failure_is_scoped_to_pipeline_and_test_id(self, tmp_path):
+        runner = _runner_with_output(tmp_path)
+        test_cases = {
+            "g/doc-a": _extract_test_case("g/doc-a"),
+            "g/doc-b": _extract_test_case("g/doc-b"),
+        }
+        successful = [
+            _success_result("g/doc-a", "doc-a", pipeline_name="pipe-a"),
+            _success_result("g/doc-b", "doc-b", pipeline_name="pipe-b"),
+        ]
+        failures = [
+            {
+                "example_id": "g/doc-b",
+                "_pipeline_dir": "pipe-a",
+                "error": "Evaluation timed out after 480s",
+                "_failure_metadata": {"evaluation_timeout": True},
+            }
+        ]
+
+        synthesized = runner._synthesize_failure_results(
+            failure_entries=failures,
+            evaluated_result_keys={(result.pipeline_name, result.test_id) for result in successful},
+            test_cases_dict=test_cases,
+            successful_results=successful,
+            pipeline_name=None,
+            product_type="extract",
+        )
+
+        assert [(row.pipeline_name, row.test_id) for row in synthesized] == [("pipe-a", "g/doc-b")]
+        assert synthesized[0].error == "Evaluation timed out after 480s"
+        assert all(metric.metadata.get("evaluation_timeout") for metric in synthesized[0].metrics)
+
+    def test_confidence_metrics_are_not_zero_synthesized(self, tmp_path):
+        """Confidence metrics measure the confidence model's ranking of an
+        extraction's fields — undefined when the extraction never ran. Zeroing
+        them conflates extraction reliability with confidence-model quality
+        (post-fix sweeps showed fake -10..-18 ROC-AUC dataset regressions
+        manufactured entirely from crashed docs). Accuracy zeros
+        still synthesize; confidence_* names must not."""
+        runner = _runner_with_output(tmp_path)
+        test_cases = {
+            "g/doc-a": _extract_test_case("g/doc-a"),
+            "g/doc-b": _extract_test_case("g/doc-b"),
+        }
+        ok = _success_result("g/doc-a", "doc-a", 0.9)
+        ok.metrics.append(MetricValue(metric_name="confidence_scoped_roc_auc", value=0.87))
+        ok.metrics.append(MetricValue(metric_name="confidence_scoped_coverage_at_0_95", value=0.4))
+        ok.diagnostic_metrics.append(MetricValue(metric_name="confidence_scoped_unique_value_count", value=12.0))
+        errors = [{"example_id": "doc-b", "error": "OOM", "error_type": "PipelineError"}]
+
+        synthesized = runner._synthesize_failure_results(
+            failure_entries=errors,
+            evaluated_result_keys={("my-pipeline", "g/doc-a")},
+            test_cases_dict=test_cases,
+            successful_results=[ok],
+            pipeline_name="my-pipeline",
+            product_type="extract",
+        )
+
+        assert len(synthesized) == 1
+        row = synthesized[0]
+        # Accuracy is still penalized; confidence metrics are excluded, so the
+        # failed doc drops out of confidence aggregates instead of scoring 0.
+        assert {m.metric_name for m in row.metrics} == {"accuracy"}
+        assert {m.metric_name for m in row.diagnostic_metrics} == {"field_accuracy_x"}
+
     def test_skips_when_test_case_already_evaluated(self, tmp_path):
         runner = _runner_with_output(tmp_path)
         test_cases = {"g/doc-a": _extract_test_case("g/doc-a")}
@@ -112,8 +250,8 @@ class TestSynthesizeFailureResults:
         errors = [{"example_id": "doc-a", "error": "transient"}]
 
         synthesized = runner._synthesize_failure_results(
-            inference_errors=errors,
-            evaluated_test_ids={"g/doc-a"},
+            failure_entries=errors,
+            evaluated_result_keys={("my-pipeline", "g/doc-a")},
             test_cases_dict=test_cases,
             successful_results=successful,
             pipeline_name="my-pipeline",
@@ -121,42 +259,14 @@ class TestSynthesizeFailureResults:
         )
         assert synthesized == []
 
-    def test_zero_fills_from_fallback_when_nothing_succeeded(self, tmp_path):
-        """Total failure: no successful result to template metric names from.
-
-        Upstream skipped here, which made a pipeline that failed on every
-        document vanish from the aggregate instead of scoring 0.0. We diverge
-        deliberately and project the product's headline metrics as zeros; see
-        ``test_runner_total_failure.py`` for the full behaviour.
-        """
-        runner = _runner_with_output(tmp_path)
-        test_cases = {"g/doc-a": _extract_test_case("g/doc-a")}
-        errors = [{"example_id": "doc-a", "error": "all_failed"}]
-
-        synthesized = runner._synthesize_failure_results(
-            inference_errors=errors,
-            evaluated_test_ids=set(),
-            test_cases_dict=test_cases,
-            successful_results=[],
-            pipeline_name="my-pipeline",
-            product_type="extract",
-        )
-        assert len(synthesized) == 1
-        assert {m.metric_name for m in synthesized[0].metrics} == {
-            "extract_unified_value_precision",
-            "extract_unified_value_recall",
-            "extract_unified_value_f1",
-        }
-        assert all(m.value == 0.0 for m in synthesized[0].metrics)
-
     def test_skips_when_example_id_does_not_match_any_test_case(self, tmp_path):
         runner = _runner_with_output(tmp_path)
         test_cases = {"g/doc-a": _extract_test_case("g/doc-a")}
         successful = [_success_result("g/doc-a", "doc-a")]
         errors = [{"example_id": "doc-zzz-not-in-cases", "error": "x"}]
         synthesized = runner._synthesize_failure_results(
-            inference_errors=errors,
-            evaluated_test_ids={"g/doc-a"},
+            failure_entries=errors,
+            evaluated_result_keys={("my-pipeline", "g/doc-a")},
             test_cases_dict=test_cases,
             successful_results=successful,
             pipeline_name="my-pipeline",
@@ -178,8 +288,8 @@ class TestAggregationIncludesFailures:
         successful = [_success_result("g/doc-a", "doc-a", 1.0)]
         errors = [{"example_id": "doc-b", "error": "boom"}]
         synthesized = runner._synthesize_failure_results(
-            inference_errors=errors,
-            evaluated_test_ids={"g/doc-a"},
+            failure_entries=errors,
+            evaluated_result_keys={("my-pipeline", "g/doc-a")},
             test_cases_dict=test_cases,
             successful_results=successful,
             pipeline_name="my-pipeline",
@@ -194,8 +304,6 @@ class TestAggregationIncludesFailures:
         assert agg_without["avg_accuracy"] == 1.0
         assert agg_with["avg_accuracy"] == 0.5
 
-
-class TestSynthesizeMissingAttempts:
     def test_synthesizes_zero_row_when_pipeline_skips_test_case(self, tmp_path):
         runner = _runner_with_output(tmp_path)
         pipeline_dir = tmp_path / "my-pipeline"
@@ -343,8 +451,8 @@ class TestPooledMicroInjection:
         ]
         errors = [{"example_id": "doc-b", "error": "x"}]
         synthesized = runner._synthesize_failure_results(
-            inference_errors=errors,
-            evaluated_test_ids={"g/doc-a"},
+            failure_entries=errors,
+            evaluated_result_keys={("p", "g/doc-a")},
             test_cases_dict=test_cases,
             successful_results=successful,
             pipeline_name="p",
@@ -402,8 +510,8 @@ class TestPooledMicroInjection:
             )
         ]
         synthesized = runner._synthesize_failure_results(
-            inference_errors=[{"example_id": "doc-b", "error": "x"}],
-            evaluated_test_ids={"g/doc-a"},
+            failure_entries=[{"example_id": "doc-b", "error": "x"}],
+            evaluated_result_keys={("p", "g/doc-a")},
             test_cases_dict=test_cases,
             successful_results=successful,
             pipeline_name="p",
@@ -442,8 +550,8 @@ class TestPooledMicroAggregationIntegration:
             )
         ]
         synthesized = runner._synthesize_failure_results(
-            inference_errors=[{"example_id": "doc-b", "error": "x"}],
-            evaluated_test_ids={"g/doc-a"},
+            failure_entries=[{"example_id": "doc-b", "error": "x"}],
+            evaluated_result_keys={("p", "g/doc-a")},
             test_cases_dict=test_cases,
             successful_results=successful,
             pipeline_name="p",

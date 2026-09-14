@@ -8,6 +8,7 @@ import pytest
 from pydantic import ValidationError
 
 from extract_bench.test_cases.schema import (
+    EVIDENCE_LAYERS,
     ExtractFieldBbox,
     ExtractFieldTestRule,
     ExtractTestCase,
@@ -87,7 +88,7 @@ def test_rule_with_bboxes_round_trip() -> None:
             ExtractFieldBbox(page=1, bbox=[0.1, 0.5, 0.3, 0.4], source_bbox_index=1),
         ],
         verified=False,
-        tags=["source_export"],
+        tags=["sample"],
     )
     payload = rule.model_dump()
     restored = ExtractFieldTestRule.model_validate(payload)
@@ -108,6 +109,39 @@ def test_rule_accepts_value_only_evidence_without_page() -> None:
 
     assert rule.evidence is not None
     assert rule.evidence[0].page is None
+    assert rule.evidence[0].layer is None
+
+
+def test_evidence_layer_defaults_to_none() -> None:
+    evidence = FieldEvidence(page=1, bbox=[0.1, 0.1, 0.2, 0.05], value="Acme")
+    assert evidence.layer is None
+
+
+def test_evidence_layer_accepts_known_names() -> None:
+    assert EVIDENCE_LAYERS == frozenset({"word", "structural", "checkbox", "checkbox_label", "checkbox_with_label"})
+    word = FieldEvidence(page=1, bbox=[0.1, 0.1, 0.2, 0.05], value="Acme", layer="word")
+    structural = FieldEvidence(page=1, bbox=[0.05, 0.05, 0.4, 0.1], value="Acme", layer="structural")
+    assert word.layer == "word"
+    assert structural.layer == "structural"
+    for name in ("checkbox", "checkbox_label", "checkbox_with_label"):
+        assert FieldEvidence(page=1, bbox=[0.1, 0.1, 0.02, 0.02], value=True, layer=name).layer == name
+
+
+def test_evidence_layer_rejects_unknown_names() -> None:
+    with pytest.raises(ValidationError, match="Unknown evidence layer"):
+        FieldEvidence(page=1, bbox=[0.1, 0.1, 0.2, 0.05], value="Acme", layer="word-tight")
+
+
+def test_evidence_layer_round_trips_on_rule() -> None:
+    rule = ExtractFieldTestRule(
+        field_path="field_name",
+        evidence=[
+            FieldEvidence(page=1, bbox=[0.1, 0.1, 0.2, 0.05], value="Acme", layer="word"),
+        ],
+    )
+    restored = ExtractFieldTestRule.model_validate(rule.model_dump())
+    assert restored.evidence is not None
+    assert restored.evidence[0].layer == "word"
 
 
 # -----------------------------------------------------------------------------

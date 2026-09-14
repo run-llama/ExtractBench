@@ -95,6 +95,10 @@ DEFAULT_USER_INSTRUCTION = (
 # Uses longest-prefix matching to support dated model ids.
 _OPENAI_RESPONSES_EXTRACT_PRICING_PER_M: dict[str, tuple[float, float]] = {
     "gpt-6-astra": (10.00, 50.00),
+    "gpt-5.6-sol": (4.00, 20.00),
+    "gpt-5.6-terra": (2.00, 12.00),
+    "gpt-5.6-luna": (0.20, 1.20),
+    "gpt-5.5": (5.00, 30.00),
     "gpt-5.4-nano": (0.20, 1.25),
     "gpt-5.4-mini": (0.75, 4.50),
     "gpt-5.4": (2.50, 15.00),
@@ -340,6 +344,47 @@ class OpenAIResponsesExtractProvider(Provider):
 
     # -- Provider interface -------------------------------------------------
 
+    def recompute_cost(self, raw_output: dict[str, Any]) -> None:
+        """(Re)derive the cost keys from the usage the API reported.
+
+        Everything here is derived from ``raw_output`` and the current pricing
+        table, never from a live call, so it can run again on a saved
+        ``.raw.json``: correcting a rate and re-running
+        ``extract-bench inference renormalize --force`` re-prices an existing run
+        instead of requiring the (expensive) inference again. Values the API
+        itself reported -- usage, parse-stage cost, page count -- are left alone.
+
+        A raw artifact with no ``usage`` at all predates token accounting;
+        re-pricing it would overwrite whatever cost it does carry with a zero,
+        so leave it.
+        """
+        usage = raw_output.get("usage")
+        if not isinstance(usage, dict):
+            return
+
+        in_tok = usage.get("input_tokens") or 0
+        out_tok = usage.get("output_tokens") or 0
+        extract_cost_usd = (
+            in_tok / 1_000_000 * self._input_price_per_1m + out_tok / 1_000_000 * self._output_price_per_1m
+        )
+        cost_usd = extract_cost_usd
+        parse_cost_usd = raw_output.get("parse_cost_usd")
+        if parse_cost_usd is not None:
+            raw_output["extract_cost_usd"] = extract_cost_usd
+            cost_usd += float(parse_cost_usd)
+        raw_output["cost_usd"] = cost_usd
+
+        num_pages = raw_output.get("num_pages") or 0
+        if num_pages > 0:
+            raw_output["cost_per_page_usd"] = cost_usd / num_pages
+
+        # Keep the recorded rates in step with the cost they explain, so a report
+        # never shows a figure computed at one rate beside a different one.
+        config = raw_output.get("_config")
+        if isinstance(config, dict):
+            config["input_price_per_1m"] = self._input_price_per_1m
+            config["output_price_per_1m"] = self._output_price_per_1m
+
     def run_inference(self, pipeline: PipelineSpec, request: InferenceRequest) -> RawInferenceResult:
         if request.product_type != ProductType.EXTRACT:
             raise ProviderPermanentError(
@@ -388,27 +433,17 @@ class OpenAIResponsesExtractProvider(Provider):
         completed_at = datetime.now()
         latency_ms = int((completed_at - started_at).total_seconds() * 1000)
 
-        # Cost tracking — keys read by evaluation/stats.py.
-        usage = raw_output["usage"]
-        in_tok = usage["input_tokens"] or 0
-        out_tok = usage["output_tokens"] or 0
-        extract_cost_usd = (
-            in_tok / 1_000_000 * self._input_price_per_1m + out_tok / 1_000_000 * self._output_price_per_1m
-        )
-        cost_usd = extract_cost_usd
         num_pages = parsed_doc.num_pages if parsed_doc and parsed_doc.num_pages > 0 else self._page_count(file_path)
         if parsed_doc is not None:
-            cost_usd += parsed_doc.parse_cost_usd
-            raw_output["extract_cost_usd"] = extract_cost_usd
             raw_output["parse_cost_usd"] = parsed_doc.parse_cost_usd
             raw_output["parse_metadata"] = parsed_doc.metadata
             raw_output["parsed_text"] = parsed_doc.text
             raw_output["_config"]["input_mode"] = self._input_mode
             raw_output["_config"]["parse_source"] = self.base_config.get("parse_source") or {}
         raw_output["num_pages"] = num_pages
-        raw_output["cost_usd"] = cost_usd
-        if num_pages > 0:
-            raw_output["cost_per_page_usd"] = cost_usd / num_pages
+        # Cost tracking — keys read by evaluation/stats.py, derived from usage so
+        # a saved run can be re-priced.
+        self.recompute_cost(raw_output)
 
         return RawInferenceResult(
             request=request,
