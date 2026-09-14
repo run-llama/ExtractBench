@@ -11,8 +11,10 @@ from extract_bench.evaluation.metrics.extract.array_record_match_metric import (
     ArrayRecordMatchMetric,
 )
 from extract_bench.evaluation.metrics.extract.unified_evidence_metric import (
+    Scorer,
     build_rule_indexes,
     compute_unified_evidence_metrics,
+    gt_cell_universe,
     index_citations,
     iou_xywh,
     lookup,
@@ -711,6 +713,200 @@ def test_array_records_with_nested_object_and_nested_object_array() -> None:
     # array_record: id matches; addr and tags are opaque mismatches → 1/3.
     assert _val(arr, "array_record_recall") == 1 / 3
     assert _val(uni, "extract_unified_value_recall") > _val(arr, "array_record_recall")
+
+
+class _CellTraceScorer(Scorer):
+    """Records paired GT paths so unmatched leaves can be subtracted."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            alt_values={},
+            evidence_boxes={},
+            evidence_pages={},
+            normalizers={},
+            pred_boxes={},
+            pred_pages={},
+            fuzzy={},
+            iou_threshold=0.5,
+        )
+        self.cell_paths: list[str] = []
+        self.matched: dict[str, bool] = {}
+
+    def _score_cell(
+        self, gt_path: str, pred_path: str, canonical: Any, actual: Any, field: str, c: Any, ground: bool = True
+    ) -> bool:
+        matched = bool(super()._score_cell(gt_path, pred_path, canonical, actual, field, c, ground))
+        self.cell_paths.append(gt_path)
+        self.matched[gt_path] = matched
+        return matched
+
+
+def test_gt_cell_universe_expands_root_object_wrapping_nested_arrays() -> None:
+    schema = {
+        "type": "object",
+        "properties": {
+            "packet": {
+                "type": "object",
+                "properties": {
+                    "title": {"type": ["string", "null"]},
+                    "claims": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "claim_id": {"type": ["string", "null"]},
+                                "services": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "code": {"type": ["string", "null"]},
+                                            "paid": {"type": ["number", "null"]},
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            }
+        },
+    }
+    expected = {
+        "packet": {
+            "title": "EOB",
+            "claims": [
+                {
+                    "claim_id": "C1",
+                    "services": [{"code": "A", "paid": 1.0}, {"code": "B", "paid": 2.0}],
+                }
+            ],
+        }
+    }
+    universe = gt_cell_universe(expected, schema["properties"])
+    assert universe == [
+        "packet.title",
+        "packet.claims[0].claim_id",
+        "packet.claims[0].services[0].code",
+        "packet.claims[0].services[0].paid",
+        "packet.claims[0].services[1].code",
+        "packet.claims[0].services[1].paid",
+    ]
+    scorer = _CellTraceScorer()
+    counts = scorer.score_root(expected, expected, schema["properties"])
+    assert scorer.cell_paths == universe
+    assert counts.expected == len(universe)
+
+
+def test_gt_cell_universe_expands_array_row_nested_objects_and_object_arrays() -> None:
+    schema = {
+        "type": "object",
+        "properties": {
+            "rows": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "id": {"type": ["string", "null"]},
+                        "addr": {
+                            "type": "object",
+                            "properties": {
+                                "city": {"type": ["string", "null"]},
+                                "geo": {
+                                    "type": "object",
+                                    "properties": {
+                                        "lat": {"type": ["string", "null"]},
+                                        "lon": {"type": ["string", "null"]},
+                                    },
+                                },
+                            },
+                        },
+                        "tags": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {"name": {"type": ["string", "null"]}},
+                            },
+                        },
+                    },
+                },
+            }
+        },
+    }
+    expected = {
+        "rows": [
+            {
+                "id": "1",
+                "addr": {"city": "A", "geo": {"lat": "1", "lon": "2"}},
+                "tags": [{"name": "x"}, {"name": "y"}],
+            }
+        ]
+    }
+    universe = gt_cell_universe(expected, schema["properties"])
+    assert universe == [
+        "rows[0].id",
+        "rows[0].addr.city",
+        "rows[0].addr.geo.lat",
+        "rows[0].addr.geo.lon",
+        "rows[0].tags[0].name",
+        "rows[0].tags[1].name",
+    ]
+    scorer = _CellTraceScorer()
+    counts = scorer.score_root(expected, expected, schema["properties"])
+    assert scorer.cell_paths == universe
+    assert counts.expected == len(universe)
+
+
+def test_gt_cell_universe_unmatched_row_is_dropped_not_wrong_value() -> None:
+    schema = {
+        "type": "object",
+        "properties": {
+            "rows": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "id": {"type": ["string", "null"]},
+                        "addr": {
+                            "type": "object",
+                            "properties": {"city": {"type": ["string", "null"]}},
+                        },
+                        "tags": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {"name": {"type": ["string", "null"]}},
+                            },
+                        },
+                    },
+                },
+            }
+        },
+    }
+    expected = {
+        "rows": [
+            {"id": "1", "addr": {"city": "A"}, "tags": [{"name": "x"}]},
+            {"id": "2", "addr": {"city": "B"}, "tags": [{"name": "y"}]},
+        ]
+    }
+    actual = {"rows": [{"id": "1", "addr": {"city": "A"}, "tags": [{"name": "x"}]}]}
+    scorer = _CellTraceScorer()
+    counts = scorer.score_root(expected, actual, schema["properties"])
+    universe = gt_cell_universe(expected, schema["properties"])
+    dropped = [path for path in universe if path not in scorer.cell_paths]
+    assert universe == [
+        "rows[0].id",
+        "rows[0].addr.city",
+        "rows[0].tags[0].name",
+        "rows[1].id",
+        "rows[1].addr.city",
+        "rows[1].tags[0].name",
+    ]
+    assert dropped == ["rows[1].id", "rows[1].addr.city", "rows[1].tags[0].name"]
+    assert scorer.cell_paths == ["rows[0].id", "rows[0].addr.city", "rows[0].tags[0].name"]
+    assert all(scorer.matched[path] for path in scorer.cell_paths)
+    assert counts.expected == 6
+    assert counts.v_correct == 3
 
 
 def test_hungarian_pairs_rows_by_nested_object_children() -> None:

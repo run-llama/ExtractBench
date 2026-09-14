@@ -386,6 +386,51 @@ def is_object_subfield(field_schema: Any) -> bool:
     return is_object_schema(field_schema)
 
 
+def gt_cell_universe(expected: Mapping[str, Any], schema_props: Mapping[str, Any]) -> list[str]:
+    """Every GT leaf path ``_count_subtree`` / ``score_root`` counts on the recall side.
+
+    Root objects and dict-valued columns expand to child leaves; nested
+    object-arrays get another row walk. A missing key with no schema
+    ``default`` is not a cell. Subtracting ``_score_cell`` paths from this
+    set is the completeness miss set: GT leaves that never received a
+    predicted partner.
+    """
+    out: list[str] = []
+
+    def collect(path: str, value: Any, schema: Mapping[str, Any] | Any) -> None:
+        if is_array_schema(schema):
+            if is_object_array_schema(schema):
+                subfield_names = array_subfield_names(schema)
+                item_sch = array_item_properties(schema)
+                for i, row in enumerate(as_rows(value)):
+                    rd = row if isinstance(row, Mapping) else {}
+                    for s in subfield_names:
+                        child_schema = item_sch.get(s, {})
+                        in_side, child_val = lookup(rd, s, child_schema)
+                        if in_side:
+                            collect(f"{path}[{i}].{s}", child_val, child_schema)
+                return
+        elif is_object_schema(schema):
+            props = schema_properties(schema)
+            if len(props) > 0:
+                rd = value if isinstance(value, Mapping) else {}
+                for key, child_schema in props.items():
+                    child = f"{path}.{key}" if len(path) > 0 else key
+                    in_side, child_val = lookup(rd, key, child_schema)
+                    if in_side:
+                        collect(child, child_val, child_schema)
+                return
+        out.append(path)
+
+    names = (set(schema_props) | set(expected)) - RESERVED_OUTPUT_KEYS
+    for name in sorted(names):
+        schema = schema_props.get(name, {})
+        in_e, ev = lookup(expected, name, schema)
+        if in_e:
+            collect(name, ev, schema)
+    return out
+
+
 type PairingPath = tuple[str, ...]
 
 
