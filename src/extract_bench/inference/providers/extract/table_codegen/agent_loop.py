@@ -30,6 +30,21 @@ from typing import Any
 
 
 @dataclass
+class ToolResultWithImages:
+    """A tool result carrying image bytes alongside its text.
+
+    Handlers may return this instead of a plain string; the google loop sends
+    the text as the ``function_response`` and appends the images as a follow-up
+    user Content (same pattern as the ``turn_note`` follow-up). Other providers
+    currently ignore the images and use only the text.
+    """
+
+    text: str
+    images: list[bytes]
+    mime: str = "image/jpeg"
+
+
+@dataclass
 class Tool:
     name: str
     description: str

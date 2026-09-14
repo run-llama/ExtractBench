@@ -198,7 +198,7 @@ def _collect_recursive(*, node: Any, source: str, path: list[str]) -> list[Field
 
     citations: list[FieldCitation] = []
     explicit_path = _extract_field_path(node_map)
-    field_path = explicit_path or _format_field_path(path)
+    field_path = explicit_path or format_field_path(path)
     if field_path:
         for citation in _iter_citation_entries(node_map):
             citations.extend(
@@ -250,7 +250,7 @@ def _collect_landingai_metadata_references(
 ) -> list[FieldCitation]:
     node_map = _as_mapping(node)
     if node_map:
-        field_path = _format_field_path(path)
+        field_path = format_field_path(path)
         references = _as_sequence(node_map.get("references"))
         if field_path and references:
             citations: list[FieldCitation] = []
@@ -335,7 +335,7 @@ def _landingai_reference_to_citation(
     )
 
 
-def _format_field_path(path: list[str]) -> str:
+def format_field_path(path: list[str]) -> str:
     """Render path tokens so list-index tokens (`[N]`) attach to the prior key without a dot.
 
     GT field paths use bracket notation (`employees[0].basic_salary`). We collect tokens during

@@ -49,6 +49,37 @@ class ProviderPermanentError(ProviderError):
     """
 
 
+class ProviderTerminalCheckpointError(ProviderPermanentError):
+    """A remote checkpoint job is terminal and cannot be resumed.
+
+    This distinct exception replaces mutable invalidation flags on generic
+    provider errors.  A harness that resumes remote jobs may retire a matching
+    checkpoint only for this explicit terminal signal; other failures retain
+    their resume token.  extract-bench itself does not checkpoint, so it treats
+    this as any other permanent error; the type is here so a downstream harness
+    and the providers it shares with this package agree on the signal.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        debug_payload: dict[str, Any] | None = None,
+        job_id: str | None = None,
+        remote_terminal_locator: Any | None = None,
+        stage_role: str | None = None,
+        endpoint: str | None = None,
+        intent_id: str | None = None,
+        path: str | None = None,
+    ) -> None:
+        super().__init__(message, debug_payload=debug_payload, job_id=job_id)
+        self.remote_terminal_locator = remote_terminal_locator
+        self.stage_role = stage_role
+        self.endpoint = endpoint
+        self.intent_id = intent_id
+        self.path = path
+
+
 class Provider(ABC):
     """Abstract base class for document parsing providers."""
 

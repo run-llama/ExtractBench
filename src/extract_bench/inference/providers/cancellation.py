@@ -43,7 +43,7 @@ from __future__ import annotations
 
 import logging
 import threading
-from typing import Protocol
+from typing import Any, Protocol
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +53,32 @@ class _Closeable(Protocol):
     ``llama_cloud.LlamaCloud`` (closes its underlying ``httpx.Client``), ..."""
 
     def close(self) -> None: ...
+
+
+class CloseOnceClient:
+    """Delegate a client while making concurrent ``close()`` calls exact-once."""
+
+    def __init__(self, client: _Closeable) -> None:
+        self._client = client
+        self._lock = threading.Lock()
+        self._closed = False
+
+    def close(self) -> None:
+        with self._lock:
+            if self._closed:
+                return
+            self._closed = True
+        self._client.close()
+
+    @property
+    def underlying(self) -> _Closeable:
+        return self._client
+
+    def __eq__(self, other: object) -> bool:
+        return other is self or other is self._client
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._client, name)
 
 
 class CancellableClientRegistry:

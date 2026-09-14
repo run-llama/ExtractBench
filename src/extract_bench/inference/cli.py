@@ -242,6 +242,14 @@ class InferenceCLI:
             actual_output_dir = output_dir / pipeline_spec.pipeline_name
 
             product_type_enum = pipeline_spec.product_type
+            if not isinstance(product_type_enum, ProductType):
+                # A harness that registers its own product type owns the runner
+                # for it: this CLI's inference loop dispatches on the built-in
+                # products only.
+                raise ValueError(
+                    f"Pipeline '{pipeline_spec.pipeline_name}' declares the extension product type "
+                    f"'{product_type_enum}'. Run it from the harness that registered it."
+                )
 
             # First, try to load test cases without product_type filter to detect type
             # This enables auto-detection for providers that support multiple product types

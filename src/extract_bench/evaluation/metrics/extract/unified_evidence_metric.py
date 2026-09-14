@@ -184,6 +184,41 @@ type BoxIndex = dict[str, list[PageBBox]]
 type EvidenceTarget = tuple[int, BBox, tuple[BBox, ...]]
 type TargetIndex = dict[str, Sequence[EvidenceTarget]]
 
+
+@dataclass(frozen=True)
+class GradedCell:
+    """One aligned cell that entered a grounding-family precision denominator.
+
+    The scorer already decides page and bbox correctness per cell during its
+    single Hungarian pass and then keeps only the pooled counters. A caller that
+    has to explain a wrong citation -- which predicted box landed where, against
+    which ground-truth box, on which aligned row -- would otherwise re-score the
+    whole document once per citation to recover what the pass just discarded.
+    Passing a list as ``graded_cells`` collects the verdicts instead.
+
+    A cell is recorded when it entered the bbox precision denominator
+    (``grounded_claim``) or the page one (``page_claim``); a cell with no
+    citation on either side is ungradeable and is left out, as it is in the
+    counters. ``gt_path`` is the ground-truth cell the row assignment chose, so
+    it is the path to look the ground truth up under, not ``pred_path``.
+
+    Collecting cells never changes a score: the list is a pure side-channel.
+    """
+
+    gt_path: str
+    pred_path: str
+    field: str
+    value_correct: bool
+    page_correct: bool
+    grounded_correct: bool
+    page_claim: bool
+    grounded_claim: bool
+    gt_boxes: tuple[PageBBox, ...]
+    gt_pages: tuple[int, ...]
+    pred_boxes: tuple[PageBBox, ...]
+    pred_pages: tuple[int, ...]
+
+
 # ``envelope``: OR of ANDs -- a coarse evidence entry is the envelope of the
 # precise entries it encloses and a citation must cover all of it (default).
 # ``any``: the original flat OR -- any citation box against any evidence box.
@@ -632,10 +667,12 @@ class Scorer:
         iou_threshold: float,
         evidence_targets: TargetIndex | None = None,
         bbox_match_mode: str = DEFAULT_BBOX_MATCH_MODE,
+        graded_cells: list[GradedCell] | None = None,
     ) -> None:
         if bbox_match_mode not in BBOX_MATCH_MODES:
             raise ValueError(f"unknown bbox_match_mode {bbox_match_mode!r}; supported: {sorted(BBOX_MATCH_MODES)}")
         self._alt = alt_values
+        self._cells = graded_cells
         self._ev_boxes = evidence_boxes
         self._ev_pages = evidence_pages
         self._ev_targets = _flat_targets(evidence_boxes) if evidence_targets is None else evidence_targets
@@ -855,14 +892,60 @@ class Scorer:
         g_correct/p_correct on the same skipped set.
         """
         matched = self._value_match(gt_path, canonical, actual, field)
+        paged = False
+        boxed = False
         if matched:
             c.v_correct += 1
             if ground:
                 if self._box_match(gt_path, pred_path):
+                    boxed = True
                     c.g_correct += 1
                 if self._page_match(gt_path, pred_path):
+                    paged = True
                     c.p_correct += 1
+        if self._cells is not None and ground:
+            cell = self._graded_cell(gt_path, pred_path, field, matched, paged, boxed)
+            if cell is not None:
+                self._cells.append(cell)
         return matched
+
+    def _graded_cell(
+        self,
+        gt_path: str,
+        pred_path: str,
+        field: str,
+        value_correct: bool,
+        page_correct: bool,
+        grounded_correct: bool,
+    ) -> GradedCell | None:
+        """The record for one aligned cell, or None when it is ungradeable.
+
+        The claim flags mirror the ``g_claims`` / ``p_claims`` conditions the
+        callers of ``_score_cell`` apply, so a recorded cell is exactly a cell
+        the pooled precision denominators counted.
+        """
+        gt_boxes = self._ev_boxes.get(gt_path)
+        gt_pages = self._ev_pages.get(gt_path)
+        pred_boxes = self._pred_boxes.get(pred_path)
+        pred_pages = self._pred_pages.get(pred_path)
+        grounded_claim = bool(gt_boxes and pred_boxes)
+        page_claim = bool(gt_pages and pred_pages)
+        if not (grounded_claim or page_claim):
+            return None
+        return GradedCell(
+            gt_path=gt_path,
+            pred_path=pred_path,
+            field=field,
+            value_correct=value_correct,
+            page_correct=page_correct,
+            grounded_correct=grounded_correct,
+            page_claim=page_claim,
+            grounded_claim=grounded_claim,
+            gt_boxes=tuple(gt_boxes or ()),
+            gt_pages=tuple(sorted(gt_pages or ())),
+            pred_boxes=tuple(pred_boxes or ()),
+            pred_pages=tuple(sorted(pred_pages or ())),
+        )
 
     def _count_subtree(
         self, path: str, value: Any, schema: Mapping[str, Any], c: _Counts, *, expected: bool, ground: bool = True
@@ -1428,6 +1511,7 @@ def compute_unified_evidence_metrics(
     normalize_dates: bool = True,
     bbox_iou_threshold: float = 0.5,
     bbox_match_mode: str = DEFAULT_BBOX_MATCH_MODE,
+    graded_cells: list[GradedCell] | None = None,
 ) -> list[MetricValue]:
     """Value + grounded precision/recall/F1 under keyless Hungarian alignment.
 
@@ -1437,6 +1521,10 @@ def compute_unified_evidence_metrics(
 
     Returns an empty list when either side is not a dict (no array structure to
     score), matching ``array_record``'s ``counts is None`` guard.
+
+    Pass a list as ``graded_cells`` to collect the per-cell verdicts the pass
+    would otherwise discard (see ``GradedCell``). It is a pure side-channel: the
+    metrics and their metadata are identical either way.
     """
     if bbox_match_mode not in BBOX_MATCH_MODES:
         raise ValueError(f"unknown bbox_match_mode {bbox_match_mode!r}; supported: {sorted(BBOX_MATCH_MODES)}")
@@ -1467,6 +1555,7 @@ def compute_unified_evidence_metrics(
         pred_pages=pred_pages,
         fuzzy=fuzzy,
         iou_threshold=bbox_iou_threshold,
+        graded_cells=graded_cells,
         evidence_targets=ev_targets if bbox_match_mode == "envelope" else None,
         bbox_match_mode=bbox_match_mode,
     ).score_root(expected, actual, schema_props)
