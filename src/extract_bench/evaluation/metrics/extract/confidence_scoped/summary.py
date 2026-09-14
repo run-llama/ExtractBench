@@ -8,6 +8,7 @@ instead.
 
 from __future__ import annotations
 
+import math
 from bisect import bisect_left
 from typing import Any
 
@@ -401,6 +402,62 @@ def _threshold_metric_values(threshold_rows: list[dict[str, Any]]) -> list[Metri
     return metrics
 
 
+def confidence_signal_coverage_summary(
+    extracted_data: Any,
+    field_citations: list[Any],
+) -> dict[str, Any]:
+    emitted_paths = {path for path, _ in iter_leaf_values(extracted_data)}
+    scored_paths: set[str] = set()
+    signal_semantics: set[str] = set()
+    for citation in field_citations:
+        field_path = str(_row_value(citation, "field_path", "") or "")
+        confidence = _row_value(citation, "confidence")
+        if field_path not in emitted_paths or isinstance(confidence, bool):
+            continue
+        try:
+            numeric_confidence = float(confidence)
+        except (TypeError, ValueError):
+            continue
+        if not math.isfinite(numeric_confidence):
+            continue
+        scored_paths.add(field_path)
+        metadata = _row_value(citation, "metadata", {}) or {}
+        if isinstance(metadata, dict) and isinstance(metadata.get("confidence_semantics"), str):
+            signal_semantics.add(metadata["confidence_semantics"])
+
+    missing_paths = sorted(emitted_paths - scored_paths)
+    emitted_count = len(emitted_paths)
+    scored_count = len(scored_paths)
+    return {
+        "confidence_signal_coverage": _safe_ratio(scored_count, emitted_count),
+        "confidence_signal_emitted_leaf_count": emitted_count,
+        "confidence_signal_scored_leaf_count": scored_count,
+        "confidence_signal_missing_leaf_count": len(missing_paths),
+        "missing_confidence_paths_sample": missing_paths[:25],
+        "confidence_semantics": sorted(signal_semantics),
+        "coverage_scope": "emitted_scalar_leaves",
+    }
+
+
+def _confidence_signal_coverage_metric(
+    extracted_data: Any,
+    field_citations: list[Any],
+) -> MetricValue:
+    coverage = confidence_signal_coverage_summary(extracted_data, field_citations)
+    return MetricValue(
+        metric_name="confidence_signal_coverage",
+        value=coverage["confidence_signal_coverage"],
+        metadata={
+            "emitted_leaf_count": coverage["confidence_signal_emitted_leaf_count"],
+            "scored_leaf_count": coverage["confidence_signal_scored_leaf_count"],
+            "missing_confidence_count": coverage["confidence_signal_missing_leaf_count"],
+            "missing_confidence_paths_sample": coverage["missing_confidence_paths_sample"],
+            "confidence_semantics": coverage["confidence_semantics"],
+            "coverage_scope": coverage["coverage_scope"],
+        },
+    )
+
+
 def compute_confidence_scoped_metrics(
     *,
     extracted_data: Any,
@@ -437,7 +494,12 @@ def compute_confidence_scoped_metrics(
         expected_output=expected_doc,
         data_schema=data_schema,
     )
-    if not rows and not summary["confidence_full_gt_expected_leaf_count"]:
+    signal_coverage_metric = _confidence_signal_coverage_metric(extracted_data, field_citations)
+    if (
+        not rows
+        and not summary["confidence_full_gt_expected_leaf_count"]
+        and not signal_coverage_metric.metadata["emitted_leaf_count"]
+    ):
         return []
 
     threshold_rows = summary["thresholds"]
@@ -485,6 +547,7 @@ def compute_confidence_scoped_metrics(
     }
 
     metrics = [
+        signal_coverage_metric,
         MetricValue(
             metric_name="confidence_scoped_auc",
             value=summary["confidence_scoped_auc"],
