@@ -85,24 +85,48 @@ UNSUPPORTED_SCHEMA_PROPERTIES = {
     "title",
 }
 
+# Property names Extend AI reserves for internal use and rejects at processor
+# creation ("Field key '<name>' is reserved for internal use"). These are legal
+# JSON Schema keys accepted by every other provider, so we rename them to a
+# collision-free alias only in the schema submitted to Extend and restore the
+# original name in the result -- the shared dataset schema/GT are never touched.
+RESERVED_PROPERTY_NAMES = frozenset({"id"})
 
-def _adapt_schema_for_extend(schema: dict[str, Any]) -> tuple[dict[str, Any], dict[str, list[str]]]:
+
+def _adapt_schema_for_extend(
+    schema: dict[str, Any],
+) -> tuple[dict[str, Any], dict[str, list[str]], dict[str, dict[str, str]]]:
     """
     Adapt a JSON schema for Extend AI compatibility.
 
     Extend AI has limited JSON Schema support:
     1. Array items must have type "object" (no primitive arrays like string[])
-    2. Many advanced keywords (pattern, not, allOf, etc.) are not supported
+    2. Object schemas must declare at least one property (no empty-object items)
+    3. A handful of property names ("id", ...) are reserved
+    4. Many advanced keywords (pattern, not, allOf, etc.) are not supported
 
     This adapter:
     - Wraps primitive array items in objects with a "value" property
+    - Treats an array whose items are an empty object ({} == "return an empty
+      array") as a primitive string array, so Extend accepts it
+    - Renames reserved property names to a collision-free alias
     - Strips unsupported schema properties
 
     Returns:
-        tuple: (adapted_schema, primitive_array_paths) where primitive_array_paths
-               maps JSON paths to the primitive types that were wrapped
+        tuple: (adapted_schema, primitive_array_paths, renamed_props) where
+               primitive_array_paths maps array JSON paths to the primitive
+               types that were wrapped, and renamed_props maps each parent
+               object's JSON path to an {alias: original_name} table.
     """
     primitive_array_paths: dict[str, list[str]] = {}
+    renamed_props: dict[str, dict[str, str]] = {}
+
+    def alias_for(name: str, siblings: dict[str, Any]) -> str:
+        """Pick a non-reserved alias that does not collide with a sibling key."""
+        candidate = f"{name}_field"
+        while candidate in siblings or candidate in RESERVED_PROPERTY_NAMES:
+            candidate = f"{candidate}_"
+        return candidate
 
     def resolve_json_pointer(ref: str) -> dict[str, Any] | None:
         if not ref.startswith("#/"):
@@ -172,22 +196,33 @@ def _adapt_schema_for_extend(schema: dict[str, Any]) -> tuple[dict[str, Any], di
                 continue
 
             if key == "properties" and isinstance(value, dict):
-                # Recurse into properties
-                result["properties"] = {
-                    prop_name: adapt_node(prop_schema, f"{path}.{prop_name}" if path else prop_name)
-                    for prop_name, prop_schema in value.items()
-                }
+                # Recurse into properties, renaming any reserved key. The child
+                # path keeps the ORIGINAL name so primitive_array_paths and the
+                # result adapter stay aligned; only the emitted key is aliased.
+                adapted_props: dict[str, Any] = {}
+                for prop_name, prop_schema in value.items():
+                    child_path = f"{path}.{prop_name}" if path else prop_name
+                    out_name = prop_name
+                    if prop_name in RESERVED_PROPERTY_NAMES:
+                        out_name = alias_for(prop_name, value)
+                        renamed_props.setdefault(path, {})[out_name] = prop_name
+                    adapted_props[out_name] = adapt_node(prop_schema, child_path)
+                result["properties"] = adapted_props
             elif key == "items" and node_type == "array":
                 # Handle array items
                 if isinstance(value, dict):
-                    items_type = value.get("type")
-                    # Check if items is a primitive type
-                    if items_type in ("string", "number", "integer", "boolean"):
-                        # Wrap primitive in object with "value" property
-                        primitive_array_paths[path] = [items_type]
+                    resolved_items = resolve_ref_node(value)
+                    items_type = resolved_items.get("type")
+                    is_empty_object = items_type == "object" and not resolved_items.get("properties")
+                    # A primitive array, or an empty-object array (a field whose
+                    # values are never populated -- GT is always []). Extend
+                    # rejects both, so wrap them in an object with a "value" key.
+                    if items_type in ("string", "number", "integer", "boolean") or is_empty_object:
+                        wrapped_type: str = "string" if is_empty_object else str(items_type)
+                        primitive_array_paths[path] = [wrapped_type]
                         result["items"] = {
                             "type": "object",
-                            "properties": {"value": adapt_node(value, f"{path}[items].value")},
+                            "properties": {"value": {"type": wrapped_type}},
                         }
                     else:
                         # Recurse into object items
@@ -204,23 +239,34 @@ def _adapt_schema_for_extend(schema: dict[str, Any]) -> tuple[dict[str, Any], di
         return result
 
     adapted = adapt_node(schema)
-    return adapted, primitive_array_paths
+    return adapted, primitive_array_paths, renamed_props
 
 
-def _adapt_result_from_extend(data: Any, primitive_array_paths: dict[str, list[str]], path: str = "") -> Any:
+def _adapt_result_from_extend(
+    data: Any,
+    primitive_array_paths: dict[str, list[str]],
+    renamed_props: dict[str, dict[str, str]] | None = None,
+    path: str = "",
+) -> Any:
     """
     Adapt extraction results back to match the original schema.
 
-    Unwraps primitive values that were wrapped in objects for Extend AI compatibility.
+    Unwraps primitive values that were wrapped in objects for Extend AI
+    compatibility, and restores any reserved property name that was aliased in
+    the submitted schema.
     """
+    renamed_props = renamed_props or {}
+
     if data is None:
         return None
 
     if isinstance(data, dict):
         result = {}
+        rename_here = renamed_props.get(path, {})
         for key, value in data.items():
-            current_path = f"{path}.{key}" if path else key
-            result[key] = _adapt_result_from_extend(value, primitive_array_paths, current_path)
+            original_key = rename_here.get(key, key)
+            current_path = f"{path}.{original_key}" if path else f"{original_key}"
+            result[original_key] = _adapt_result_from_extend(value, primitive_array_paths, renamed_props, current_path)
         return result
 
     if isinstance(data, list):
@@ -230,7 +276,9 @@ def _adapt_result_from_extend(data: Any, primitive_array_paths: dict[str, list[s
             return [item.get("value") if isinstance(item, dict) else item for item in data]
         else:
             # Recurse into array items
-            return [_adapt_result_from_extend(item, primitive_array_paths, f"{path}[items]") for item in data]
+            return [
+                _adapt_result_from_extend(item, primitive_array_paths, renamed_props, f"{path}[items]") for item in data
+            ]
 
     return data
 
@@ -764,7 +812,7 @@ class ExtendProvider(Provider):
         :raises ProviderError: For any extraction errors
         """
         # Step 0: Adapt schema for Extend AI compatibility
-        adapted_schema, primitive_array_paths = _adapt_schema_for_extend(schema)
+        adapted_schema, primitive_array_paths, renamed_props = _adapt_schema_for_extend(schema)
 
         # Step 1: Upload file
         file_id = self._upload_file(file_path)
@@ -786,6 +834,7 @@ class ExtendProvider(Provider):
             "file_id": file_id,
             "processor_id": processor_id,
             "primitive_array_paths": primitive_array_paths,
+            "renamed_props": renamed_props,
         }
 
         return result
@@ -874,9 +923,11 @@ class ExtendProvider(Provider):
 
         # Adapt the result back to match the original schema
         # (unwrap primitive arrays that were wrapped for Extend AI)
-        primitive_array_paths = (raw_result.raw_output.get("_extend_metadata") or {}).get("primitive_array_paths") or {}
-        if primitive_array_paths:
-            extracted_data = _adapt_result_from_extend(extracted_data, primitive_array_paths)
+        extend_metadata = raw_result.raw_output.get("_extend_metadata") or {}
+        primitive_array_paths = extend_metadata.get("primitive_array_paths") or {}
+        renamed_props = extend_metadata.get("renamed_props") or {}
+        if primitive_array_paths or renamed_props:
+            extracted_data = _adapt_result_from_extend(extracted_data, primitive_array_paths, renamed_props)
 
         output = ExtractOutput(
             task_type="extract",

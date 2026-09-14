@@ -76,6 +76,34 @@ harness ahead of the first PyPI release.
 - `confidence_signal_coverage` metric: the share of emitted scalar leaves that
   carry a finite confidence score, with per-document and aggregate counts in the
   grounded-confidence payloads.
+- Non-LlamaCloud providers receive the document under a random basename
+  (`report-3f9a….pdf`) staged from the same bytes, so a dataset filename cannot
+  leak what a document is to a hosted model or an agent's prompt. The saved
+  request keeps the benchmark path. Recorded in `_metadata.json` as
+  `randomize_external_filenames`; a pipeline opts out with
+  `randomize_external_filename: false`.
+- `Provider.recompute_cost(raw_output)`: a provider-agnostic re-pricing seam
+  called by `inference renormalize`, so a corrected rate table re-prices saved
+  runs without new inference. Implemented for the OpenAI Responses and Codex
+  providers.
+- Pricing rows for `gpt-5.5`, `gpt-5.6-sol` / `-terra` / `-luna`,
+  `gemini-3.5-flash-lite` and `gemini-3.1-pro`. The Codex `gpt-5.6-sol` row is
+  corrected from 5.00/0.50/30.00 to 4.00/0.40/20.00 per million tokens.
+- Codex provider: `retry_empty_output` treats an all-null `output.json` as a
+  transient failure and retries; `extra_instructions` appends pipeline-specific
+  lines to the task prompt.
+- Claude Code provider: `non_zdr: true` authenticates with
+  `ANTHROPIC_NON_ZDR_API_KEY` for models unavailable under zero-data-retention.
+- `glm_deepinfra_extract` provider and the
+  `glm_5_3_flash_deepinfra_extract_oneshot_structured_output_file` pipeline:
+  GLM-5.3-Flash served by DeepInfra over page images (`DEEPINFRA_API_KEY`). The
+  z.ai pipeline is unchanged and remains the leaderboard row.
+
+### Fixed
+- Extend: a schema property named `id` (reserved by Extend) is aliased in the
+  submitted schema and restored in the result, and an array whose items are an
+  empty object is wrapped like a primitive array. Both shapes previously failed
+  at processor creation.
 
 ### Fixed
 - Dataset discovery keeps one input per stem and directory. A sibling `.png`
