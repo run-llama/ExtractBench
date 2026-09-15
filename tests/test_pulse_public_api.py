@@ -1,14 +1,13 @@
 from datetime import datetime
-from pathlib import Path
+
+import pytest
 
 from extract_bench.inference.pipelines import get_pipeline
 from extract_bench.inference.providers.parse.pulse import (
     PulseProvider,
     _build_layout_pages,
     _iter_bbox_elements,
-    _merge_tables_endpoint_into_markdown,
     _normalize_coords,
-    _strip_html_table_blocks,
 )
 from extract_bench.schemas.pipeline import PipelineSpec
 from extract_bench.schemas.pipeline_io import InferenceRequest, RawInferenceResult
@@ -30,37 +29,16 @@ def _provider(config: dict | None = None) -> PulseProvider:
     return PulseProvider("pulse", {"api_key": "test-key", **(config or {})})
 
 
-def test_should_run_tables_endpoint_matches_substring_case_insensitively() -> None:
-    provider = _provider(
-        {
-            "use_tables_endpoint": True,
-            "tables_endpoint_categories": ["chart", "table"],
-        }
-    )
-
-    assert provider._should_run_tables_endpoint(Path("/tmp/charts_core/doc.pdf"))
-    assert provider._should_run_tables_endpoint(Path("/tmp/Tables_Extended/doc.pdf"))
-    assert provider._should_run_tables_endpoint(Path("/tmp/staged/chart-v2/doc.pdf"))
-    assert provider._should_run_tables_endpoint(Path("/tmp/docs/table/doc.pdf"))
-    assert not provider._should_run_tables_endpoint(Path("/tmp/docs/layout/doc.pdf"))
-
-
-def test_should_run_tables_endpoint_respects_disabled_and_empty_categories() -> None:
-    disabled = _provider({"use_tables_endpoint": False, "tables_endpoint_categories": ["chart"]})
-    all_categories = _provider({"use_tables_endpoint": True})
-
-    assert not disabled._should_run_tables_endpoint(Path("/tmp/chart/doc.pdf"))
-    assert all_categories._should_run_tables_endpoint(Path("/tmp/layout/doc.pdf"))
-
-
-def test_registered_pulse_pipeline_runs_tables_endpoint_for_all_paths() -> None:
-    pipeline = get_pipeline("pulse")
+def test_only_current_pulse_pipeline_is_registered() -> None:
+    pipeline = get_pipeline("pulse_ultra_2")
     provider = _provider(pipeline.config)
+    fields = {name: value for name, (_, value) in provider._build_form_fields()}
 
-    assert provider._use_tables_endpoint is True
-    assert provider._tables_endpoint_categories == set()
-    assert provider._should_run_tables_endpoint(Path("/tmp/customer/upload/invoice.pdf"))
-    assert provider._should_run_tables_endpoint(Path("/tmp/customer/upload/report.pdf"))
+    assert pipeline.provider_name == "pulse"
+    assert pipeline.config["model"] == "pulse-ultra-2"
+    assert fields["model"] == "pulse-ultra-2"
+    with pytest.raises(ValueError, match="Pipeline 'pulse' not found"):
+        get_pipeline("pulse")
 
 
 def test_normalize_coords_handles_pixels_polygons_and_invalid_boxes() -> None:
@@ -88,38 +66,6 @@ def test_normalize_coords_handles_pixels_polygons_and_invalid_boxes() -> None:
     assert _normalize_coords(["bad", 0, 1, 1]) is None
 
 
-def test_strip_html_table_blocks_removes_tables_without_matching_notable_text() -> None:
-    content = "before\n<table><tr><td>A</td></tr></table>\nafter\n<notable>keep</notable>"
-
-    assert _strip_html_table_blocks(content) == "before\nafter\n<notable>keep</notable>"
-    assert _strip_html_table_blocks("x<table><tr><td><table></table></td></tr></table>y") == "xy"
-
-
-def test_merge_tables_endpoint_into_markdown_replaces_or_appends_tables() -> None:
-    markdown = "Intro\n<table><tr><td>old</td></tr></table>\nOutro"
-    tables_result = {
-        "tables_output": {
-            "tables": [
-                {
-                    "table_content": "<table><tr><td>new</td></tr></table>",
-                    "from_chart": True,
-                    "citations": ["chart-1"],
-                }
-            ]
-        }
-    }
-
-    replaced = _merge_tables_endpoint_into_markdown(markdown, tables_result, replace_existing_tables=True)
-    assert "old" not in replaced
-    assert "Outro" in replaced
-    assert "from_chart=true; citations=chart-1" in replaced
-    assert "<td>new</td>" in replaced
-
-    appended = _merge_tables_endpoint_into_markdown(markdown, tables_result, replace_existing_tables=False)
-    assert "old" in appended
-    assert "<td>new</td>" in appended
-
-
 def _raw_result(example_id: str, source_file_path: str, raw_output: dict) -> RawInferenceResult:
     now = datetime.now()
     return RawInferenceResult(
@@ -129,12 +75,12 @@ def _raw_result(example_id: str, source_file_path: str, raw_output: dict) -> Raw
             product_type=ProductType.PARSE,
         ),
         pipeline=PipelineSpec(
-            pipeline_name="pulse",
+            pipeline_name="pulse_ultra_2",
             provider_name="pulse",
             product_type=ProductType.PARSE,
             config={},
         ),
-        pipeline_name="pulse",
+        pipeline_name="pulse_ultra_2",
         product_type=ProductType.PARSE,
         raw_output=raw_output,
         started_at=now,

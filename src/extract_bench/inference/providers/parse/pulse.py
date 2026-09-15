@@ -1,8 +1,7 @@
 """Provider for Pulse PARSE.
 
 Calls the Pulse REST API directly via multipart/form-data. The provider exposes
-the public /extract controls and can optionally run /tables after extraction so
-registered pipelines can reproduce leaderboard runs without hidden harness code.
+the public /extract controls needed to reproduce leaderboard runs.
 """
 
 import json
@@ -121,12 +120,6 @@ class PulseProvider(Provider):
         self._custom_image_prompt: str | None = self.base_config.get("custom_image_prompt")
         self._custom_refine_prompt: str | None = self.base_config.get("custom_refine_prompt")
 
-        # Public default-model figure processing and alternate outputs.
-        figure_processing = self.base_config.get("figure_processing")
-        if figure_processing is not None and not isinstance(figure_processing, dict):
-            raise ProviderConfigError("figure_processing must be a dict")
-        self._figure_processing: dict[str, Any] | None = figure_processing
-
         extensions = self.base_config.get("extensions")
         if extensions is not None and not isinstance(extensions, dict):
             raise ProviderConfigError("extensions must be a dict")
@@ -142,26 +135,8 @@ class PulseProvider(Provider):
             raise ProviderConfigError("storage must be a dict")
         self._storage: dict[str, Any] | None = storage
 
-        # /tables post-processing
-        tables_config = self.base_config.get("tables_config")
-        if tables_config is not None and not isinstance(tables_config, dict):
-            raise ProviderConfigError("tables_config must be a dict")
-        self._use_tables_endpoint: bool = bool(self.base_config.get("use_tables_endpoint", False))
-        self._tables_config: dict[str, Any] = dict(tables_config or {})
-        raw_categories = self.base_config.get("tables_endpoint_categories")
-        if raw_categories is None:
-            self._tables_endpoint_categories: set[str] = set()
-        elif isinstance(raw_categories, list):
-            self._tables_endpoint_categories = {str(item).lower() for item in raw_categories}
-        else:
-            raise ProviderConfigError("tables_endpoint_categories must be a list when provided")
-        self._merge_tables_into_markdown: bool = bool(self.base_config.get("merge_tables_into_markdown", False))
-        self._replace_existing_tables: bool = bool(self.base_config.get("replace_existing_tables", True))
-
-        # Misc / async controls
         self._poll_interval: float = float(self.base_config.get("poll_interval", os.getenv("PULSE_POLL_INTERVAL", 1.0)))
         self._async_extract: bool = bool(self.base_config.get("async_extract", self.base_config.get("async", False)))
-        self._async_tables: bool = bool(self.base_config.get("async_tables", False))
         self._force_url: bool = bool(self.base_config.get("force_url", False))
         self._request_timeout: float = float(
             self.base_config.get(
@@ -212,7 +187,6 @@ class PulseProvider(Provider):
         add("pages", self._pages)
         add("async", self._async_extract or None)
         add("force_url", self._force_url or None)
-        add("figure_processing", self._figure_processing)
         add("extensions", self._extensions)
         add("storage", self._storage)
         add("refine", self._refine or None)
@@ -312,39 +286,6 @@ class PulseProvider(Provider):
 
         return self._resolve_large_result(raw, "extract")
 
-    def _should_run_tables_endpoint(self, file_path: Path) -> bool:
-        if not self._use_tables_endpoint:
-            return False
-        if not self._tables_endpoint_categories:
-            return True
-        parts = [part.lower() for part in file_path.parts]
-        return any(cat in part for part in parts for cat in self._tables_endpoint_categories)
-
-    def _extract_tables(self, extraction_id: str) -> dict[str, Any]:
-        payload: dict[str, Any] = {"extraction_id": extraction_id}
-        if self._tables_config:
-            payload["tables_config"] = self._tables_config
-        if self._async_tables:
-            payload["async"] = True
-
-        response = requests.post(
-            f"{self._base_url}/tables",
-            headers={**self._headers(), "Content-Type": "application/json"},
-            json=payload,
-            timeout=self._request_timeout,
-        )
-        self._classify_bad_response(response, "tables submit")
-        try:
-            raw: dict[str, Any] = response.json()
-        except ValueError as e:
-            raise ProviderPermanentError(f"Pulse tables returned non-JSON response: {e}") from e
-
-        job_id = raw.get("job_id") or raw.get("tables_id")
-        if isinstance(job_id, str) and (self._async_tables or raw.get("status") in {"pending", "processing"}):
-            return self._poll_job(job_id, "tables")
-
-        return self._resolve_large_result(raw, "tables")
-
     # --------------------------------------------------------------------- #
     # Provider interface
     # --------------------------------------------------------------------- #
@@ -361,9 +302,6 @@ class PulseProvider(Provider):
 
         try:
             raw_output = self._extract(str(file_path))
-            extraction_id = raw_output.get("extraction_id")
-            if isinstance(extraction_id, str) and self._should_run_tables_endpoint(file_path):
-                raw_output["_tables_result"] = self._extract_tables(extraction_id)
         except (
             ProviderPermanentError,
             ProviderTransientError,
@@ -386,27 +324,17 @@ class PulseProvider(Provider):
             "refine_options": self._refine_options,
             "extract_figure": self._extract_figure,
             "figure_description": self._figure_description,
-            "figure_processing": self._figure_processing,
             "extensions": self._extensions,
             "storage": self._storage,
             "custom_image_prompt": self._custom_image_prompt,
             "custom_refine_prompt": self._custom_refine_prompt,
             "additional_prompt": self._additional_prompt,
             "pages": self._pages,
-            "use_tables_endpoint": self._use_tables_endpoint,
-            "tables_config": self._tables_config,
-            "tables_endpoint_categories": sorted(self._tables_endpoint_categories),
-            "merge_tables_into_markdown": self._merge_tables_into_markdown,
-            "replace_existing_tables": self._replace_existing_tables,
-            "async_tables": self._async_tables,
             "markdown_source": self._markdown_source,
             "request_timeout": self._request_timeout,
             "job_timeout": self._job_timeout,
             "credits_per_page": self._credits_per_page,
         }
-
-        if self._use_tables_endpoint:
-            raw_output["_tables_endpoint_applied"] = "_tables_result" in raw_output
 
         plan_info = raw_output.get("plan-info", raw_output.get("plan_info", {}))
         pages_used = None
@@ -458,12 +386,6 @@ class PulseProvider(Provider):
             markdown = native_markdown
         else:
             markdown = ""
-        if self._merge_tables_into_markdown:
-            markdown = _merge_tables_endpoint_into_markdown(
-                markdown,
-                raw.get("_tables_result"),
-                replace_existing_tables=self._replace_existing_tables,
-            )
         layout_pages = _build_layout_pages(raw.get("bounding_boxes", {}))
 
         output = ParseOutput(
@@ -549,111 +471,7 @@ def _get_pulse_html(raw: dict[str, Any]) -> str:
                     if isinstance(html, str) and html:
                         return html
 
-    html = raw.get("html")
-    if isinstance(html, str) and html:
-        return html
-
     return ""
-
-
-def _table_endpoint_tables(tables_result: Any) -> list[dict[str, Any]]:
-    if not isinstance(tables_result, dict):
-        return []
-    result = tables_result.get("result")
-    if isinstance(result, dict):
-        tables_result = result
-    tables_output = tables_result.get("tables_output")
-    if not isinstance(tables_output, dict):
-        return []
-    tables = tables_output.get("tables")
-    if not isinstance(tables, list):
-        return []
-    return [table for table in tables if isinstance(table, dict)]
-
-
-def _format_endpoint_table(table: dict[str, Any]) -> str:
-    content = table.get("table_content")
-    if not isinstance(content, str) or "<table" not in content.lower():
-        return ""
-    citations = table.get("citations")
-    citations_text = ""
-    if isinstance(citations, list) and citations:
-        citations_text = " ".join(str(citation) for citation in citations)
-    from_chart = "true" if table.get("from_chart") else "false"
-    comment_parts = [f"from_chart={from_chart}"]
-    if citations_text:
-        comment_parts.append(f"citations={citations_text}")
-    return f"<!-- pulse-tables-endpoint {'; '.join(comment_parts)} -->\n{content.strip()}"
-
-
-def _strip_html_table_blocks(content: str) -> str:
-    if "<table" not in content.lower():
-        return content
-
-    lower = content.lower()
-    pieces: list[str] = []
-    search_start = 0
-    while True:
-        start = lower.find("<table", search_start)
-        if start == -1:
-            pieces.append(content[search_start:])
-            break
-        tag_name_end = start + len("<table")
-        if tag_name_end < len(lower) and lower[tag_name_end] not in (">", " ", "\t", "\n", "\r"):
-            pieces.append(content[search_start : start + 1])
-            search_start = start + 1
-            continue
-        pieces.append(content[search_start:start])
-
-        depth = 0
-        pos = start
-        end = -1
-        while pos < len(lower):
-            next_open = lower.find("<table", pos + 1)
-            next_close = lower.find("</table>", pos + 1)
-            if next_close == -1:
-                break
-            if next_open != -1 and next_open < next_close:
-                nested_name_end = next_open + len("<table")
-                if nested_name_end < len(lower) and lower[nested_name_end] not in (
-                    ">",
-                    " ",
-                    "\t",
-                    "\n",
-                    "\r",
-                ):
-                    pos = next_open
-                    continue
-                depth += 1
-                pos = next_open
-                continue
-            if depth == 0:
-                end = next_close + len("</table>")
-                break
-            depth -= 1
-            pos = next_close
-
-        if end == -1:
-            search_start = len(content)
-            break
-        search_start = end
-
-    return "\n".join(part for part in "".join(pieces).splitlines() if part.strip())
-
-
-def _merge_tables_endpoint_into_markdown(
-    markdown: str,
-    tables_result: Any,
-    *,
-    replace_existing_tables: bool,
-) -> str:
-    table_blocks = [_format_endpoint_table(table) for table in _table_endpoint_tables(tables_result)]
-    table_blocks = [block for block in table_blocks if block]
-    if not table_blocks:
-        return markdown
-
-    base = _strip_html_table_blocks(markdown) if replace_existing_tables else markdown
-    return f"{base.rstrip()}\n\n" + "\n\n".join(table_blocks)
 
 
 def _canonical_label(raw_label: Any, y: float | None = None) -> str:

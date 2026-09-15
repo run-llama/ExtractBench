@@ -1,6 +1,8 @@
 Provider,Category,Overall,Short,Medium,Long,Cost_Per_Page,Cost_Short,Cost_Medium,Cost_Long,P_Short,P_Medium,P_Long,R_Short,R_Medium,R_Long,Word_Grounding,Word_Grounding_Short,Word_Grounding_Medium,Word_Grounding_Long,Page_Grounding,Page_Grounding_Short,Page_Grounding_Medium,Page_Grounding_Long,Latency_S_Per_Doc_Short,Latency_S_Per_Doc_Medium,Latency_S_Per_Doc_Long
+Pulse (Effort),Specialized APIs,95.91,96.46,95.01,93.51,0.1050,0.1050,0.1050,0.1050,96.44,95.28,94.07,96.50,94.89,93.19,1.49,1.17,3.03,0.04,79.70,77.40,86.19,77.74,125.7,206.3,453.1
 LlamaExtract Agentic Plus,LlamaExtract,95.59,96.56,93.34,94.41,0.0811,0.0831,0.0771,0.0750,96.59,93.95,94.32,96.54,92.80,94.54,46.43,43.74,54.01,54.67,84.92,89.70,72.25,87.14,110.7,197.7,587.5
 Codex (GPT-5.5),Coding Agents,93.57,95.68,91.15,78.88,0.2783,0.3579,0.1214,0.0434,96.01,93.64,94.03,95.51,90.16,78.58,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,70.3,82.6,122.0
+Pulse (Non-effort),Specialized APIs,92.70,93.17,92.22,89.07,0.0300,0.0300,0.0300,0.0300,93.36,92.59,90.81,93.17,92.01,87.82,0.71,0.82,0.49,0.01,73.42,73.81,69.86,84.72,87.2,140.0,314.3
 OpenAI GPT-6 Astra,Commercial VLM,91.91,97.22,90.56,31.70,0.1109,0.1320,0.0677,0.0382,97.14,92.08,75.58,97.32,90.16,29.87,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,35.0,106.4,90.1
 Reducto Deep Extract,Specialized APIs,90.44,94.20,80.47,92.01,0.3444,0.3798,0.2312,0.5058,94.09,80.78,91.98,94.38,80.20,92.06,43.30,42.84,45.57,41.13,71.71,72.60,70.42,67.28,206.5,293.7,591.7
 DeepSeek V4.1 Flash,Commercial VLM,87.11,94.44,81.49,22.23,0.0032,0.0037,0.0017,0.0006,94.06,81.59,22.16,94.98,81.73,22.31,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,9.9,29.2,29.0
