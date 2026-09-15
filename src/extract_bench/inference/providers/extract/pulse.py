@@ -534,7 +534,7 @@ def _as_sequence(value: Any) -> Sequence[Any]:
 
 def _collect_citations(node: Any, *, path: list[str]) -> list[FieldCitation]:
     if isinstance(node, Mapping):
-        field_path = _format_field_path(path)
+        field_path = format_field_path(path)
         if field_path and _looks_like_citation(node):
             citation = _citation_from_node(field_path, node)
             return [citation] if citation is not None else []
@@ -632,7 +632,7 @@ def _compact_metadata(node: Mapping[str, Any]) -> dict[str, Any] | None:
     return dict(metadata) if metadata else None
 
 
-def _format_field_path(path: list[str]) -> str:
+def format_field_path(path: list[str]) -> str:
     rendered = ""
     for token in path:
         if token.startswith("[") and token.endswith("]"):

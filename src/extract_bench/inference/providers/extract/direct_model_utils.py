@@ -9,7 +9,7 @@ from typing import Any
 from pypdf import PdfReader
 
 from extract_bench.inference.providers.base import ProviderPermanentError
-from extract_bench.schemas.extract_output import ExtractOutput
+from extract_bench.schemas.extract_output import ExtractOutput, FieldCitation
 from extract_bench.schemas.pipeline_io import InferenceResult, RawInferenceResult
 from extract_bench.schemas.product import ProductType
 
@@ -165,3 +165,22 @@ def normalize_extract_result(raw_result: RawInferenceResult) -> InferenceResult:
         completed_at=raw_result.completed_at,
         latency_in_ms=raw_result.latency_in_ms,
     )
+
+
+def field_citations_from_raw(raw_output: dict[str, Any]) -> list[FieldCitation]:
+    """Read back citations a provider stashed in ``raw_output['field_citations']``.
+
+    Direct model providers return no evidence unless they were run in evidence
+    mode, in which case the citations are already normalized and only need
+    re-hydrating into models here.
+    """
+    entries = raw_output.get("field_citations")
+    if not isinstance(entries, list):
+        return []
+    citations: list[FieldCitation] = []
+    for entry in entries:
+        if isinstance(entry, FieldCitation):
+            citations.append(entry)
+        elif isinstance(entry, dict):
+            citations.append(FieldCitation.model_validate(entry))
+    return citations

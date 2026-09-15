@@ -55,6 +55,26 @@ harness ahead of the first PyPI release.
   1 MiB, so citation-heavy long documents are never cut off.
 
 ### Added
+- Extension points matching the ones `parse-bench` already exposes, so a
+  downstream harness can keep its private providers, products and adapters in
+  its own package instead of forking this one:
+  `register_product_type` (a registered name validates anywhere a product type
+  is declared and behaves like a `ProductType` member), `register_output_model`
+  (a normalized output model for that product, dispatched on `task_type` so
+  saved results round-trip through JSON), and `register_pipeline_resolver` (the
+  harness's own pipeline registry resolves a result's `pipeline_name` to a
+  provider key before the package registry is consulted). All re-exported from
+  `extract_bench.extensions`; `ProductType` is now a `StrEnum`.
+- `GradedCell` and the `graded_cells=` side-channel on
+  `compute_unified_evidence_metrics`: collects the per-cell page/bbox verdicts
+  the Hungarian pass already computes and would otherwise discard, so a caller
+  explaining a wrong citation does not re-score the document once per citation.
+  Scores and metric metadata are identical whether or not cells are collected.
+- `ProviderTerminalCheckpointError` (a permanent error naming a remote
+  checkpoint that cannot be resumed), `CloseOnceClient` (exact-once `close()`
+  over a shared client), `format_field_path` (public, was `_format_field_path`),
+  `field_citations_from_raw`, and `ToolResultWithImages` — shared with the
+  providers a downstream harness co-owns.
 - `FieldEvidence.layer` names the bbox geometry when the same location is
   annotated more than once (`word`, `structural`, `checkbox`, ...), so ground
   truth written for the internal harness loads unchanged. Unknown names are
