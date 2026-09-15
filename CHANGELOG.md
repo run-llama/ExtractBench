@@ -98,6 +98,20 @@ harness ahead of the first PyPI release.
   `glm_5_3_flash_deepinfra_extract_oneshot_structured_output_file` pipeline:
   GLM-5.3-Flash served by DeepInfra over page images (`DEEPINFRA_API_KEY`). The
   z.ai pipeline is unchanged and remains the leaderboard row.
+- Packaging for PyPI: the version is read from `extract_bench.__version__` at
+  build time, the sdist carries only the package, tests, README, LICENSE and
+  this changelog, and the package ships a `py.typed` marker. Per-provider
+  extras (`llamaextract`, `openai`, `anthropic`, `google`, `openweights`,
+  `reducto`, `extend`, `datalab`, `landingai`, `azure`, `aws`, `local`) install
+  one system's SDK; `runners` remains their union. Releases are published by
+  `.github/workflows/publish.yml` on a `v*` tag (see `docs/releasing.md`).
+- `extract-bench version` prints the installed version.
+- `extract_bench.extensions` collects the public registration hooks
+  (`register_provider`, `register_pipeline`, `register_layout_adapter`,
+  `register_layout_label_mapper`) for harnesses built on the package.
+
+### Removed
+- The unused `tqdm` dependency.
 
 ### Fixed
 - Extend: a schema property named `id` (reserved by Extend) is aliased in the
