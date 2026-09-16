@@ -1104,7 +1104,7 @@ def _as_sequence(value: Any) -> Sequence[Any]:
 
 def _collect_citations(node: Any, *, path: list[str]) -> list[FieldCitation]:
     if isinstance(node, _PulseAnchorGroup):
-        field_path = _format_field_path(path)
+        field_path = format_field_path(path)
         if not field_path:
             return []
         return [citation for item in node.boxes if (citation := _citation_from_node(field_path, item)) is not None]
