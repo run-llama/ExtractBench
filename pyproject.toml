@@ -1,5 +1,5 @@
 [project]
-name = "extract-bench"
+name = "llama-extract-bench"
 dynamic = ["version"]
 description = "ExtractBench: a benchmark and evaluation harness for schema-guided document extraction on real-world enterprise documents"
 readme = "README.md"

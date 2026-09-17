@@ -4,7 +4,7 @@ name: Publish to PyPI
 # match `__version__` in src/extract_bench/__init__.py.
 #
 # Uses PyPI trusted publishing (OIDC): no API token is stored in GitHub.
-# One-time setup on pypi.org: project "extract-bench" -> Publishing -> add a
+# One-time setup on pypi.org: project "llama-extract-bench" -> Publishing -> add a
 # GitHub publisher with owner run-llama, repo ExtractBench, workflow
 # publish.yml, environment pypi.
 

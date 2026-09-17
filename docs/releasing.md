@@ -1,11 +1,11 @@
-# Releasing extract-bench
+# Releasing llama-extract-bench
 
 Releases are cut from `main` and published to PyPI automatically by
 `.github/workflows/publish.yml` when a `v*` tag is pushed.
 
 ## Versioning
 
-`extract-bench` follows semantic versioning with one benchmark-specific rule:
+`llama-extract-bench` follows semantic versioning with one benchmark-specific rule:
 
 - **Patch** (`1.0.x`): provider fixes, new pipelines, docs, tooling. Scores for
   existing pipelines on the public dataset do not change.
@@ -44,7 +44,7 @@ traced to the code that produced them.
 The publish workflow uses [trusted publishing](https://docs.pypi.org/trusted-publishers/),
 so no PyPI token is stored in GitHub.
 
-1. On pypi.org, create the `extract-bench` project (or use "Add a new pending publisher"
+1. On pypi.org, create the `llama-extract-bench` project (or use "Add a new pending publisher"
    if the project does not exist yet).
 2. Under *Publishing*, add a GitHub publisher: owner `run-llama`, repository
    `ExtractBench`, workflow `publish.yml`, environment `pypi`.
@@ -54,12 +54,12 @@ so no PyPI token is stored in GitHub.
 ## Consuming the package from another project
 
 ```bash
-uv add "extract-bench[runners]"          # or pip install "extract-bench[runners]"
-uv add "extract-bench[llamaextract]"     # just one provider
+uv add "llama-extract-bench[runners]"          # or pip install "llama-extract-bench[runners]"
+uv add "llama-extract-bench[llamaextract]"     # just one provider
 ```
 
 Pin an exact version in evaluation harnesses so scores are reproducible:
 
 ```toml
-dependencies = ["extract-bench==0.3.0"]
+dependencies = ["llama-extract-bench==0.3.0"]
 ```
