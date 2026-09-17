@@ -1,10 +1,16 @@
 # Changelog
 
-All notable changes to `extract-bench` are recorded here. The format follows
+All notable changes to `llama-extract-bench` are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+
+### Packaging
+
+- The PyPI distribution is `llama-extract-bench` (the `extract-bench` name is
+  taken by an unrelated project). The `extract-bench` CLI command and the
+  `extract_bench` import package are unchanged.
 
 Pulls the extract scorer into alignment with the internal LlamaCloud benchmark
 harness ahead of the first PyPI release.

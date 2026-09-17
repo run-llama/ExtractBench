@@ -76,8 +76,8 @@ Top 10 of 39 systems — full table in [leaderboard.csv](leaderboard.csv).
 
 ```bash
 # Install from PyPI (pick the extras for the systems you want to run)
-pip install "extract-bench[runners]"          # every provider SDK
-pip install "extract-bench[llamaextract]"     # or just one, e.g. llamaextract / openai / anthropic / google
+pip install "llama-extract-bench[runners]"    # every provider SDK
+pip install "llama-extract-bench[llamaextract]" # or just one, e.g. llamaextract / openai / anthropic / google
 
 # Or, from a checkout of this repo
 uv sync --extra runners
