@@ -41,6 +41,11 @@ from extract_bench.inference.providers.base import (
     ProviderRateLimitError,
     ProviderTransientError,
 )
+from extract_bench.inference.providers.extract.agent_evidence import (
+    agent_evidence_instruction,
+    citations_from_agent_file,
+    read_agent_citations_file,
+)
 from extract_bench.inference.providers.extract.direct_model_utils import (
     IMAGE_EXTENSIONS,
     add_additional_properties_false,
@@ -103,6 +108,7 @@ class ClaudeCodeExtractProvider(Provider):
         # anthropic_direct-proven combination.
         self._promote_repeated: bool = bool(self.base_config.get("promote_repeated_structure", True))
         self._additional_properties_false: bool = bool(self.base_config.get("additional_properties_false", True))
+        self._evidence_mode: bool = bool(self.base_config.get("evidence_mode", False))
         # Track live subprocesses for cancel(): example_id -> Popen
         self._procs: dict[str, subprocess.Popen[str]] = {}
         self._procs_lock = threading.Lock()
@@ -134,6 +140,7 @@ class ClaudeCodeExtractProvider(Provider):
 
     def _build_prompt(self, schema: dict[str, Any], staged_name: str) -> str:
         schema_json = json.dumps(schema, indent=2)
+        evidence_rule = f"\n{agent_evidence_instruction()}" if self._evidence_mode else ""
         return (
             f"Extract structured data from the document file `./{staged_name}` in the current directory.\n\n"
             "Use only local file inspection and shell commands. Do not use web search, network calls, "
@@ -146,7 +153,7 @@ class ClaudeCodeExtractProvider(Provider):
             "- For large regular tables, prefer writing and running a local script to parse/enumerate rows.\n"
             "- For forms, prefer direct field extraction from the document content.\n"
             "- Write the resulting JSON object to ./output.json and validate that it is valid JSON before stopping.\n"
-            "- Do not print the JSON to your assistant output."
+            f"- Do not print the JSON to your assistant output.{evidence_rule}"
         )
 
     def _build_cmd(self, prompt: str, mcp_config_path: Path) -> list[str]:
@@ -453,6 +460,7 @@ class ClaudeCodeExtractProvider(Provider):
             "effort": self._effort,
             "promote_repeated_structure": self._promote_repeated,
             "additional_properties_false": self._additional_properties_false,
+            "evidence_mode": self._evidence_mode,
         }
 
     # ------------------------------------------------------------------
@@ -496,6 +504,7 @@ class ClaudeCodeExtractProvider(Provider):
             result_event = self._parse_result_event(lines)
             self._raise_for_status(returncode, result_event, lines, stderr_tail)
             data = self._read_output_json(workdir)
+            agent_citations = read_agent_citations_file(workdir / "citations.json") if self._evidence_mode else None
 
         completed_at = datetime.now()
         latency_ms = int((completed_at - started_at).total_seconds() * 1000)
@@ -518,6 +527,11 @@ class ClaudeCodeExtractProvider(Provider):
             **self._tool_usage(lines),
             "_trace_tail": self._trace_tail(lines),
         }
+
+        if self._evidence_mode:
+            citations, evidence_stats = citations_from_agent_file(agent_citations, source="claude_code_evidence")
+            raw_output["field_citations"] = [citation.model_dump() for citation in citations]
+            raw_output["evidence_stats"] = evidence_stats.as_dict()
 
         return RawInferenceResult(
             request=request,

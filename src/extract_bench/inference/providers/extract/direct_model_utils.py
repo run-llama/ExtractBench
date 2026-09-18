@@ -152,7 +152,7 @@ def normalize_extract_result(raw_result: RawInferenceResult) -> InferenceResult:
         example_id=raw_result.request.example_id,
         pipeline_name=raw_result.pipeline_name,
         extracted_data=raw_result.raw_output.get("data") or {},
-        field_citations=[],
+        field_citations=field_citations_from_raw(raw_result.raw_output),
     )
 
     return InferenceResult(

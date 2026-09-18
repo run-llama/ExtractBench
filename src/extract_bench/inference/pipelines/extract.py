@@ -306,6 +306,13 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
             config={"model": "claude-opus-4-8", "bare": True},
         )
     )
+    register_fn(
+        _pipeline_spec(
+            pipeline_name="claude_code_extract_opus_4_8_evidence",
+            provider_name="claude_code_extract",
+            config={"model": "claude-opus-4-8", "evidence_mode": True},
+        )
+    )
 
     for _model_slug, _model, _reasoning_effort in (
         ("gpt_5_4", "gpt-5.4", "low"),
@@ -324,6 +331,39 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
                 },
             )
         )
+
+    for _pipeline_name, _model in (
+        ("codex_code_extract_gpt_5_5_low_evidence", "gpt-5.5"),
+        ("codex_code_extract_gpt_5_6_sol_low_evidence", "gpt-5.6-sol"),
+        ("codex_code_extract_gpt_5_6_terra_low_evidence", "gpt-5.6-terra"),
+    ):
+        register_fn(
+            _pipeline_spec(
+                pipeline_name=_pipeline_name,
+                provider_name="codex_code_extract",
+                config={
+                    "model": _model,
+                    "reasoning_effort": "low",
+                    "sandbox": "danger-full-access",
+                    "max_cost_usd": 5.00,
+                    "evidence_mode": True,
+                },
+            )
+        )
+
+    register_fn(
+        _pipeline_spec(
+            pipeline_name="codex_code_extract_gpt_5_6_luna_medium_evidence",
+            provider_name="codex_code_extract",
+            config={
+                "model": "gpt-5.6-luna",
+                "reasoning_effort": "medium",
+                "sandbox": "danger-full-access",
+                "max_cost_usd": None,
+                "evidence_mode": True,
+            },
+        )
+    )
 
     # =========================================================================
     # Commercial extraction APIs

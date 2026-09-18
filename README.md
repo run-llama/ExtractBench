@@ -20,22 +20,22 @@ The benchmark covers **370 documents (4,869 pages)** across 8 business domains a
 Models and prices reflect each provider's official documentation as of September 11, 2026; each system uses its recommended configuration.
 
 <!-- LEADERBOARD:START -->
-**Unified value F1** — the headline metric. Every score is an unweighted mean over documents; each document counts once, whatever its length. For raw data including per-split precision and recall, cost, and latency, see [leaderboard.csv](leaderboard.csv). The best score in each Overall, Short, Medium, and Long column is **bold**; the second-best distinct score is <u>underlined</u>.
+**Unified value F1** — the headline metric. Every score is an unweighted mean over documents; each document counts once, whatever its length. For raw data including per-split precision and recall, cost, and latency, see [leaderboard.csv](leaderboard.csv). Equal displayed Overall scores are ordered by lower cost per page. The best score in each Overall, Short, Medium, and Long column is **bold**; the second-best distinct score is <u>underlined</u>.
 
 | Rank | Provider | Category | Overall | Short | Medium | Long | ¢ / Page |
 |---:|---|---|---:|---:|---:|---:|---:|
-| 1 | Pulse (Effort) | Specialized APIs | **95.91** | 96.46 | **95.01** | **93.51** | 10.50¢ |
-| 2 | LlamaExtract Agentic Plus | LlamaExtract | <u>95.66</u> | <u>96.94</u> | <u>94.45</u> | 85.46 | 8.11¢ |
-| 3 | LlamaExtract Agentic | LlamaExtract | 94.52 | 96.04 | 92.11 | 87.14 | 3.12¢ |
-| 4 | Codex (GPT-5.5) | Coding Agents | 93.57 | 95.68 | 91.15 | 78.88 | 27.83¢ |
-| 5 | Pulse (Non-effort) | Specialized APIs | 92.70 | 93.17 | 92.22 | 89.07 | 3.00¢ |
-| 6 | LlamaExtract Cost-Effective | LlamaExtract | 92.27 | 94.03 | 89.51 | 83.73 | 1.00¢ |
-| 7 | OpenAI GPT-6 Astra | Commercial VLM | 91.91 | **97.22** | 90.56 | 31.70 | 11.09¢ |
-| 8 | Reducto Deep Extract | Specialized APIs | 90.44 | 94.20 | 80.47 | <u>92.01</u> | 34.44¢ |
-| 9 | Qwen3.8 Flash Next | OSS | 89.88 | 94.82 | 87.81 | 37.74 | — |
-| 10 | Qwen3.8 27B | OSS | 89.75 | 94.68 | 87.54 | 38.45 | — |
+| 1 | LlamaExtract Agentic Plus | LlamaExtract | **95.91** | <u>96.94</u> | <u>94.45</u> | 90.18 | 8.11¢ |
+| 2 | Pulse (Effort) | Specialized APIs | **95.91** | 96.46 | **95.01** | **93.51** | 10.50¢ |
+| 3 | LlamaExtract Agentic | LlamaExtract | <u>94.77</u> | 96.04 | 92.11 | 91.83 | 3.31¢ |
+| 4 | Codex (GPT-5.6 Sol Evidence) | Coding Agents | 93.77 | 96.04 | 90.19 | 82.73 | 21.65¢ |
+| 5 | Codex (GPT-5.5) | Coding Agents | 93.57 | 95.68 | 91.15 | 78.88 | 27.83¢ |
+| 6 | Codex (GPT-5.5 Evidence) | Coding Agents | 93.35 | 95.59 | 88.72 | 87.97 | 33.63¢ |
+| 7 | Pulse (Non-effort) | Specialized APIs | 92.70 | 93.17 | 92.22 | 89.07 | 3.00¢ |
+| 8 | LlamaExtract Cost-Effective | LlamaExtract | 92.27 | 94.03 | 89.51 | 83.73 | 1.06¢ |
+| 9 | Codex (GPT-5.6 Terra Evidence) | Coding Agents | 92.26 | 95.60 | 86.69 | 77.36 | 9.45¢ |
+| 10 | OpenAI GPT-6 Astra | Commercial VLM | 91.91 | **97.22** | 90.56 | 31.70 | 11.09¢ |
 
-Top 10 of 39 systems — full table in [leaderboard.csv](leaderboard.csv).
+Top 10 of 44 systems — full table in [leaderboard.csv](leaderboard.csv).
 <!-- LEADERBOARD:END -->
 
 <!-- GROUNDING:START -->
@@ -47,18 +47,20 @@ Top 10 of 39 systems — full table in [leaderboard.csv](leaderboard.csv).
     <tr><th align="right">Overall</th><th align="right">Short</th><th align="right">Medium</th><th align="right">Long</th><th align="right">Overall</th><th align="right">Short</th><th align="right">Medium</th><th align="right">Long</th></tr>
   </thead>
   <tbody>
-    <tr><td align="right">1</td><td>LlamaExtract Agentic Plus</td><td align="right"><strong>46.43</strong></td><td align="right"><strong>43.74</strong></td><td align="right"><strong>54.01</strong></td><td align="right"><strong>54.67</strong></td><td align="right"><strong>84.92</strong></td><td align="right"><strong>89.70</strong></td><td align="right"><u>72.25</u></td><td align="right"><strong>87.14</strong></td></tr>
-    <tr><td align="right">2</td><td>LlamaExtract Agentic</td><td align="right"><u>44.14</u></td><td align="right">42.30</td><td align="right"><u>50.47</u></td><td align="right"><u>45.68</u></td><td align="right">66.12</td><td align="right">69.73</td><td align="right">56.59</td><td align="right">67.60</td></tr>
-    <tr><td align="right">3</td><td>Reducto Deep Extract</td><td align="right">43.30</td><td align="right"><u>42.84</u></td><td align="right">45.57</td><td align="right">41.13</td><td align="right">71.71</td><td align="right">72.60</td><td align="right">70.42</td><td align="right">67.28</td></tr>
-    <tr><td align="right">4</td><td>LlamaExtract Cost-Effective</td><td align="right">40.43</td><td align="right">40.20</td><td align="right">42.30</td><td align="right">36.67</td><td align="right">64.15</td><td align="right">68.90</td><td align="right">53.73</td><td align="right">56.55</td></tr>
-    <tr><td align="right">5</td><td>Extend (Max Context)</td><td align="right">25.20</td><td align="right">33.93</td><td align="right">0.21</td><td align="right">0.02</td><td align="right">49.04</td><td align="right">61.71</td><td align="right">27.68</td><td align="right">0.03</td></tr>
-    <tr><td align="right">6</td><td>Extend Extract</td><td align="right">15.96</td><td align="right">21.13</td><td align="right">1.03</td><td align="right">0.01</td><td align="right">53.58</td><td align="right">64.50</td><td align="right">37.39</td><td align="right">0.03</td></tr>
-    <tr><td align="right">7</td><td>Datalab (Accurate + Balanced)</td><td align="right">2.02</td><td align="right">2.67</td><td align="right">0.24</td><td align="right">0.00</td><td align="right">48.50</td><td align="right">56.90</td><td align="right">38.55</td><td align="right">0.01</td></tr>
-    <tr><td align="right">8</td><td>Pulse (Effort)</td><td align="right">1.49</td><td align="right">1.17</td><td align="right">3.03</td><td align="right">0.04</td><td align="right"><u>79.70</u></td><td align="right"><u>77.40</u></td><td align="right"><strong>86.19</strong></td><td align="right">77.74</td></tr>
-    <tr><td align="right">9</td><td>Pulse (Non-effort)</td><td align="right">0.71</td><td align="right">0.82</td><td align="right">0.49</td><td align="right">0.01</td><td align="right">73.42</td><td align="right">73.81</td><td align="right">69.86</td><td align="right"><u>84.72</u></td></tr>
-    <tr><td align="right">—</td><td><em>All 30 other systems</em></td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td></tr>
+    <tr><td align="right">1</td><td>LlamaExtract Agentic Plus</td><td align="right"><strong>58.11</strong></td><td align="right"><strong>54.11</strong></td><td align="right"><strong>69.93</strong></td><td align="right"><u>68.31</u></td><td align="right"><strong>86.66</strong></td><td align="right"><strong>91.37</strong></td><td align="right">78.84</td><td align="right">66.25</td></tr>
+    <tr><td align="right">2</td><td>Codex (GPT-5.6 Sol Evidence)</td><td align="right"><u>54.66</u></td><td align="right">50.87</td><td align="right"><u>64.58</u></td><td align="right"><strong>69.01</strong></td><td align="right"><u>83.62</u></td><td align="right">85.12</td><td align="right"><u>80.77</u></td><td align="right">78.84</td></tr>
+    <tr><td align="right">3</td><td>Codex (GPT-5.5 Evidence)</td><td align="right">52.57</td><td align="right"><u>53.13</u></td><td align="right">48.01</td><td align="right">61.87</td><td align="right">80.64</td><td align="right">83.27</td><td align="right">73.87</td><td align="right"><u>79.90</u></td></tr>
+    <tr><td align="right">4</td><td>Claude Code (Opus 4.8 Evidence)</td><td align="right">49.48</td><td align="right">45.31</td><td align="right">62.35</td><td align="right">58.43</td><td align="right">72.52</td><td align="right">74.84</td><td align="right">67.38</td><td align="right">68.03</td></tr>
+    <tr><td align="right">5</td><td>LlamaExtract Agentic</td><td align="right">44.47</td><td align="right">37.41</td><td align="right">63.83</td><td align="right">68.08</td><td align="right">81.30</td><td align="right"><u>87.68</u></td><td align="right">68.27</td><td align="right">64.56</td></tr>
+    <tr><td align="right">6</td><td>Codex (GPT-5.6 Terra Evidence)</td><td align="right">43.68</td><td align="right">40.48</td><td align="right">53.32</td><td align="right">51.17</td><td align="right">80.52</td><td align="right">83.51</td><td align="right">75.18</td><td align="right">69.32</td></tr>
+    <tr><td align="right">7</td><td>Reducto Deep Extract</td><td align="right">43.30</td><td align="right">42.84</td><td align="right">45.57</td><td align="right">41.13</td><td align="right">71.71</td><td align="right">72.60</td><td align="right">70.42</td><td align="right">67.28</td></tr>
+    <tr><td align="right">8</td><td>Codex (GPT-5.6 Luna Evidence)</td><td align="right">40.03</td><td align="right">37.18</td><td align="right">47.66</td><td align="right">50.89</td><td align="right">79.81</td><td align="right">82.85</td><td align="right">74.07</td><td align="right">69.50</td></tr>
+    <tr><td align="right">9</td><td>LlamaExtract Cost-Effective</td><td align="right">38.32</td><td align="right">31.80</td><td align="right">57.55</td><td align="right">53.92</td><td align="right">78.69</td><td align="right">86.87</td><td align="right">63.31</td><td align="right">52.72</td></tr>
+    <tr><td align="right">10</td><td>Extend (Max Context)</td><td align="right">25.20</td><td align="right">33.93</td><td align="right">0.21</td><td align="right">0.02</td><td align="right">49.04</td><td align="right">61.71</td><td align="right">27.68</td><td align="right">0.03</td></tr>
   </tbody>
 </table>
+
+Top 10 of 44 systems — full table in [leaderboard.csv](leaderboard.csv).
 <!-- GROUNDING:END -->
 
 <details>
