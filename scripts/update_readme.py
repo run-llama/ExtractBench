@@ -61,7 +61,13 @@ TOP_N = 10
 
 
 def value_table(rows: list[dict]) -> str:
-    ranked = sorted(rows, key=lambda r: float(r["Overall"]), reverse=True)[:TOP_N]
+    ranked = sorted(
+        rows,
+        key=lambda r: (
+            -float(r["Overall"]),
+            float(r["Cost_Per_Page"]) if r["Cost_Per_Page"] else float("inf"),
+        ),
+    )[:TOP_N]
     score_columns = ("Overall", "Short", "Medium", "Long")
     ranks = column_ranks(rows, score_columns)
     body = table(
@@ -165,6 +171,7 @@ def main() -> None:
         "**Unified value F1** — the headline metric. Every score is an unweighted mean over "
         "documents; each document counts once, whatever its length. For raw data including per-split "
         "precision and recall, cost, and latency, see [leaderboard.csv](leaderboard.csv). "
+        "Equal displayed Overall scores are ordered by lower cost per page. "
         "The best score in each Overall, Short, Medium, and Long column is **bold**; the second-best "
         "distinct score is <u>underlined</u>.\n\n" + value_table(rows),
     )

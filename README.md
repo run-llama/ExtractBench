@@ -20,13 +20,13 @@ The benchmark covers **370 documents (4,869 pages)** across 8 business domains a
 Models and prices reflect each provider's official documentation as of September 11, 2026; each system uses its recommended configuration.
 
 <!-- LEADERBOARD:START -->
-**Unified value F1** — the headline metric. Every score is an unweighted mean over documents; each document counts once, whatever its length. For raw data including per-split precision and recall, cost, and latency, see [leaderboard.csv](leaderboard.csv). The best score in each Overall, Short, Medium, and Long column is **bold**; the second-best distinct score is <u>underlined</u>.
+**Unified value F1** — the headline metric. Every score is an unweighted mean over documents; each document counts once, whatever its length. For raw data including per-split precision and recall, cost, and latency, see [leaderboard.csv](leaderboard.csv). Equal displayed Overall scores are ordered by lower cost per page. The best score in each Overall, Short, Medium, and Long column is **bold**; the second-best distinct score is <u>underlined</u>.
 
 | Rank | Provider | Category | Overall | Short | Medium | Long | ¢ / Page |
 |---:|---|---|---:|---:|---:|---:|---:|
-| 1 | Pulse (Effort) | Specialized APIs | **95.91** | 96.46 | **95.01** | **93.51** | 10.50¢ |
-| 2 | LlamaExtract Agentic Plus | LlamaExtract | <u>95.66</u> | <u>96.94</u> | <u>94.45</u> | 85.46 | 8.11¢ |
-| 3 | LlamaExtract Agentic | LlamaExtract | 94.52 | 96.04 | 92.11 | 87.14 | 3.12¢ |
+| 1 | LlamaExtract Agentic Plus | LlamaExtract | **95.91** | <u>96.94</u> | <u>94.45</u> | 90.18 | 8.11¢ |
+| 2 | Pulse (Effort) | Specialized APIs | **95.91** | 96.46 | **95.01** | **93.51** | 10.50¢ |
+| 3 | LlamaExtract Agentic | LlamaExtract | <u>94.77</u> | 96.04 | 92.11 | 91.83 | 3.12¢ |
 | 4 | Codex (GPT-5.5) | Coding Agents | 93.57 | 95.68 | 91.15 | 78.88 | 27.83¢ |
 | 5 | Pulse (Non-effort) | Specialized APIs | 92.70 | 93.17 | 92.22 | 89.07 | 3.00¢ |
 | 6 | LlamaExtract Cost-Effective | LlamaExtract | 92.27 | 94.03 | 89.51 | 83.73 | 1.00¢ |
