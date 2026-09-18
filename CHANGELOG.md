@@ -11,9 +11,34 @@ All notable changes to `llama-extract-bench` are recorded here. The format follo
 - The PyPI distribution is `llama-extract-bench` (the `extract-bench` name is
   taken by an unrelated project). The `extract-bench` CLI command and the
   `extract_bench` import package are unchanged.
+- `parse-bench>=1.0.2` is now a dependency, and the shared core it already
+  owns is re-exported from it rather than duplicated here: `MetricValue`,
+  `RunStat`, `ConfusionMatrixMetrics`, `ExtractOutput`, `FieldCitation`,
+  `PipelineSpec`, `ProductType` (with its extension registry), the layout
+  ontology, `geometry.rotated_bbox`, `evaluation.metrics.base.Metric` and
+  `test_cases.extract_field_paths`. Import paths and class names are
+  unchanged, and no score changes: the modules were byte-identical apart from
+  docstrings. A harness that pins both packages now sees one class per
+  concept, so metrics from both can be collected into one list — with two
+  structurally identical classes, Pydantic rejected the crossing.
 
 Pulls the extract scorer into alignment with the internal LlamaCloud benchmark
 harness ahead of the first PyPI release.
+
+### Added
+- `ExtractEvaluator.compute_metrics()` returns an `ExtractMetricBundle`: the
+  headline and diagnostic metrics plus the `ExtractScoringInputs` they scored
+  (post list-unwrap, post EOB layout reconciliation). A harness with its own
+  result model uses it to reuse this package's metric selection and add its
+  own metrics, instead of copying the metric wiring. `evaluate()` is now a
+  thin wrapper over it and reports the same metrics.
+- `ExtractEvaluator.can_evaluate()` compares the product type by value, and
+  accepts any test case carrying extract ground truth (`is_extract_test_case`,
+  also exported from `extensions`) rather than requiring this package's
+  `ExtractTestCase`. A harness's own `InferenceResult` and test-case classes
+  extend its own bases, so the previous `isinstance` guards made the extract
+  metrics unreachable from the harness. A parse or layout case still fails the
+  check, so evaluator routing is unchanged.
 
 ### Scoring (changes evaluation numbers)
 - Unified extract F1: a key omitted from a prediction resolves to the JSON

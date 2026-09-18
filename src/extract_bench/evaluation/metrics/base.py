@@ -1,33 +1,9 @@
-"""Base metric interface for evaluation metrics."""
+"""Base metric interface for evaluation metrics.
 
-from abc import ABC, abstractmethod
-from typing import Any
+Re-exported from ``parse-bench`` so a metric written against either package's
+``Metric`` is accepted by both, and ``isinstance`` checks hold across them.
+"""
 
-from extract_bench.schemas.evaluation import MetricValue
+from parse_bench.evaluation.metrics.base import Metric
 
-
-class Metric(ABC):
-    """
-    Abstract base class for evaluation metrics.
-
-    Metrics compute scores by comparing expected (ground truth) values
-    with actual (predicted) values from inference results.
-    """
-
-    @property
-    @abstractmethod
-    def name(self) -> str:
-        """Return the name of this metric."""
-        raise NotImplementedError
-
-    @abstractmethod
-    def compute(self, expected: Any, actual: Any, **kwargs: Any) -> MetricValue:
-        """
-        Compute the metric score by comparing expected vs actual values.
-
-        :param expected: Expected/ground truth value
-        :param actual: Actual/predicted value from inference
-        :param kwargs: Additional configuration options for the metric
-        :return: MetricValue with the computed score and metadata
-        """
-        raise NotImplementedError
+__all__ = ["Metric"]

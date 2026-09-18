@@ -1,6 +1,14 @@
-"""Evaluator for EXTRACT product type using annotation-based evaluation."""
+"""Evaluator for EXTRACT product type using annotation-based evaluation.
 
-from typing import Any
+Metric computation is deliberately separate from result construction. A
+downstream harness that keeps its own ``EvaluationResult`` model (with its own
+provenance fields) calls :meth:`ExtractEvaluator.compute_metrics` to get this
+package's metric selection, adds its own metrics, and builds its own result —
+without either side having to copy the other's metric wiring.
+"""
+
+from dataclasses import dataclass, field
+from typing import Any, TypeGuard
 
 from extract_bench.evaluation.evaluators.base import BaseEvaluator
 from extract_bench.evaluation.grounded_confidence_payloads import confidence_field_rules
@@ -98,6 +106,48 @@ def _normalize_eob_layouts(extract: Any, gt: Any) -> tuple[Any, Any]:
     return extract, gt
 
 
+def is_extract_test_case(test_case: Any) -> TypeGuard[ExtractTestCase]:
+    """Whether ``test_case`` carries extract ground truth this evaluator can read.
+
+    Structural rather than an ``isinstance``: a downstream harness has its own
+    test-case hierarchy (its ``ExtractTestCase`` extends its own base, not this
+    one), and rejecting it would make the extract metrics unreachable from the
+    harness this package is meant to be embedded in. A parse or layout case
+    still fails the check, so evaluator routing is unaffected.
+    """
+    if isinstance(test_case, ExtractTestCase):
+        return True
+    return callable(getattr(test_case, "get_extract_field_rules", None)) and hasattr(test_case, "data_schema")
+
+
+@dataclass(frozen=True)
+class ExtractScoringInputs:
+    """The normalized view of one extract result that every metric scores.
+
+    Handed back with the metrics so a caller adding its own metrics scores the
+    same ``extracted_data`` the package did — list-unwrap normalization and EOB
+    layout reconciliation already applied — instead of re-deriving it and
+    drifting from the headline numbers.
+    """
+
+    test_case: ExtractTestCase
+    extracted_data: Any
+    expected_output: dict[str, Any] | None
+    field_citations: list[Any]
+    identity_keys_by_path: dict[tuple[str, ...], list[str]]
+    skip_field_paths: list[str]
+    field_rules: list[ExtractFieldTestRule]
+
+
+@dataclass
+class ExtractMetricBundle:
+    """Metrics for one extract result, split by how reports consume them."""
+
+    metrics: list[MetricValue] = field(default_factory=list)
+    diagnostic_metrics: list[MetricValue] = field(default_factory=list)
+    inputs: ExtractScoringInputs | None = None
+
+
 class ExtractEvaluator(BaseEvaluator):
     """Evaluator for EXTRACT product type."""
 
@@ -131,16 +181,18 @@ class ExtractEvaluator(BaseEvaluator):
         :param test_case: The test case to evaluate against
         :return: True if this evaluator can handle this case
         """
-        # Must be EXTRACT product type
-        if inference_result.product_type != ProductType.EXTRACT:
+        # Must be EXTRACT product type. Compared by value: a harness may carry
+        # its own product-type enum whose EXTRACT member is a distinct object.
+        product_type = getattr(inference_result.product_type, "value", inference_result.product_type)
+        if product_type != ProductType.EXTRACT.value:
             return False
 
         # Must have ExtractOutput
         if not isinstance(inference_result.output, ExtractOutput):
             return False
 
-        # Must be ExtractTestCase
-        if not isinstance(test_case, ExtractTestCase):
+        # Must carry extract ground truth (a harness's own case class counts)
+        if not is_extract_test_case(test_case):
             return False
 
         # Need expected_output or extract_field rules
@@ -158,18 +210,45 @@ class ExtractEvaluator(BaseEvaluator):
         :return: Evaluation result with accuracy metrics
         :raises ValueError: If neither expected_output nor test_rules are provided
         """
+        bundle = self.compute_metrics(inference_result, test_case)
+        return EvaluationResult(
+            test_id=test_case.test_id,
+            example_id=inference_result.request.example_id,
+            pipeline_name=inference_result.pipeline_name,
+            product_type=getattr(inference_result.product_type, "value", inference_result.product_type),
+            success=True,
+            metrics=bundle.metrics,
+            diagnostic_metrics=bundle.diagnostic_metrics,
+            error=None,
+            job_id=inference_result.raw_output.get("job_id"),
+            parse_job_id=inference_result.raw_output.get("parse_job_id"),
+            stats=build_operational_stats(inference_result),
+        )
+
+    def compute_metrics(self, inference_result: InferenceResult, test_case: TestCase) -> ExtractMetricBundle:
+        """
+        Compute this package's extract metrics, without building a result model.
+
+        :param inference_result: The inference result to score
+        :param test_case: The test case with expected output or field rules
+        :return: Headline and diagnostic metrics, plus the normalized inputs they scored
+        :raises ValueError: If neither expected_output nor test_rules are provided
+        """
         if not self.can_evaluate(inference_result, test_case):
             raise ValueError("Cannot evaluate: missing expected_output or test_rules, or invalid product type")
 
         if not isinstance(inference_result.output, ExtractOutput):
             raise ValueError("Inference result output is not ExtractOutput")
 
-        if not isinstance(test_case, ExtractTestCase):
-            raise ValueError("Test case must be ExtractTestCase for EXTRACT evaluation")
+        if not is_extract_test_case(test_case):
+            raise ValueError("Test case must carry extract ground truth for EXTRACT evaluation")
 
         raw_extracted_data = inference_result.output.extracted_data
         metrics: list[MetricValue] = []
         diagnostic_metrics: list[MetricValue] = []
+        # The expected output actually scored, i.e. after EOB layout
+        # reconciliation. ``None`` when the case is rule-only.
+        scored_expected_output: dict[str, Any] | None = None
 
         # Normalize per_table_row list projections back into the per-doc shape
         # used by extract_field rules. The adapter is a pure shape transform:
@@ -209,6 +288,7 @@ class ExtractEvaluator(BaseEvaluator):
             # Reconcile flat vs nested EOB claims layouts so the JSON subset
             # match metric does not score zero when only the nesting differs.
             extracted_data, expected_output = _normalize_eob_layouts(extracted_data, expected_output)
+            scored_expected_output = expected_output
 
             # Calculate overall accuracy using the metric
             accuracy_metric = self._accuracy_metric.compute(
@@ -292,20 +372,18 @@ class ExtractEvaluator(BaseEvaluator):
             )
         )
 
-        stats = build_operational_stats(inference_result)
-
-        return EvaluationResult(
-            test_id=test_case.test_id,
-            example_id=inference_result.request.example_id,
-            pipeline_name=inference_result.pipeline_name,
-            product_type=inference_result.product_type.value,
-            success=True,
+        return ExtractMetricBundle(
             metrics=metrics,
             diagnostic_metrics=diagnostic_metrics,
-            error=None,
-            job_id=inference_result.raw_output.get("job_id"),
-            parse_job_id=inference_result.raw_output.get("parse_job_id"),
-            stats=stats,
+            inputs=ExtractScoringInputs(
+                test_case=test_case,
+                extracted_data=extracted_data,
+                expected_output=scored_expected_output,
+                field_citations=list(getattr(inference_result.output, "field_citations", [])),
+                identity_keys_by_path=identity_keys_by_path,
+                skip_field_paths=unwrap_skipped,
+                field_rules=field_rules_for_unwrap,
+            ),
         )
 
 
