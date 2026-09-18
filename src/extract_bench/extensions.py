@@ -14,6 +14,12 @@ products, layout adapters and evaluators without forking extract-bench:
   ``pipeline_name`` to a provider key through the harness's own pipeline registry.
 - ``EvaluationRunner.register_evaluator(product_type, evaluator)`` — scoring for
   a registered product.
+- :meth:`ExtractEvaluator.compute_metrics` — this package's extract metric
+  selection, returning :class:`ExtractMetricBundle` (metrics plus the
+  normalized :class:`ExtractScoringInputs` they scored) instead of an
+  ``EvaluationResult``. A harness with its own result model calls it, appends
+  its own metrics, and builds its own result — so the metric wiring lives in
+  one place rather than being copied and left to drift.
 
 Registrations take effect when the extension module is imported, so an
 extension package typically performs them in its top-level ``__init__``::
@@ -40,6 +46,12 @@ The CLI is a Google Fire class; subclass :class:`extract_bench.cli.BenchCLI` and
 add attributes for extra command groups.
 """
 
+from extract_bench.evaluation.evaluators.extract import (
+    ExtractEvaluator,
+    ExtractMetricBundle,
+    ExtractScoringInputs,
+    is_extract_test_case,
+)
 from extract_bench.evaluation.layout_adapters.registry import register_layout_adapter, register_pipeline_resolver
 from extract_bench.evaluation.layout_label_mappers.registry import register_layout_label_mapper
 from extract_bench.inference.pipelines import register_pipeline
@@ -53,6 +65,9 @@ from extract_bench.schemas.product import (
 
 __all__ = [
     "ExtensionProductType",
+    "ExtractEvaluator",
+    "ExtractMetricBundle",
+    "ExtractScoringInputs",
     "register_layout_adapter",
     "register_layout_label_mapper",
     "register_output_model",
@@ -62,4 +77,5 @@ __all__ = [
     "register_provider",
     "registered_output_models",
     "registered_product_types",
+    "is_extract_test_case",
 ]

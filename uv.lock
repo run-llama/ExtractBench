@@ -1625,6 +1625,7 @@ dependencies = [
     { name = "markdown2" },
     { name = "numpy" },
     { name = "pandas" },
+    { name = "parse-bench" },
     { name = "pydantic" },
     { name = "python-dateutil" },
     { name = "python-dotenv" },
@@ -1779,6 +1780,7 @@ requires-dist = [
     { name = "openai", marker = "extra == 'openweights'", specifier = ">=1.0.0" },
     { name = "openai", marker = "extra == 'runners'", specifier = ">=1.0.0" },
     { name = "pandas", specifier = ">=2.0.0" },
+    { name = "parse-bench", specifier = ">=1.0.2" },
     { name = "pdf2image", marker = "extra == 'anthropic'", specifier = ">=1.16.0" },
     { name = "pdf2image", marker = "extra == 'google'", specifier = ">=1.16.0" },
     { name = "pdf2image", marker = "extra == 'local'", specifier = ">=1.16.0" },
@@ -2710,6 +2712,39 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/6d/02/c6e04b694ffd68568297abd03588b6d30295265176a5c01b7459d3bc35a3/pandas-3.0.1-cp314-cp314t-musllinux_1_2_x86_64.whl", hash = "sha256:15860b1fdb1973fffade772fdb931ccf9b2f400a3f5665aef94a00445d7d8dd5", size = 11810974, upload-time = "2026-02-17T22:20:08.946Z" },
     { url = "https://files.pythonhosted.org/packages/89/41/d7dfb63d2407f12055215070c42fc6ac41b66e90a2946cdc5e759058398b/pandas-3.0.1-cp314-cp314t-win_amd64.whl", hash = "sha256:44f1364411d5670efa692b146c748f4ed013df91ee91e9bec5677fb1fd58b937", size = 10884622, upload-time = "2026-02-17T22:20:11.711Z" },
     { url = "https://files.pythonhosted.org/packages/68/b0/34937815889fa982613775e4b97fddd13250f11012d769949c5465af2150/pandas-3.0.1-cp314-cp314t-win_arm64.whl", hash = "sha256:108dd1790337a494aa80e38def654ca3f0968cf4f362c85f44c15e471667102d", size = 9452085, upload-time = "2026-02-17T22:20:14.331Z" },
+]
+
+[[package]]
+name = "parse-bench"
+version = "1.0.4"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "anls-star" },
+    { name = "apted" },
+    { name = "autoevals" },
+    { name = "beautifulsoup4" },
+    { name = "bleach" },
+    { name = "fire" },
+    { name = "fuzzysearch" },
+    { name = "huggingface-hub" },
+    { name = "lxml" },
+    { name = "markdown" },
+    { name = "markdown-it-py" },
+    { name = "markdown2" },
+    { name = "numpy" },
+    { name = "pandas" },
+    { name = "pydantic" },
+    { name = "python-dateutil" },
+    { name = "python-dotenv" },
+    { name = "python-levenshtein" },
+    { name = "rapidfuzz" },
+    { name = "rich" },
+    { name = "scipy" },
+    { name = "unidecode" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/b4/ce/aa5297515410803fd98f31004d6dcaf49cda50c4a0987f49118d83f85bf1/parse_bench-1.0.4.tar.gz", hash = "sha256:451d8582209b34099ad713ce261fc5aca5570d9a29abce7d914eebbcd9970206", size = 1106977, upload-time = "2026-09-04T22:29:28.393Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e0/6c/603b70e37d4bc0f906b6fb7386b4db4f06bf29ee91200d8553e9f709588d/parse_bench-1.0.4-py3-none-any.whl", hash = "sha256:050535c95dcfd715ed0f135dceaaad1a9ef07fbd6980a2cf914a27ecf2531a68", size = 1029023, upload-time = "2026-09-04T22:29:26.251Z" },
 ]
 
 [[package]]

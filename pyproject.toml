@@ -37,6 +37,11 @@ dependencies = [
     "markdown2>=2.4.0",
     "numpy>=1.24.0",
     "pandas>=2.0.0",
+    # Owns the core shared with parse-bench (see the re-export modules under
+    # schemas/). The floor is 1.0.2 because that is what the internal harness
+    # pins (a 1.0.2 rev carrying the v2.1 contract backport); every re-exported
+    # module is identical from 1.0.2 through 1.0.4.
+    "parse-bench>=1.0.2",
     "pydantic>=2.0.0",
     "python-dateutil>=2.9.0",
     "python-dotenv>=1.0.0",

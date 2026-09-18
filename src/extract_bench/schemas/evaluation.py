@@ -1,31 +1,22 @@
-"""Schema definitions for evaluation results."""
+"""Schema definitions for evaluation results.
+
+``MetricValue`` and ``RunStat`` are re-exported from ``parse-bench``. They are
+what every metric returns, so a harness that pins both packages collects
+metrics from both into one list: two structurally identical classes would make
+that list unvalidatable. ``EvaluationResult`` and ``EvaluationSummary`` stay
+local — this package carries diagnostic-metric fields that parse-bench has no
+notion of, and a harness builds its own result model anyway.
+"""
 
 from datetime import datetime
 from typing import Any
 
+from parse_bench.schemas.evaluation import MetricValue, RunStat
 from pydantic import BaseModel, Field
 
 from extract_bench.schemas.metrics import ConfusionMatrixMetrics
 
-
-class RunStat(BaseModel):
-    """A single operational measurement (latency, cost, tokens, etc.)."""
-
-    name: str = Field(description="Stat name, e.g. 'latency_ms', 'credits_used'")
-    value: float = Field(description="Raw numeric value")
-    unit: str = Field(description="Unit of measurement, e.g. 'ms', 'credits', 'tokens'")
-
-
-class MetricValue(BaseModel):
-    """Individual metric score with metadata."""
-
-    metric_name: str = Field(description="Name of the metric")
-    value: float = Field(description="Metric score (typically 0.0 to 1.0)")
-    metadata: dict[str, Any] = Field(default_factory=dict, description="Additional metric metadata")
-    details: list[str] = Field(
-        default_factory=list,
-        description="Human-readable diagnostic details for the report detail panel",
-    )
+__all__ = ["EvaluationResult", "EvaluationSummary", "MetricValue", "RunStat"]
 
 
 class EvaluationResult(BaseModel):
