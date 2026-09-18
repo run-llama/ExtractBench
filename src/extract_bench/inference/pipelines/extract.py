@@ -310,7 +310,7 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
         _pipeline_spec(
             pipeline_name="claude_code_extract_opus_4_8_evidence",
             provider_name="claude_code_extract",
-            config={"model": "claude-opus-4-8", "bare": True, "evidence_mode": True},
+            config={"model": "claude-opus-4-8", "evidence_mode": True},
         )
     )
 
@@ -335,6 +335,7 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
     for _model_slug, _model in (
         ("gpt_5_5", "gpt-5.5"),
         ("gpt_5_6_sol", "gpt-5.6-sol"),
+        ("gpt_5_6_terra", "gpt-5.6-terra"),
     ):
         register_fn(
             _pipeline_spec(
@@ -343,12 +344,26 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
                 config={
                     "model": _model,
                     "reasoning_effort": "low",
-                    "sandbox": "workspace-write",
+                    "sandbox": "danger-full-access",
                     "max_cost_usd": 5.00,
                     "evidence_mode": True,
                 },
             )
         )
+
+    register_fn(
+        _pipeline_spec(
+            pipeline_name="codex_code_extract_gpt_5_6_luna_medium_evidence",
+            provider_name="codex_code_extract",
+            config={
+                "model": "gpt-5.6-luna",
+                "reasoning_effort": "medium",
+                "sandbox": "danger-full-access",
+                "max_cost_usd": None,
+                "evidence_mode": True,
+            },
+        )
+    )
 
     # =========================================================================
     # Commercial extraction APIs

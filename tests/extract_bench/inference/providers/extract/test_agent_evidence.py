@@ -21,21 +21,30 @@ from extract_bench.schemas.pipeline_io import InferenceRequest
 from extract_bench.schemas.product import ProductType
 
 
-def test_evidence_pipeline_configs_match_coding_agent_baselines() -> None:
+def test_evidence_pipeline_configs_match_measured_agent_settings() -> None:
     specs: list[PipelineSpec] = []
     register_extract_pipelines(specs.append)
     by_name = {spec.pipeline_name: spec for spec in specs}
 
-    for name in ("claude_code_extract_opus_4_8", "codex_code_extract_gpt_5_5_low"):
-        base = by_name[name]
-        evidence = by_name[f"{name}_evidence"]
-        assert evidence.provider_name == base.provider_name
-        assert evidence.config == {**base.config, "evidence_mode": True}
+    claude = by_name["claude_code_extract_opus_4_8_evidence"]
+    assert claude.provider_name == "claude_code_extract"
+    assert claude.config == {"model": "claude-opus-4-8", "evidence_mode": True}
 
-    sol = by_name["codex_code_extract_gpt_5_6_sol_low_evidence"]
-    assert sol.config == {
-        **by_name["codex_code_extract_gpt_5_5_low"].config,
-        "model": "gpt-5.6-sol",
+    for slug, model in (("gpt_5_5", "gpt-5.5"), ("gpt_5_6_sol", "gpt-5.6-sol"), ("gpt_5_6_terra", "gpt-5.6-terra")):
+        evidence = by_name[f"codex_code_extract_{slug}_low_evidence"]
+        assert evidence.config == {
+            **by_name["codex_code_extract_gpt_5_5_low"].config,
+            "model": model,
+            "sandbox": "danger-full-access",
+            "evidence_mode": True,
+        }
+
+    luna = by_name["codex_code_extract_gpt_5_6_luna_medium_evidence"]
+    assert luna.config == {
+        "model": "gpt-5.6-luna",
+        "reasoning_effort": "medium",
+        "sandbox": "danger-full-access",
+        "max_cost_usd": None,
         "evidence_mode": True,
     }
 

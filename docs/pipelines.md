@@ -34,8 +34,9 @@ uv run extract-bench run <pipeline_name>
 | `kimi_k3_extract_oneshot_structured_output_file` | Kimi K3 (Fireworks) | one-shot vision (rasterized pages), json_object mode; uses `FIREWORKS_API_KEY` |
 | `claude_code_extract_opus_4_8` | Claude Code CLI | agentic extraction; cost from CLI `total_cost_usd` |
 | `codex_code_extract_gpt_5_4_low` / `codex_code_extract_gpt_5_5_low` / `codex_code_extract_gpt_5_5_high` | Codex CLI | agentic extraction; cost estimated from token usage |
-| `claude_code_extract_opus_4_8_evidence` | Claude Code CLI | same extraction setup, with page and box citations in `citations.json` |
-| `codex_code_extract_gpt_5_5_low_evidence` / `codex_code_extract_gpt_5_6_sol_low_evidence` | Codex CLI | low-effort agentic extraction with page and box citations in `citations.json` |
+| `claude_code_extract_opus_4_8_evidence` | Claude Code CLI | agentic extraction with page and box citations in `citations.json` |
+| `codex_code_extract_gpt_5_5_low_evidence` / `codex_code_extract_gpt_5_6_sol_low_evidence` / `codex_code_extract_gpt_5_6_terra_low_evidence` | Codex CLI | low-effort extraction with page and box citations; unrestricted shell |
+| `codex_code_extract_gpt_5_6_luna_medium_evidence` | Codex CLI | medium-effort extraction with page and box citations; unrestricted shell, no cost cap |
 | `reducto_extract` / `reducto_deep_extract` | Reducto | deep variant adds citations |
 | `extend_extract` / `extend_extract_max` | Extend | citations enabled; max-context array strategy variant |
 | `landingai_extract` | LandingAI ADE | |
