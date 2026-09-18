@@ -57,13 +57,10 @@ Top 10 of 44 systems — full table in [leaderboard.csv](leaderboard.csv).
     <tr><td align="right">8</td><td>Codex (GPT-5.6 Luna Medium Evidence)</td><td align="right">40.03</td><td align="right">37.18</td><td align="right">47.66</td><td align="right">50.89</td><td align="right">79.81</td><td align="right">82.85</td><td align="right">74.07</td><td align="right">69.50</td></tr>
     <tr><td align="right">9</td><td>LlamaExtract Cost-Effective</td><td align="right">38.32</td><td align="right">31.80</td><td align="right">57.55</td><td align="right">53.92</td><td align="right">78.69</td><td align="right">86.87</td><td align="right">63.31</td><td align="right">52.72</td></tr>
     <tr><td align="right">10</td><td>Extend (Max Context)</td><td align="right">25.20</td><td align="right">33.93</td><td align="right">0.21</td><td align="right">0.02</td><td align="right">49.04</td><td align="right">61.71</td><td align="right">27.68</td><td align="right">0.03</td></tr>
-    <tr><td align="right">11</td><td>Extend Extract</td><td align="right">15.96</td><td align="right">21.13</td><td align="right">1.03</td><td align="right">0.01</td><td align="right">53.58</td><td align="right">64.50</td><td align="right">37.39</td><td align="right">0.03</td></tr>
-    <tr><td align="right">12</td><td>Datalab (Accurate + Balanced)</td><td align="right">2.02</td><td align="right">2.67</td><td align="right">0.24</td><td align="right">0.00</td><td align="right">48.50</td><td align="right">56.90</td><td align="right">38.55</td><td align="right">0.01</td></tr>
-    <tr><td align="right">13</td><td>Pulse (Effort)</td><td align="right">1.49</td><td align="right">1.17</td><td align="right">3.03</td><td align="right">0.04</td><td align="right">79.70</td><td align="right">77.40</td><td align="right"><strong>86.19</strong></td><td align="right">77.74</td></tr>
-    <tr><td align="right">14</td><td>Pulse (Non-effort)</td><td align="right">0.71</td><td align="right">0.82</td><td align="right">0.49</td><td align="right">0.01</td><td align="right">73.42</td><td align="right">73.81</td><td align="right">69.86</td><td align="right"><strong>84.72</strong></td></tr>
-    <tr><td align="right">—</td><td><em>All 30 other systems</em></td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td><td align="right">0.00</td></tr>
   </tbody>
 </table>
+
+Top 10 of 44 systems — full table in [leaderboard.csv](leaderboard.csv).
 <!-- GROUNDING:END -->
 
 <details>

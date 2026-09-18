@@ -101,20 +101,10 @@ def _grounding_cells(row: dict, ranks: dict[str, dict[float, str]]) -> list[str]
 
 
 def grounding_table(rows: list[dict]) -> str:
-    """Both grounding metrics in one table, ranked by word-level overall.
-
-    Written as HTML rather than a markdown table because the eight metric
-    columns only stay readable under grouped headers, and markdown tables
-    cannot span a header cell.
-
-    Systems that score zero on *both* metrics collapse into a single trailing
-    row: most systems return no source evidence at all, so listing them would be
-    eight rows of zeros. A system scoring on one metric but not the other still
-    gets its own row.
-    """
+    """Show the top grounding providers by overall word-level F1."""
     scoring = [r for r in rows if any(float(r[p]) > 0 for p in GROUNDING_PREFIXES)]
     scoring.sort(key=lambda r: float(r[GROUNDING_PREFIXES[0]]), reverse=True)
-    zeroed = [r for r in rows if all(float(r[p]) == 0 for p in GROUNDING_PREFIXES)]
+    ranked = scoring[:TOP_N]
     score_columns = tuple(
         key
         for prefix in GROUNDING_PREFIXES
@@ -129,13 +119,8 @@ def grounding_table(rows: list[dict]) -> str:
         f'<td align="right">{i}</td><td>{r["Provider"]}</td>'
         + "".join(f'<td align="right">{c}</td>' for c in _grounding_cells(r, ranks))
         + "</tr>"
-        for i, r in enumerate(scoring, 1)
+        for i, r in enumerate(ranked, 1)
     ]
-    if zeroed:
-        body.append(
-            '    <tr><td align="right">—</td>'
-            f"<td><em>All {len(zeroed)} other systems</em></td>" + '<td align="right">0.00</td>' * 8 + "</tr>"
-        )
     return "\n".join(
         [
             "<table>",
@@ -147,6 +132,8 @@ def grounding_table(rows: list[dict]) -> str:
             *body,
             "  </tbody>",
             "</table>",
+            "",
+            f"Top {len(ranked)} of {len(rows)} systems — full table in [leaderboard.csv](leaderboard.csv).",
         ]
     )
 
