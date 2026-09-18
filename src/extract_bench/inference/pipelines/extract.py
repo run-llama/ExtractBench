@@ -332,14 +332,14 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
             )
         )
 
-    for _model_slug, _model in (
-        ("gpt_5_5", "gpt-5.5"),
-        ("gpt_5_6_sol", "gpt-5.6-sol"),
-        ("gpt_5_6_terra", "gpt-5.6-terra"),
+    for _pipeline_name, _model in (
+        ("codex_code_extract_gpt_5_5_low_evidence", "gpt-5.5"),
+        ("codex_code_extract_gpt_5_6_sol_low_evidence", "gpt-5.6-sol"),
+        ("codex_code_extract_gpt_5_6_terra_low_evidence", "gpt-5.6-terra"),
     ):
         register_fn(
             _pipeline_spec(
-                pipeline_name=f"codex_code_extract_{_model_slug}_low_evidence",
+                pipeline_name=_pipeline_name,
                 provider_name="codex_code_extract",
                 config={
                     "model": _model,

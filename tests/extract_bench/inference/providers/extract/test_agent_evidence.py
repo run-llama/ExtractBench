@@ -30,8 +30,12 @@ def test_evidence_pipeline_configs_match_measured_agent_settings() -> None:
     assert claude.provider_name == "claude_code_extract"
     assert claude.config == {"model": "claude-opus-4-8", "evidence_mode": True}
 
-    for slug, model in (("gpt_5_5", "gpt-5.5"), ("gpt_5_6_sol", "gpt-5.6-sol"), ("gpt_5_6_terra", "gpt-5.6-terra")):
-        evidence = by_name[f"codex_code_extract_{slug}_low_evidence"]
+    for name, model in (
+        ("codex_code_extract_gpt_5_5_low_evidence", "gpt-5.5"),
+        ("codex_code_extract_gpt_5_6_sol_low_evidence", "gpt-5.6-sol"),
+        ("codex_code_extract_gpt_5_6_terra_low_evidence", "gpt-5.6-terra"),
+    ):
+        evidence = by_name[name]
         assert evidence.config == {
             **by_name["codex_code_extract_gpt_5_5_low"].config,
             "model": model,
