@@ -306,6 +306,13 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
             config={"model": "claude-opus-4-8", "bare": True},
         )
     )
+    register_fn(
+        _pipeline_spec(
+            pipeline_name="claude_code_extract_opus_4_8_evidence",
+            provider_name="claude_code_extract",
+            config={"model": "claude-opus-4-8", "bare": True, "evidence_mode": True},
+        )
+    )
 
     for _model_slug, _model, _reasoning_effort in (
         ("gpt_5_4", "gpt-5.4", "low"),
@@ -321,6 +328,24 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
                     "reasoning_effort": _reasoning_effort,
                     "sandbox": "workspace-write",
                     "max_cost_usd": 5.00,
+                },
+            )
+        )
+
+    for _model_slug, _model in (
+        ("gpt_5_5", "gpt-5.5"),
+        ("gpt_5_6_sol", "gpt-5.6-sol"),
+    ):
+        register_fn(
+            _pipeline_spec(
+                pipeline_name=f"codex_code_extract_{_model_slug}_low_evidence",
+                provider_name="codex_code_extract",
+                config={
+                    "model": _model,
+                    "reasoning_effort": "low",
+                    "sandbox": "workspace-write",
+                    "max_cost_usd": 5.00,
+                    "evidence_mode": True,
                 },
             )
         )

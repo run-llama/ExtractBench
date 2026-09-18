@@ -30,6 +30,11 @@ from extract_bench.inference.providers.base import (
     ProviderRateLimitError,
     ProviderTransientError,
 )
+from extract_bench.inference.providers.extract.agent_evidence import (
+    agent_evidence_instruction,
+    citations_from_agent_file,
+    read_agent_citations_file,
+)
 from extract_bench.inference.providers.extract.direct_model_utils import (
     IMAGE_EXTENSIONS,
     add_additional_properties_false,
@@ -143,6 +148,7 @@ class CodexCodeExtractProvider(Provider):
         # own required fields instead of forcing every nullable/optional field
         # to be required. Direct model providers can still opt into this.
         self._all_properties_required: bool = bool(self.base_config.get("all_properties_required", False))
+        self._evidence_mode: bool = bool(self.base_config.get("evidence_mode", False))
 
         self._api_key: str | None = self.base_config.get("api_key") or os.getenv("CODEX_API_KEY")
         self._codex_home: str | None = self.base_config.get("codex_home")
@@ -181,6 +187,7 @@ class CodexCodeExtractProvider(Provider):
 
     def _build_prompt(self, schema: dict[str, Any], staged_name: str) -> str:
         schema_json = json.dumps(schema, indent=2)
+        evidence_rule = f"\n{agent_evidence_instruction()}" if self._evidence_mode else ""
         return (
             f"Extract structured data from the document file `./{staged_name}` in the current directory.\n\n"
             "Use only local file inspection and shell commands. Do not use web search, network calls, "
@@ -193,7 +200,7 @@ class CodexCodeExtractProvider(Provider):
             "- For large regular tables, prefer writing and running a local script to parse/enumerate rows.\n"
             "- For forms, prefer direct field extraction from the document content.\n"
             "- Write the resulting JSON object to ./output.json and validate that it is valid JSON before stopping.\n"
-            "- Do not print the JSON to your assistant output."
+            f"- Do not print the JSON to your assistant output.{evidence_rule}"
             + (f"\n\n{self._extra_instructions}" if self._extra_instructions else "")
         )
 
@@ -636,6 +643,7 @@ class CodexCodeExtractProvider(Provider):
             "promote_repeated_structure": self._promote_repeated,
             "additional_properties_false": self._additional_properties_false,
             "all_properties_required": self._all_properties_required,
+            "evidence_mode": self._evidence_mode,
             "input_price_per_1m": self._input_price_per_1m,
             "cached_input_price_per_1m": self._cached_input_price_per_1m,
             "output_price_per_1m": self._output_price_per_1m,
@@ -687,6 +695,7 @@ class CodexCodeExtractProvider(Provider):
             lines: list[str] = []
             returncode: int | None = None
             stderr_tail = ""
+            agent_citations: Any = None
             try:
                 returncode, stderr_tail = self._run_cli(cmd, prompt, workdir, request.example_id, lines)
                 self._raise_for_status(returncode, lines, stderr_tail)
@@ -696,6 +705,8 @@ class CodexCodeExtractProvider(Provider):
                     raise ProviderTransientError(
                         "codex_code_extract: output.json contains no non-empty values; retrying the document."
                     )
+                if self._evidence_mode:
+                    agent_citations = read_agent_citations_file(workdir / "citations.json")
                 last_message_tail = self._read_stderr_tail(last_message_path)
             except ProviderError as exc:
                 payload = self._failure_debug_payload(
@@ -733,6 +744,11 @@ class CodexCodeExtractProvider(Provider):
         }
 
         self.recompute_cost(raw_output)
+
+        if self._evidence_mode:
+            citations, evidence_stats = citations_from_agent_file(agent_citations, source="codex_code_evidence")
+            raw_output["field_citations"] = [citation.model_dump() for citation in citations]
+            raw_output["evidence_stats"] = evidence_stats.as_dict()
 
         return RawInferenceResult(
             request=request,
