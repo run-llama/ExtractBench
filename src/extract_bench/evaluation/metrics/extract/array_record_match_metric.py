@@ -314,6 +314,58 @@ def peel_exact_row_matches[K: CellKey](
     )
 
 
+def _fuzzy_column_cells[K: CellKey](rows: Sequence[Any], field: K) -> list[tuple[str | None, Any]]:
+    """Per-row ``(normalized_text, raw_value)`` for one fuzzy-threshold column.
+
+    ``normalized_text`` is ``None`` exactly when the cell is not a string, which
+    is the condition under which ``cell_match`` skips its fuzzy branch.
+    """
+    cells: list[tuple[str | None, Any]] = []
+    for row in rows:
+        value = row.get(field) if isinstance(row, dict) else None
+        cells.append((_normalize_text(value) if isinstance(value, str) else None, value))
+    return cells
+
+
+def _add_fuzzy_column_mismatches[K: CellKey](
+    cost: np.ndarray,
+    actual_list: Sequence[Any],
+    expected_list: Sequence[Any],
+    field: K,
+    *,
+    threshold: float,
+) -> None:
+    """Add one fuzzy-threshold column's mismatch counts to ``cost`` in place.
+
+    Same decision as ``cell_match`` on every pair, but each cell is normalized
+    once instead of once per pair. ``cell_match`` calls ``_normalize_text`` on
+    both operands every time it runs, so the plain pairwise build normalized the
+    same n + m cells n * m times -- two regex substitutions per call, and the
+    single largest cost in this metric on long arrays.
+    """
+    cutoff = threshold * 100.0
+    actual_cells = _fuzzy_column_cells(actual_list, field)
+    expected_cells = _fuzzy_column_cells(expected_list, field)
+    for i, (actual_norm, actual_value) in enumerate(actual_cells):
+        cost[i] += [
+            (
+                not (
+                    expected_norm == actual_norm
+                    or (
+                        len(expected_norm) > 0
+                        and len(actual_norm) > 0
+                        and fuzz.ratio(expected_norm, actual_norm) >= cutoff
+                    )
+                )
+                if expected_norm is not None and actual_norm is not None
+                # Not two strings: ``cell_match`` skips both string branches
+                # and falls through to the plain ``==`` compare.
+                else not bool(expected_value == actual_value)
+            )
+            for expected_norm, expected_value in expected_cells
+        ]
+
+
 def mismatch_cost_matrix[K: CellKey](
     actual_list: Sequence[Any],
     expected_list: Sequence[Any],
@@ -338,14 +390,18 @@ def mismatch_cost_matrix[K: CellKey](
         return cost
     for field in subfields:
         field_schema = (field_schemas or {}).get(field)
+        threshold = fuzzy_field_thresholds.get(field)
         interned = None
-        if fuzzy_field_thresholds.get(field) is None:
+        if threshold is None:
             interned = _intern_field(actual_list, expected_list, field, field_schema)
         if interned is not None:
             act_ids, exp_ids = interned
             cost += act_ids[:, None] != exp_ids[None, :]
             continue
-        # Fuzzy threshold or unhashable cell: original per-pair compare, this column only.
+        if threshold is not None:
+            _add_fuzzy_column_mismatches(cost, actual_list, expected_list, field, threshold=threshold)
+            continue
+        # Unhashable cell in an exact column: original per-pair compare, this column only.
         for i, actual_row in enumerate(actual_list):
             actual_dict = actual_row if isinstance(actual_row, dict) else {}
             actual_value = actual_dict.get(field)

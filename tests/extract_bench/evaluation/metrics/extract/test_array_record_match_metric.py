@@ -4,8 +4,10 @@ import json
 from datetime import datetime
 from pathlib import Path
 
+import numpy as np
 import pytest
 
+import extract_bench.evaluation.metrics.extract.array_record_match_metric as array_record_match_metric
 from extract_bench.evaluation.evaluators.extract import ExtractEvaluator
 from extract_bench.evaluation.metrics.extract.array_record_match_metric import (
     _UNHASHABLE,
@@ -437,3 +439,140 @@ def test_array_record_precision_stays_bounded_when_null_scalars_are_omitted() ->
     # 4 scalars (account wrong, 3 implicit nulls correct) + 6 array cells.
     assert counts.predicted_total == 10
     assert counts.correct == 9
+
+
+def _pairwise_cost_matrix(
+    actual_rows: list[dict],
+    expected_rows: list[dict],
+    subfields: list[str],
+    thresholds: dict[str, float],
+) -> list[list[int]]:
+    """Reference build: one ``cell_match`` per (row pair, subfield)."""
+    return [
+        [
+            sum(
+                not cell_match(
+                    expected_row.get(field),
+                    actual_row.get(field),
+                    field,
+                    fuzzy_field_thresholds=thresholds,
+                )
+                for field in subfields
+            )
+            for expected_row in expected_rows
+        ]
+        for actual_row in actual_rows
+    ]
+
+
+def test_fuzzy_column_cost_matches_pairwise_cell_match() -> None:
+    """The fuzzy column's precomputed build is the pairwise build's answer.
+
+    ``description`` and ``court`` carry fuzzy thresholds, so their columns skip
+    interning. Cases cover exact matches, whitespace and punctuation drift,
+    near-misses either side of the threshold, empty strings, and non-string
+    cells that fall through to the plain ``==`` compare.
+    """
+    subfields = ["description", "court", "amount"]
+    actual_rows = [
+        {"description": "Acme Corp. widget order", "court": "Superior Court", "amount": 10},
+        {"description": "Acme Corp widget  order", "court": "superior court!", "amount": 10.0},
+        {"description": "totally different text", "court": None, "amount": None},
+        {"description": "", "court": "", "amount": 0},
+        {"description": None, "court": 7, "amount": "10"},
+        {"description": "Acme Corp. widget ordeX", "court": "Supreme Court", "amount": True},
+    ]
+    expected_rows = [
+        {"description": "Acme Corp. widget order", "court": "Superior Court", "amount": 10},
+        {"description": "unrelated", "court": "Supreme Court of Nowhere", "amount": 1},
+        {"description": "", "court": None, "amount": None},
+        {"description": None, "court": "", "amount": 1},
+        {"court": "Superior Court"},
+    ]
+
+    matrix = mismatch_cost_matrix(
+        actual_rows,
+        expected_rows,
+        subfields=subfields,
+        fuzzy_field_thresholds=DEFAULT_FUZZY_FIELD_THRESHOLDS,
+    )
+
+    assert matrix.tolist() == _pairwise_cost_matrix(
+        actual_rows, expected_rows, subfields, DEFAULT_FUZZY_FIELD_THRESHOLDS
+    )
+
+
+def test_fuzzy_column_cost_matches_pairwise_on_boundary_threshold() -> None:
+    """A threshold of exactly 1.0 admits only normalization-equal cells."""
+    subfields = ["description"]
+    thresholds = {"description": 1.0}
+    actual_rows = [{"description": "alpha beta"}, {"description": "alpha bet"}, {"description": "Alpha, Beta"}]
+    expected_rows = [{"description": "alpha beta"}, {"description": "gamma"}]
+
+    matrix = mismatch_cost_matrix(actual_rows, expected_rows, subfields=subfields, fuzzy_field_thresholds=thresholds)
+
+    assert matrix.tolist() == _pairwise_cost_matrix(actual_rows, expected_rows, subfields, thresholds)
+    # "Alpha, Beta" normalizes to "alpha beta", so it matches exactly.
+    assert matrix[2][0] == 0
+
+
+def test_fuzzy_column_build_is_the_path_a_threshold_column_takes(monkeypatch) -> None:
+    """A threshold column reaches the precomputed build; an exact column does not.
+
+    Without this the differential tests above would still pass if the fuzzy
+    column quietly fell back to the pairwise loop, which is the thing they
+    exist to protect.
+    """
+    calls: list[str] = []
+    original = array_record_match_metric._add_fuzzy_column_mismatches
+
+    def counting(cost, actual_list, expected_list, field, *, threshold):
+        calls.append(field)
+        return original(cost, actual_list, expected_list, field, threshold=threshold)
+
+    monkeypatch.setattr(array_record_match_metric, "_add_fuzzy_column_mismatches", counting)
+
+    rows = [{"description": "alpha", "court": "district", "amount": 1}]
+    array_record_match_metric.mismatch_cost_matrix(
+        rows,
+        rows,
+        subfields=["description", "court", "amount"],
+        fuzzy_field_thresholds=DEFAULT_FUZZY_FIELD_THRESHOLDS,
+    )
+    assert sorted(calls) == ["court", "description"]
+
+    calls.clear()
+    array_record_match_metric.mismatch_cost_matrix(
+        rows, rows, subfields=["amount"], fuzzy_field_thresholds=DEFAULT_FUZZY_FIELD_THRESHOLDS
+    )
+    assert calls == []
+
+
+def test_fuzzy_column_build_runs_both_of_its_compare_branches(monkeypatch) -> None:
+    """Two strings go through ``fuzz.ratio``; anything else goes through ``==``."""
+    ratio_calls: list[tuple[str, str]] = []
+    original_ratio = array_record_match_metric.fuzz.ratio
+
+    def counting_ratio(a, b, **kwargs):
+        ratio_calls.append((a, b))
+        return original_ratio(a, b, **kwargs)
+
+    monkeypatch.setattr(array_record_match_metric.fuzz, "ratio", counting_ratio)
+
+    # Row 0 vs row 0 is a string near-miss, so only the fuzzy branch can decide
+    # it. Row 1 pairs two non-strings that are equal, which only the ``==``
+    # branch can decide -- the fuzzy branch would have to skip them.
+    actual_rows = [{"description": "alpha beta gamma"}, {"description": 42}]
+    expected_rows = [{"description": "alpha beta gamm"}, {"description": 42}]
+
+    # Called directly so the assertions below can only be about this function.
+    cost = np.zeros((2, 2), dtype=np.int16)
+    array_record_match_metric._add_fuzzy_column_mismatches(
+        cost, actual_rows, expected_rows, "description", threshold=0.5
+    )
+
+    assert ratio_calls, "the fuzzy compare branch never ran"
+    # The 42/42 pair matched without a ratio call, so it took the ``==`` branch.
+    assert cost[1][1] == 0
+    assert ("alpha beta gamm", 42) not in ratio_calls
+    assert cost[0][0] == 0

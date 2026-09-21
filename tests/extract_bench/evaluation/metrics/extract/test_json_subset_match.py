@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import copy
+import math
 from collections.abc import Mapping
 from typing import Any
 
+import extract_bench.evaluation.metrics.extract.json_subset_match as json_subset_match
 from extract_bench.evaluation.metrics.extract.json_subset_match import (
+    _flatten_normalized_leaves,
     _is_nullable_numeric_field,
+    _leaf_mismatch_counts,
     json_subset_match_score,
     normalize_date_string,
     normalize_field_aliases,
@@ -593,3 +597,178 @@ def test_nonzero_still_mismatches_on_nullable_numeric() -> None:
 
 def test_no_schema_falls_back_to_strict_equality() -> None:
     assert json_subset_match_score(expected={"amount": None}, actual={"amount": 0.0}) == 0.0
+
+
+def _pairwise_leaf_mismatch_counts(
+    expected_flat: list[dict[tuple[Any, ...], Any]],
+    actual_flat: list[dict[tuple[Any, ...], Any]],
+) -> list[list[int]]:
+    """Reference build: count expected leaves the actual element does not carry."""
+    return [
+        [
+            sum(
+                1
+                for leaf_path, leaf in exp_leaves.items()
+                if leaf_path not in act_leaves or act_leaves[leaf_path] != leaf
+            )
+            for act_leaves in actual_flat
+        ]
+        for exp_leaves in expected_flat
+    ]
+
+
+def _flatten(items: list[Any]) -> list[dict[tuple[Any, ...], Any]]:
+    return [_flatten_normalized_leaves(item, case_sensitive=False, normalize_dates=True) for item in items]
+
+
+def test_leaf_mismatch_counts_match_pairwise_build() -> None:
+    """The interned count is the pairwise count, including container leaves.
+
+    Empty dicts and lists survive flattening as leaves and are not hashable,
+    so they are interned under distinct tags; `{}` and `[]` must stay
+    different from each other and equal to their own kind.
+    """
+    expected = [
+        {"a": "Alpha", "n": 1, "empty": {}, "none": None},
+        {"a": "alpha", "n": 1.0, "empty": [], "none": None},
+        {"a": "Beta", "n": 2, "empty": {}, "none": False},
+    ]
+    actual = [
+        {"a": "ALPHA", "n": 1, "empty": {}, "none": None},
+        {"a": "Beta", "n": 2, "empty": [], "none": 0},
+        {"a": "gamma", "n": 3, "empty": {}, "none": None},
+        {"a": "Alpha"},
+    ]
+
+    counts = _leaf_mismatch_counts(_flatten(expected), _flatten(actual))
+
+    assert counts is not None
+    assert counts.tolist() == _pairwise_leaf_mismatch_counts(_flatten(expected), _flatten(actual))
+
+
+def test_leaf_mismatch_counts_bail_out_on_uninternable_leaves() -> None:
+    """NaN and unhashable leaves fall back to the pairwise build.
+
+    A NaN is not equal to itself under ``!=`` but a dict lookup still finds
+    it, so interning would call two NaN cells a match where the pairwise
+    build calls them a mismatch.
+    """
+    nan = float("nan")
+    assert _leaf_mismatch_counts(_flatten([{"n": nan}]), _flatten([{"n": nan}])) is None
+    assert _leaf_mismatch_counts(_flatten([{"s": {1, 2}}]), _flatten([{"s": {1, 2}}])) is None
+
+
+def test_json_subset_match_pairs_reordered_rows_without_identity_keys() -> None:
+    """Order-invariant pairing still recovers a shuffled array's full score."""
+    rows = [{"label": f"row {index}", "amount": index} for index in range(6)]
+    expected = {"items": rows}
+    actual = {"items": list(reversed(rows))}
+
+    assert json_subset_match_score(expected=expected, actual=actual) == 1.0
+
+
+def test_normalize_date_string_is_stable_across_repeat_calls() -> None:
+    """Repeat calls return the memoized answer, non-strings still pass through."""
+    for _ in range(3):
+        assert normalize_date_string("March 27, 1956") == "1956-03-27"
+        assert normalize_date_string("INV-100200300400") == "INV-100200300400"
+        assert normalize_date_string("not a date at all") == "not a date at all"
+        assert normalize_date_string(1956) == 1956
+        assert normalize_date_string(None) is None
+
+
+def test_normalize_field_aliases_preserves_scalar_leaves() -> None:
+    """Skipping the recursive call for leaves leaves their values untouched."""
+    obj = {
+        "a": [1, "two", None, True, 3.5, {}, []],
+        "b": {"c": "d", "e": [{"f": 1}]},
+        "rendering_provider": {"rendering_provider_identification_number": "123", "name": "x"},
+    }
+
+    assert normalize_field_aliases(obj) == {
+        "a": [1, "two", None, True, 3.5, {}, []],
+        "b": {"c": "d", "e": [{"f": 1}]},
+        "rendering_provider": {"provider_npi": "123", "name": "x"},
+    }
+
+
+def test_scoring_a_shuffled_array_reaches_the_interned_mismatch_build(monkeypatch) -> None:
+    """The order-invariant pairing path really does use the interned counts.
+
+    The differential test above calls ``_leaf_mismatch_counts`` directly, so on
+    its own it would still pass if the scorer never reached this branch.
+    """
+    calls: list[int] = []
+    original = json_subset_match._leaf_mismatch_counts
+
+    def counting(expected_flat, actual_flat):
+        result = original(expected_flat, actual_flat)
+        calls.append(0 if result is None else 1)
+        return result
+
+    monkeypatch.setattr(json_subset_match, "_leaf_mismatch_counts", counting)
+
+    rows = [{"label": f"row {index}", "amount": index} for index in range(6)]
+    score = json_subset_match_score(expected={"items": rows}, actual={"items": list(reversed(rows))})
+
+    assert calls == [1], "the interned mismatch build never ran, or it bailed out"
+    assert score == 1.0
+
+
+def test_uninternable_leaves_fall_back_and_still_score(monkeypatch) -> None:
+    """A NaN leaf drives the scorer down the pairwise build, not the sparse one."""
+    calls: list[int] = []
+    original = json_subset_match._leaf_mismatch_counts
+
+    def counting(expected_flat, actual_flat):
+        result = original(expected_flat, actual_flat)
+        calls.append(0 if result is None else 1)
+        return result
+
+    monkeypatch.setattr(json_subset_match, "_leaf_mismatch_counts", counting)
+
+    rows = [{"label": f"row {index}", "amount": float("nan")} for index in range(4)]
+    score = json_subset_match_score(expected={"items": rows}, actual={"items": list(reversed(rows))})
+
+    assert calls == [0], "expected the bail-out, so the pairwise build had to run"
+    # NumericDiff on a NaN cell yields NaN and the weighted mean carries it up.
+    # That is the scalar scoring path, which the pairing change does not touch;
+    # what this test pins is that a NaN leaf takes the pairwise branch.
+    assert math.isnan(score)
+
+
+def test_date_normalization_serves_repeat_strings_from_the_memo() -> None:
+    """A repeated string is a cache hit, and a long one never takes a slot."""
+    json_subset_match._normalize_date_text.cache_clear()
+
+    normalize_date_string("March 27, 1956")
+    after_first = json_subset_match._normalize_date_text.cache_info()
+    assert (after_first.hits, after_first.misses) == (0, 1)
+
+    normalize_date_string("March 27, 1956")
+    after_second = json_subset_match._normalize_date_text.cache_info()
+    assert after_second.hits == 1
+    assert after_second.currsize == 1
+
+    # Over the length gate: answered without entering the memo at all.
+    long_text = "a description that runs well past fifty characters, " + "x" * 40
+    assert normalize_date_string(long_text) == long_text
+    assert json_subset_match._normalize_date_text.cache_info().currsize == 1
+
+
+def test_alias_rewrite_skips_the_recursive_call_for_leaves(monkeypatch) -> None:
+    """Leaves are returned in place rather than through another recursion."""
+    depth_calls: list[Any] = []
+    original = json_subset_match.normalize_field_aliases
+
+    def counting(obj):
+        depth_calls.append(obj)
+        return original(obj)
+
+    monkeypatch.setattr(json_subset_match, "normalize_field_aliases", counting)
+
+    # One call for the root dict, one for the list, one for the nested dict.
+    # The four scalars inside must not add calls of their own.
+    json_subset_match.normalize_field_aliases({"a": [1, "two", None, {"b": 3.5}]})
+
+    assert len(depth_calls) == 3
