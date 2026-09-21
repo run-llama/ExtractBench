@@ -4,35 +4,53 @@ Ports json_subset_match_score from extract-tests with date normalization support
 """
 
 import re
+from functools import lru_cache
 from typing import Any
 
 import numpy as np
 from autoevals.number import NumericDiff
 from autoevals.string import EmbeddingSimilarity, Levenshtein
 from dateutil import parser as date_parser
+from scipy import sparse
 from scipy.optimize import linear_sum_assignment
 
 from extract_bench.evaluation.metrics.field_grounding.evidence_comparator import stable_value_key
 
 _COMMA_WS_RE = re.compile(r"\s*,\s*")
+_LONG_DIGIT_RUN_RE = re.compile(r"\d{10,}")
+
+_DATE_PATTERNS = tuple(
+    re.compile(pattern)
+    for pattern in (
+        r"\d{4}-\d{1,2}-\d{1,2}",  # YYYY-MM-DD
+        r"\d{1,2}/\d{1,2}/\d{4}",  # MM/DD/YYYY
+        r"\d{1,2}/\d{1,2}/\d{2}\b",  # MM/DD/YY (v5 GT canonical format)
+        r"\d{1,2}-\d{1,2}-\d{4}",  # MM-DD-YYYY
+        r"\d{1,2}-\d{1,2}-\d{2}\b",  # MM-DD-YY
+        r"[A-Za-z]+ \d{1,2},? \d{4}",  # Month DD, YYYY
+        r"[A-Za-z]+\.? [A-Za-z]+\.? \d{1,2},? \d{4}",  # Weekday Month DD YYYY
+        r"\d{1,2} [A-Za-z]+ \d{4}",  # DD Month YYYY
+    )
+)
+
+# Date normalization runs on every string leaf of both sides, and both metric
+# families walk the same document repeatedly (the accuracy metric alone runs
+# once overall, once per top-level field, and once per declared metric group).
+# The rewrite is a pure function of the string, so the same leaf text resolves
+# to the same answer every time; memoizing it turns those repeats into a dict
+# hit. Bounded so a pathological corpus cannot grow the table without limit,
+# and keyed on the whole string so the key is complete.
+_DATE_CACHE_MAX_ENTRIES = 200_000
 
 
-def normalize_date_string(date_str: Any) -> Any:
-    """Normalise a date string to ISO format (YYYY-MM-DD).
-
-    Returns the input unchanged if it does not look like a date.
-    """
-    if not isinstance(date_str, str):
-        return date_str
-
-    if len(date_str) < 4 or len(date_str) > 50:
-        return date_str
-
+@lru_cache(maxsize=_DATE_CACHE_MAX_ENTRIES)
+def _normalize_date_text(date_str: str) -> str:
+    """Date-normalize a string of date-plausible length. See ``normalize_date_string``."""
     if date_str.isdigit():
         return date_str
 
     # Long digit runs (10+) are almost certainly IDs, not dates.
-    if re.search(r"\d{10,}", date_str):
+    if _LONG_DIGIT_RUN_RE.search(date_str):
         return date_str
 
     # Spacing around the comma carries no meaning: "March 28,1956" and
@@ -44,26 +62,30 @@ def normalize_date_string(date_str: Any) -> Any:
     # doubled spaces) would silently widen what counts as a date everywhere.
     probe = _COMMA_WS_RE.sub(", ", date_str) if "," in date_str else date_str
 
-    date_patterns = [
-        r"\d{4}-\d{1,2}-\d{1,2}",  # YYYY-MM-DD
-        r"\d{1,2}/\d{1,2}/\d{4}",  # MM/DD/YYYY
-        r"\d{1,2}/\d{1,2}/\d{2}\b",  # MM/DD/YY (v5 GT canonical format)
-        r"\d{1,2}-\d{1,2}-\d{4}",  # MM-DD-YYYY
-        r"\d{1,2}-\d{1,2}-\d{2}\b",  # MM-DD-YY
-        r"[A-Za-z]+ \d{1,2},? \d{4}",  # Month DD, YYYY
-        r"[A-Za-z]+\.? [A-Za-z]+\.? \d{1,2},? \d{4}",  # Weekday Month DD YYYY
-        r"\d{1,2} [A-Za-z]+ \d{4}",  # DD Month YYYY
-    ]
-    if not any(re.search(p, probe) for p in date_patterns):
+    if not any(pattern.search(probe) for pattern in _DATE_PATTERNS):
         return date_str
 
     try:
         parsed = date_parser.parse(probe, fuzzy=False)
         if parsed.year < 1900 or parsed.year > 2100:
             return date_str
-        return parsed.strftime("%Y-%m-%d")
+        return str(parsed.strftime("%Y-%m-%d"))
     except (ValueError, TypeError, date_parser.ParserError, OverflowError):
         return date_str
+
+
+def normalize_date_string(date_str: Any) -> Any:
+    """Normalise a date string to ISO format (YYYY-MM-DD).
+
+    Returns the input unchanged if it does not look like a date.
+    """
+    if not isinstance(date_str, str):
+        return date_str
+    # Length gate ahead of the memo so long strings -- descriptions, addresses,
+    # the bulk of a long array -- neither take a cache slot nor pay a lookup.
+    if len(date_str) < 4 or len(date_str) > 50:
+        return date_str
+    return _normalize_date_text(date_str)
 
 
 # Back-compat alias for the NPI field on rendering_provider. The schema
@@ -161,7 +183,12 @@ def _normalize_payment_details_entry(entry: Any) -> Any:
 
 
 def normalize_field_aliases(obj: Any) -> Any:
-    """Recursively rewrite back-compat field aliases on both expected and actual."""
+    """Recursively rewrite back-compat field aliases on both expected and actual.
+
+    Only dicts and lists can carry an alias, so leaves are returned in place
+    rather than through a recursive call. Leaves are the bulk of every
+    document, and this walk runs once per side per scored subtree.
+    """
     if isinstance(obj, dict):
         result: dict[str, Any] = {}
         for k, v in obj.items():
@@ -169,10 +196,10 @@ def normalize_field_aliases(obj: Any) -> Any:
                 v = _normalize_rendering_provider(v)
             elif k == _PAYMENT_DETAILS_KEY and isinstance(v, list):
                 v = [_normalize_payment_details_entry(e) for e in v]
-            result[k] = normalize_field_aliases(v)
+            result[k] = normalize_field_aliases(v) if isinstance(v, (dict, list)) else v
         return result
     if isinstance(obj, list):
-        return [normalize_field_aliases(item) for item in obj]
+        return [normalize_field_aliases(item) if isinstance(item, (dict, list)) else item for item in obj]
     return obj
 
 
@@ -370,6 +397,84 @@ def _flatten_normalized_leaves(
             normalized = normalize_date_string(normalized)
         return {_path: normalized}
     return {_path: value}
+
+
+# Tagged stand-ins for the empty-container leaves ``_flatten_normalized_leaves``
+# keeps. They are not hashable, so they cannot be interned directly; `{}` and
+# `[]` get different tags because they do not compare equal to each other.
+_EMPTY_DICT_LEAF = ("<empty dict>",)
+_EMPTY_LIST_LEAF = ("<empty list>",)
+
+
+def _intern_leaf_items(
+    flats: list[dict[tuple[Any, ...], Any]],
+) -> tuple[list[list[int]], int] | None:
+    """Intern every element's ``(path, leaf)`` pairs to ids on a shared map.
+
+    Two elements get the same id for a pair exactly when the paths are equal
+    and the leaves compare equal, which is the test the pairwise cost build
+    runs. Returns ``None`` when a leaf cannot be interned on those terms: an
+    unhashable leaf, or a NaN, which a dict lookup finds by identity while
+    ``!=`` still reports it as different from itself.
+    """
+    slots: dict[tuple[Any, ...], int] = {}
+    interned: list[list[int]] = []
+    for flat in flats:
+        ids: list[int] = []
+        for path, leaf in flat.items():
+            if isinstance(leaf, dict):
+                key: tuple[Any, ...] = (path, _EMPTY_DICT_LEAF)
+            elif isinstance(leaf, list):
+                key = (path, _EMPTY_LIST_LEAF)
+            else:
+                if isinstance(leaf, float) and leaf != leaf:
+                    return None
+                try:
+                    hash(leaf)
+                except TypeError:
+                    return None
+                key = (path, leaf)
+            slot = slots.get(key)
+            if slot is None:
+                slot = len(slots)
+                slots[key] = slot
+            ids.append(slot)
+        interned.append(ids)
+    return interned, len(slots)
+
+
+def _leaf_indicator(rows: list[list[int]], n_slots: int) -> sparse.csr_array:
+    """Sparse 0/1 matrix marking which interned items each element carries."""
+    indptr = np.zeros(len(rows) + 1, dtype=np.int64)
+    np.cumsum(np.fromiter((len(row) for row in rows), dtype=np.int64, count=len(rows)), out=indptr[1:])
+    nnz = int(indptr[-1])
+    indices = np.fromiter((slot for row in rows for slot in row), dtype=np.int64, count=nnz)
+    return sparse.csr_array((np.ones(nnz, dtype=np.int64), indices, indptr), shape=(len(rows), n_slots))
+
+
+def _leaf_mismatch_counts(
+    expected_flat: list[dict[tuple[Any, ...], Any]],
+    actual_flat: list[dict[tuple[Any, ...], Any]],
+) -> np.ndarray | None:
+    """``(n_expected, n_actual)`` counts of expected leaves the actual element
+    does not carry at the same path with an equal value.
+
+    The same count as testing every leaf of every element pair, but as
+    ``len(expected leaves) - overlap`` from one sparse product rather than an
+    n * m * leaves Python loop. A path appears at most once per element, so the
+    product counts each shared item once. Returns ``None`` when the leaves
+    cannot be interned and the caller must fall back to the pairwise build.
+    """
+    interned = _intern_leaf_items(expected_flat + actual_flat)
+    if interned is None:
+        return None
+    ids, n_slots = interned
+    expected_ids = ids[: len(expected_flat)]
+    actual_ids = ids[len(expected_flat) :]
+    overlap = (_leaf_indicator(expected_ids, n_slots) @ _leaf_indicator(actual_ids, n_slots).T).toarray()
+    sizes = np.fromiter((len(row) for row in expected_ids), dtype=np.int64, count=len(expected_ids))
+    counts: np.ndarray = sizes[:, None] - overlap
+    return counts
 
 
 def _descend_schema_for_key(schema_node: Any, key: str) -> Any:
@@ -608,15 +713,22 @@ def _compute_score_with_weight(
             # is bounded by n*m), which means it can never override a real
             # integer mismatch-count difference.
             tiebreak_eps = 1.0 / (len(expected) * len(actual) + 1)
-            cost = np.empty((len(expected), len(actual)))
-            for i, exp_leaves in enumerate(expected_flat):
-                for j, act_leaves in enumerate(actual_flat):
-                    mismatches = sum(
-                        1
-                        for leaf_path, leaf in exp_leaves.items()
-                        if leaf_path not in act_leaves or act_leaves[leaf_path] != leaf
-                    )
-                    cost[i, j] = mismatches + tiebreak_eps * abs(i - j)
+            index_bias = tiebreak_eps * np.abs(
+                np.arange(len(expected), dtype=np.int64)[:, None] - np.arange(len(actual), dtype=np.int64)[None, :]
+            )
+            mismatch_counts = _leaf_mismatch_counts(expected_flat, actual_flat)
+            if mismatch_counts is not None:
+                cost = mismatch_counts + index_bias
+            else:
+                cost = np.empty((len(expected), len(actual)))
+                for i, exp_leaves in enumerate(expected_flat):
+                    for j, act_leaves in enumerate(actual_flat):
+                        mismatches = sum(
+                            1
+                            for leaf_path, leaf in exp_leaves.items()
+                            if leaf_path not in act_leaves or act_leaves[leaf_path] != leaf
+                        )
+                        cost[i, j] = mismatches + tiebreak_eps * abs(i - j)
             exp_indices, act_indices = linear_sum_assignment(cost)
             assigned = dict(zip(exp_indices.tolist(), act_indices.tolist(), strict=True))
 
