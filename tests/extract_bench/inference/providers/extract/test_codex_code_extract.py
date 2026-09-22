@@ -150,16 +150,42 @@ def test_usage_from_events_sums_turns() -> None:
         json.dumps({"type": "thread.started", "thread_id": "t"}),
         _turn_completed(input_tokens=10, cached_input_tokens=2, output_tokens=3, reasoning_output_tokens=1),
         "not-json",
-        _turn_completed(input_tokens=7, cached_input_tokens=1, output_tokens=5, reasoning_output_tokens=2),
+        _turn_completed(
+            input_tokens=7,
+            cached_input_tokens=1,
+            cache_write_input_tokens=4,
+            output_tokens=5,
+            reasoning_output_tokens=2,
+        ),
     ]
 
     assert Provider._usage_from_events(lines) == {
         "input_tokens": 17,
         "cached_input_tokens": 3,
+        "cache_write_input_tokens": 4,
         "output_tokens": 8,
         "reasoning_output_tokens": 3,
         "total_tokens": 25,
     }
+
+
+def test_cache_write_tokens_bill_at_the_cache_write_rate() -> None:
+    usage = {
+        "input_tokens": 1_000_000,
+        "cached_input_tokens": 600_000,
+        "cache_write_input_tokens": 300_000,
+        "output_tokens": 100_000,
+    }
+
+    # gpt-6-sol: 100K fresh x $2.00 + 300K writes x $2.50 + 600K cached x $0.20 + 100K out x $10.00.
+    sol = Provider("codex_code_extract", {"model": "gpt-6-sol"})
+    assert sol._estimate_cost_usd(usage) == pytest.approx(0.20 + 0.75 + 0.12 + 1.00)
+
+    # A model with no cache-write row prices writes as plain uncached input, as before.
+    gpt55 = Provider("codex_code_extract", {"model": "gpt-5.5"})
+    assert gpt55._estimate_cost_usd(usage) == pytest.approx(
+        gpt55._estimate_cost_usd({**usage, "cache_write_input_tokens": 0})
+    )
 
 
 def test_prepare_schema_preserves_required_fields_by_default() -> None:
@@ -283,6 +309,7 @@ def test_estimate_cost_applies_long_context_uplift() -> None:
         "long_context_threshold_tokens": 272_000,
         "input_price_per_1m": 5.00,
         "cached_input_price_per_1m": 0.50,
+        "cache_write_price_per_1m": 5.00,
         "output_price_per_1m": 22.50,
     }
 
