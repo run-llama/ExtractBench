@@ -13,6 +13,7 @@ from rapidfuzz import fuzz
 from scipy.optimize import linear_sum_assignment
 
 from extract_bench.evaluation.metrics.extract.json_subset_match import (
+    _identity_cell_key,
     normalize_date_string,
 )
 from extract_bench.inference.providers.extract.table_codegen.schema_utils import (
@@ -25,7 +26,10 @@ from extract_bench.schemas.evaluation import MetricValue
 # Above this many residual cells (unmatched_actual x unmatched_expected, after the
 # exact-row peel) the dense assignment matrix is skipped to bound eval memory.
 # Matches unified_evidence's _GROUNDED_MAX_CELLS; a 77.4k-row array would need
-# ~67 GB otherwise and OOM-kill the runner.
+# ~67 GB otherwise and OOM-kill the runner. When identity keys are supplied for
+# an array whose full row product is over this cap, rows are paired inside
+# those identity buckets first. A bucket that is still over the cap keeps the
+# residual skip.
 _MAX_RESIDUAL_ASSIGNMENT_CELLS = 100_000_000
 
 _PUNCT_RE = re.compile(r"[^\w\s]", re.U)
@@ -561,12 +565,54 @@ def _score_array(
     )
 
 
+def _row_identity(row: Any, keys: Sequence[str]) -> tuple[str, ...]:
+    """Canonical identity, same cell key as declared-identity pairing."""
+    if not isinstance(row, Mapping):
+        return tuple("" for _ in keys)
+    return tuple(_identity_cell_key(row.get(key)) for key in keys)
+
+
+def _score_array_by_identity(
+    expected_rows: Any,
+    actual_rows: Any,
+    *,
+    keys: Sequence[str],
+    subfields: Sequence[str],
+    fuzzy_field_thresholds: Mapping[str, float],
+    field_schemas: Mapping[str, Any] | None = None,
+) -> tuple[int, int, int, int, int]:
+    """Score one array as independent identity buckets, then sum the counts."""
+    expected_buckets: dict[tuple[str, ...], list[Any]] = defaultdict(list)
+    actual_buckets: dict[tuple[str, ...], list[Any]] = defaultdict(list)
+    for row in as_rows(expected_rows):
+        expected_buckets[_row_identity(row, keys)].append(row)
+    for row in as_rows(actual_rows):
+        actual_buckets[_row_identity(row, keys)].append(row)
+
+    correct = expected_total = predicted_total = expected_n = predicted_n = 0
+    for ident in set(expected_buckets) | set(actual_buckets):
+        part = _score_array(
+            expected_buckets.get(ident, []),
+            actual_buckets.get(ident, []),
+            subfields=subfields,
+            fuzzy_field_thresholds=fuzzy_field_thresholds,
+            field_schemas=field_schemas,
+        )
+        correct += part[0]
+        expected_total += part[1]
+        predicted_total += part[2]
+        expected_n += part[3]
+        predicted_n += part[4]
+    return correct, expected_total, predicted_total, expected_n, predicted_n
+
+
 def compute_array_record_match_counts(
     expected: Any,
     actual: Any,
     data_schema: Mapping[str, Any] | None = None,
     fuzzy_field_thresholds: Mapping[str, float] | None = None,
     normalize_dates: bool = True,
+    identity_keys_by_field: Mapping[str, Sequence[str]] | None = None,
 ) -> ArrayRecordMatchCounts | None:
     """Compute order-insensitive record matching counts for top-level arrays.
 
@@ -577,6 +623,10 @@ def compute_array_record_match_counts(
     When ``normalize_dates`` is set (the default), date-like strings on both
     sides are canonicalized to ISO format before comparison, aligned with the
     generic ``accuracy`` metric (json_subset_match).
+
+    ``identity_keys_by_field`` maps a top-level array name to the row fields
+    that identify a record. It applies only when that array's row product is
+    over ``_MAX_RESIDUAL_ASSIGNMENT_CELLS``. Below the cap, pairing stays keyless.
     """
     expected = unwrap_value(expected)
     actual = unwrap_value(actual)
@@ -607,19 +657,37 @@ def compute_array_record_match_counts(
             if len(subfield_names) == 0:
                 continue
             field_schemas = array_item_properties(field_schema)
+            identity_keys = None if identity_keys_by_field is None else identity_keys_by_field.get(field)
+            expected_list = as_rows(expected_value)
+            actual_list = as_rows(actual_value)
+            if (
+                identity_keys is not None
+                and len(identity_keys) > 0
+                and len(expected_list) * len(actual_list) > _MAX_RESIDUAL_ASSIGNMENT_CELLS
+            ):
+                scored = _score_array_by_identity(
+                    expected_list,
+                    actual_list,
+                    keys=identity_keys,
+                    subfields=subfield_names,
+                    fuzzy_field_thresholds=fuzzy,
+                    field_schemas=field_schemas,
+                )
+            else:
+                scored = _score_array(
+                    expected_list,
+                    actual_list,
+                    subfields=subfield_names,
+                    fuzzy_field_thresholds=fuzzy,
+                    field_schemas=field_schemas,
+                )
             (
                 array_correct,
                 array_expected_total,
                 array_predicted_total,
                 array_expected_rows,
                 array_predicted_rows,
-            ) = _score_array(
-                expected_value,
-                actual_value,
-                subfields=subfield_names,
-                fuzzy_field_thresholds=fuzzy,
-                field_schemas=field_schemas,
-            )
+            ) = scored
             correct += array_correct
             expected_total += array_expected_total
             predicted_total += array_predicted_total
@@ -672,12 +740,14 @@ class ArrayRecordMatchMetric:
         data_schema = kwargs.get("data_schema")
         fuzzy_field_thresholds = kwargs.get("fuzzy_field_thresholds", self._fuzzy_field_thresholds)
         normalize_dates = kwargs.get("normalize_dates", self._normalize_dates)
+        identity_keys_by_field = kwargs.get("identity_keys_by_field")
         counts = compute_array_record_match_counts(
             expected=expected,
             actual=actual,
             data_schema=data_schema,
             fuzzy_field_thresholds=fuzzy_field_thresholds,
             normalize_dates=normalize_dates,
+            identity_keys_by_field=identity_keys_by_field,
         )
         if counts is None:
             return []
