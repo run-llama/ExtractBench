@@ -1,0 +1,154 @@
+{
+  "status": "all_20_metric_means_match_official_runner",
+  "native_counts": {
+    "total_examples": 370,
+    "successful": 355,
+    "failed": 15,
+    "skipped": 0
+  },
+  "splits": {
+    "all": {
+      "value_precision": {
+        "native_mean": 0.49017594997108327,
+        "native_denominator": 370,
+        "report_mean": 0.49017594997108327,
+        "exact_mean_match": true
+      },
+      "value_recall": {
+        "native_mean": 0.4249191901363473,
+        "native_denominator": 370,
+        "report_mean": 0.4249191901363473,
+        "exact_mean_match": true
+      },
+      "value_f1": {
+        "native_mean": 0.4200724190766894,
+        "native_denominator": 370,
+        "report_mean": 0.4200724190766894,
+        "exact_mean_match": true
+      },
+      "word_grounding_f1": {
+        "native_mean": 0.0820288122258728,
+        "native_denominator": 239,
+        "report_mean": 0.0820288122258728,
+        "exact_mean_match": true
+      },
+      "page_grounding_f1": {
+        "native_mean": 0.2741177617577315,
+        "native_denominator": 295,
+        "report_mean": 0.2741177617577315,
+        "exact_mean_match": true
+      }
+    },
+    "short": {
+      "value_precision": {
+        "native_mean": 0.553220352611618,
+        "native_denominator": 252,
+        "report_mean": 0.553220352611618,
+        "exact_mean_match": true
+      },
+      "value_recall": {
+        "native_mean": 0.45565069888532633,
+        "native_denominator": 252,
+        "report_mean": 0.45565069888532633,
+        "exact_mean_match": true
+      },
+      "value_f1": {
+        "native_mean": 0.4743339257488937,
+        "native_denominator": 252,
+        "report_mean": 0.4743339257488937,
+        "exact_mean_match": true
+      },
+      "word_grounding_f1": {
+        "native_mean": 0.07391765283355838,
+        "native_denominator": 175,
+        "report_mean": 0.07391765283355838,
+        "exact_mean_match": true
+      },
+      "page_grounding_f1": {
+        "native_mean": 0.2856082381675484,
+        "native_denominator": 200,
+        "report_mean": 0.2856082381675484,
+        "exact_mean_match": true
+      }
+    },
+    "medium": {
+      "value_precision": {
+        "native_mean": 0.42044311533159123,
+        "native_denominator": 98,
+        "report_mean": 0.42044311533159123,
+        "exact_mean_match": true
+      },
+      "value_recall": {
+        "native_mean": 0.4083617008474841,
+        "native_denominator": 98,
+        "report_mean": 0.4083617008474841,
+        "exact_mean_match": true
+      },
+      "value_f1": {
+        "native_mean": 0.35850311423880055,
+        "native_denominator": 98,
+        "report_mean": 0.35850311423880055,
+        "exact_mean_match": true
+      },
+      "word_grounding_f1": {
+        "native_mean": 0.13818763653187996,
+        "native_denominator": 48,
+        "report_mean": 0.13818763653187996,
+        "exact_mean_match": true
+      },
+      "page_grounding_f1": {
+        "native_mean": 0.3087769279646446,
+        "native_denominator": 76,
+        "report_mean": 0.3087769279646446,
+        "exact_mean_match": true
+      }
+    },
+    "long": {
+      "value_precision": {
+        "native_mean": 0.03750736643385719,
+        "native_denominator": 20,
+        "report_mean": 0.03750736643385719,
+        "exact_mean_match": true
+      },
+      "value_recall": {
+        "native_mean": 0.1188338774146415,
+        "native_denominator": 20,
+        "report_mean": 0.1188338774146415,
+        "exact_mean_match": true
+      },
+      "value_f1": {
+        "native_mean": 0.038067028712570374,
+        "native_denominator": 20,
+        "report_mean": 0.038067028712570374,
+        "exact_mean_match": true
+      },
+      "word_grounding_f1": {
+        "native_mean": 0.0022681451612903223,
+        "native_denominator": 16,
+        "report_mean": 0.0022681451612903223,
+        "exact_mean_match": true
+      },
+      "page_grounding_f1": {
+        "native_mean": 0.014528713668849114,
+        "native_denominator": 19,
+        "report_mean": 0.014528713668849114,
+        "exact_mean_match": true
+      }
+    }
+  },
+  "cause": "Report follows the unchanged upstream runner, which pads all observed grounding metrics with zero for every failure.",
+  "unchanged_predictions_and_citations_verified": 355,
+  "official_failed_grounding_padding": [
+    {
+      "id": "sf1449_supplies_services_0042",
+      "word": true,
+      "page": true
+    },
+    {
+      "id": "sf1449_supplies_services_0059",
+      "word": true,
+      "page": false
+    }
+  ],
+  "current_native_archive_sha256": "61125c0d591d56eb1d039120330194b2c1082a8e55b4f1304552731384f59b7f"
+}

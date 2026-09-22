@@ -1,0 +1,81 @@
+{
+  "verified_at_utc": "2026-09-22T14:14:42.660622+00:00",
+  "dataset_repo": "llamaindex/ExtractBench",
+  "remote_revision": "f6180e917a050a84582e6366cff85b7dc1e84e58",
+  "remote_revision_url": "https://huggingface.co/datasets/llamaindex/ExtractBench/tree/f6180e917a050a84582e6366cff85b7dc1e84e58",
+  "local_manifest": {
+    "repo": "llamaindex/ExtractBench",
+    "revision": "f6180e917a050a84582e6366cff85b7dc1e84e58",
+    "test": false,
+    "cases": 370,
+    "per_split": {
+      "short": 252,
+      "medium": 98,
+      "long": 20
+    }
+  },
+  "remote_split_counts": {
+    "short": 252,
+    "medium": 98,
+    "long": 20
+  },
+  "remote_jsonl_sha256": {
+    "short": "e4b07b3612f1d4bcf4157d5b97b8692d671aeddaf96e5b5898338345b654e740",
+    "medium": "8ae0884d8e8dddb1282eb98282d942b65c8d99b82dd37e650edc53cd0f5bb5df",
+    "long": "ac5b22bbf810548a5e086e792d4afe0aa98dc572d24deceab820a2558570f3bd"
+  },
+  "canonical_json_hash_format": "SHA256 UTF-8 json.dumps(sort_keys=True, ensure_ascii=False, separators=(comma,colon)); corpus hash applies same encoding to sorted document-path-to-component-hash mapping",
+  "components": {
+    "data_schema": {
+      "matched": 370,
+      "different_ids": [],
+      "unverified_ids": [],
+      "local_corpus_sha256": "a528daae58792034f9258039592094fa200ac98b72edca7919729d5337d40415",
+      "remote_corpus_sha256": "a528daae58792034f9258039592094fa200ac98b72edca7919729d5337d40415"
+    },
+    "expected_output": {
+      "matched": 370,
+      "different_ids": [],
+      "unverified_ids": [],
+      "local_corpus_sha256": "ab9a1cdd5e0db7eac0817de5a68cf1cf71717c1fb359cedfa35b0b692ee39723",
+      "remote_corpus_sha256": "ab9a1cdd5e0db7eac0817de5a68cf1cf71717c1fb359cedfa35b0b692ee39723"
+    },
+    "field_rules": {
+      "matched": 370,
+      "different_ids": [],
+      "unverified_ids": [],
+      "local_corpus_sha256": "8bb8173645f0ddcfbf0e07e1d4d3e65e07c98ea675c5c5266a5cb36df578d784",
+      "remote_corpus_sha256": "8bb8173645f0ddcfbf0e07e1d4d3e65e07c98ea675c5c5266a5cb36df578d784"
+    },
+    "repeated_structure": {
+      "matched": 370,
+      "different_ids": [],
+      "unverified_ids": [],
+      "local_corpus_sha256": "52a0cd20809b004245d621a1400970c116aad44b7dab2c0714d52ed53a9076cb",
+      "remote_corpus_sha256": "52a0cd20809b004245d621a1400970c116aad44b7dab2c0714d52ed53a9076cb"
+    },
+    "tags": {
+      "matched": 370,
+      "different_ids": [],
+      "unverified_ids": [],
+      "local_corpus_sha256": "00be0c9993412074827736a6d712279e4478ac52f8d51c04cb20f6a554ab76e5",
+      "remote_corpus_sha256": "00be0c9993412074827736a6d712279e4478ac52f8d51c04cb20f6a554ab76e5"
+    },
+    "pdf": {
+      "matched": 370,
+      "different_ids": [],
+      "unverified_ids": [],
+      "local_corpus_sha256": "d11c3e5e4a48e128a5da7eada6ba252bfa41b34bf3cac98b6c65c68f43734e24",
+      "lfs_sha256_matched": 272,
+      "git_blob_sha1_matched": 98,
+      "local_git_blob_corpus_sha256": "44034188a8eac9212a00d09be0e8748c3179ec2c65c811c8217db9b7fc08e952",
+      "remote_git_blob_corpus_sha256": "44034188a8eac9212a00d09be0e8748c3179ec2c65c811c8217db9b7fc08e952",
+      "remote_lfs_subset_corpus_sha256": "59c93632346d9f1a64ae6596fd75d5b36dca1a92d92af2a633d92e2acaa99189",
+      "note": "All local PDFs have SHA256s in local_corpus_sha256. Remote LFS subset has272 SHA256 entries; remaining98 ordinary Git files were checked against Git blob SHA1 metadata without PDF downloads."
+    }
+  },
+  "missing_local_ids": [],
+  "extra_local_sidecars": [],
+  "all_components_match": true,
+  "label_handling": "Expected outputs, field rules, and row identities were compared only as canonical JSON hashes; no label values were printed or used for inference. Downloaded metadata and three JSONL files only; local dataset unchanged."
+}

@@ -24,6 +24,7 @@ _PROVIDER_MODULES = [
     "gemini_direct",
     "glm_extract",
     "glm_zai_extract",
+    "jev_provider",
     "kimi_extract",
     "landingai",
     "lift",

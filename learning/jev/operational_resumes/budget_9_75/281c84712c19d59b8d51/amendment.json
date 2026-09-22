@@ -1,0 +1,197 @@
+{
+  "document_id": "real_imedia_full",
+  "amendment": "Shared study accounting cap9.00 ->9.75; frozen inference unchanged",
+  "old_cap_usd": 9.0,
+  "new_cap_usd": 9.75,
+  "original_record_sha256": "0e0527a23d1febf3bfc79cdd98487099bc99d96fad7a917f11fa3ed9f97c50d3",
+  "original_calls": 26,
+  "original_cost_usd": 0.006121332000000001,
+  "freeze_sha256": "22097c421b5b8fc973a0c3f3d541ffceadc01b7dfc72355d2c2d325b815d1a10",
+  "wrapper_sha256": "3c6ecbd8e281623c64b118ba10509fc76d2bedd30c5b34f97610ce6cd78658b3",
+  "deadline_policy": "New 1800-second operational allowance starts at resume; old calls still count toward2000.",
+  "prefix": [
+    {
+      "id": 45223,
+      "request_hash": "e7cf55d73321af5d7cf31271419c2f9b7f396ca91ae1a46b0949795ab5cb0db9",
+      "status": "settled",
+      "cost": 0.000167916,
+      "archive_sha256": "983c0565154688bf5419bbfa378a2c0dc3f75a07a2a02535b0054e9f675e95dd"
+    },
+    {
+      "id": 45235,
+      "request_hash": "1e441cef41fa2e69949e0e9f25f2d20c9a9e6aa14263edaa620ee5d88367d34b",
+      "status": "settled",
+      "cost": 0.000261324,
+      "archive_sha256": "18784f741cb7b505618053a01eac63ab929f138a9ec6dd42f078e737b7d39cd6"
+    },
+    {
+      "id": 45245,
+      "request_hash": "c55727cc253670a2b508c03a0be51a6f81ab424a481fbb01196784636c60adeb",
+      "status": "settled",
+      "cost": 0.000261702,
+      "archive_sha256": "b6ed6b26326fc6c2b0336ba42f27ba2c26aa2ee872e6303addeaeaf6bc647136"
+    },
+    {
+      "id": 45257,
+      "request_hash": "56d037064e0cdd8ea3330372281f58db2a4a02cb16c573e8b46f791242715e43",
+      "status": "settled",
+      "cost": 0.00015687,
+      "archive_sha256": "fca2c9a37ff73393f12f3fe4ac4b213b308b0befcc278a65b039b2d3b9973615"
+    },
+    {
+      "id": 45269,
+      "request_hash": "10ac386f1a5d1a7707afffc0e0609d32c586e875a5e423cb261f35e91c983c8b",
+      "status": "settled",
+      "cost": 0.000148134,
+      "archive_sha256": "005b70de57364b393187940397d269b0e1cbe2936ce293526e3de7908a3350da"
+    },
+    {
+      "id": 45279,
+      "request_hash": "68309d8bb0b9331b2d23bfbc53e0b7846e39200550db32133809c412030a1dd8",
+      "status": "settled",
+      "cost": 0.00015078,
+      "archive_sha256": "1d46b5c57fa4cd2f9bb6701715c3b91de9667f0503d844f291312b9b299aba72"
+    },
+    {
+      "id": 45286,
+      "request_hash": "3f22f212cfb6058de5867a90820630bb3d3762d7163af5e3a735cb69480b55f7",
+      "status": "settled",
+      "cost": 0.000124992,
+      "archive_sha256": "7f1defeb0ce20dbad956bb15a7ad15ee344069022e3940507484811b9b9366e8"
+    },
+    {
+      "id": 45296,
+      "request_hash": "35e6d825981c6c024c56ee95e758c275dac0e95bfcd9c3b9e4ed7540723c5e0a",
+      "status": "settled",
+      "cost": 0.000212268,
+      "archive_sha256": "0b35664973c1f8619ef925256eb8a3fa71a30948788aac8ad7af9045ab86bc0b"
+    },
+    {
+      "id": 45307,
+      "request_hash": "bac3c79b3029f89660ca635012d2720c7291c60088d589f75c39d193a77cd569",
+      "status": "settled",
+      "cost": 0.00037443,
+      "archive_sha256": "0447ac58917401566d1f4a596c84faed07d8b5448fa427be579603177fe779b2"
+    },
+    {
+      "id": 45317,
+      "request_hash": "7fc31a6401e29efeba6736426fd54ae9904e0244266116796e784193bce1fef7",
+      "status": "settled",
+      "cost": 0.00036225,
+      "archive_sha256": "56a8e19cfa565b917ec3e716733dc4bbcb90decb83d6bdbd1a8ea6516b033ac6"
+    },
+    {
+      "id": 45327,
+      "request_hash": "4c2c3f6426cf797bb6f7a20fa43c9dc31cf202631630d33fd6d4cb20034f70f1",
+      "status": "settled",
+      "cost": 5.1912e-05,
+      "archive_sha256": "d0b8847a550e16cc5628c775cc581b7d34601f63cef1010cfe8ba21f13bf75be"
+    },
+    {
+      "id": 45337,
+      "request_hash": "8369d035eefb1e3f86bc196e6889284b2e57ed57a68867afac547066643c6543",
+      "status": "settled",
+      "cost": 0.000154308,
+      "archive_sha256": "0eea595fd2a0647c7f55f9e7232215ca8f058b930412713509cbec09ed9fd375"
+    },
+    {
+      "id": 45347,
+      "request_hash": "70ec72bd044e4281e2e3889430a962469ac8f276e6341b680a0b6671e491ee5b",
+      "status": "settled",
+      "cost": 0.000138432,
+      "archive_sha256": "cf1e90512c087f19e0ce9f5ae5c74c6153a704d30ba0c6d05911e2ac4747ee82"
+    },
+    {
+      "id": 45358,
+      "request_hash": "510094694f05b6068b5c31cf3887773b972dbb35389f514d976e673c08895514",
+      "status": "settled",
+      "cost": 0.000143724,
+      "archive_sha256": "f5dc61c746a6e273efd34058977798722b93fc330f86c5c4f69a7d49a8a50e29"
+    },
+    {
+      "id": 45366,
+      "request_hash": "4476f0b1f62a4e8a6f1984b0ddb80dfa2748ea1fce7272febead3188fb5ef700",
+      "status": "settled",
+      "cost": 5.5692e-05,
+      "archive_sha256": "135029db6f21aa726c74e5150b9714af4b507cc038bea1cf45e0335dd42f77bd"
+    },
+    {
+      "id": 45376,
+      "request_hash": "e94b869098226aec40e9d24e00338f804f44692b7682509f7b5a51ec9a60ed03",
+      "status": "settled",
+      "cost": 0.000192108,
+      "archive_sha256": "a915be9c51df69b2c8a33fc9c17684245a9ffe6176579e791ec2dfbb916b29b1"
+    },
+    {
+      "id": 45385,
+      "request_hash": "bc3f949c5933e6a5805b9e05b9d79cf576449f2eceef23df07f833f024c6c011",
+      "status": "settled",
+      "cost": 0.000231756,
+      "archive_sha256": "173e66a0347e55e34a1d494c0869c2311a687668ab6736cb85493e4d44cb26f8"
+    },
+    {
+      "id": 45394,
+      "request_hash": "5b8333de3f296b9193fc21d64a27888df12bbe3b9900fb94fd999b1f524943b8",
+      "status": "settled",
+      "cost": 0.000344148,
+      "archive_sha256": "f9aeea81aeda69f2cbb4cd7627a2f788a493cef094bdd28ef68f714515e2fe1f"
+    },
+    {
+      "id": 45403,
+      "request_hash": "67a2ff5ec7388dcea973a9ec766a7ec87c9aa283bc4691c9954b50015873bdd4",
+      "status": "settled",
+      "cost": 0.000405678,
+      "archive_sha256": "c65aceb4c6ea6b114c19fb5fe63d9e4c7ff5b44b342044897693399d1cd1fc58"
+    },
+    {
+      "id": 45411,
+      "request_hash": "dbeef2defd786abb7c60e7d938c3af3e6b37d2f68bdc2987adffdc2de187f7a8",
+      "status": "settled",
+      "cost": 0.000322056,
+      "archive_sha256": "8d13bf1ddf924a570be70901ce5c04ca46bd07a8b3048a1ab60cea2f5a9b69c0"
+    },
+    {
+      "id": 45420,
+      "request_hash": "de48f52295fbb97b2ddea2a4d7777565ee9547c9c4507b2d41595c98f7387f4f",
+      "status": "settled",
+      "cost": 0.000320712,
+      "archive_sha256": "ee1d8c8b41622f127428229989606321bccef90382daa095f9b583890c6d564b"
+    },
+    {
+      "id": 45428,
+      "request_hash": "e22e2157873413dbe3a456727af28dfec829f1083f7b3b29f6f4089990d03f54",
+      "status": "settled",
+      "cost": 0.000340788,
+      "archive_sha256": "03d15f2dffde25d56966df22b9a8592f54430e9e4a0a64bc6ba5d035f5fcabf1"
+    },
+    {
+      "id": 45437,
+      "request_hash": "9b58d1b7c48e59219a0f5bcd39034f7ded40e79c8e0643536459bfca1d3698fe",
+      "status": "settled",
+      "cost": 0.00031731,
+      "archive_sha256": "b3cf3236652bb7f0af2de9e54f91228bc770b22789bfbab93f8ad0434d3fe637"
+    },
+    {
+      "id": 45445,
+      "request_hash": "b55d48fb66ac392c168fdaa7d87e6ef212b7ec0d349c3808075c8af1c0189e95",
+      "status": "settled",
+      "cost": 0.000291018,
+      "archive_sha256": "adcdb7088d51f201aa48cc13630a39c8636473ec0fa170cf9f2750d9282f191f"
+    },
+    {
+      "id": 45452,
+      "request_hash": "27b272012b6ecf446b25fa5ac15353e346dcaad656a24cf44fb18119b30c0506",
+      "status": "settled",
+      "cost": 0.000269682,
+      "archive_sha256": "3729929b19e9b4a5016b22b200ce261248bc99241e6853683d4157826b976a70"
+    },
+    {
+      "id": 45462,
+      "request_hash": "64a043a90e9305156b84ec882ce7d3698613064ad0926838ece9ff6abb3b6765",
+      "status": "settled",
+      "cost": 0.000321342,
+      "archive_sha256": "5be018679b36b60124dee89af82bad7b86bd905234338ff13544b205a2b1ab18"
+    }
+  ],
+  "started_at": "2026-09-22T22:58:26.318498"
+}

@@ -1,0 +1,489 @@
+{
+  "seed": 20260922,
+  "selection": "Reuse frozen prior 12-document development and 12-document schema-disjoint holdout coverage sample; prior Luna study saw holdout labels. Jev changes use development labels only. Full-corpus report will disclose development overlap.",
+  "budget_usd": 9,
+  "documents": [
+    {
+      "id": "07021-2016-p0018",
+      "split": "short",
+      "pages": 1,
+      "tags": [
+        "source:real",
+        "challenge:T3.a",
+        "delivery:G1",
+        "delivery:G4",
+        "length:short",
+        "domain:D1"
+      ],
+      "schema_bytes": 18188,
+      "schema_hash": "30623361bad97ee66e685ddc8d0e859150ec2019b914757799140b776e80938a",
+      "schema_title": "Schedule K-1 (Form 1065) Partner's Share of Income, Deductions, Credits, etc.",
+      "text_chars": 2391,
+      "partition": "dev",
+      "pdf_sha256": "e667acf072151b34ddaee54965db1c838855019efce443d610c826b21472cdb5"
+    },
+    {
+      "id": "mcdonalds_receipt_chicago_documentcloud",
+      "split": "short",
+      "pages": 1,
+      "tags": [
+        "source:real",
+        "challenge:T3.b",
+        "perception:P2",
+        "length:short",
+        "domain:D1"
+      ],
+      "schema_bytes": 10420,
+      "schema_hash": "0b8525756617e8df86ef0599fb3b7b4a3c81a9cab45d9e6dd38fe11c51473d84",
+      "schema_title": "",
+      "text_chars": 0,
+      "partition": "dev",
+      "pdf_sha256": "7733dfb56fe7f3b58d5f9070463d1f9341a44794f871c5aaacccb6278ac5ddd6"
+    },
+    {
+      "id": "H9-53-59_60",
+      "split": "short",
+      "pages": 1,
+      "tags": [
+        "source:real",
+        "challenge:T3.a",
+        "perception:P2",
+        "perception:P3",
+        "delivery:G1",
+        "delivery:G4",
+        "length:short",
+        "domain:D2"
+      ],
+      "schema_bytes": 29129,
+      "schema_hash": "3ed88269aa3b306944b365be830ad89677350e0630dcc2173bad72cef7e3041a",
+      "schema_title": "RRCH9Extraction",
+      "text_chars": 0,
+      "partition": "dev",
+      "pdf_sha256": "3138b0b9eb5558bd7a4926da7fd6fcbe9dc6416d598bf3b8a45721151bfb28b4"
+    },
+    {
+      "id": "P4-Historical Single Signature83-10963_5480",
+      "split": "short",
+      "pages": 1,
+      "tags": [
+        "source:real",
+        "challenge:T3.a",
+        "perception:P2",
+        "perception:P3",
+        "delivery:G1",
+        "delivery:G4",
+        "length:short",
+        "domain:D2"
+      ],
+      "schema_bytes": 30169,
+      "schema_hash": "c50c32330a96e7259cd4a5a5125dbae3dacc48136407eb1882f2c5f5d2388b6c",
+      "schema_title": "RRCP4Extraction",
+      "text_chars": 3410,
+      "partition": "dev",
+      "pdf_sha256": "91e6c084622131653977e8e0f244fe4f13dbae34c8509172948939bdc94d1076"
+    },
+    {
+      "id": "W14-58509_W14 2nd sub revised",
+      "split": "short",
+      "pages": 1,
+      "tags": [
+        "source:real",
+        "challenge:T3.a",
+        "challenge:T3.e",
+        "delivery:G1",
+        "delivery:G4",
+        "length:short",
+        "domain:D2",
+        "challenge:T3.d"
+      ],
+      "schema_bytes": 182423,
+      "schema_hash": "7ad6ae99b204297b28920683d028ff9ef71b35a455b7a34a7f2363fd474d5d45",
+      "schema_title": "RRCW14ReviewExtraction",
+      "text_chars": 5685,
+      "partition": "dev",
+      "pdf_sha256": "22511db4eda31b6cba04e88fc8732c47e00d191d81cc9468c4e1366214f4901a"
+    },
+    {
+      "id": "utah_fleet_rate_schedule_fy2024",
+      "split": "short",
+      "pages": 2,
+      "tags": [
+        "source:real",
+        "challenge:T1.a",
+        "length:short",
+        "domain:D5"
+      ],
+      "schema_bytes": 8607,
+      "schema_hash": "8d2100fb3b42f63411a8a3e12b615f0247d4b2b50331a715a4fa980a6b54b23c",
+      "schema_title": "GovernmentFleetRateCard",
+      "text_chars": 2646,
+      "partition": "dev",
+      "pdf_sha256": "0b3841123954a66b6eec5cc0cd75c42c58910e6ac0558a65bdb21591af6bcc30"
+    },
+    {
+      "id": "ms_medicaid_ra_adjustments_corrupted",
+      "split": "short",
+      "pages": 4,
+      "tags": [
+        "source:real",
+        "challenge:T1.c",
+        "challenge:T2.d",
+        "perception:P1",
+        "delivery:G2",
+        "delivery:G3",
+        "length:short",
+        "domain:D6"
+      ],
+      "schema_bytes": 9706,
+      "schema_hash": "13eaa707b5ac17f2c0deef4667980b1ee49b2113f51f1c5eabdf266e4b1b5db5",
+      "schema_title": "StateMedicaidRemittanceAdvice",
+      "text_chars": 0,
+      "partition": "dev",
+      "pdf_sha256": "9b17b95061663faaa627a2fb38558cc2a4e030a7e9669755b1e0e2792a83bf4e"
+    },
+    {
+      "id": "cfpb_closing-disclosure_filled-sample_corrupted",
+      "split": "short",
+      "pages": 5,
+      "tags": [
+        "source:real",
+        "challenge:T3.a",
+        "perception:P1",
+        "structure:S1",
+        "delivery:G4",
+        "length:short",
+        "domain:D8"
+      ],
+      "schema_bytes": 28239,
+      "schema_hash": "166b66fcdeba068088c5d867c232204bbff04cd0b3bac9badabaa4f95e0d655e",
+      "schema_title": "ClosingDisclosureTRID",
+      "text_chars": 0,
+      "partition": "dev",
+      "pdf_sha256": "257964ee735970ddf25d6dd56b3e34af80fcca8c473f9cc79eb8388ea253bc7b"
+    },
+    {
+      "id": "ccc_online_0012_chubb_dodge_durango_corrupted",
+      "split": "medium",
+      "pages": 17,
+      "tags": [
+        "source:real",
+        "challenge:T1.d",
+        "challenge:T1.a",
+        "challenge:T1.b",
+        "structure:S2",
+        "structure:S3",
+        "delivery:G2",
+        "delivery:G4",
+        "length:medium",
+        "domain:D4",
+        "perception:P1"
+      ],
+      "schema_bytes": 27360,
+      "schema_hash": "97bc56fc0019939b8f89e45349601a7d6962f7f15b962b6ed32b8aa0c43e1939",
+      "schema_title": "CCCMarketValuationReport",
+      "text_chars": 0,
+      "partition": "dev",
+      "pdf_sha256": "3b36e3cc0c65b1bfa82bc668ac92ea4c7b0bd40fb42640cd155af4877157cba1"
+    },
+    {
+      "id": "baker_hughes_earnings_deck_q4fy25",
+      "split": "medium",
+      "pages": 25,
+      "tags": [
+        "source:real",
+        "challenge:T2.b",
+        "challenge:T2.d",
+        "length:medium",
+        "domain:D1"
+      ],
+      "schema_bytes": 13090,
+      "schema_hash": "9c44694c086d54a67e6f397dc2ed9f7c103738a4de5811d0395bba71a6261338",
+      "schema_title": "EarningsDeckHeadlineKPIs",
+      "text_chars": 30327,
+      "partition": "dev",
+      "pdf_sha256": "0aacb98fdb9ee986940f4b1c348f403acfaa42d32621a22909c6f3abb0f75f8f"
+    },
+    {
+      "id": "gsa_mas_it_labor_0010",
+      "split": "medium",
+      "pages": 15,
+      "tags": [
+        "source:real",
+        "challenge:T1.d",
+        "structure:S2",
+        "structure:S1",
+        "length:medium",
+        "domain:D3"
+      ],
+      "schema_bytes": 15111,
+      "schema_hash": "27a32c93f440da9aaa09878c85e8185c47eef79f2d42843d4ff878498bf7a573",
+      "schema_title": "GsaMasItLaborPricelist",
+      "text_chars": 30062,
+      "partition": "dev",
+      "pdf_sha256": "f635fa705077b35a36859509c0094cf6a17f1bd6d29c830bced79183ddc3be58"
+    },
+    {
+      "id": "sec_13f_0026_brown_brothers_harriman",
+      "split": "long",
+      "pages": 55,
+      "tags": [
+        "source:real",
+        "challenge:T1.a",
+        "structure:S4",
+        "delivery:G1",
+        "length:long",
+        "domain:D1"
+      ],
+      "schema_bytes": 8901,
+      "schema_hash": "213162a02c73274888105e01841954b374bf7e76f4b89a13bd4012e54d267862",
+      "schema_title": "SEC Form 13F Information Table",
+      "text_chars": 155714,
+      "partition": "dev",
+      "pdf_sha256": "4787d70ca373866d0e595f923c9305d0759e63f7dd7128e070b78efbf3632283"
+    },
+    {
+      "id": "ROGER-WINFIELD-SCOTT-FOUNDATION-INC-2009-580655183-p0025",
+      "split": "short",
+      "pages": 1,
+      "tags": [
+        "source:real",
+        "challenge:T3.a",
+        "delivery:G1",
+        "delivery:G4",
+        "length:short",
+        "domain:D1"
+      ],
+      "schema_bytes": 9384,
+      "schema_hash": "096c5878f646131c2478c4078473bb8f3b8ff8682fa525fbfe021308d1ddb8f5",
+      "schema_title": "Form 1099-B Proceeds From Broker and Barter Exchange Transactions (2009 consolidated statement)",
+      "text_chars": 2012,
+      "partition": "holdout",
+      "pdf_sha256": "87d7ed4ebdbe33b173bff7ec6b1fbdf87d48838a6793f022055b67bb6ded9d37"
+    },
+    {
+      "id": "passcoag-2020-w2-p0003-r4",
+      "split": "short",
+      "pages": 1,
+      "tags": [
+        "source:real",
+        "challenge:T3.a",
+        "perception:P2",
+        "delivery:G1",
+        "delivery:G4",
+        "length:short",
+        "domain:D1"
+      ],
+      "schema_bytes": 16517,
+      "schema_hash": "393e6af6abdf24ef1807e7719f385dd1945ae95a89aab79c4579a7a0ae72a9ae",
+      "schema_title": "Form W-2 Wage and Tax Statement (2020)",
+      "text_chars": 0,
+      "partition": "holdout",
+      "pdf_sha256": "97837090044250faf3530036408df95272aaa6f6a7c37e69a39fd2c2b21af9c2"
+    },
+    {
+      "id": "bianco-2024",
+      "split": "short",
+      "pages": 10,
+      "tags": [
+        "source:real",
+        "challenge:T3.a",
+        "challenge:T3.e",
+        "perception:P2",
+        "delivery:G1",
+        "delivery:G4",
+        "length:short",
+        "domain:D1"
+      ],
+      "schema_bytes": 566619,
+      "schema_hash": "adb8676f92cba92714e20343d095fe37ca9e5ceeed5c119622a0690c5c22c0ee",
+      "schema_title": "Form 1040 (2024) U.S. Individual Income Tax Return with Schedules 1, 2, 3",
+      "text_chars": 0,
+      "partition": "holdout",
+      "pdf_sha256": "571fe05a74b6c4820906ac9c00e9a8ce141420b7de54d4129f60c61c887c5012"
+    },
+    {
+      "id": "2A-27-103150_116454",
+      "split": "short",
+      "pages": 2,
+      "tags": [
+        "source:real",
+        "challenge:T3.a",
+        "perception:P2",
+        "delivery:G1",
+        "length:short",
+        "domain:D2"
+      ],
+      "schema_bytes": 46262,
+      "schema_hash": "15720d205585ebe295ced29a11fba4149d8103ab04c579e77a23c72316712381",
+      "schema_title": "RRC2AExtraction",
+      "text_chars": 4067,
+      "partition": "holdout",
+      "pdf_sha256": "194175ea26333f81e3bdd1913a2373f77ae74ab9d46f7a430ccaa05bef4cbbfe"
+    },
+    {
+      "id": "P18-28-50_51",
+      "split": "short",
+      "pages": 1,
+      "tags": [
+        "source:real",
+        "challenge:T3.a",
+        "perception:P2",
+        "delivery:G1",
+        "delivery:G4",
+        "length:short",
+        "domain:D2"
+      ],
+      "schema_bytes": 38589,
+      "schema_hash": "e03b4bb767622ee10daf2c1c08a21752895bff711ab5561bde19215ed95d6dcb",
+      "schema_title": "RRCP18Extraction",
+      "text_chars": 0,
+      "partition": "holdout",
+      "pdf_sha256": "455fb956dcc87354dcd99cc0f428c0a3410da632aafd94e4f0887cacede4ac72"
+    },
+    {
+      "id": "h5Filing-50745-2",
+      "split": "short",
+      "pages": 2,
+      "tags": [
+        "source:real",
+        "challenge:T3.a",
+        "delivery:G1",
+        "delivery:G4",
+        "length:short",
+        "domain:D2"
+      ],
+      "schema_bytes": 32500,
+      "schema_hash": "9da7f35863547bd42c931cbdffbd63f66fe5155d32e192786b28f697ba11e121",
+      "schema_title": "RRCH5Extraction",
+      "text_chars": 2114,
+      "partition": "holdout",
+      "pdf_sha256": "6202430be71d2c5ab414ab5882f8e7fdd5b4f1b09c204c7447e93dad6f51aa46"
+    },
+    {
+      "id": "lancaster_county_ne_requisition_po_husker_steel_corrupted",
+      "split": "short",
+      "pages": 6,
+      "tags": [
+        "source:real",
+        "challenge:T3.b",
+        "perception:P1",
+        "length:short",
+        "domain:D5"
+      ],
+      "schema_bytes": 14292,
+      "schema_hash": "bb4cff41496f3335e6d5ddc0e3604b16159bff6a689a0e7458e2974278056b5a",
+      "schema_title": "PurchaseOrder",
+      "text_chars": 0,
+      "partition": "holdout",
+      "pdf_sha256": "47ec12bf52083e85e5bfa7197b22734195a0871e414a0e7b4db588df2b89f41c"
+    },
+    {
+      "id": "real_clinton_property_25_11073_corrupted",
+      "split": "short",
+      "pages": 9,
+      "tags": [
+        "source:synthetic",
+        "challenge:T1.c",
+        "challenge:T1.e",
+        "challenge:T1.b",
+        "perception:P1",
+        "structure:S5",
+        "structure:S3",
+        "delivery:G4",
+        "delivery:G1",
+        "length:short",
+        "domain:D7"
+      ],
+      "schema_bytes": 3498,
+      "schema_hash": "fd3964ebe265f16802907f6db24db07b03481f67bcdd261c12618c1b9591b465",
+      "schema_title": "Bankruptcy Schedule E/F (Form 206E/F) unsecured-creditors extraction schema",
+      "text_chars": 0,
+      "partition": "holdout",
+      "pdf_sha256": "e5764c68739c187c67af868200a39b3a06efab3da8a929284f1415aeab46fea5"
+    },
+    {
+      "id": "1G1PC5SB6E7111015_professional_valuation",
+      "split": "medium",
+      "pages": 13,
+      "tags": [
+        "source:real",
+        "challenge:T1.a",
+        "challenge:T1.c",
+        "perception:P2",
+        "delivery:G2",
+        "length:medium",
+        "domain:D4"
+      ],
+      "schema_bytes": 35297,
+      "schema_hash": "2bed9e7c807550adf8d0e30f263ca978b6342c463a723272597c166404bba13a",
+      "schema_title": "MitchellVehicleValuationReport",
+      "text_chars": 23131,
+      "partition": "holdout",
+      "pdf_sha256": "305094d37586c8151d0531d1a2e5633ccdb88a8e7a6296fb7a999974fa26d313"
+    },
+    {
+      "id": "sched_i__akron_community_foundation_ty2024",
+      "split": "medium",
+      "pages": 26,
+      "tags": [
+        "source:real",
+        "challenge:T1.b",
+        "challenge:T1.e",
+        "challenge:T1.a",
+        "structure:S3",
+        "structure:S5",
+        "delivery:G1",
+        "length:medium",
+        "domain:D1"
+      ],
+      "schema_bytes": 4083,
+      "schema_hash": "fe2d20c963159adb83649ff4c1a0611220ca78f17b213b75b555dc5e6025ba3a",
+      "schema_title": "",
+      "text_chars": 59845,
+      "partition": "holdout",
+      "pdf_sha256": "899acb43a978ac39fe4bb5d0e8572dfaa4a7701137b86a5de5ee4bdfb41a22f5"
+    },
+    {
+      "id": "real_wright_co_mn",
+      "split": "medium",
+      "pages": 37,
+      "tags": [
+        "source:synthetic",
+        "challenge:T1.c",
+        "challenge:T2.d",
+        "challenge:T1.b",
+        "structure:S1",
+        "structure:S3",
+        "delivery:G1",
+        "length:medium",
+        "domain:D1"
+      ],
+      "schema_bytes": 6175,
+      "schema_hash": "98089dc7ff4e6202706e7afd73310cc4b8a0f046bb8076653f0ca1a5eae45c09",
+      "schema_title": "Wright County Audit List for Board (Commissioner's Vouchers) extraction schema",
+      "text_chars": 58455,
+      "partition": "holdout",
+      "pdf_sha256": "6cf1aeb8d02f37cca71c4ce5fc3df53aee81f4a9b3c1ffb0ce93b0ce3602470f"
+    },
+    {
+      "id": "gov_clin_schedule_0031",
+      "split": "long",
+      "pages": 62,
+      "tags": [
+        "source:real",
+        "challenge:T2.a",
+        "challenge:T2.c",
+        "challenge:T1.b",
+        "structure:S3",
+        "length:long",
+        "domain:D3"
+      ],
+      "schema_bytes": 17405,
+      "schema_hash": "d85a17f7eae13086479629ee9221d3e394619ec5a6f88a17562223183a56299e",
+      "schema_title": "DoDClinSchedule",
+      "text_chars": 81472,
+      "partition": "holdout",
+      "pdf_sha256": "80c12ae1c911f821c90ce459081fd3d51305e89c77bc124e45e701869eab81f3"
+    }
+  ]
+}

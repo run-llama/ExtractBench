@@ -1,0 +1,2 @@
+Provider,Category,Overall,Short,Medium,Long,Cost_Per_Page,Cost_Short,Cost_Medium,Cost_Long,P_Short,P_Medium,P_Long,R_Short,R_Medium,R_Long,Word_Grounding,Word_Grounding_Short,Word_Grounding_Medium,Word_Grounding_Long,Page_Grounding,Page_Grounding_Short,Page_Grounding_Medium,Page_Grounding_Long,Latency_S_Per_Doc_Short,Latency_S_Per_Doc_Medium,Latency_S_Per_Doc_Long
+Jev 1.13 + LiteParse (budget-limited),Specialized APIs,42.01,47.43,35.85,3.81,0.0046,0.0061,0.0015,0.0005,55.32,42.04,3.75,45.57,40.84,11.88,8.20,7.39,13.82,0.23,27.41,28.56,30.88,1.45,,,

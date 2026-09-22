@@ -44,6 +44,31 @@ def _pipeline_spec(
 def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-def]
     """Register the public extract pipeline roster."""
 
+    # Source-selection experiments; router is the recommended final framework.
+    for variant in (
+        "fields",
+        "hierarchical",
+        "tables",
+        "geometric",
+        "localized",
+        "multipage",
+        "hybrid",
+        "boundaries",
+        "rowrepair",
+        "compact",
+        "consensus",
+        "anchors",
+        "router",
+    ):
+        register_fn(
+            _pipeline_spec(
+                pipeline_name=f"jev_liteparse_{variant}",
+                provider_name="jev_liteparse",
+                config={"model": "typesafe/jev-1.13", "variant": variant, "budget_usd": 9.0},
+                per_file_timeout=1800.0,
+            )
+        )
+
     # =========================================================================
     # LlamaExtract (hosted V2 extract API, /api/v2/extract)
     # =========================================================================

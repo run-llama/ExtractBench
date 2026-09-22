@@ -1,0 +1,75 @@
+{
+  "generated_at_utc": "2026-09-22T15:09:51.102099+00:00",
+  "scope": "All calls in the shared experiment ledger, including development, diagnostics, and full inference.",
+  "ledger_attempts": 49355,
+  "max_call_id": 49355,
+  "requested_model_counts": {
+    "typesafe/jev-1.13": 49355
+  },
+  "resolved_model_counts": {
+    "<missing-or-invalid>": 1,
+    "typesafe/jev-1.13-20260917": 49354
+  },
+  "response_provider_counts": {
+    "<missing-or-invalid>": 1,
+    "TypeSafe": 49354
+  },
+  "http_status_counts": {
+    "200": 49354,
+    "400": 1
+  },
+  "ledger_accounting_by_status": {
+    "settled": {
+      "attempts": 49354,
+      "accounted_usd": 9.746093112,
+      "input_tokens": 232049836
+    },
+    "reserved": {
+      "attempts": 1,
+      "accounted_usd": 0.003493014,
+      "input_tokens": 0
+    }
+  },
+  "total_accounted_usd": 9.749586126,
+  "initial_shared_budget_cap_usd": 9.0,
+  "shared_budget_cap_usd": 9.75,
+  "documented_budget_caps_usd": [
+    9.0,
+    9.75
+  ],
+  "archive_usage": {
+    "responses_with_cost": 49354,
+    "reported_cost_usd": 9.746093112,
+    "input_tokens": 232049836,
+    "output_tokens": 40572894
+  },
+  "preledger_smoke": {
+    "successful_probe_cost_usd": 1.4532e-05,
+    "included_in_ledger": false,
+    "included_in_archive_usage": false
+  },
+  "archive_completeness": {
+    "decoded_archives": 49355,
+    "missing_call_ids": [],
+    "malformed_call_ids": [],
+    "orphan_archive_call_ids": [],
+    "request_hash_mismatch_call_ids": [],
+    "settled_cost_mismatch_call_ids": [],
+    "error_archives": 1,
+    "missing_response_metadata_counts": {
+      "model": 1,
+      "provider": 1,
+      "id": 1
+    },
+    "ledger_changed_during_audit": false,
+    "complete_and_consistent": true
+  },
+  "archive_hash_manifest_sha256": "5f0068b6dbe2d2c0a86e0f1a71869a0f3677291d5cbf1b8915a352db5c5da998",
+  "archive_hash_method": "SHA256 of compact sorted JSON mapping archive basename to SHA256(file bytes).",
+  "notes": [
+    "Reserved costs are conservative accounting for unresolved requests, not confirmed provider charges.",
+    "Model-resolution counts use returned response.model; HTTP failures can lack model/provider metadata.",
+    "Usage sums cover archived responses only; no credit-balance request or other network call was made.",
+    "No request state, question criteria, response answers, document text, credentials, or error bodies are emitted."
+  ]
+}

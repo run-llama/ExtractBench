@@ -1,0 +1,14 @@
+{
+  "last_pre_freeze_call_id": 11449,
+  "development_and_diagnostics_accounted_usd": 2.466419088,
+  "development_and_diagnostics_attempts": 11449,
+  "full_corpus_accounted_api_usd": 7.283167038,
+  "full_corpus_api_attempts": 37906,
+  "full_per_document_cost_and_calls_match_ledger": true,
+  "settled_provider_charges_usd": 9.746093112,
+  "unresolved_reservations_usd": 0.003493014,
+  "preledger_probe_usd": 1.4532e-05,
+  "known_reported_study_charges_including_probe_usd": 9.746107644,
+  "conservative_study_accounting_including_probe_usd": 9.749600658,
+  "remaining_budget_failures": 15
+}

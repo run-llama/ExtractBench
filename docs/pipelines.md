@@ -17,6 +17,7 @@ uv run extract-bench run <pipeline_name>
 
 | Pipeline | Provider | Notes |
 |---|---|---|
+| `jev_liteparse_*` | Jev via OpenRouter + local LiteParse | decision-based source extraction; requires `OPENROUTER_API_KEY` and the `jev` extra |
 | `llamaextract_cost_effective` / `llamaextract_agentic` | LlamaExtract V2 API | word-grounded citations, via a parse at the same tier (`LLAMA_CLOUD_API_KEY`) |
 | `llamaextract_agentic_plus` | LlamaExtract V2 API | highest tier; returns word-level citation boxes natively, no parse pass needed |
 | `llamaextract_cost_effective_standard_bbox` / `llamaextract_agentic_standard_bbox` | LlamaExtract V2 API | same tiers with block-level citation boxes and no granular parse pass |
@@ -62,6 +63,23 @@ uv run extract-bench run <pipeline_name>
 | `gemma4_12b_vllm_extract_oneshot_structured_output_file` | Self-hosted vLLM | Gemma-4-12B, json_object mode; requires `GEMMA4_12B_SERVER_URL` |
 | `qwen3_5_4b_vllm_extract_oneshot_structured_output_file` | Self-hosted vLLM | Qwen3.5-4B, json_object mode; requires `QWEN3_5_4B_SERVER_URL` |
 | `nuextract3_extract` | Self-hosted vLLM | schema converted to a NuExtract template; requires `NUEXTRACT3_SERVER_URL` |
+
+### Jev with LiteParse
+
+Install the parser with `uv sync --extra jev`, set `OPENROUTER_API_KEY`, and run
+`uv run extract-bench run jev_liteparse_router`. The thirteen variants
+are `fields`, `hierarchical`, `tables`, `geometric`, `localized`, `multipage`,
+`hybrid`, `boundaries`, `rowrepair`, `compact`, `consensus`, `anchors`, and `router` (each prefixed `jev_liteparse_`).
+
+Jev selects among source spans and structural choices; Python assembles the
+schema output. LiteParse 2.14.4 supplies PDF text, OCR, and word positions. These
+pipelines use OpenRouter's Decisions endpoint with `typesafe/jev-1.13`.
+
+API requests, responses, parsed text, and a shared spend ledger are written to
+`output/jev_liteparse/` by default. The default $9 budget applies cumulatively
+across pipelines sharing this directory, including conservative reservations
+for failed requests. Provider configuration supports `artifact_directory`,
+`budget_usd`, `model`, and `variant`; retain the ledger when resuming work.
 
 ## Parse Pipelines
 

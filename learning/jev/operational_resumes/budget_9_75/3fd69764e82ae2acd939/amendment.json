@@ -1,0 +1,14 @@
+{
+  "document_id": "real_ofac_ssi_full",
+  "amendment": "Shared study accounting cap9.00 ->9.75; frozen inference unchanged",
+  "old_cap_usd": 9.0,
+  "new_cap_usd": 9.75,
+  "original_record_sha256": "41bf236e24824e0830071f2dd7e60f2849d92693b9c1cdf521f780bcfccac379",
+  "original_calls": 0,
+  "original_cost_usd": 0.0,
+  "freeze_sha256": "22097c421b5b8fc973a0c3f3d541ffceadc01b7dfc72355d2c2d325b815d1a10",
+  "wrapper_sha256": "3c6ecbd8e281623c64b118ba10509fc76d2bedd30c5b34f97610ce6cd78658b3",
+  "deadline_policy": "New 1800-second operational allowance starts at resume; old calls still count toward2000.",
+  "prefix": [],
+  "started_at": "2026-09-22T23:04:19.088418"
+}

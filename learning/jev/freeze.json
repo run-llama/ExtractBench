@@ -1,0 +1,1514 @@
+{
+  "selected_variant": "router",
+  "model": "typesafe/jev-1.13",
+  "resolved_model": "typesafe/jev-1.13-20260917",
+  "frozen_at": "2026-09-22T14:18:26.331502+00:00",
+  "source_sha256": {
+    "learning/jev/run.py": "17069eac4359c20ce119c195dcc937028f6dc6806cd5ed94d77fd43afcaf2a80",
+    "src/extract_bench/inference/providers/extract/jev/__init__.py": "56172964a8506bc66b4cf6917d105c52425ef080f644d107e72e1ad0fbc4d25b",
+    "src/extract_bench/inference/providers/extract/jev/citations.py": "4800895e525c10f9f2e7d32ee9f861e4a9c2af81c87ee65b6385592d292fbed3",
+    "src/extract_bench/inference/providers/extract/jev/client.py": "beb1a61abb4b88e0c376f51442ced7df794dcaba9976c360914bef744220cd35",
+    "src/extract_bench/inference/providers/extract/jev/parser.py": "bfe6db7e59a7c887901bb07c0db0a378b95342cb3f9b526b2bb435fb75486535",
+    "src/extract_bench/inference/providers/extract/jev/variant_anchors.py": "b19578366a5ea56088712a9272e6fb7140d0f2534698ba672b9c799e4c987858",
+    "src/extract_bench/inference/providers/extract/jev/variant_boundaries.py": "5459a351a81ecd7629ad57d8d310f35a190cf288f551b97e09c110406413c980",
+    "src/extract_bench/inference/providers/extract/jev/variant_compact.py": "2c6391fe6262f575decc967a3202b00d1d1dcbcd639fe7546dfa152a7b4fd666",
+    "src/extract_bench/inference/providers/extract/jev/variant_consensus.py": "9a3f10ebb5349950d48dd14756863d4b8c3c436cb9a089b6818fee37dc9df3cf",
+    "src/extract_bench/inference/providers/extract/jev/variant_fields.py": "9a21e0920e98714a567ddc9394349f7978692ed380bce208dcbfd20044104597",
+    "src/extract_bench/inference/providers/extract/jev/variant_geometric.py": "4b37ff54d32db9b70c311ee5f70a70eeddd120d611b5c1fc323b19d7248087df",
+    "src/extract_bench/inference/providers/extract/jev/variant_hierarchical.py": "d786f7feecbf31c06ef8099be47e57958c37280d71705e05384234eb304c3d38",
+    "src/extract_bench/inference/providers/extract/jev/variant_hybrid.py": "846b51de513c32a0af92e981da99119840b8ebaa3604912d144459f8617a3cda",
+    "src/extract_bench/inference/providers/extract/jev/variant_localized.py": "9739b688b0c6298c84a453bd37a17622854dff66031584fa4007b872183c1f32",
+    "src/extract_bench/inference/providers/extract/jev/variant_multipage.py": "8039f13cb57506671951878d63a32c0dd3a4c123c87f649a0a48ab0662e85818",
+    "src/extract_bench/inference/providers/extract/jev/variant_router.py": "eba0c6713fb54140a56c1e24ead76051f7998d9a5a53c40d68ad4dae7c229066",
+    "src/extract_bench/inference/providers/extract/jev/variant_rowrepair.py": "0c65f35f02d2f33d96070fa8828a755ffd481e37d3053a937af59a735a666db3",
+    "src/extract_bench/inference/providers/extract/jev/variant_tables.py": "540a3c3f382eec8115c50bf05a4e726c9453e378828cefbf359ea7c380a55c95",
+    "src/extract_bench/inference/providers/extract/jev_provider.py": "b1ff1d5eb1cef3b4fc3fba01266d45850133f4c2c1ab9bcc3465fcf97c3ac8f7",
+    "src/extract_bench/inference/providers/extract/table_codegen/schema_utils.py": "0d142666f01b497c2b17beba54200f2b3f9efeba92c7ee51ec90b6bd1543f075"
+  },
+  "documents": {
+    "00581-2011-p0050": {
+      "pdf_sha256": "2f226254360f8f7c73185242a3c57e7b81f7df0d8cf4dae2e81d2f0db5d4d341",
+      "schema_sha256": "30623361bad97ee66e685ddc8d0e859150ec2019b914757799140b776e80938a"
+    },
+    "00581-2011-p0052": {
+      "pdf_sha256": "a8505844ea3a28e4959381da4dcf6d795572fcdbcfa0f5599583972d20e4852e",
+      "schema_sha256": "30623361bad97ee66e685ddc8d0e859150ec2019b914757799140b776e80938a"
+    },
+    "00581-2011-p0098": {
+      "pdf_sha256": "45d67fc0692146ca39e614efe42927df12741c89106e6883c82ade47e84100d3",
+      "schema_sha256": "30623361bad97ee66e685ddc8d0e859150ec2019b914757799140b776e80938a"
+    },
+    "00581-2011-p0102": {
+      "pdf_sha256": "47ae2f0e36c19f9e143206a936912e286847d5a9427a09a42f31439449ff86f5",
+      "schema_sha256": "30623361bad97ee66e685ddc8d0e859150ec2019b914757799140b776e80938a"
+    },
+    "02-10121 H-12 7-2-2024 F-22628": {
+      "pdf_sha256": "879a2d82b22864b8033f787d5288959c36c8180e8fa88f08ff07a724140f7d7c",
+      "schema_sha256": "5008a526cc1325bf6eee97760732faf3b7af579a52383b9c0e6f6dda9164b054"
+    },
+    "07021-2016-p0014": {
+      "pdf_sha256": "451e7e94014e17bea24c8dbf98b93f3f6fc77aa80eeea4498c91a1d14ba6427a",
+      "schema_sha256": "30623361bad97ee66e685ddc8d0e859150ec2019b914757799140b776e80938a"
+    },
+    "07021-2016-p0016": {
+      "pdf_sha256": "be11dccda724dbe4c43fc67c1309a128abdf351d7ea91311d686006a3d098995",
+      "schema_sha256": "30623361bad97ee66e685ddc8d0e859150ec2019b914757799140b776e80938a"
+    },
+    "07021-2016-p0018": {
+      "pdf_sha256": "e667acf072151b34ddaee54965db1c838855019efce443d610c826b21472cdb5",
+      "schema_sha256": "30623361bad97ee66e685ddc8d0e859150ec2019b914757799140b776e80938a"
+    },
+    "07021-2016-p0026": {
+      "pdf_sha256": "ff03b46f1104e1bf2daa410d905c3cd0cd007fc948d76f55c27c9550dcc2616b",
+      "schema_sha256": "30623361bad97ee66e685ddc8d0e859150ec2019b914757799140b776e80938a"
+    },
+    "07021-2016-p0029": {
+      "pdf_sha256": "c485552704ad1ffe0fc0f65bb593641313f1a094ddf94d073bc486fec1866f72",
+      "schema_sha256": "30623361bad97ee66e685ddc8d0e859150ec2019b914757799140b776e80938a"
+    },
+    "07021-2016-p0032": {
+      "pdf_sha256": "500865852320964777300d94e324732bc6f4822bedd52ea926e0017347fd4168",
+      "schema_sha256": "30623361bad97ee66e685ddc8d0e859150ec2019b914757799140b776e80938a"
+    },
+    "07021-2016-p0038": {
+      "pdf_sha256": "ad6d9e5870e12e4b28836ca6efc77cdea539fbc0fb59dafebdbcda508c759156",
+      "schema_sha256": "0b623b60be77bc5bd2232ea891b728e3c1b36b5f4df011f4f40f5ce9554d46a1"
+    },
+    "07021-2016-p0039": {
+      "pdf_sha256": "4df1f5b8613c4b8ad12902a27aca838b24fcfc1aa1277266fdfe63caeae8ca2b",
+      "schema_sha256": "0b623b60be77bc5bd2232ea891b728e3c1b36b5f4df011f4f40f5ce9554d46a1"
+    },
+    "07021-2016-p0040": {
+      "pdf_sha256": "406d283581c82c4c9063bd530b06a4e2a3721d5615191c236ade6efb32e220b2",
+      "schema_sha256": "0b623b60be77bc5bd2232ea891b728e3c1b36b5f4df011f4f40f5ce9554d46a1"
+    },
+    "07021-2016-p0051": {
+      "pdf_sha256": "b9b8e2d4f4c8bd7b63a3493e182be82c2620b2724f6e5eb568e685789577460d",
+      "schema_sha256": "0b623b60be77bc5bd2232ea891b728e3c1b36b5f4df011f4f40f5ce9554d46a1"
+    },
+    "07021-2016-p0052": {
+      "pdf_sha256": "ba003a58c09db7ab2c4f08e99fc12ee46ab20253160a3750afdc6917bf3b3bb2",
+      "schema_sha256": "0b623b60be77bc5bd2232ea891b728e3c1b36b5f4df011f4f40f5ce9554d46a1"
+    },
+    "07021-2016-p0053": {
+      "pdf_sha256": "883af88dda9084694bbcea38f33c6b8e9c9ff5fcc1aa973470ed164716992501",
+      "schema_sha256": "0b623b60be77bc5bd2232ea891b728e3c1b36b5f4df011f4f40f5ce9554d46a1"
+    },
+    "07021-2016-p0074": {
+      "pdf_sha256": "0b280f5c605466472836c5790705260a4c6231c512c668270aa86eae66c27853",
+      "schema_sha256": "0b623b60be77bc5bd2232ea891b728e3c1b36b5f4df011f4f40f5ce9554d46a1"
+    },
+    "07021-2016-p0078": {
+      "pdf_sha256": "fd76a5753d93969a1a6343c32d0179b06d62acbd734fe96868df425b60ba0f27",
+      "schema_sha256": "0b623b60be77bc5bd2232ea891b728e3c1b36b5f4df011f4f40f5ce9554d46a1"
+    },
+    "07021-2016-p0082": {
+      "pdf_sha256": "84a290d5fd28524dc35cf074f957e078ffc377e16e37a0046f24beeab030fa1e",
+      "schema_sha256": "0b623b60be77bc5bd2232ea891b728e3c1b36b5f4df011f4f40f5ce9554d46a1"
+    },
+    "08-15427 H-12 1-21-2003 F-01341": {
+      "pdf_sha256": "16af340b6eff8c6dad73a18a99053a459bb0bd5e22fe10fd80f16d7947ad7d7b",
+      "schema_sha256": "5008a526cc1325bf6eee97760732faf3b7af579a52383b9c0e6f6dda9164b054"
+    },
+    "08-20813 H-12 10-17-2008 F-01094A": {
+      "pdf_sha256": "be7344e838525d62fcd0ce1b4061a2f03b218acbcb4051875d65ff232e36db79",
+      "schema_sha256": "5008a526cc1325bf6eee97760732faf3b7af579a52383b9c0e6f6dda9164b054"
+    },
+    "08-37943 H-12 09-25-2014 F-01249": {
+      "pdf_sha256": "a21839643f0b39b0c8c1328ee6ec14a17f0abdb67291db1c6c8c8f6e47b6dcb9",
+      "schema_sha256": "5008a526cc1325bf6eee97760732faf3b7af579a52383b9c0e6f6dda9164b054"
+    },
+    "08-43259 H-12 3-18-2024 F-22737": {
+      "pdf_sha256": "0638ae0316daeded32ba6516904945588c5c450be138f73dffc68e59acd45cf9",
+      "schema_sha256": "5008a526cc1325bf6eee97760732faf3b7af579a52383b9c0e6f6dda9164b054"
+    },
+    "08-51344 H-12 10-2-2023 F-22666": {
+      "pdf_sha256": "d69c8ed8cd0b27bb24cfc592fe04f374c2f67eed7a194716565fd1110642ee19",
+      "schema_sha256": "5008a526cc1325bf6eee97760732faf3b7af579a52383b9c0e6f6dda9164b054"
+    },
+    "13f__audent_global_2025q4": {
+      "pdf_sha256": "65735b5f9fb4e836a0a7a95103f54ccd38a92f54762113651170b5abffe55678",
+      "schema_sha256": "f6d255e1fa0c0378e60241dc6192d42460575d3c147d58665341ae50c28007a2"
+    },
+    "13f__dedeker_financial_llc": {
+      "pdf_sha256": "612289723da0dd9c69d540471803cd27c242e7dc773fa36a57ebfa4ac03eaffa",
+      "schema_sha256": "f6d255e1fa0c0378e60241dc6192d42460575d3c147d58665341ae50c28007a2"
+    },
+    "13f__radnor_capital_management_llc": {
+      "pdf_sha256": "c1998e41740248c2bbf014482fd841a8564b122243c2e1c42c21388fd4a566c3",
+      "schema_sha256": "f6d255e1fa0c0378e60241dc6192d42460575d3c147d58665341ae50c28007a2"
+    },
+    "13f__sl_advisors_llc": {
+      "pdf_sha256": "80db34d7bbea9feec78853c636fe8998c428d41744e4c7077bf634cb412ec302",
+      "schema_sha256": "f6d255e1fa0c0378e60241dc6192d42460575d3c147d58665341ae50c28007a2"
+    },
+    "2A-27-103150_116454": {
+      "pdf_sha256": "194175ea26333f81e3bdd1913a2373f77ae74ab9d46f7a430ccaa05bef4cbbfe",
+      "schema_sha256": "15720d205585ebe295ced29a11fba4149d8103ab04c579e77a23c72316712381"
+    },
+    "2A-9-136008_97695": {
+      "pdf_sha256": "e98937c710737bdf74b2b8e85f19c15bce520bfe4b4a62058e5938d0c2eba25a",
+      "schema_sha256": "15720d205585ebe295ced29a11fba4149d8103ab04c579e77a23c72316712381"
+    },
+    "2A-9-156032_107792": {
+      "pdf_sha256": "a7b87c60cbeb7808e88a902458745a0ff24da5c83a6701e8a789e3cba90c86a6",
+      "schema_sha256": "15720d205585ebe295ced29a11fba4149d8103ab04c579e77a23c72316712381"
+    },
+    "2A-9-160248_109904": {
+      "pdf_sha256": "82a5b87de6469aaa3541a945d7b7a31f2a74a5d106e9a2ecd02bbd7bb7b75cd1",
+      "schema_sha256": "15720d205585ebe295ced29a11fba4149d8103ab04c579e77a23c72316712381"
+    },
+    "2A-9-160258_109909": {
+      "pdf_sha256": "45894f55ba5b75dc9ef1b57f7c6b3f7fdc92a945b0429d7e5b74005e583a91b9",
+      "schema_sha256": "15720d205585ebe295ced29a11fba4149d8103ab04c579e77a23c72316712381"
+    },
+    "2A-9-160266_109913": {
+      "pdf_sha256": "46cc21fd397adeb17ba28c9e6f6fadbf69715c8ae259b3fc67ab6cdaa4afd3b1",
+      "schema_sha256": "15720d205585ebe295ced29a11fba4149d8103ab04c579e77a23c72316712381"
+    },
+    "2A-9-160268_109914": {
+      "pdf_sha256": "79b8cf582f228affbe1375bd42e1443a839aae4225119047cfe23c53847175eb",
+      "schema_sha256": "15720d205585ebe295ced29a11fba4149d8103ab04c579e77a23c72316712381"
+    },
+    "2A-9-160282_109921": {
+      "pdf_sha256": "47e43cc990a1e135c16fc4117c05f1e5d657ab5ded07dc2db2f8d180ec682bef",
+      "schema_sha256": "15720d205585ebe295ced29a11fba4149d8103ab04c579e77a23c72316712381"
+    },
+    "2A-9-160294_109927": {
+      "pdf_sha256": "a1a6b49f8e924dfe2bf44d073c1c40e936448b3842a64f99630de350703645de",
+      "schema_sha256": "15720d205585ebe295ced29a11fba4149d8103ab04c579e77a23c72316712381"
+    },
+    "2A-9-160298_109929": {
+      "pdf_sha256": "27e072e0639e41105da4e3626ff6fb90ccaf1791c80eb9ca776a88c5477f275f",
+      "schema_sha256": "15720d205585ebe295ced29a11fba4149d8103ab04c579e77a23c72316712381"
+    },
+    "2A-9-160318_109939": {
+      "pdf_sha256": "6eb89365449fd666ad5e85c02c08530d6e6bd2021569fa08cf84e787f2debf1e",
+      "schema_sha256": "15720d205585ebe295ced29a11fba4149d8103ab04c579e77a23c72316712381"
+    },
+    "3N1AB7AP8FY283932_professional_valuation": {
+      "pdf_sha256": "18479ab374f0d551fce40ef62c62bffe22f6e6253a0f1e3f7732370537785e20",
+      "schema_sha256": "2bed9e7c807550adf8d0e30f263ca978b6342c463a723272597c166404bba13a"
+    },
+    "3N1AB7AP8FY283932_professional_valuation_corrupted": {
+      "pdf_sha256": "e90c4beca98df74689c8b32c96e832d5407bb6b95b9d531a6c98e145d162be1a",
+      "schema_sha256": "2bed9e7c807550adf8d0e30f263ca978b6342c463a723272597c166404bba13a"
+    },
+    "593338187_200912_990PF-p0023": {
+      "pdf_sha256": "5d70ec757c665ca2538117faf9716c926c5b949994a6df0822f8423f55ebadba",
+      "schema_sha256": "096c5878f646131c2478c4078473bb8f3b8ff8682fa525fbfe021308d1ddb8f5"
+    },
+    "593338187_200912_990PF-p0024": {
+      "pdf_sha256": "a5f6eadb94ecb254d27f60f0ca43bd7a438c1c7078962a296b4702ad01e3292d",
+      "schema_sha256": "096c5878f646131c2478c4078473bb8f3b8ff8682fa525fbfe021308d1ddb8f5"
+    },
+    "593338187_200912_990PF-p0025": {
+      "pdf_sha256": "e2d6a56db142fe85d4ce048fea7f525a9bfa6433e5654bfb5a4069a0f6ec3492",
+      "schema_sha256": "096c5878f646131c2478c4078473bb8f3b8ff8682fa525fbfe021308d1ddb8f5"
+    },
+    "593338187_200912_990PF-p0026": {
+      "pdf_sha256": "cba609ad1602769be08f49dc04444ee87a0494d4d28d252e4b8e4e418bbd6bc5",
+      "schema_sha256": "096c5878f646131c2478c4078473bb8f3b8ff8682fa525fbfe021308d1ddb8f5"
+    },
+    "593338187_200912_990PF-p0027": {
+      "pdf_sha256": "6908617ae5617bf9e1eee314913203d8912d052e03bd3e76cc76e3b4b7df2607",
+      "schema_sha256": "096c5878f646131c2478c4078473bb8f3b8ff8682fa525fbfe021308d1ddb8f5"
+    },
+    "593338187_200912_990PF-p0030": {
+      "pdf_sha256": "1e3a9d1abdd1123653312a88c4c63318d59225f616ab8c5fdf5b4ae6d3675782",
+      "schema_sha256": "096c5878f646131c2478c4078473bb8f3b8ff8682fa525fbfe021308d1ddb8f5"
+    },
+    "593338187_200912_990PF-p0031": {
+      "pdf_sha256": "8786c0e901723ab90d95bd86547e5b74ed04f41d8719f5445506a33a62c75b9a",
+      "schema_sha256": "096c5878f646131c2478c4078473bb8f3b8ff8682fa525fbfe021308d1ddb8f5"
+    },
+    "593338187_200912_990PF-p0032": {
+      "pdf_sha256": "9949639ac32831cf8319a127cbd3e4fcdb96c124804bca352c75e67a3cb1cc88",
+      "schema_sha256": "096c5878f646131c2478c4078473bb8f3b8ff8682fa525fbfe021308d1ddb8f5"
+    },
+    "593338187_200912_990PF-p0033": {
+      "pdf_sha256": "fc38c693fce73e9736ed37dd339686b1740e40e4725a5a27dcf9a9f7a50fc960",
+      "schema_sha256": "096c5878f646131c2478c4078473bb8f3b8ff8682fa525fbfe021308d1ddb8f5"
+    },
+    "593338187_200912_990PF-p0034": {
+      "pdf_sha256": "234e23685b437291e80a49797244958e0454f72c403735eecc94cc9c9980392c",
+      "schema_sha256": "096c5878f646131c2478c4078473bb8f3b8ff8682fa525fbfe021308d1ddb8f5"
+    },
+    "593338187_200912_990PF-p0035": {
+      "pdf_sha256": "457569ef86f77865badbe5c8741cb7ff36f8f7fdb1e736fe27b07dd15052f503",
+      "schema_sha256": "096c5878f646131c2478c4078473bb8f3b8ff8682fa525fbfe021308d1ddb8f5"
+    },
+    "593338187_200912_990PF-p0036": {
+      "pdf_sha256": "1730c051085ca71ada2c1ee2ad718e1aec8e81ba09837d044878d6346ed6986c",
+      "schema_sha256": "096c5878f646131c2478c4078473bb8f3b8ff8682fa525fbfe021308d1ddb8f5"
+    },
+    "593338187_200912_990PF-p0037": {
+      "pdf_sha256": "66012a0560e53420fd383ccdd0224fe8862e87edc2139c08b436544d7103f7e6",
+      "schema_sha256": "096c5878f646131c2478c4078473bb8f3b8ff8682fa525fbfe021308d1ddb8f5"
+    },
+    "593338187_200912_990PF-p0038": {
+      "pdf_sha256": "ba3376f090a964b5a1a9953fe4b62c57203fbc938f54de45c53f24aaa49f7569",
+      "schema_sha256": "096c5878f646131c2478c4078473bb8f3b8ff8682fa525fbfe021308d1ddb8f5"
+    },
+    "7C-02014 H-12 5-20-2013 F-01083": {
+      "pdf_sha256": "601ccd331c6821f30113ca0b6869ad23a21561d36bace4cd3eac78f65767c8a7",
+      "schema_sha256": "5008a526cc1325bf6eee97760732faf3b7af579a52383b9c0e6f6dda9164b054"
+    },
+    "7C-04947 H-12 12-7-2009 F-01079": {
+      "pdf_sha256": "0cf75a5a307d3446c48f5f5c5218bc796177c8ecbb539683d6da9cc2843b2e22",
+      "schema_sha256": "5008a526cc1325bf6eee97760732faf3b7af579a52383b9c0e6f6dda9164b054"
+    },
+    "H9-53-1621_1656": {
+      "pdf_sha256": "91043855cae1445c5ad336624cfead3cb8adfa9d6e1467f265ff5567cf6ddaf8",
+      "schema_sha256": "3ed88269aa3b306944b365be830ad89677350e0630dcc2173bad72cef7e3041a"
+    },
+    "H9-53-2119_2144": {
+      "pdf_sha256": "5c50024d0b251a6457c906f191c444d8ab3b13b455126d8f703c42ba1ca0b422",
+      "schema_sha256": "3ed88269aa3b306944b365be830ad89677350e0630dcc2173bad72cef7e3041a"
+    },
+    "H9-53-23_23": {
+      "pdf_sha256": "24edfbc5a9f677789b671a025035040f940236bc67eaa8456566d7ecc61ed7f0",
+      "schema_sha256": "3ed88269aa3b306944b365be830ad89677350e0630dcc2173bad72cef7e3041a"
+    },
+    "H9-53-24_24": {
+      "pdf_sha256": "b1442c68ee2835c7d4322c8118442280cfb8198ec4cb4872f17e92ee92654a69",
+      "schema_sha256": "3ed88269aa3b306944b365be830ad89677350e0630dcc2173bad72cef7e3041a"
+    },
+    "H9-53-30_30": {
+      "pdf_sha256": "7903f5c7ed4f9cd5f0a4dea400f509c616738be7a8ffe327635d15101611d3b1",
+      "schema_sha256": "3ed88269aa3b306944b365be830ad89677350e0630dcc2173bad72cef7e3041a"
+    },
+    "H9-53-319_311": {
+      "pdf_sha256": "28ad6ff2e0a4e430ed73e2ebdbab9be7180e0c30e40344da64d28468f9cf5efe",
+      "schema_sha256": "3ed88269aa3b306944b365be830ad89677350e0630dcc2173bad72cef7e3041a"
+    },
+    "H9-53-31_31": {
+      "pdf_sha256": "bb59dc4e7e4d4906d52ce3763901ffd41624449318af43307ba59531466257d5",
+      "schema_sha256": "3ed88269aa3b306944b365be830ad89677350e0630dcc2173bad72cef7e3041a"
+    },
+    "H9-53-32_32": {
+      "pdf_sha256": "99d197d64fa621b8fc5caafaa1f893981ebb69f4b431c56477e2e4e35df459fa",
+      "schema_sha256": "3ed88269aa3b306944b365be830ad89677350e0630dcc2173bad72cef7e3041a"
+    },
+    "H9-53-514_1043": {
+      "pdf_sha256": "c754d48c9d5985ef14d5fb73261af439ecb507775e865b7515368b868da119ad",
+      "schema_sha256": "3ed88269aa3b306944b365be830ad89677350e0630dcc2173bad72cef7e3041a"
+    },
+    "H9-53-59_60": {
+      "pdf_sha256": "3138b0b9eb5558bd7a4926da7fd6fcbe9dc6416d598bf3b8a45721151bfb28b4",
+      "schema_sha256": "3ed88269aa3b306944b365be830ad89677350e0630dcc2173bad72cef7e3041a"
+    },
+    "H9-53-7226_7240": {
+      "pdf_sha256": "0f7729ec4db3c679c0bc2c5d53b68c72799bb988a388d6d48caa214ef429b07c",
+      "schema_sha256": "3ed88269aa3b306944b365be830ad89677350e0630dcc2173bad72cef7e3041a"
+    },
+    "H9-53-7234_7248": {
+      "pdf_sha256": "a231d4cca9d00885eec4d48b3658eaa4395fd21460dea411e1323dd968c16d4d",
+      "schema_sha256": "3ed88269aa3b306944b365be830ad89677350e0630dcc2173bad72cef7e3041a"
+    },
+    "H9-53-7239_7253": {
+      "pdf_sha256": "2af1284c9a65af93d12f3b0d723d6f4e4ad70b981c5778047e09e74d647067e2",
+      "schema_sha256": "3ed88269aa3b306944b365be830ad89677350e0630dcc2173bad72cef7e3041a"
+    },
+    "H9-53-9349_9509": {
+      "pdf_sha256": "b1c2ff4ee60678ce5a816e1a3d7615f4b9115d50bd516131fa2d207f1e455383",
+      "schema_sha256": "3ed88269aa3b306944b365be830ad89677350e0630dcc2173bad72cef7e3041a"
+    },
+    "H9-53-9386_9545": {
+      "pdf_sha256": "083d79321c0a160e2ad2cc4a3cf31274016f6b9a4d041c766e4131224c474b96",
+      "schema_sha256": "3ed88269aa3b306944b365be830ad89677350e0630dcc2173bad72cef7e3041a"
+    },
+    "P18-28-1547": {
+      "pdf_sha256": "a5e745098890dda9548454a5569eea2ff88713994e6927863d448cd6dee0ee7d",
+      "schema_sha256": "e03b4bb767622ee10daf2c1c08a21752895bff711ab5561bde19215ed95d6dcb"
+    },
+    "P18-28-21_77": {
+      "pdf_sha256": "f517d816d69d1d48c079ec6c23427301fd08a86efe0a2806beb97b205a2ac395",
+      "schema_sha256": "e03b4bb767622ee10daf2c1c08a21752895bff711ab5561bde19215ed95d6dcb"
+    },
+    "P18-28-35_39": {
+      "pdf_sha256": "9c2eb3ad26045ddcf2ec50d751bcce3d15c5e3f581aabe4c594f270fbd2f0aff",
+      "schema_sha256": "e03b4bb767622ee10daf2c1c08a21752895bff711ab5561bde19215ed95d6dcb"
+    },
+    "P18-28-43_44": {
+      "pdf_sha256": "bac565814afe042172f8d4a167477796595deddc745ba4a27a9ad5a56d98d68b",
+      "schema_sha256": "e03b4bb767622ee10daf2c1c08a21752895bff711ab5561bde19215ed95d6dcb"
+    },
+    "P18-28-44_45": {
+      "pdf_sha256": "49c8e65028901fa89df55d9d00cd6f304976303b97454e7dba2ed6771b11b1f9",
+      "schema_sha256": "e03b4bb767622ee10daf2c1c08a21752895bff711ab5561bde19215ed95d6dcb"
+    },
+    "P18-28-50_51": {
+      "pdf_sha256": "455fb956dcc87354dcd99cc0f428c0a3410da632aafd94e4f0887cacede4ac72",
+      "schema_sha256": "e03b4bb767622ee10daf2c1c08a21752895bff711ab5561bde19215ed95d6dcb"
+    },
+    "P18-28-52_53": {
+      "pdf_sha256": "de9898abdfc5403b95252e91691a2d80c916a9dad7372eaddf527ccc7f848816",
+      "schema_sha256": "e03b4bb767622ee10daf2c1c08a21752895bff711ab5561bde19215ed95d6dcb"
+    },
+    "P18-28-54_55": {
+      "pdf_sha256": "7e3d2e25639fa9f0cd661a00b3d168f6d2e6679b18a5e6a5380f852dfcee6ae3",
+      "schema_sha256": "e03b4bb767622ee10daf2c1c08a21752895bff711ab5561bde19215ed95d6dcb"
+    },
+    "P18-28-55_56": {
+      "pdf_sha256": "51a3aa089ac724f4486eddb93a869de9e955990a5f38f74fdc55f0ab75d6e3ba",
+      "schema_sha256": "e03b4bb767622ee10daf2c1c08a21752895bff711ab5561bde19215ed95d6dcb"
+    },
+    "P18-28-56_57": {
+      "pdf_sha256": "e190b1c4db48adde563781634cf5485f8f4d5c94d39b134992eddd1056c22276",
+      "schema_sha256": "e03b4bb767622ee10daf2c1c08a21752895bff711ab5561bde19215ed95d6dcb"
+    },
+    "P18-28-62_62": {
+      "pdf_sha256": "a8495e5d339302326f1f5a6e2fcf9183974678eb1afb0bae9909709b6eed148a",
+      "schema_sha256": "e03b4bb767622ee10daf2c1c08a21752895bff711ab5561bde19215ed95d6dcb"
+    },
+    "P4-27-51022_74198": {
+      "pdf_sha256": "337d6c013bd204f174e76d34fbec8868abbf106da330084b055dc5a4beaff34e",
+      "schema_sha256": "c50c32330a96e7259cd4a5a5125dbae3dacc48136407eb1882f2c5f5d2388b6c"
+    },
+    "P4-27-51094_74234": {
+      "pdf_sha256": "e06b664cd5a3b7c805fc7d6524d1e3b3e0f3a7f8fd4daffe0c71d713c631a24c",
+      "schema_sha256": "c50c32330a96e7259cd4a5a5125dbae3dacc48136407eb1882f2c5f5d2388b6c"
+    },
+    "P4-27-51220_74625": {
+      "pdf_sha256": "015bba21b22a78a0b3ce6bc478fe45da1b3d6f9800bc4454e61bddd201af72e4",
+      "schema_sha256": "c50c32330a96e7259cd4a5a5125dbae3dacc48136407eb1882f2c5f5d2388b6c"
+    },
+    "P4-27-51300_74665": {
+      "pdf_sha256": "55d90b9423e9be459bdc14fcd8df2bd89479a225d311d3e3228e875a86e06946",
+      "schema_sha256": "c50c32330a96e7259cd4a5a5125dbae3dacc48136407eb1882f2c5f5d2388b6c"
+    },
+    "P4-27-51318_74674": {
+      "pdf_sha256": "e10472ec8d5ef66d6e6600d92f7fd188ed1d647f02b37560b3443a82127e0be9",
+      "schema_sha256": "c50c32330a96e7259cd4a5a5125dbae3dacc48136407eb1882f2c5f5d2388b6c"
+    },
+    "P4-83-199_29": {
+      "pdf_sha256": "6b8d1a9aaeb2002f980d3f52b451190d270fbb13270f576e09fb8d76307827d2",
+      "schema_sha256": "c50c32330a96e7259cd4a5a5125dbae3dacc48136407eb1882f2c5f5d2388b6c"
+    },
+    "P4-83-201_30": {
+      "pdf_sha256": "3df5bb893d805bc09aed6dd3f102a549e0d8fb372d7c75797defb0735310b0d8",
+      "schema_sha256": "c50c32330a96e7259cd4a5a5125dbae3dacc48136407eb1882f2c5f5d2388b6c"
+    },
+    "P4-83-211_35": {
+      "pdf_sha256": "01e2ef3d2229479f413d5240a20ba4bcc278baeb600199384039ee1fe5c70da1",
+      "schema_sha256": "c50c32330a96e7259cd4a5a5125dbae3dacc48136407eb1882f2c5f5d2388b6c"
+    },
+    "P4-83-433_147": {
+      "pdf_sha256": "398f686ceb31fb016dba0cf0cf59477e0ff3a597ec946ea4de3e8c1515950c02",
+      "schema_sha256": "c50c32330a96e7259cd4a5a5125dbae3dacc48136407eb1882f2c5f5d2388b6c"
+    },
+    "P4-83-443_152": {
+      "pdf_sha256": "2a1d7207a15763faa4419696092240a37d0c181b55e9d3025f3c4dd29f7a9d21",
+      "schema_sha256": "c50c32330a96e7259cd4a5a5125dbae3dacc48136407eb1882f2c5f5d2388b6c"
+    },
+    "P4-83-449_155": {
+      "pdf_sha256": "27c6fb613a665e76669f2d6b55b46f22304b46ee8074fb352a2366004408a646",
+      "schema_sha256": "c50c32330a96e7259cd4a5a5125dbae3dacc48136407eb1882f2c5f5d2388b6c"
+    },
+    "P4-83-457_159": {
+      "pdf_sha256": "87e1ab1e4767c144a5494b52ac90a8bc6f9d87ff10a395ee5750121bb8c27df6",
+      "schema_sha256": "c50c32330a96e7259cd4a5a5125dbae3dacc48136407eb1882f2c5f5d2388b6c"
+    },
+    "P4-83-631_246": {
+      "pdf_sha256": "dab2c9cc04b065775684b4c8fe1eab6ff28b65825bb270ea641023f256dda4d1",
+      "schema_sha256": "c50c32330a96e7259cd4a5a5125dbae3dacc48136407eb1882f2c5f5d2388b6c"
+    },
+    "P4-83-693_277": {
+      "pdf_sha256": "672ccee145726116ad6846e15a02955148ff41f894f5a580f68dc3a391e2ab84",
+      "schema_sha256": "c50c32330a96e7259cd4a5a5125dbae3dacc48136407eb1882f2c5f5d2388b6c"
+    },
+    "P4-Historical Single Signature83-10963_5480": {
+      "pdf_sha256": "91e6c084622131653977e8e0f244fe4f13dbae34c8509172948939bdc94d1076",
+      "schema_sha256": "c50c32330a96e7259cd4a5a5125dbae3dacc48136407eb1882f2c5f5d2388b6c"
+    },
+    "P4-Historical Single Signature83-223_41": {
+      "pdf_sha256": "adf4d00fdb7b318aa50028f86f40d3a41ef37fdceb7f7ad0c47363798e9cf552",
+      "schema_sha256": "c50c32330a96e7259cd4a5a5125dbae3dacc48136407eb1882f2c5f5d2388b6c"
+    },
+    "P4-Historical Single Signature83-257_58": {
+      "pdf_sha256": "af03226f99a51c7bc51ca330f3f8dcc4fe6b442303e8794eee51e6528bf45369",
+      "schema_sha256": "c50c32330a96e7259cd4a5a5125dbae3dacc48136407eb1882f2c5f5d2388b6c"
+    },
+    "REDACTED_2007_NISSAN_MURANO_professional_valuation": {
+      "pdf_sha256": "e3d5e2405c119a214f1d5fae8fdcc48ff60a32c1c58bd0952db37a4fecc87762",
+      "schema_sha256": "2bed9e7c807550adf8d0e30f263ca978b6342c463a723272597c166404bba13a"
+    },
+    "ROGER-WINFIELD-SCOTT-FOUNDATION-INC-2009-580655183-p0023": {
+      "pdf_sha256": "903124a599db469d91ac37b53bddfffc9c8d5fd257de37e44638b1f001b6802c",
+      "schema_sha256": "096c5878f646131c2478c4078473bb8f3b8ff8682fa525fbfe021308d1ddb8f5"
+    },
+    "ROGER-WINFIELD-SCOTT-FOUNDATION-INC-2009-580655183-p0024": {
+      "pdf_sha256": "683a95d43d0abbe8d100c03403309adc3fb4566f2a41d982cfb07106d13567d8",
+      "schema_sha256": "096c5878f646131c2478c4078473bb8f3b8ff8682fa525fbfe021308d1ddb8f5"
+    },
+    "ROGER-WINFIELD-SCOTT-FOUNDATION-INC-2009-580655183-p0025": {
+      "pdf_sha256": "87d7ed4ebdbe33b173bff7ec6b1fbdf87d48838a6793f022055b67bb6ded9d37",
+      "schema_sha256": "096c5878f646131c2478c4078473bb8f3b8ff8682fa525fbfe021308d1ddb8f5"
+    },
+    "W-1-9-258_260": {
+      "pdf_sha256": "e274aae61550ad5c93e23d95dcd0a9b8f0c043372136dee6b5a20ef732183fe5",
+      "schema_sha256": "f21488692951d6a84a123ebf39dffcf4a44003acf5db8ba27a6fcd0f4eac7c97"
+    },
+    "W-1-9-260_262": {
+      "pdf_sha256": "b8d17febb6989713b459d788c470f4915501cdadf52ebd182b6b05aad5d81bf9",
+      "schema_sha256": "f21488692951d6a84a123ebf39dffcf4a44003acf5db8ba27a6fcd0f4eac7c97"
+    },
+    "W-1-9-261_263": {
+      "pdf_sha256": "26cfe733bd7ae8ea435ce8638f7e8e7ff69e005676b9ac817dbd63c38ad0d392",
+      "schema_sha256": "f21488692951d6a84a123ebf39dffcf4a44003acf5db8ba27a6fcd0f4eac7c97"
+    },
+    "W14-2nd Sub 53269 Revised W14": {
+      "pdf_sha256": "6860c28b86c44cb8796b4f0204ac938b7017681fe4ac9ba3522a1df20d2206b3",
+      "schema_sha256": "7ad6ae99b204297b28920683d028ff9ef71b35a455b7a34a7f2363fd474d5d45"
+    },
+    "W14-2nd Sub 55975 Revised W14 ADMIN REVIEWED": {
+      "pdf_sha256": "511c4118042541f859c4c94eb760be643b3d7f84d53884c1cc9c1256deaf6ab4",
+      "schema_sha256": "7ad6ae99b204297b28920683d028ff9ef71b35a455b7a34a7f2363fd474d5d45"
+    },
+    "W14-52342_W14": {
+      "pdf_sha256": "e09f090e9d93488e232981df3061c44686901886fd65d5cd5f4d961141d94028",
+      "schema_sha256": "7ad6ae99b204297b28920683d028ff9ef71b35a455b7a34a7f2363fd474d5d45"
+    },
+    "W14-53632_W14 ADMIN REVIEWED": {
+      "pdf_sha256": "0c742954d861f8063cec5f4cee06eeb5e267841e8e7b3ddff79025515b63a321",
+      "schema_sha256": "7ad6ae99b204297b28920683d028ff9ef71b35a455b7a34a7f2363fd474d5d45"
+    },
+    "W14-54500_W14 admin reviewed": {
+      "pdf_sha256": "5e86adaf3f1f4e575c5867a874e8096fd34f188dd6d615e6d53972270b5fb6ab",
+      "schema_sha256": "7ad6ae99b204297b28920683d028ff9ef71b35a455b7a34a7f2363fd474d5d45"
+    },
+    "W14-55311_W14 reviewed": {
+      "pdf_sha256": "1bb5459c96011dd708af2cf252b31a075c5fabdd4fdb76a0d21abd86b2fda359",
+      "schema_sha256": "7ad6ae99b204297b28920683d028ff9ef71b35a455b7a34a7f2363fd474d5d45"
+    },
+    "W14-55711_W14 ADMIN REVIEWED": {
+      "pdf_sha256": "dd290241efa81f1010d54d773b8fb5a038335444c2c1abdbfe40786296aa167c",
+      "schema_sha256": "7ad6ae99b204297b28920683d028ff9ef71b35a455b7a34a7f2363fd474d5d45"
+    },
+    "W14-57077_W14": {
+      "pdf_sha256": "0bd9524bda05afacfbe18d6661bd73fb49047c2fd863c6ff16e7da96a13e898e",
+      "schema_sha256": "7ad6ae99b204297b28920683d028ff9ef71b35a455b7a34a7f2363fd474d5d45"
+    },
+    "W14-57728_W14_REVISED": {
+      "pdf_sha256": "34c1d1146e7e8e291db63291bd60f22e35a31fb9d3a9540a19439c079722ca70",
+      "schema_sha256": "7ad6ae99b204297b28920683d028ff9ef71b35a455b7a34a7f2363fd474d5d45"
+    },
+    "W14-58025_W14 Admin Reviewed": {
+      "pdf_sha256": "1381e5060c048d5ef1f50954f403b431c0c1ead9b1d2f384dc7aec80c7a199ec",
+      "schema_sha256": "7ad6ae99b204297b28920683d028ff9ef71b35a455b7a34a7f2363fd474d5d45"
+    },
+    "W14-58509_W14 2nd sub revised": {
+      "pdf_sha256": "22511db4eda31b6cba04e88fc8732c47e00d191d81cc9468c4e1366214f4901a",
+      "schema_sha256": "7ad6ae99b204297b28920683d028ff9ef71b35a455b7a34a7f2363fd474d5d45"
+    },
+    "W14-58549_W14": {
+      "pdf_sha256": "47ebc5649fc96c7e621f9a99e61705eca927f13d019cc57107b4128358e708d0",
+      "schema_sha256": "7ad6ae99b204297b28920683d028ff9ef71b35a455b7a34a7f2363fd474d5d45"
+    },
+    "W14-Atascosa SWD Well No. 4 - W-14 (Updated 01.22.2025)": {
+      "pdf_sha256": "628bac93c3ff54210d8c22e42b13367cdf2c832d591b56057746ce027977a2e7",
+      "schema_sha256": "7ad6ae99b204297b28920683d028ff9ef71b35a455b7a34a7f2363fd474d5d45"
+    },
+    "W2-27-216874_212740": {
+      "pdf_sha256": "5106413ab9e751ee4e0d252e9c42bbdf7350b43ee47855aeba1bad397540ac60",
+      "schema_sha256": "3868a7c27e7022ac1659e57eb2173013c326f3856d7b623d079bb78dbfdba4ce"
+    },
+    "W2-27-217184_213122": {
+      "pdf_sha256": "7519c7d5e769a8ef4d3f3d919fb498736b23a369b2bbc74ee8062d3b1815afef",
+      "schema_sha256": "3868a7c27e7022ac1659e57eb2173013c326f3856d7b623d079bb78dbfdba4ce"
+    },
+    "W2-27-217314_213200": {
+      "pdf_sha256": "2ef81ddf8bdd05e011165c2654b1e384a34f024c74a24ccbc48c37fa840490c5",
+      "schema_sha256": "3868a7c27e7022ac1659e57eb2173013c326f3856d7b623d079bb78dbfdba4ce"
+    },
+    "W2-27-217884_213729": {
+      "pdf_sha256": "d485ec016665f64fa24c4c91f489dee83da21aed891d5697a1680b42bf8401ac",
+      "schema_sha256": "3868a7c27e7022ac1659e57eb2173013c326f3856d7b623d079bb78dbfdba4ce"
+    },
+    "WVWJK73C19P047779_professional_valuation": {
+      "pdf_sha256": "004176e394dd5e7f708729afc38c17ff59a9ea88337971e8e69c2818775305db",
+      "schema_sha256": "2bed9e7c807550adf8d0e30f263ca978b6342c463a723272597c166404bba13a"
+    },
+    "WVWJK73C19P047779_professional_valuation_corrupted": {
+      "pdf_sha256": "adcbd1f42d4890824641785d82c185e0f4b39205dc0f3140adc6287f5e89dcd4",
+      "schema_sha256": "2bed9e7c807550adf8d0e30f263ca978b6342c463a723272597c166404bba13a"
+    },
+    "YV4952BL2C1140915_professional_valuation": {
+      "pdf_sha256": "b1c78255a3a63d08853ebbb3b183d2535f269e69317b5756600a9cb10592b167",
+      "schema_sha256": "2bed9e7c807550adf8d0e30f263ca978b6342c463a723272597c166404bba13a"
+    },
+    "YV4952BL2C1140915_professional_valuation_corrupted": {
+      "pdf_sha256": "f35e446b5b23c9c94da5086b7a6f4f485ecfe2b21fc7f2e22448edff84864162",
+      "schema_sha256": "2bed9e7c807550adf8d0e30f263ca978b6342c463a723272597c166404bba13a"
+    },
+    "aclu_cdwg_invoice": {
+      "pdf_sha256": "8a87cfd1c8006b7f23c958de052b65316b2d39c32e1699f98861d938510f1c0b",
+      "schema_sha256": "64c3779952a98fae03b4c0de00e866d9a97951486e09ff89ffc4c4dd0bb7cee5"
+    },
+    "arif-2021": {
+      "pdf_sha256": "6f764533ccb3b8e5a523edd7c0a1bb751abcdb575519549618badbf3f1b91897",
+      "schema_sha256": "30bc292ec0f2a761b6bf4535c1515d4d0373c5182dd4b74e34011438d71a0c3f"
+    },
+    "arif-2022": {
+      "pdf_sha256": "7e5934b9dbc2f06804e7dbcffe44ff881724e167e9c04e856840d9e779a5132e",
+      "schema_sha256": "1c4b756b03b04c2c2074122829bd9eaba73003b59e0c4a79459d1e6b275df913"
+    },
+    "arif-2024": {
+      "pdf_sha256": "1ffcc7f5850db85dfa700d269c13e68a0e155e6486d2195a097e5e18b63a45ab",
+      "schema_sha256": "adb8676f92cba92714e20343d095fe37ca9e5ceeed5c119622a0690c5c22c0ee"
+    },
+    "bianco-2024": {
+      "pdf_sha256": "571fe05a74b6c4820906ac9c00e9a8ce141420b7de54d4129f60c61c887c5012",
+      "schema_sha256": "adb8676f92cba92714e20343d095fe37ca9e5ceeed5c119622a0690c5c22c0ee"
+    },
+    "brand_price_list_lifescience_2024": {
+      "pdf_sha256": "f25e9de511345bed35024a1c19ef76880a2427c676a2fe6cbdd82a2ca1ea86cc",
+      "schema_sha256": "bc78fd74c80febb2b94cddf06e3e0fd3c9d7fefe09ac36d5b123f971b00735eb"
+    },
+    "brand_price_list_lifescience_2024_corrupted": {
+      "pdf_sha256": "7b2b45d19db204c2e1c7557d9b17a843737876faa5dfd82ba96da648df9b136b",
+      "schema_sha256": "bc78fd74c80febb2b94cddf06e3e0fd3c9d7fefe09ac36d5b123f971b00735eb"
+    },
+    "budget_appendix_doe": {
+      "pdf_sha256": "7a2066a4e04327a913dad57a0644c6a3fa66aa4eb1dea6f042b25d533e45cbf2",
+      "schema_sha256": "2c404106c6ef68983cf0f8e2dcb51dfcb7bf1583ccb2a21245b5eedc75686331"
+    },
+    "budget_appendix_legis": {
+      "pdf_sha256": "436b2659c1002cb2e7aac4cc9cf3b421d251fedc99082eafd20072e38aba3afe",
+      "schema_sha256": "2c404106c6ef68983cf0f8e2dcb51dfcb7bf1583ccb2a21245b5eedc75686331"
+    },
+    "ca_rad_crossover_inpatient_p5": {
+      "pdf_sha256": "a1b71ba11308fa832e235b62954bbb230fab77e921fc309805ebcec6c01c2bd2",
+      "schema_sha256": "13eaa707b5ac17f2c0deef4667980b1ee49b2113f51f1c5eabdf266e4b1b5db5"
+    },
+    "ca_rad_crossover_inpatient_p5_corrupted": {
+      "pdf_sha256": "a5b97b3ec0b114adba68d523bc9345e1d33134b098e189b8a5e08452043a60f8",
+      "schema_sha256": "13eaa707b5ac17f2c0deef4667980b1ee49b2113f51f1c5eabdf266e4b1b5db5"
+    },
+    "ca_rad_crossover_outpatient_p5": {
+      "pdf_sha256": "f1391851e87db3dad74827f3a20eccb299861b87b34e0b0b71f0924e49fa3151",
+      "schema_sha256": "13eaa707b5ac17f2c0deef4667980b1ee49b2113f51f1c5eabdf266e4b1b5db5"
+    },
+    "ca_rad_crossover_outpatient_p5_corrupted": {
+      "pdf_sha256": "0045db2f577520af36c1bedda0886a413a4dc43f383901c4fc55608bc4549018",
+      "schema_sha256": "13eaa707b5ac17f2c0deef4667980b1ee49b2113f51f1c5eabdf266e4b1b5db5"
+    },
+    "caterpillar_spec_sheet_312c_excavator": {
+      "pdf_sha256": "273da886c2e150c04d5577424a099a12369612317598aaca8f4900e5bb9a4fc7",
+      "schema_sha256": "189059eb7b663219faa87a3ff3a73d42c81ced976bc73252bd071fbd95c3e0c8"
+    },
+    "caterpillar_spec_sheet_312c_excavator_corrupted": {
+      "pdf_sha256": "acae3c16a4e19dd75d4f1060e0d81a6dceda4c243f1de90ffe09bdae6b5bb414",
+      "schema_sha256": "189059eb7b663219faa87a3ff3a73d42c81ced976bc73252bd071fbd95c3e0c8"
+    },
+    "caterpillar_spec_sheet_330_excavator": {
+      "pdf_sha256": "521739ebf245900cac628bd7b424b7c67d9aac5101ccdf4e3ef7ce20cfdd6267",
+      "schema_sha256": "189059eb7b663219faa87a3ff3a73d42c81ced976bc73252bd071fbd95c3e0c8"
+    },
+    "caterpillar_spec_sheet_330_excavator_corrupted": {
+      "pdf_sha256": "1823bd680846485f668443b7d969b0d2f8f25e81401006fa768ca979e007b6ab",
+      "schema_sha256": "189059eb7b663219faa87a3ff3a73d42c81ced976bc73252bd071fbd95c3e0c8"
+    },
+    "cbp_7501_continuation_0001": {
+      "pdf_sha256": "eb4418971b4ccdbea1a78e456c304f91f65f5cc4d372ab215d7516f6f155a62a",
+      "schema_sha256": "b596f72711868f82a87b637df40cceeb36d723f9fe6a9388f783f3e9b89dec11"
+    },
+    "cbp_7501_continuation_0002": {
+      "pdf_sha256": "dc6de6c12c8aa232225b4a4307c88e73e56060830457957f47fb8a58b8458858",
+      "schema_sha256": "b596f72711868f82a87b637df40cceeb36d723f9fe6a9388f783f3e9b89dec11"
+    },
+    "cbp_7501_continuation_0007": {
+      "pdf_sha256": "bad87db82d08420fa5e5c2bc1e0e24bb0b216434aa8095ef7c8d03f53298fdbf",
+      "schema_sha256": "b596f72711868f82a87b637df40cceeb36d723f9fe6a9388f783f3e9b89dec11"
+    },
+    "cbp_7501_continuation_0016": {
+      "pdf_sha256": "bb9dd2dc1ff51415558f222793a9aad405530de7cbe4af43a0f76e83ec43d7e4",
+      "schema_sha256": "b596f72711868f82a87b637df40cceeb36d723f9fe6a9388f783f3e9b89dec11"
+    },
+    "cbp_7501_continuation_0018": {
+      "pdf_sha256": "554b6a413f4b8187fdbb2444c145bed9b8a8981b80f3f3e4908d204ef9be6d3d",
+      "schema_sha256": "b596f72711868f82a87b637df40cceeb36d723f9fe6a9388f783f3e9b89dec11"
+    },
+    "ccc_online_0005_american_family_chevrolet_sonic": {
+      "pdf_sha256": "01627e30b05293fed5e878faedeeb9e810a125181de7a6993caecaa949774986",
+      "schema_sha256": "97bc56fc0019939b8f89e45349601a7d6962f7f15b962b6ed32b8aa0c43e1939"
+    },
+    "ccc_online_0005_american_family_chevrolet_sonic_corrupted": {
+      "pdf_sha256": "b8315dc32c2a9392a8df9676984d9d7185770103d073608fb335bf62dbcff6b7",
+      "schema_sha256": "97bc56fc0019939b8f89e45349601a7d6962f7f15b962b6ed32b8aa0c43e1939"
+    },
+    "ccc_online_0006_esurance_toyota_rav4": {
+      "pdf_sha256": "2f7ce7cf8292565f19fd458759fa232fcce7c5019ddffe99a9809dbeebd20d30",
+      "schema_sha256": "97bc56fc0019939b8f89e45349601a7d6962f7f15b962b6ed32b8aa0c43e1939"
+    },
+    "ccc_online_0006_esurance_toyota_rav4_corrupted": {
+      "pdf_sha256": "a708438680dd52b4e3555f32e32370fff2e9e9d6de33ec8a03c58bff29763450",
+      "schema_sha256": "97bc56fc0019939b8f89e45349601a7d6962f7f15b962b6ed32b8aa0c43e1939"
+    },
+    "census_statab": {
+      "pdf_sha256": "f02c347dfe01e5720aff8d532933a8e478e6abf52a21a1af16a31fc86f6194d6",
+      "schema_sha256": "f21e7bd6f9c09a1bbc20ff070575a697d29d5cd2d39a62cb2264bc7808f544cf"
+    },
+    "census_statab_12s0035": {
+      "pdf_sha256": "46525faea141ed004b57ec485f58eac0cef9a7360ab7671e9af47f8695de0bf5",
+      "schema_sha256": "f21e7bd6f9c09a1bbc20ff070575a697d29d5cd2d39a62cb2264bc7808f544cf"
+    },
+    "census_statab_12s0711": {
+      "pdf_sha256": "08bace05a48f2ec0f5a8cd07c8c2fe52ddb6240d597fb8e489acdf678e299a44",
+      "schema_sha256": "f21e7bd6f9c09a1bbc20ff070575a697d29d5cd2d39a62cb2264bc7808f544cf"
+    },
+    "census_statab_employment": {
+      "pdf_sha256": "2745b48bd1458ba2324b0009bcf8ca8784164e39babb75985d3257445cf71bf2",
+      "schema_sha256": "f21e7bd6f9c09a1bbc20ff070575a697d29d5cd2d39a62cb2264bc7808f544cf"
+    },
+    "census_statab_income_by_state": {
+      "pdf_sha256": "7c61ade898ba39371b58387bcd8bd97913094fc06b23a03cb1e65323d032ff5d",
+      "schema_sha256": "f21e7bd6f9c09a1bbc20ff070575a697d29d5cd2d39a62cb2264bc7808f544cf"
+    },
+    "cfpb_closing-disclosure_H25E": {
+      "pdf_sha256": "75611b4dded3424d71aa46b4716324bd75d35e248e6d1cf1ecdb5b703b6e4fc6",
+      "schema_sha256": "166b66fcdeba068088c5d867c232204bbff04cd0b3bac9badabaa4f95e0d655e"
+    },
+    "cfpb_closing-disclosure_H25E_corrupted": {
+      "pdf_sha256": "a889c5b7a0d82e15fd99a7c47dd49a1dd245f5175623ade64758d9c71d056d16",
+      "schema_sha256": "166b66fcdeba068088c5d867c232204bbff04cd0b3bac9badabaa4f95e0d655e"
+    },
+    "cfpb_closing-disclosure_H25F": {
+      "pdf_sha256": "1a1de1fbddb2f6f26f3227195406f369e1c4aba0b15729bda35917d20a81bfa0",
+      "schema_sha256": "166b66fcdeba068088c5d867c232204bbff04cd0b3bac9badabaa4f95e0d655e"
+    },
+    "cfpb_closing-disclosure_H25F_corrupted": {
+      "pdf_sha256": "32881402fe099d28dca393e60c9b94559161ac511c854f7cd1f7aec51b9fbaff",
+      "schema_sha256": "166b66fcdeba068088c5d867c232204bbff04cd0b3bac9badabaa4f95e0d655e"
+    },
+    "cfpb_closing-disclosure_filled-sample": {
+      "pdf_sha256": "9f5dc39bf904a75c6a43266fed3c0617e93cdaef4ed770861a33ce5cd1ac9c1b",
+      "schema_sha256": "166b66fcdeba068088c5d867c232204bbff04cd0b3bac9badabaa4f95e0d655e"
+    },
+    "cfpb_closing-disclosure_filled-sample_corrupted": {
+      "pdf_sha256": "257964ee735970ddf25d6dd56b3e34af80fcca8c473f9cc79eb8388ea253bc7b",
+      "schema_sha256": "166b66fcdeba068088c5d867c232204bbff04cd0b3bac9badabaa4f95e0d655e"
+    },
+    "dc-pepco-residential-bill": {
+      "pdf_sha256": "8796ed60843ea1a0c779b95f1564ac8130bdab3b6effba09353cec217cbac119",
+      "schema_sha256": "5e3ca92d6ea7d855240d514ea31826ed6cf1ed33126928faccf2a130d24237cb"
+    },
+    "dd1155_schedule_continuation_0002": {
+      "pdf_sha256": "dca8584ecda4bbba8418a0bfcfa43f3a9f97318d4b7aa64f055c3d9c12c53d5e",
+      "schema_sha256": "59e6d304bb3444a1fcf7bebdb9975c97e543f874fc4307a64ad677c1dd4a241e"
+    },
+    "dd1155_schedule_continuation_0008": {
+      "pdf_sha256": "d23348a012161e4fe9f438053f082f3fed9e48a2fae09ece92c5e4d296eb5914",
+      "schema_sha256": "59e6d304bb3444a1fcf7bebdb9975c97e543f874fc4307a64ad677c1dd4a241e"
+    },
+    "fidelity_0002_sample": {
+      "pdf_sha256": "7ef11e73f6097c0473cbd6fda2dc04a58817582be1273bfc0703d9b50b58a50f",
+      "schema_sha256": "d1dc8be6bc2229343c21083d5eb2c15aea1abc07f23aa384869962aa22ce133e"
+    },
+    "fort_bend_operativeiq_invoice": {
+      "pdf_sha256": "b260a7591b54983e0e04f696a6a508f2fdfde1db2038ea3f77527c7ee79285b2",
+      "schema_sha256": "64c3779952a98fae03b4c0de00e866d9a97951486e09ff89ffc4c4dd0bb7cee5"
+    },
+    "golden_corral_receipt_refugio_county_auditor": {
+      "pdf_sha256": "77109a6f067ff1f62dc8342dd47db3228cf7be53ab0f0b50b1ea8f6b442daf01",
+      "schema_sha256": "0b8525756617e8df86ef0599fb3b7b4a3c81a9cab45d9e6dd38fe11c51473d84"
+    },
+    "grafton_isotrope_invoice_19503": {
+      "pdf_sha256": "7b6f8dba51da521091b8f14e46572fba0a50b4069bac899b51284e7970f1e519",
+      "schema_sha256": "64c3779952a98fae03b4c0de00e866d9a97951486e09ff89ffc4c4dd0bb7cee5"
+    },
+    "gsa_mas_it_labor_0004": {
+      "pdf_sha256": "26f6c7b1f91464b24b9b414ab96e130001e2eebbb8a0f2dd5018132dfe535c15",
+      "schema_sha256": "27a32c93f440da9aaa09878c85e8185c47eef79f2d42843d4ff878498bf7a573"
+    },
+    "gsa_mas_it_labor_0020": {
+      "pdf_sha256": "d23c37fe2190868ade379087eeaa8f692d7f17becdf0a5c9fc35daa0b6888952",
+      "schema_sha256": "27a32c93f440da9aaa09878c85e8185c47eef79f2d42843d4ff878498bf7a573"
+    },
+    "h5Filing-45659-1": {
+      "pdf_sha256": "377c9c0028e5ff234b6b69e97841393ff51e24932000bafd10face8b51039ebd",
+      "schema_sha256": "9da7f35863547bd42c931cbdffbd63f66fe5155d32e192786b28f697ba11e121"
+    },
+    "h5Filing-45884-1": {
+      "pdf_sha256": "50f579794bbf055a921dbf240c56b953bcdd22b5639ea97fc981ab8cb8832155",
+      "schema_sha256": "9da7f35863547bd42c931cbdffbd63f66fe5155d32e192786b28f697ba11e121"
+    },
+    "h5Filing-45887-1": {
+      "pdf_sha256": "6bf704f88102a145e77602cdefe532ec0cc1edd5cdeffc1ca87599d80761e8db",
+      "schema_sha256": "9da7f35863547bd42c931cbdffbd63f66fe5155d32e192786b28f697ba11e121"
+    },
+    "h5Filing-45919-1": {
+      "pdf_sha256": "24b60d5581f9401bbfacd5a698f4f8f71e57f05afdf7b41d46c1e032e307a2a8",
+      "schema_sha256": "9da7f35863547bd42c931cbdffbd63f66fe5155d32e192786b28f697ba11e121"
+    },
+    "h5Filing-46302-1": {
+      "pdf_sha256": "833f6818b88176b84e287ad3899a4f02c8cd5c150d73a05db45a507d9c2aad44",
+      "schema_sha256": "9da7f35863547bd42c931cbdffbd63f66fe5155d32e192786b28f697ba11e121"
+    },
+    "h5Filing-46383-1": {
+      "pdf_sha256": "bfce0614803b3333a6778ee6b0e3f8b238d6095a82ee321624ad2e8cb1780018",
+      "schema_sha256": "9da7f35863547bd42c931cbdffbd63f66fe5155d32e192786b28f697ba11e121"
+    },
+    "h5Filing-46384-1": {
+      "pdf_sha256": "7ef1679349e04871c2799c991e4797a055ee0ed5dc64eead54dd4691ad936996",
+      "schema_sha256": "9da7f35863547bd42c931cbdffbd63f66fe5155d32e192786b28f697ba11e121"
+    },
+    "h5Filing-46780-1": {
+      "pdf_sha256": "ff6508315b3284186e922fe6bfb831db9c93173e70519da3c19383c20c8bcb63",
+      "schema_sha256": "9da7f35863547bd42c931cbdffbd63f66fe5155d32e192786b28f697ba11e121"
+    },
+    "h5Filing-47175-1": {
+      "pdf_sha256": "316bb09a40e54407734ccdbdedb1b76409fac96ce32929f7729d08cf8af5f547",
+      "schema_sha256": "9da7f35863547bd42c931cbdffbd63f66fe5155d32e192786b28f697ba11e121"
+    },
+    "h5Filing-48982-1": {
+      "pdf_sha256": "47c32419d0b4a13e888b4355043cc546c67e227865930346fc5001720db31d6e",
+      "schema_sha256": "9da7f35863547bd42c931cbdffbd63f66fe5155d32e192786b28f697ba11e121"
+    },
+    "h5Filing-49070-1": {
+      "pdf_sha256": "d04a256609405828f96820307a5051023b549675d5d3e53996d36630cd9dd544",
+      "schema_sha256": "9da7f35863547bd42c931cbdffbd63f66fe5155d32e192786b28f697ba11e121"
+    },
+    "h5Filing-50745-2": {
+      "pdf_sha256": "6202430be71d2c5ab414ab5882f8e7fdd5b4f1b09c204c7447e93dad6f51aa46",
+      "schema_sha256": "9da7f35863547bd42c931cbdffbd63f66fe5155d32e192786b28f697ba11e121"
+    },
+    "h5Filing-66006-1": {
+      "pdf_sha256": "d211bca5823c77ea72d892eceebcf0af7203d12483f1efdd19b88640690cd4a5",
+      "schema_sha256": "9da7f35863547bd42c931cbdffbd63f66fe5155d32e192786b28f697ba11e121"
+    },
+    "hingham-grainger-invoice": {
+      "pdf_sha256": "41cb782032cca14b7625e7eb6ef41091b04f9ab62748b577c5011e8b66e401ab",
+      "schema_sha256": "64c3779952a98fae03b4c0de00e866d9a97951486e09ff89ffc4c4dd0bb7cee5"
+    },
+    "hingham-wbmason-invoice": {
+      "pdf_sha256": "ae91473d351decd2cd36ad4b8486d62f16dadd2393b3e42c3684e3c23090d701",
+      "schema_sha256": "64c3779952a98fae03b4c0de00e866d9a97951486e09ff89ffc4c4dd0bb7cee5"
+    },
+    "hingham_lowes_receipt": {
+      "pdf_sha256": "2a636b87a3a73becf52de2ecf9467be6144bf921fb4a93bb87870afe91cf485f",
+      "schema_sha256": "0b8525756617e8df86ef0599fb3b7b4a3c81a9cab45d9e6dd38fe11c51473d84"
+    },
+    "lancaster_county_ne_requisition_po_husker_steel": {
+      "pdf_sha256": "f1cda8d78cc6ff55d35fed5d4277f4b6ef2421690fb61b5cb71ea772bdb51dbd",
+      "schema_sha256": "bb4cff41496f3335e6d5ddc0e3604b16159bff6a689a0e7458e2974278056b5a"
+    },
+    "lancaster_county_ne_requisition_po_husker_steel_corrupted": {
+      "pdf_sha256": "47ec12bf52083e85e5bfa7197b22734195a0871e414a0e7b4db588df2b89f41c",
+      "schema_sha256": "bb4cff41496f3335e6d5ddc0e3604b16159bff6a689a0e7458e2974278056b5a"
+    },
+    "mcdonalds_receipt_chicago_documentcloud": {
+      "pdf_sha256": "7733dfb56fe7f3b58d5f9070463d1f9341a44794f871c5aaacccb6278ac5ddd6",
+      "schema_sha256": "0b8525756617e8df86ef0599fb3b7b4a3c81a9cab45d9e6dd38fe11c51473d84"
+    },
+    "mission-tx-tyler-invoice": {
+      "pdf_sha256": "e9f18a603c0f9ce128463d30e964b04058c22aaeda7098ca0703fdabe874694a",
+      "schema_sha256": "64c3779952a98fae03b4c0de00e866d9a97951486e09ff89ffc4c4dd0bb7cee5"
+    },
+    "ms_medicaid_ra_adjustments": {
+      "pdf_sha256": "7b9cc56d8d1cb0f1ee76789b390a4fa959dc8adb58c9b8707385ebd03924b592",
+      "schema_sha256": "13eaa707b5ac17f2c0deef4667980b1ee49b2113f51f1c5eabdf266e4b1b5db5"
+    },
+    "ms_medicaid_ra_adjustments_corrupted": {
+      "pdf_sha256": "9b17b95061663faaa627a2fb38558cc2a4e030a7e9669755b1e0e2792a83bf4e",
+      "schema_sha256": "13eaa707b5ac17f2c0deef4667980b1ee49b2113f51f1c5eabdf266e4b1b5db5"
+    },
+    "ms_medicaid_ra_paid_denied_claims": {
+      "pdf_sha256": "75d97f5c16b858946167a98d2ceea215647971d2f2436283876c69e22a9bbc61",
+      "schema_sha256": "13eaa707b5ac17f2c0deef4667980b1ee49b2113f51f1c5eabdf266e4b1b5db5"
+    },
+    "ms_medicaid_ra_paid_denied_claims_corrupted": {
+      "pdf_sha256": "2d246cc02c1cfe0734485c0506b522c955d4873f6e07b7e93d0c479bd92f335f",
+      "schema_sha256": "13eaa707b5ac17f2c0deef4667980b1ee49b2113f51f1c5eabdf266e4b1b5db5"
+    },
+    "nport__bullfinch_fund_inc": {
+      "pdf_sha256": "4004554c5e453e3f87dda906117d5e8de35d38b011ef7f9ac81105c2b0807625",
+      "schema_sha256": "491bf5cab904963a88352969a75b0a24113fc4722f05dcd30774534d822d1aaf"
+    },
+    "nport__gabelli_growth_fund_2025q4": {
+      "pdf_sha256": "6b1890cc78823387e82f41c03913e8c5a3730414c54b685d6ea3ea9809e0e023",
+      "schema_sha256": "e8d73c0bdeca0e80ed2a8390e60f5bdb8cc4dfeda5cac50adc1bf702193122ce"
+    },
+    "nport__oak_associates_funds": {
+      "pdf_sha256": "89f096790d5395eb0385fea5a387b1790069d4d94490ac5d38fcf910cd7bc0af",
+      "schema_sha256": "e8d73c0bdeca0e80ed2a8390e60f5bdb8cc4dfeda5cac50adc1bf702193122ce"
+    },
+    "oklahoma_county_purchase_order_avl_systems": {
+      "pdf_sha256": "da2b6b3d032eb37e19e37102892d414f92b229102ee090911b663d2db19d72fb",
+      "schema_sha256": "bb4cff41496f3335e6d5ddc0e3604b16159bff6a689a0e7458e2974278056b5a"
+    },
+    "oklahoma_county_purchase_order_avl_systems_corrupted": {
+      "pdf_sha256": "b170b8a09284b569e6ed8a0f99ae268d8cc70650266a8b0b2f9ab0eb01cfcbd3",
+      "schema_sha256": "bb4cff41496f3335e6d5ddc0e3604b16159bff6a689a0e7458e2974278056b5a"
+    },
+    "passcoag-2020-w2-p0002-r1": {
+      "pdf_sha256": "14147d0a5f089fb79e820f5e495a926da2b2a4d76b016568a6d7351e8efc1e64",
+      "schema_sha256": "393e6af6abdf24ef1807e7719f385dd1945ae95a89aab79c4579a7a0ae72a9ae"
+    },
+    "passcoag-2020-w2-p0002-r2": {
+      "pdf_sha256": "9770bbc1a9e1ed3f0abb00e4b1f1e5bb3ededffecfd7256ba06c3f8d0fd8dde9",
+      "schema_sha256": "a3b3a1ffcd856d0cb542f55059a12e7f195cecc58e855f35f76e5a7687b84c38"
+    },
+    "passcoag-2020-w2-p0002-r3": {
+      "pdf_sha256": "3d5e0c966143e7710e8f8ab87301cf18cfc1bfbd28433dd73a482f7e98481d74",
+      "schema_sha256": "393e6af6abdf24ef1807e7719f385dd1945ae95a89aab79c4579a7a0ae72a9ae"
+    },
+    "passcoag-2020-w2-p0002-r4": {
+      "pdf_sha256": "a990d259e7f474253620f9c3ed2f24d2fd09cb998b5f12b473dc799fe7e8a820",
+      "schema_sha256": "393e6af6abdf24ef1807e7719f385dd1945ae95a89aab79c4579a7a0ae72a9ae"
+    },
+    "passcoag-2020-w2-p0003-r1": {
+      "pdf_sha256": "591026c6762f831f10b19321fed611b58e23719600111ca1ca4992f1998d0322",
+      "schema_sha256": "393e6af6abdf24ef1807e7719f385dd1945ae95a89aab79c4579a7a0ae72a9ae"
+    },
+    "passcoag-2020-w2-p0003-r2": {
+      "pdf_sha256": "02cc63cef7908aad42996809ef02fec416ec6128c101c54b3d9d840d8b8fbc1c",
+      "schema_sha256": "393e6af6abdf24ef1807e7719f385dd1945ae95a89aab79c4579a7a0ae72a9ae"
+    },
+    "passcoag-2020-w2-p0003-r3": {
+      "pdf_sha256": "ecb75a6a8deaf1d61e044a92d4c5fc06fb9ddefbb120f0b1d953ea200879aa6b",
+      "schema_sha256": "393e6af6abdf24ef1807e7719f385dd1945ae95a89aab79c4579a7a0ae72a9ae"
+    },
+    "passcoag-2020-w2-p0003-r4": {
+      "pdf_sha256": "97837090044250faf3530036408df95272aaa6f6a7c37e69a39fd2c2b21af9c2",
+      "schema_sha256": "393e6af6abdf24ef1807e7719f385dd1945ae95a89aab79c4579a7a0ae72a9ae"
+    },
+    "passcoag-2020-w2-p0004-r1": {
+      "pdf_sha256": "e668faab418d8f010c29928f82ce8ef76319f284fa7464add84d5044418eeac3",
+      "schema_sha256": "393e6af6abdf24ef1807e7719f385dd1945ae95a89aab79c4579a7a0ae72a9ae"
+    },
+    "passcoag-2020-w2-p0004-r2": {
+      "pdf_sha256": "c374decfb2048c65c46faea2383395e56a0ecd9ee8221fd3eda32ec930aba3bf",
+      "schema_sha256": "393e6af6abdf24ef1807e7719f385dd1945ae95a89aab79c4579a7a0ae72a9ae"
+    },
+    "passcoag-2020-w2-p0004-r3": {
+      "pdf_sha256": "187d1f2dbdadb6937bf69d77535ceef066962dc006e4284c37a11f2cc02daff2",
+      "schema_sha256": "393e6af6abdf24ef1807e7719f385dd1945ae95a89aab79c4579a7a0ae72a9ae"
+    },
+    "passcoag-2020-w2-p0004-r4": {
+      "pdf_sha256": "0e1ea352514aa3c71ba020b80ddaa112cfea8ddf2aef699279acf803d06e72cc",
+      "schema_sha256": "393e6af6abdf24ef1807e7719f385dd1945ae95a89aab79c4579a7a0ae72a9ae"
+    },
+    "passcoag-2020-w2-p0005-r1": {
+      "pdf_sha256": "ef4bad5e304a163abc0b0d1dfbd09e3b0bd0ef5e79d16bd75bf59c38797974cb",
+      "schema_sha256": "393e6af6abdf24ef1807e7719f385dd1945ae95a89aab79c4579a7a0ae72a9ae"
+    },
+    "passcoag-2020-w2-p0005-r2": {
+      "pdf_sha256": "21e3019919f9537a14f08f17773390b3aaa29b65eb0c6e84c5c2eda544a2eda6",
+      "schema_sha256": "393e6af6abdf24ef1807e7719f385dd1945ae95a89aab79c4579a7a0ae72a9ae"
+    },
+    "passcoag-2020-w2-p0005-r3": {
+      "pdf_sha256": "40f872b701f69b7612fee7efbb0639fb1c940ddff7397415914660a543b05bf0",
+      "schema_sha256": "393e6af6abdf24ef1807e7719f385dd1945ae95a89aab79c4579a7a0ae72a9ae"
+    },
+    "passcoag-2020-w2-p0005-r4": {
+      "pdf_sha256": "98b94e69a177778465497be7ee7ce3079c40bde5ad1746c4068eeb0f8ff18390",
+      "schema_sha256": "393e6af6abdf24ef1807e7719f385dd1945ae95a89aab79c4579a7a0ae72a9ae"
+    },
+    "passcoag-2020-w2-p0006-r1": {
+      "pdf_sha256": "64465710c4737b5067cc08bfaebbb03655259aeae2d6dcf92d5e1d333f03c845",
+      "schema_sha256": "393e6af6abdf24ef1807e7719f385dd1945ae95a89aab79c4579a7a0ae72a9ae"
+    },
+    "passcoag-2020-w2-p0006-r2": {
+      "pdf_sha256": "b969a5962a0863131c755861086b0da4411f017c2ce98a32a32af76a473c0082",
+      "schema_sha256": "393e6af6abdf24ef1807e7719f385dd1945ae95a89aab79c4579a7a0ae72a9ae"
+    },
+    "passcoag-2020-w2-p0006-r3": {
+      "pdf_sha256": "2363e07f7f702bdf40d4d5a5da29cfbb12db082d13b2d27b9a410bc858396216",
+      "schema_sha256": "393e6af6abdf24ef1807e7719f385dd1945ae95a89aab79c4579a7a0ae72a9ae"
+    },
+    "passcoag-2020-w2-p0006-r4": {
+      "pdf_sha256": "a1788c8a63f679e040e3c333c40912da812c55b943cb2315f8b309269e2512d7",
+      "schema_sha256": "393e6af6abdf24ef1807e7719f385dd1945ae95a89aab79c4579a7a0ae72a9ae"
+    },
+    "pershing_0001": {
+      "pdf_sha256": "cd5e78d0712d920e321c28a6a4d2c8897157f24ae3b8f2a7ddb243dcbcd94d81",
+      "schema_sha256": "d1dc8be6bc2229343c21083d5eb2c15aea1abc07f23aa384869962aa22ce133e"
+    },
+    "ppl-two-bill-example": {
+      "pdf_sha256": "9c27a6132d1e39d9cb257e6b605ecac12a0d715139b263c0df63fc0bcb7be025",
+      "schema_sha256": "5e3ca92d6ea7d855240d514ea31826ed6cf1ed33126928faccf2a130d24237cb"
+    },
+    "real_clinton_property_25_11073": {
+      "pdf_sha256": "05828044c0b81a100aa7baff0a092ae7f732fe20dc7fd9731224d961d9d243b0",
+      "schema_sha256": "fd3964ebe265f16802907f6db24db07b03481f67bcdd261c12618c1b9591b465"
+    },
+    "real_clinton_property_25_11073_corrupted": {
+      "pdf_sha256": "e5764c68739c187c67af868200a39b3a06efab3da8a929284f1415aeab46fea5",
+      "schema_sha256": "fd3964ebe265f16802907f6db24db07b03481f67bcdd261c12618c1b9591b465"
+    },
+    "real_franklin_aug_2025": {
+      "pdf_sha256": "416e65f870e4dbaa09ceea3b47be198016af6f45b88d09d893fd2d69bbefec9a",
+      "schema_sha256": "7ef0f67ed6f1cc8a699e3d4dc0a104caab4b616da2a0016dfb4fb021eaa27091"
+    },
+    "real_franklin_nov_2025": {
+      "pdf_sha256": "358d58775ba52d60afcf7f81b962989134b556440e095a153707890bdaafb423",
+      "schema_sha256": "7ef0f67ed6f1cc8a699e3d4dc0a104caab4b616da2a0016dfb4fb021eaa27091"
+    },
+    "real_wyo_Goshen_2024": {
+      "pdf_sha256": "391d65fe5cda94842ac341cf515f947f7a1f554a00f0cc473d14fde6523282a7",
+      "schema_sha256": "ab56dddbb88a669e1fffca2372e32a03c00950a5aab0715e7a8444eb5c010a18"
+    },
+    "real_wyo_Niobrara_2024": {
+      "pdf_sha256": "1b61963a177cba54b2bbf1480ea03e9394aa5550c0ed4854a5bbc96f5eb60870",
+      "schema_sha256": "ab56dddbb88a669e1fffca2372e32a03c00950a5aab0715e7a8444eb5c010a18"
+    },
+    "real_wyo_Weston_2024": {
+      "pdf_sha256": "14b0a91c253096d7dd6ee678eb8f9bac48a01d929fff0a62f167f88f7241df47",
+      "schema_sha256": "ab56dddbb88a669e1fffca2372e32a03c00950a5aab0715e7a8444eb5c010a18"
+    },
+    "sched_i__after_violence_project_ty2024": {
+      "pdf_sha256": "502d1bb898d363590f535039feaafec052f16d75b3c580ce5eb5fbb2290616fe",
+      "schema_sha256": "fe2d20c963159adb83649ff4c1a0611220ca78f17b213b75b555dc5e6025ba3a"
+    },
+    "sched_i__idaho_humanities_council_inc_ty2023": {
+      "pdf_sha256": "049364899312a50c798051ebc68ee4f0c9ea4c3b9eb1d4afc3b658c9bb665dca",
+      "schema_sha256": "fe2d20c963159adb83649ff4c1a0611220ca78f17b213b75b555dc5e6025ba3a"
+    },
+    "sched_i__rotary_club_ty2024": {
+      "pdf_sha256": "edc3247f8b7f15d9e4fdfac0bde6ea8ba3e8bfb171d03997cd78b0f7221d37db",
+      "schema_sha256": "fe2d20c963159adb83649ff4c1a0611220ca78f17b213b75b555dc5e6025ba3a"
+    },
+    "sched_i__the_women_s_foundation_of_colorado_inc_ty2024": {
+      "pdf_sha256": "d85a99dd62f6398057e1baceb2597f76e65da432f7620308eb89cad5c66eda30",
+      "schema_sha256": "fe2d20c963159adb83649ff4c1a0611220ca78f17b213b75b555dc5e6025ba3a"
+    },
+    "sec_13f_0009_coatue_management": {
+      "pdf_sha256": "d5d2dc20bf2b28cc9103fecab77e528264a36e32c307257fa0f76a9f58aae3dd",
+      "schema_sha256": "213162a02c73274888105e01841954b374bf7e76f4b89a13bd4012e54d267862"
+    },
+    "sec_13f_0019_soros_fund_management": {
+      "pdf_sha256": "38deff0d26b09f344944bcaa447fc9d2dd11049b7a65fbc9a40cb8980683f628",
+      "schema_sha256": "213162a02c73274888105e01841954b374bf7e76f4b89a13bd4012e54d267862"
+    },
+    "southampton-ny-york-env-invoice": {
+      "pdf_sha256": "c484f0f748a7a0ce705841824832b7fa7cbf4d1014df18d8e291820b7665f069",
+      "schema_sha256": "64c3779952a98fae03b4c0de00e866d9a97951486e09ff89ffc4c4dd0bb7cee5"
+    },
+    "stephenville-axon-invoice": {
+      "pdf_sha256": "f2244076de12708e1ed9713ec8d8383a3833edc703671b5851e72d19501ba4af",
+      "schema_sha256": "64c3779952a98fae03b4c0de00e866d9a97951486e09ff89ffc4c4dd0bb7cee5"
+    },
+    "texas_facilities_commission_purchase_order_shelton-keller": {
+      "pdf_sha256": "cfdb1daba82b972d19162e4293adcd6fadc2b39e558540cdbc3b968b221f3f64",
+      "schema_sha256": "bb4cff41496f3335e6d5ddc0e3604b16159bff6a689a0e7458e2974278056b5a"
+    },
+    "texas_facilities_commission_purchase_order_shelton-keller_corrupted": {
+      "pdf_sha256": "4840fd5b81fea6a589743c2f84249629efe8c7286dd7a2b2e255ada0aa2082bf",
+      "schema_sha256": "bb4cff41496f3335e6d5ddc0e3604b16159bff6a689a0e7458e2974278056b5a"
+    },
+    "ti_spec_sheet_ne555_timer": {
+      "pdf_sha256": "e184d1254982325132df51600e380ebbae371f88301800dafba3d116eb926336",
+      "schema_sha256": "189059eb7b663219faa87a3ff3a73d42c81ced976bc73252bd071fbd95c3e0c8"
+    },
+    "ti_spec_sheet_ne555_timer_corrupted": {
+      "pdf_sha256": "41c924a50878889d86c4df20b857df7aeda7d6dc55a673f2bc96d3a7a683f72d",
+      "schema_sha256": "189059eb7b663219faa87a3ff3a73d42c81ced976bc73252bd071fbd95c3e0c8"
+    },
+    "uillinois_rate_card_carpool_2024": {
+      "pdf_sha256": "5ecb62098487c91d4f534b7a47dd1b70b08e0556d113ae62a59cf03b815a111e",
+      "schema_sha256": "8d2100fb3b42f63411a8a3e12b615f0247d4b2b50331a715a4fa980a6b54b23c"
+    },
+    "uillinois_rate_card_carpool_2024_corrupted": {
+      "pdf_sha256": "2a43245fd46cc7c82643ddbcf3240df184e248ecd4dc0a9c55f401b905bc681c",
+      "schema_sha256": "8d2100fb3b42f63411a8a3e12b615f0247d4b2b50331a715a4fa980a6b54b23c"
+    },
+    "utah_fleet_rate_schedule_fy2024": {
+      "pdf_sha256": "0b3841123954a66b6eec5cc0cd75c42c58910e6ac0558a65bdb21591af6bcc30",
+      "schema_sha256": "8d2100fb3b42f63411a8a3e12b615f0247d4b2b50331a715a4fa980a6b54b23c"
+    },
+    "utah_fleet_rate_schedule_fy2024_corrupted": {
+      "pdf_sha256": "ba73baf995feffdcbca642b94031f83ad986e15e729515a4045467d98420faa6",
+      "schema_sha256": "8d2100fb3b42f63411a8a3e12b615f0247d4b2b50331a715a4fa980a6b54b23c"
+    },
+    "viega_price_list_propress_2026": {
+      "pdf_sha256": "6bff386dd9a9ae8c42b609288b9e75f39486b5a983b3b061eab82d983e87df72",
+      "schema_sha256": "bc78fd74c80febb2b94cddf06e3e0fd3c9d7fefe09ac36d5b123f971b00735eb"
+    },
+    "viega_price_list_propress_2026_corrupted": {
+      "pdf_sha256": "79d03eef0d990e0f4dab1c515b0c8aec42d9d1ef7b8021fcf14f920150d76947",
+      "schema_sha256": "bc78fd74c80febb2b94cddf06e3e0fd3c9d7fefe09ac36d5b123f971b00735eb"
+    },
+    "we-energies-sample-bill": {
+      "pdf_sha256": "a76fec7cb1eb15749093aa35e1f507fe51c9c859586a5b0719cba55271e6751a",
+      "schema_sha256": "5e3ca92d6ea7d855240d514ea31826ed6cf1ed33126928faccf2a130d24237cb"
+    },
+    "13f__leonteq_securities_2025q4": {
+      "pdf_sha256": "b487caf81b720fe913d37e3d83032af6b29d48495fea55826e6289916db77bc7",
+      "schema_sha256": "f6d255e1fa0c0378e60241dc6192d42460575d3c147d58665341ae50c28007a2"
+    },
+    "13f__nalls_sherbakoff_2025q4": {
+      "pdf_sha256": "7fa98ffef906379db4b11fce751b053f830d8f1348641a40eb84ca00a14b0ac2",
+      "schema_sha256": "f6d255e1fa0c0378e60241dc6192d42460575d3c147d58665341ae50c28007a2"
+    },
+    "1G1PC5SB6E7111015_professional_valuation": {
+      "pdf_sha256": "305094d37586c8151d0531d1a2e5633ccdb88a8e7a6296fb7a999974fa26d313",
+      "schema_sha256": "2bed9e7c807550adf8d0e30f263ca978b6342c463a723272597c166404bba13a"
+    },
+    "1G1PC5SB6E7111015_professional_valuation_corrupted": {
+      "pdf_sha256": "4416e5d78772421e8042b6a2af9d0a9b0bc13dc6e8d738522b51ace4573efff8",
+      "schema_sha256": "2bed9e7c807550adf8d0e30f263ca978b6342c463a723272597c166404bba13a"
+    },
+    "arif-2023": {
+      "pdf_sha256": "af0f4c2cdd0d5553993e482c0934442104392d64c5be7bfc506fa2c089ffb31d",
+      "schema_sha256": "762b82549309cd2ee3cdab11939664d1587f4bf22d6547d26afe838d0faab716"
+    },
+    "baker_hughes_earnings_deck_q4fy25": {
+      "pdf_sha256": "0aacb98fdb9ee986940f4b1c348f403acfaa42d32621a22909c6f3abb0f75f8f",
+      "schema_sha256": "9c44694c086d54a67e6f397dc2ed9f7c103738a4de5811d0395bba71a6261338"
+    },
+    "bar-lev-2021": {
+      "pdf_sha256": "f4360b1fd2d3b3576dc954e62c883a122cb51301b432bd83b4d2b64d6d1d8ffb",
+      "schema_sha256": "30bc292ec0f2a761b6bf4535c1515d4d0373c5182dd4b74e34011438d71a0c3f"
+    },
+    "bar-lev-2022": {
+      "pdf_sha256": "87e40f9d51583184bbdc794a0d72d9e2d207df9dc673ede7409137a8b52debd5",
+      "schema_sha256": "1c4b756b03b04c2c2074122829bd9eaba73003b59e0c4a79459d1e6b275df913"
+    },
+    "bar-lev-2023": {
+      "pdf_sha256": "4b27f2a2b48e59117d2b60f3ee4e0a66fc7f6fbb8fe60ceddd277d441e0ce8c9",
+      "schema_sha256": "762b82549309cd2ee3cdab11939664d1587f4bf22d6547d26afe838d0faab716"
+    },
+    "bar-lev-2024": {
+      "pdf_sha256": "6c3b7299f44a0c1bf39288db1859d5f351b7088892b2aecf3bca49122352597c",
+      "schema_sha256": "adb8676f92cba92714e20343d095fe37ca9e5ceeed5c119622a0690c5c22c0ee"
+    },
+    "becerra-2021": {
+      "pdf_sha256": "2a4d40ced8237725d84e264400245da0263b1269d36b27c03774ce249527e079",
+      "schema_sha256": "30bc292ec0f2a761b6bf4535c1515d4d0373c5182dd4b74e34011438d71a0c3f"
+    },
+    "becerra-2022": {
+      "pdf_sha256": "b24bd3aecd2352c78d4c46de9a1d7822dbb5fca6dce1d1b767d43ddd7662dad6",
+      "schema_sha256": "1c4b756b03b04c2c2074122829bd9eaba73003b59e0c4a79459d1e6b275df913"
+    },
+    "becerra-2023": {
+      "pdf_sha256": "ce48dba65b7295d892d265a3fae86acd70bd7858ba36b2b9a1806f00afca0930",
+      "schema_sha256": "762b82549309cd2ee3cdab11939664d1587f4bf22d6547d26afe838d0faab716"
+    },
+    "becerra-2024": {
+      "pdf_sha256": "1c5300b8a2c105913278f04eb9e043b73775cc1f007574f4188517b652ed0435",
+      "schema_sha256": "adb8676f92cba92714e20343d095fe37ca9e5ceeed5c119622a0690c5c22c0ee"
+    },
+    "bianco-2021": {
+      "pdf_sha256": "364e4544fc3b2e8380d7535e2d03aa29097a6ff1563ced84e6fd7db6fa11315d",
+      "schema_sha256": "30bc292ec0f2a761b6bf4535c1515d4d0373c5182dd4b74e34011438d71a0c3f"
+    },
+    "bianco-2022": {
+      "pdf_sha256": "9c717a6760a62d155f1e08391a6149f6a681346d15481b0893a17bcadec0ad08",
+      "schema_sha256": "1c4b756b03b04c2c2074122829bd9eaba73003b59e0c4a79459d1e6b275df913"
+    },
+    "byline_bancorp_investor_deck_q2_2023": {
+      "pdf_sha256": "7394b1341151868ef58567bef073f2892bd4ee23b81a17e47c883039e90174a7",
+      "schema_sha256": "9c44694c086d54a67e6f397dc2ed9f7c103738a4de5811d0395bba71a6261338"
+    },
+    "cabrera-2021": {
+      "pdf_sha256": "69bd7f4811259ddbfd0e9d65b2394980211c6b6e6ae5b28a9cc4170462fc08cb",
+      "schema_sha256": "30bc292ec0f2a761b6bf4535c1515d4d0373c5182dd4b74e34011438d71a0c3f"
+    },
+    "cabrera-2022": {
+      "pdf_sha256": "c0bdbe2346a7b3c07f366238a8aa5322c7731d10a20d394f3820d262ac173667",
+      "schema_sha256": "1c4b756b03b04c2c2074122829bd9eaba73003b59e0c4a79459d1e6b275df913"
+    },
+    "cabrera-2023": {
+      "pdf_sha256": "df19f97b5774f1fbe8a893f979389b17b6be0fcfd5a698515bf1f983e32d11a1",
+      "schema_sha256": "762b82549309cd2ee3cdab11939664d1587f4bf22d6547d26afe838d0faab716"
+    },
+    "ccc_online_0003_geico_ford_crown_victoria": {
+      "pdf_sha256": "faab69cdc88b7e6a29bf1187e9acdcf5cd9fe92e5ec9c32cad42964e28f89f76",
+      "schema_sha256": "97bc56fc0019939b8f89e45349601a7d6962f7f15b962b6ed32b8aa0c43e1939"
+    },
+    "ccc_online_0003_geico_ford_crown_victoria_corrupted": {
+      "pdf_sha256": "b28a47cf6428c746fd585cb13c9b6efd29c9ac23c29d356412e13751634c6f6a",
+      "schema_sha256": "97bc56fc0019939b8f89e45349601a7d6962f7f15b962b6ed32b8aa0c43e1939"
+    },
+    "ccc_online_0004_liberty_dodge_journey": {
+      "pdf_sha256": "faf1f8ab9ca0f80d6244c2ed780027963f65e7fa6b26091e8fda3637677e1f85",
+      "schema_sha256": "97bc56fc0019939b8f89e45349601a7d6962f7f15b962b6ed32b8aa0c43e1939"
+    },
+    "ccc_online_0004_liberty_dodge_journey_corrupted": {
+      "pdf_sha256": "4a5801ed3bc9662d5d191eb2f9f5b45aa8cadb1be66b7feafcbdbf2d02696dc3",
+      "schema_sha256": "97bc56fc0019939b8f89e45349601a7d6962f7f15b962b6ed32b8aa0c43e1939"
+    },
+    "ccc_online_0008_state_farm_genesis_gv80": {
+      "pdf_sha256": "6c68ae0a2445cb05ad0635c5790f405335685e49f66d118845b79e30f26a11cc",
+      "schema_sha256": "97bc56fc0019939b8f89e45349601a7d6962f7f15b962b6ed32b8aa0c43e1939"
+    },
+    "ccc_online_0008_state_farm_genesis_gv80_corrupted": {
+      "pdf_sha256": "54d7841cf1ea9d8b9623e13e944b5bf96e673f186340f7076ba10b237ec6cbe7",
+      "schema_sha256": "97bc56fc0019939b8f89e45349601a7d6962f7f15b962b6ed32b8aa0c43e1939"
+    },
+    "ccc_online_0009_travelers_ford_f150": {
+      "pdf_sha256": "dc06b6f9c119d17866a9b1dbe076129c67189fe6e379ef699f693c84ee6a62fa",
+      "schema_sha256": "97bc56fc0019939b8f89e45349601a7d6962f7f15b962b6ed32b8aa0c43e1939"
+    },
+    "ccc_online_0009_travelers_ford_f150_corrupted": {
+      "pdf_sha256": "175ab8d4a9db2d9692ad64e705cbad3fdbdf54520754114c06d6dad381bac190",
+      "schema_sha256": "97bc56fc0019939b8f89e45349601a7d6962f7f15b962b6ed32b8aa0c43e1939"
+    },
+    "ccc_online_0010_travelers_ford_explorer": {
+      "pdf_sha256": "74cb8231323c04a3c201790106fd5103816e51772614f6c05b7bb62faaee78c6",
+      "schema_sha256": "97bc56fc0019939b8f89e45349601a7d6962f7f15b962b6ed32b8aa0c43e1939"
+    },
+    "ccc_online_0010_travelers_ford_explorer_corrupted": {
+      "pdf_sha256": "e3d2b6bdc676a93e595efc0574fabcf0369ceb99df3b505150f7b31de5b04aed",
+      "schema_sha256": "97bc56fc0019939b8f89e45349601a7d6962f7f15b962b6ed32b8aa0c43e1939"
+    },
+    "ccc_online_0011_infinity_toyota_tacoma": {
+      "pdf_sha256": "2b463d63b44afc3ab3ec5ff88d3b5d281bfe16a7c0c3308d3f2f13c60bbd2553",
+      "schema_sha256": "97bc56fc0019939b8f89e45349601a7d6962f7f15b962b6ed32b8aa0c43e1939"
+    },
+    "ccc_online_0011_infinity_toyota_tacoma_corrupted": {
+      "pdf_sha256": "c08c2db6e7b02d783466db7d641044304eb52b5b9b9612a689862911b80a0c54",
+      "schema_sha256": "97bc56fc0019939b8f89e45349601a7d6962f7f15b962b6ed32b8aa0c43e1939"
+    },
+    "ccc_online_0012_chubb_dodge_durango": {
+      "pdf_sha256": "5259794a6182766ccd17ea16a34c25681b7e33154397b6b6fb8c120de10ca2e6",
+      "schema_sha256": "97bc56fc0019939b8f89e45349601a7d6962f7f15b962b6ed32b8aa0c43e1939"
+    },
+    "ccc_online_0012_chubb_dodge_durango_corrupted": {
+      "pdf_sha256": "3b36e3cc0c65b1bfa82bc668ac92ea4c7b0bd40fb42640cd155af4877157cba1",
+      "schema_sha256": "97bc56fc0019939b8f89e45349601a7d6962f7f15b962b6ed32b8aa0c43e1939"
+    },
+    "coreweave_earnings_deck_q4fy25": {
+      "pdf_sha256": "58e636235b7cbcb6c55974c50db4a9160da73b553f0bcd185b7de36af02374bb",
+      "schema_sha256": "9c44694c086d54a67e6f397dc2ed9f7c103738a4de5811d0395bba71a6261338"
+    },
+    "crh_results_deck_q4fy25": {
+      "pdf_sha256": "c3157ce7a25922cdace180cba6a5facb34b195f1f5d727978412b6e30e8bdb46",
+      "schema_sha256": "9c44694c086d54a67e6f397dc2ed9f7c103738a4de5811d0395bba71a6261338"
+    },
+    "dd1155_schedule_continuation_0007": {
+      "pdf_sha256": "f43cfcada8e437a17e56524a1a2b6a762a57b6eb94f9cd4a2d8bcd130aaa42ef",
+      "schema_sha256": "59e6d304bb3444a1fcf7bebdb9975c97e543f874fc4307a64ad677c1dd4a241e"
+    },
+    "erie_county_2017_single_audit": {
+      "pdf_sha256": "e05d3adcc305a8a1431ba0576c347dd4a5aa4903ac93588e8b158c2d0168a89f",
+      "schema_sha256": "573f038058edb72c2bdc467077ed37a86873b611f2fbdcee6d1b6080993576f3"
+    },
+    "gov_clin_schedule_0033": {
+      "pdf_sha256": "86e1bfea8464ba4585bd213b8b93c5b3732b46fa2645d1bca79eb52ee37df8f8",
+      "schema_sha256": "d85a17f7eae13086479629ee9221d3e394619ec5a6f88a17562223183a56299e"
+    },
+    "gov_clin_schedule_0035": {
+      "pdf_sha256": "2db73543b475a7d29be7953be981950ee50773ba33950e502cbe34e4c6e4bdba",
+      "schema_sha256": "d85a17f7eae13086479629ee9221d3e394619ec5a6f88a17562223183a56299e"
+    },
+    "gov_clin_schedule_0038": {
+      "pdf_sha256": "3a4d5806820aec63d5eec946b50dff6a1e8cf30546089d413042233047f0ae6f",
+      "schema_sha256": "d85a17f7eae13086479629ee9221d3e394619ec5a6f88a17562223183a56299e"
+    },
+    "gsa_mas_it_labor_0003": {
+      "pdf_sha256": "a18b601004bbddfda34d1064fc43d91b1273f5f3e590e20738cd113e5d068f3e",
+      "schema_sha256": "27a32c93f440da9aaa09878c85e8185c47eef79f2d42843d4ff878498bf7a573"
+    },
+    "gsa_mas_it_labor_0005": {
+      "pdf_sha256": "6fc4e04e54c79e2d03ad8f846a5b5510d942836ba9a5b47b0b55b1c7b9640a0e",
+      "schema_sha256": "27a32c93f440da9aaa09878c85e8185c47eef79f2d42843d4ff878498bf7a573"
+    },
+    "gsa_mas_it_labor_0006": {
+      "pdf_sha256": "91328a91d0a34984bd29823ed313277f27ff952e25ebbe9cfd28ba9cc1542afa",
+      "schema_sha256": "27a32c93f440da9aaa09878c85e8185c47eef79f2d42843d4ff878498bf7a573"
+    },
+    "gsa_mas_it_labor_0007": {
+      "pdf_sha256": "9ae2a372115a9503d0b6bb29cf45826727753eaae1ad1fd7e9bd62546f6e0e76",
+      "schema_sha256": "27a32c93f440da9aaa09878c85e8185c47eef79f2d42843d4ff878498bf7a573"
+    },
+    "gsa_mas_it_labor_0008": {
+      "pdf_sha256": "dca0441afd20b266e3e01d585cae1cded752c29eb7cfc6804ae62b70f379b806",
+      "schema_sha256": "27a32c93f440da9aaa09878c85e8185c47eef79f2d42843d4ff878498bf7a573"
+    },
+    "gsa_mas_it_labor_0010": {
+      "pdf_sha256": "f635fa705077b35a36859509c0094cf6a17f1bd6d29c830bced79183ddc3be58",
+      "schema_sha256": "27a32c93f440da9aaa09878c85e8185c47eef79f2d42843d4ff878498bf7a573"
+    },
+    "gsa_mas_it_labor_0011": {
+      "pdf_sha256": "41d9185aa99a80e984ba399e73ebd32189de8c7f44e150e21ca929ebb4285a79",
+      "schema_sha256": "27a32c93f440da9aaa09878c85e8185c47eef79f2d42843d4ff878498bf7a573"
+    },
+    "gsa_mas_it_labor_0014": {
+      "pdf_sha256": "f46d1046d04dd94ae84f21b06f89b58e7c31e702d3df9ccacb4e211cae1180b5",
+      "schema_sha256": "27a32c93f440da9aaa09878c85e8185c47eef79f2d42843d4ff878498bf7a573"
+    },
+    "gsa_mas_it_labor_0016": {
+      "pdf_sha256": "2fd00143fdf2eea21213ae8fd75af67b812137a2bc0d182420fb315b09297ae7",
+      "schema_sha256": "27a32c93f440da9aaa09878c85e8185c47eef79f2d42843d4ff878498bf7a573"
+    },
+    "gsa_mas_it_labor_0018": {
+      "pdf_sha256": "fca78892b214f85f1efd378a1f2bb313b0c08109294e1e969a13feb67db502df",
+      "schema_sha256": "27a32c93f440da9aaa09878c85e8185c47eef79f2d42843d4ff878498bf7a573"
+    },
+    "gsa_mas_it_labor_0019": {
+      "pdf_sha256": "42758886a5d1b12a16d5b4869b7e0091bba12e57a7c89ebe01e94eb7e79a7a08",
+      "schema_sha256": "27a32c93f440da9aaa09878c85e8185c47eef79f2d42843d4ff878498bf7a573"
+    },
+    "hpe_earnings_deck_q4fy25": {
+      "pdf_sha256": "1ba8fe2bfbb85b45968f5a286115758bb99f655ffd10b8916df6f5d48381117c",
+      "schema_sha256": "9c44694c086d54a67e6f397dc2ed9f7c103738a4de5811d0395bba71a6261338"
+    },
+    "jackson_college_2024_federal_awards_audit": {
+      "pdf_sha256": "663dbcb067b8d54d0305352df3a8dabcecab40f1adae08e161e94688ed1758df",
+      "schema_sha256": "573f038058edb72c2bdc467077ed37a86873b611f2fbdcee6d1b6080993576f3"
+    },
+    "nport__advisors_inner_circle_fund": {
+      "pdf_sha256": "e45d67a8e8fb392d54b49d6f91bb339f552030bf58afc5d0c2b544b1a36d8027",
+      "schema_sha256": "e8d73c0bdeca0e80ed2a8390e60f5bdb8cc4dfeda5cac50adc1bf702193122ce"
+    },
+    "nport__dunham_funds": {
+      "pdf_sha256": "a4949f7eec7c3525e72fcb86e0dbdfff7e0e70e62927ca53832382ec7ee9e6ec",
+      "schema_sha256": "25380855746ad5c9a4c0a3a1e44023098003b51e7deebd8014439fbd841ef1d9"
+    },
+    "nport__sei_etf_2025q4": {
+      "pdf_sha256": "423907c9b1238cfdff5c3d241925a5970bb677984330c67a6f0307cfee4da448",
+      "schema_sha256": "e8d73c0bdeca0e80ed2a8390e60f5bdb8cc4dfeda5cac50adc1bf702193122ce"
+    },
+    "q4-2025-earnings-press-release": {
+      "pdf_sha256": "bfa2b12a9b3e0066a8f3caf24185fc485964ec53804963e0b3d8d87cff3f163d",
+      "schema_sha256": "9c44694c086d54a67e6f397dc2ed9f7c103738a4de5811d0395bba71a6261338"
+    },
+    "real_bbb_service_list": {
+      "pdf_sha256": "15887c833b78b53f4279d544298bf88cd5799a82e8c2736c0a8ce71dba33cf44",
+      "schema_sha256": "0a5f50116d1a53f754b5c199469fc0400a849f116edb830ea6f5ef40a130d421"
+    },
+    "real_bbb_service_list_corrupted": {
+      "pdf_sha256": "c39a3abeaff126d4c81c94e1b6775616a853b7e730cf6be5010ce885c3e88936",
+      "schema_sha256": "0a5f50116d1a53f754b5c199469fc0400a849f116edb830ea6f5ef40a130d421"
+    },
+    "real_blackrock_muni_bmn": {
+      "pdf_sha256": "babd4623b4af91091ed8ad8a2ac04fd88a721226838be4841500a21772a6b73b",
+      "schema_sha256": "a370ad830aba75e63c03e1867cea545f2902be47b1c1ed87ccac600a3fee87d7"
+    },
+    "real_blackrock_schedule_full": {
+      "pdf_sha256": "b88d571de59cdeb522d0b73ba88d9906ac2167e1af5bcf08e8d37370db806ed3",
+      "schema_sha256": "2a10857ca5e7a38c39d29297a27733be333fa2fe4d27b501f0ac1fb2ba9b96b7"
+    },
+    "real_cooke_co_tx_2024": {
+      "pdf_sha256": "f8ebffb929232a744a5e4e458d44a8c1d6ec293ae66b70efe6b2758858cb5525",
+      "schema_sha256": "233689c2ff565361803c544ba2b56685659dd1a00d1902837ecfb9b1a7f0e5dd"
+    },
+    "real_dcd_sumf_full": {
+      "pdf_sha256": "7579253d09326763598ea3c2592f980f1119784d7bcd21979bbfe43b3bcbee39",
+      "schema_sha256": "2028a6838ad95410090aee6202b933e9ef44ababbf6788dd5359444293c68eb4"
+    },
+    "real_dcd_sumf_full_corrupted": {
+      "pdf_sha256": "41a0a782187666a669de422ab9c96d0b2fd817defb65d3fb3b7d7fd60bedf36c",
+      "schema_sha256": "2028a6838ad95410090aee6202b933e9ef44ababbf6788dd5359444293c68eb4"
+    },
+    "real_enotes_deviations": {
+      "pdf_sha256": "b4022dbb65ec75d10df5e7268b4128d74747a24c6681e2c05addad0b95bdc8cc",
+      "schema_sha256": "9139b6532ac8d1f9cb213ca62f3ad5acc25fa8d3cb3abaf014c7fb055b398673"
+    },
+    "real_enotes_deviations_corrupted": {
+      "pdf_sha256": "d60c73504d84a6439e13b1465103ed43a28e881f6fb6b845812155501464d044",
+      "schema_sha256": "9139b6532ac8d1f9cb213ca62f3ad5acc25fa8d3cb3abaf014c7fb055b398673"
+    },
+    "real_fidelity_northstar": {
+      "pdf_sha256": "ee0086c874948b2cfa5b9ab5db2b0fa8d4e4d6af8f81832b49be5fbec71dcdf6",
+      "schema_sha256": "42614097bc0f2c75351fa62c8d932d78ce1b34055593aeacd941089555127f7a"
+    },
+    "real_franklin_sep_2025": {
+      "pdf_sha256": "5fba53c8dd825e284b0c4e3d0fd4cac5d8dc5bbf35ae4686e76f247d3c79efb3",
+      "schema_sha256": "7ef0f67ed6f1cc8a699e3d4dc0a104caab4b616da2a0016dfb4fb021eaa27091"
+    },
+    "real_penn_hills_pa_2023": {
+      "pdf_sha256": "a64c7512684f3946c3cfb43b960544e6087e0f7c70f41a97ba93ea93f4ab8309",
+      "schema_sha256": "1586b859d3edbc6f34011ecc5505e0e119207b32fbd904bed6de4052a9cae23a"
+    },
+    "real_pueblo_oct_2025": {
+      "pdf_sha256": "aa3548beb298d8de582016b1f4fd9e2b066c983fc7759462901506ef19bca3e8",
+      "schema_sha256": "fd822f5d0d8ed774704457d178c9e6f62d75cea775515afc903258a218129d09"
+    },
+    "real_sm0801_dispositions_full": {
+      "pdf_sha256": "79b75ea283392178507f8d747334ebb2bf75062b6fbccb05d00622f2a063d38a",
+      "schema_sha256": "0c97a1a23332edb4c4f2884ff80ae700bc9f9b8dc5b4ef9bacc0f8e734cc66ff"
+    },
+    "real_sm0801_dispositions_full_corrupted": {
+      "pdf_sha256": "e8e5b1e5559481c373d1acc15d4d5d79eafd947a7675b968103f4b650abe7fba",
+      "schema_sha256": "0c97a1a23332edb4c4f2884ff80ae700bc9f9b8dc5b4ef9bacc0f8e734cc66ff"
+    },
+    "real_vg_divappr_full": {
+      "pdf_sha256": "ec2e062ad7cd1b10c2d3869be8d7ad85048e3dd20cd2529b1e2865866e7c26ac",
+      "schema_sha256": "cee6755b2044ef3d5e3d12abbeb1cbc5d304354bbb798dc9490c1ce24679e01a"
+    },
+    "real_vg_divgrowth_full": {
+      "pdf_sha256": "1ef0218e38e7811e939868a666ce47a44fd82a253f424fa644f36479c37bdf26",
+      "schema_sha256": "cee6755b2044ef3d5e3d12abbeb1cbc5d304354bbb798dc9490c1ce24679e01a"
+    },
+    "real_vg_equity_income_full": {
+      "pdf_sha256": "764ec9ea56e0ec62210dc1b1986f991ed567385d2d81f213ce90b77efd580e2f",
+      "schema_sha256": "9eeacee3822890546f95b25879ba77eb8896316d6bf25a52df763bfa80c5e32e"
+    },
+    "real_vg_esg_full": {
+      "pdf_sha256": "d27136f7532559055fdb3625b2ab0dac1e98f2882c4b81c96386c3f8d9ac0b7a",
+      "schema_sha256": "cee6755b2044ef3d5e3d12abbeb1cbc5d304354bbb798dc9490c1ce24679e01a"
+    },
+    "real_vg_gcc_full": {
+      "pdf_sha256": "9b36aa2d35916895892c0d88f2d33b75605f2c886842ded608f0830015ba64db",
+      "schema_sha256": "cee6755b2044ef3d5e3d12abbeb1cbc5d304354bbb798dc9490c1ce24679e01a"
+    },
+    "real_vg_healthcare_full": {
+      "pdf_sha256": "790e014adabd036b0ec24e1f91e49ac3ee6598e2961a2f87ff60a0e1d3e4a76a",
+      "schema_sha256": "cee6755b2044ef3d5e3d12abbeb1cbc5d304354bbb798dc9490c1ce24679e01a"
+    },
+    "real_vg_megacap_full": {
+      "pdf_sha256": "899bf1968422addd1770cb7ff5286ebe4e41f981f841d96b361454913817a263",
+      "schema_sha256": "9eeacee3822890546f95b25879ba77eb8896316d6bf25a52df763bfa80c5e32e"
+    },
+    "real_vg_primecap_full": {
+      "pdf_sha256": "b6764c4202c2547cc3cb7e531e58ea4bcc4f571c43a95edff7e0b44cf02787d0",
+      "schema_sha256": "9eeacee3822890546f95b25879ba77eb8896316d6bf25a52df763bfa80c5e32e"
+    },
+    "real_vg_reit2_full": {
+      "pdf_sha256": "5ae01339c578201ec136f3114899d72df8e92b72e66d50bab8e6ee10f14c6224",
+      "schema_sha256": "cee6755b2044ef3d5e3d12abbeb1cbc5d304354bbb798dc9490c1ce24679e01a"
+    },
+    "real_vg_reit_full": {
+      "pdf_sha256": "71e9723806448f3e841e9cd97bbcfd345740201d801f12be1645b117c019af76",
+      "schema_sha256": "cee6755b2044ef3d5e3d12abbeb1cbc5d304354bbb798dc9490c1ce24679e01a"
+    },
+    "real_wright_co_mn": {
+      "pdf_sha256": "6cf1aeb8d02f37cca71c4ce5fc3df53aee81f4a9b3c1ffb0ce93b0ce3602470f",
+      "schema_sha256": "98089dc7ff4e6202706e7afd73310cc4b8a0f046bb8076653f0ca1a5eae45c09"
+    },
+    "sched_i__akron_community_foundation_ty2024": {
+      "pdf_sha256": "899acb43a978ac39fe4bb5d0e8572dfaa4a7701137b86a5de5ee4bdfb41a22f5",
+      "schema_sha256": "fe2d20c963159adb83649ff4c1a0611220ca78f17b213b75b555dc5e6025ba3a"
+    },
+    "sched_i__united_way_worldwide_ty2024": {
+      "pdf_sha256": "3cca80e459e7e73a4b279035219b3d6657ef0c3f5f20ece828c7ecd3047e41e9",
+      "schema_sha256": "fe2d20c963159adb83649ff4c1a0611220ca78f17b213b75b555dc5e6025ba3a"
+    },
+    "schwab_dana_jones_2012": {
+      "pdf_sha256": "b5c1770bc842533dad0ac998ca18e1cec4a1ed41a1362b7d58e0585bd4a07598",
+      "schema_sha256": "d1dc8be6bc2229343c21083d5eb2c15aea1abc07f23aa384869962aa22ce133e"
+    },
+    "sec_13f_0031_loomis_sayles": {
+      "pdf_sha256": "c23b9f8cfec4f05d1a3ab98c92eb7207f104487fd5a84a36d10f7588454d415c",
+      "schema_sha256": "213162a02c73274888105e01841954b374bf7e76f4b89a13bd4012e54d267862"
+    },
+    "sf1449_supplies_services_0003": {
+      "pdf_sha256": "13e437eda68e6922625340505e91f7397bb797a726c1d2937bb1a2721cfcd368",
+      "schema_sha256": "8bdc4420f39cb891d0e9de439b595b229f25ed7e25468c477606a1c9e9f605ca"
+    },
+    "sf1449_supplies_services_0046": {
+      "pdf_sha256": "a7f371e60b6e37daa35886e8e892bc555735078b7e8b64bc65493ba17a26136b",
+      "schema_sha256": "8bdc4420f39cb891d0e9de439b595b229f25ed7e25468c477606a1c9e9f605ca"
+    },
+    "sf1449_supplies_services_0047": {
+      "pdf_sha256": "d31bafaaad5650ceea3737418da57180539d823feea8de38578306eced08e274",
+      "schema_sha256": "8bdc4420f39cb891d0e9de439b595b229f25ed7e25468c477606a1c9e9f605ca"
+    },
+    "smfg-kessan-tanshin-2024-ja": {
+      "pdf_sha256": "8cff8c5b3b51dc9148a4deb79c75e08b9fa91d082cbaaa77480dd83db6059d5f",
+      "schema_sha256": "9c44694c086d54a67e6f397dc2ed9f7c103738a4de5811d0395bba71a6261338"
+    },
+    "sunoco_investor_deck_march_2026": {
+      "pdf_sha256": "106047676f64e1774763ddf8cd3eeaa63c73c6b414ffbca6ae8109e99d155fa6",
+      "schema_sha256": "9c44694c086d54a67e6f397dc2ed9f7c103738a4de5811d0395bba71a6261338"
+    },
+    "synchrony_investor_deck_q1_2026": {
+      "pdf_sha256": "8197903af9846cda568e599ae457d8c5dc61f88d88318022103d3e1d550c5123",
+      "schema_sha256": "9c44694c086d54a67e6f397dc2ed9f7c103738a4de5811d0395bba71a6261338"
+    },
+    "sysco_earnings_deck_q2fy26": {
+      "pdf_sha256": "c3bc4a31210edf844a776a0864fdebeead0aa5e18ed223c1aa66702c298ec116",
+      "schema_sha256": "9c44694c086d54a67e6f397dc2ed9f7c103738a4de5811d0395bba71a6261338"
+    },
+    "transunion_earnings_deck_q4fy25": {
+      "pdf_sha256": "4623bfa1f3bb2277268626f8ed0fa5df9ebfc048dfb089392e446b72f08ed93c",
+      "schema_sha256": "9c44694c086d54a67e6f397dc2ed9f7c103738a4de5811d0395bba71a6261338"
+    },
+    "united_way_san_antonio_fy23_single_audit": {
+      "pdf_sha256": "820e6b98a7764ce0853137e2d5640e3a33968ad4a98f22b9ada2b4894e2b1219",
+      "schema_sha256": "573f038058edb72c2bdc467077ed37a86873b611f2fbdcee6d1b6080993576f3"
+    },
+    "veralto_earnings_deck_q4fy25": {
+      "pdf_sha256": "0b434fe01dc376c8972ede272df0551c30965f58b880dcecdc37bb254de970ce",
+      "schema_sha256": "9c44694c086d54a67e6f397dc2ed9f7c103738a4de5811d0395bba71a6261338"
+    },
+    "dd1155_schedule_continuation_0011": {
+      "pdf_sha256": "92bf85531f4d525a50421f81a009b63d80987a36e7cd3481d5778f79a5d78ab5",
+      "schema_sha256": "59e6d304bb3444a1fcf7bebdb9975c97e543f874fc4307a64ad677c1dd4a241e"
+    },
+    "dd1155_schedule_continuation_0012": {
+      "pdf_sha256": "8632fc7b1783beffc0f898470b9b4f1291608412b195e3c57585794437d4e2f6",
+      "schema_sha256": "59e6d304bb3444a1fcf7bebdb9975c97e543f874fc4307a64ad677c1dd4a241e"
+    },
+    "gov_clin_schedule_0005": {
+      "pdf_sha256": "e0d7577e5d87907c281c0388ac96cdb00e7e794bb344af0693f358bbd1a77943",
+      "schema_sha256": "d85a17f7eae13086479629ee9221d3e394619ec5a6f88a17562223183a56299e"
+    },
+    "gov_clin_schedule_0031": {
+      "pdf_sha256": "80c12ae1c911f821c90ce459081fd3d51305e89c77bc124e45e701869eab81f3",
+      "schema_sha256": "d85a17f7eae13086479629ee9221d3e394619ec5a6f88a17562223183a56299e"
+    },
+    "real_credit_strategies_full": {
+      "pdf_sha256": "c5cd96b35269c4d95cf5acbd56de1adebe22f2549b76188cab2fbdc3a156d853",
+      "schema_sha256": "2188fb0df47b0c5bf9864f1138d588be69756de41ed778b1332c5e00d445deae"
+    },
+    "real_freer_register_full": {
+      "pdf_sha256": "4fc4c47e19fcaa9820f655294b824a29e51ebd66888afc9f3f04b4d4961d96ff",
+      "schema_sha256": "601a51d4cfdb3d4e6dffa1074d374ed0c124d8271375a6b31cd1a0ae68b32a65"
+    },
+    "real_ftx_full": {
+      "pdf_sha256": "2c64aea406e2f7117036e7db73201299bd6317f58627fbc120333afa5984cb34",
+      "schema_sha256": "9ed4f690508202ff0b74550ebbd2ba43d4f85f85bbc57a379847fd690c5d8c08"
+    },
+    "real_ftx_full_corrupted": {
+      "pdf_sha256": "ae32e3e176427feb3a19b83150393fbc5820160cdd2a0730f3bcc0b01eb69dd3",
+      "schema_sha256": "9ed4f690508202ff0b74550ebbd2ba43d4f85f85bbc57a379847fd690c5d8c08"
+    },
+    "real_imedia_full": {
+      "pdf_sha256": "baf432a796a8ba49addb77efe39b19cfd001183684d340fdf43f3c37e59e7c36",
+      "schema_sha256": "8b5c30fcca83b5cc4e2f511898b5c4077f4fa3c16a9ec0051cd5f4d48d6d896a"
+    },
+    "real_imedia_full_corrupted": {
+      "pdf_sha256": "f52373f5891cebea37365011acfa98187b3b742967d1df9bf8c75f0bac9f4c17",
+      "schema_sha256": "8b5c30fcca83b5cc4e2f511898b5c4077f4fa3c16a9ec0051cd5f4d48d6d896a"
+    },
+    "real_ishares_iboxx_bond_etfs": {
+      "pdf_sha256": "2a27528bdaab0fc6df7b4491bc10fd251ceead769a6fefa70384662d90b29320",
+      "schema_sha256": "a85ca5f09e37d95ef1550b84feed49d9c81b78569ad0a0cd2f479a87ad560e8c"
+    },
+    "real_ofac_ssi_full": {
+      "pdf_sha256": "6fca7572691d172cb907f081c5bb3bb32bc99b64d20b8c9902af50ab1958e734",
+      "schema_sha256": "a46be93289a2823a013c999cd2e33acb1c89fb76a3cd65d44b475ad29dab6d2b"
+    },
+    "real_oklahoma_unclaimed_2024": {
+      "pdf_sha256": "1faa56d7c911dfbab21d0432ae87b591609df9ca85f863c85ac2c0c8d947857d",
+      "schema_sha256": "172bdd18cd8e26c40e0fb19032332a166c50e5a437ad3ff1cffa6e399a64f27c"
+    },
+    "real_sm0801_ae_full": {
+      "pdf_sha256": "f311999a7b1c9f36ecf80a1328fbc5dbd81a22f93b42983807899635b453a5c4",
+      "schema_sha256": "3f096099d593fa0f39c213ef3ad0c09ca81fe00df50daff7617839d60d218039"
+    },
+    "real_sm0801_eco_full": {
+      "pdf_sha256": "e21e6eeb75d5aa1ce519c636de319e20445980e7a1ef28b7aa897d004af89030",
+      "schema_sha256": "f3c6133ca2b459dc5df687a6f27bd8a4220467caeb259269f5c3de49446f9962"
+    },
+    "real_sm0801_eco_full_corrupted": {
+      "pdf_sha256": "5680320c8c8ddbad55d889f9cdfd5b283df302ac932edc86175ea8eca12e0239",
+      "schema_sha256": "f3c6133ca2b459dc5df687a6f27bd8a4220467caeb259269f5c3de49446f9962"
+    },
+    "sec_13f_0010_renaissance_technologies": {
+      "pdf_sha256": "63c4ae033b570db4caf0371d53bcf4289f1e8986d6e15bc099cc22df4c1a70f8",
+      "schema_sha256": "213162a02c73274888105e01841954b374bf7e76f4b89a13bd4012e54d267862"
+    },
+    "sec_13f_0026_brown_brothers_harriman": {
+      "pdf_sha256": "4787d70ca373866d0e595f923c9305d0759e63f7dd7128e070b78efbf3632283",
+      "schema_sha256": "213162a02c73274888105e01841954b374bf7e76f4b89a13bd4012e54d267862"
+    },
+    "sf1449_supplies_services_0042": {
+      "pdf_sha256": "5b08e5f3b7feae39f547e5afad3b4d4b9f77e9a20f432f24e37338d2777ff55a",
+      "schema_sha256": "8bdc4420f39cb891d0e9de439b595b229f25ed7e25468c477606a1c9e9f605ca"
+    },
+    "sf1449_supplies_services_0059": {
+      "pdf_sha256": "8b4089e97851f6eb117c8c139229981a9a0f4c49c331ad61a3419f2e4ad47077",
+      "schema_sha256": "8bdc4420f39cb891d0e9de439b595b229f25ed7e25468c477606a1c9e9f605ca"
+    }
+  },
+  "dataset_revision": "f6180e917a050a84582e6366cff85b7dc1e84e58",
+  "evaluator_commit": "11937d102cad9d9b815044888d55e7ce343d3924",
+  "liteparse_version": "2.14.4",
+  "selection": "Four rounds of three variants on 12 development documents, followed by source/schema-only router synthesis. No subsequent tuning."
+}

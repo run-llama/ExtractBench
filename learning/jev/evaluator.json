@@ -1,0 +1,8 @@
+{
+  "upstream_commit": "11937d102cad9d9b815044888d55e7ce343d3924",
+  "local_commit": "5d04ac6d62a98c6864ac37c21a832eacdfd6240e",
+  "parse_bench_version": "1.0.4",
+  "liteparse_version": "2.14.4",
+  "upstream_checkout": "/tmp/extractbench-jev-evaluator",
+  "dependencies_target": "/tmp/extractbench-jev-deps"
+}

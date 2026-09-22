@@ -1,0 +1,27 @@
+{
+  "python": "3.12.3 (main, Mar 23 2026, 19:04:32) [GCC 13.3.0]",
+  "runtime_versions": {
+    "parse-bench": "1.0.4",
+    "liteparse": "2.14.4",
+    "numpy": "2.4.3",
+    "scipy": "1.17.1",
+    "anls-star": "1.0.1",
+    "rapidfuzz": "3.14.3",
+    "pydantic": "2.12.5",
+    "python-Levenshtein": "0.27.3",
+    "Unidecode": "1.4.0",
+    "requests": "2.32.5"
+  },
+  "submission_lock_versions": {
+    "parse-bench": "1.0.4",
+    "liteparse": "2.14.4",
+    "numpy": "2.4.3",
+    "scipy": "1.17.1",
+    "anls-star": "1.0.1",
+    "rapidfuzz": "3.14.3",
+    "pydantic": "2.12.5",
+    "python-Levenshtein": "0.27.3",
+    "Unidecode": "1.4.0",
+    "requests": "2.32.5"
+  }
+}

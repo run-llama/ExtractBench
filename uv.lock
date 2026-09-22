@@ -1591,6 +1591,21 @@ wheels = [
 ]
 
 [[package]]
+name = "liteparse"
+version = "2.14.4"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/09/60/0f858c1c87c03e936d17bfc698ac861dc6bafd6f8fa5ae185e8022c43610/liteparse-2.14.4.tar.gz", hash = "sha256:ad0a3e6e86b2710e72b0ff63b8a89176bd2ccfc95c0ad4cfd82afff55d46c02f", size = 519672, upload-time = "2026-09-07T16:56:33.136Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/88/07/84c95ea6ccd4f67f3e475360e09d45efb50a41177f2adad91e90e7a01ce7/liteparse-2.14.4-cp310-abi3-macosx_10_12_x86_64.whl", hash = "sha256:f6f44f26217e6f06d98c636a1390631b4ae96e9b60dfe5698afa36d75e2809f4", size = 12626122, upload-time = "2026-09-07T16:56:16.51Z" },
+    { url = "https://files.pythonhosted.org/packages/08/2e/7626afd3ed8a392db59d370db4a9f3bd97d4fafa04fe170383ac3fa5e801/liteparse-2.14.4-cp310-abi3-macosx_11_0_arm64.whl", hash = "sha256:274a9de5c013821c61cd217e62791f930e2a4a9c417906c02dd018e1743004fb", size = 12039601, upload-time = "2026-09-07T16:56:18.808Z" },
+    { url = "https://files.pythonhosted.org/packages/2d/84/935e5af49e693f39efce3b0083deda64ee45617c0230e842a423aa351f16/liteparse-2.14.4-cp310-abi3-manylinux_2_28_aarch64.whl", hash = "sha256:6a72332652a735b4a190aefe2775b81f09bb0d548fbac93133b9dcc62cb7d499", size = 13538784, upload-time = "2026-09-07T16:56:20.983Z" },
+    { url = "https://files.pythonhosted.org/packages/42/f5/99208c776d2fb95da4897bebf436359f85625c190cde2ddf3905733f09c4/liteparse-2.14.4-cp310-abi3-manylinux_2_28_x86_64.whl", hash = "sha256:4c5c04b2cc8eb58ba01466bcc5022159e5192f8036a53553ccc40a777fc09210", size = 13839323, upload-time = "2026-09-07T16:56:23.515Z" },
+    { url = "https://files.pythonhosted.org/packages/93/c8/2ebb420f6e8111d846d7bb1acee3b628697103b863043ea349fc8d9ae5f3/liteparse-2.14.4-cp310-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:4ef275fc08a88e26f64aedf9d80b9c35239d79c57936ad1164614209f9b3e653", size = 17037016, upload-time = "2026-09-07T16:56:26.203Z" },
+    { url = "https://files.pythonhosted.org/packages/f8/a5/22811790ca3a29a2d6e40a6c1dda941421292c3ad07e7414705f35fb6534/liteparse-2.14.4-cp310-abi3-win_amd64.whl", hash = "sha256:ab0f1b52a8e6c3e99c0793704aa88198e8a3aaa708dd9844047708f5845831e0", size = 12047846, upload-time = "2026-09-07T16:56:28.864Z" },
+    { url = "https://files.pythonhosted.org/packages/71/05/082ec8517009059f37cee73b851a460fe3a1b3badbd26957fbfe7318cd19/liteparse-2.14.4-cp310-abi3-win_arm64.whl", hash = "sha256:6b9dfe4ebd8b6eb6500265ea0bda2e6f4021c16626dc23ff37fdf7466c25b2d4", size = 11373207, upload-time = "2026-09-07T16:56:31.167Z" },
+]
+
+[[package]]
 name = "llama-cloud"
 version = "1.6.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1676,6 +1691,9 @@ google = [
     { name = "pymupdf" },
     { name = "pypdf" },
 ]
+jev = [
+    { name = "liteparse" },
+]
 landingai = [
     { name = "landingai-ade" },
 ]
@@ -1721,6 +1739,7 @@ runners = [
     { name = "httpx" },
     { name = "infinity-parser2" },
     { name = "landingai-ade" },
+    { name = "liteparse" },
     { name = "llama-cloud" },
     { name = "openai" },
     { name = "pdf2image" },
@@ -1767,6 +1786,8 @@ requires-dist = [
     { name = "infinity-parser2", marker = "extra == 'runners'", specifier = ">=0.3.0" },
     { name = "landingai-ade", marker = "extra == 'landingai'", specifier = ">=1.4.0" },
     { name = "landingai-ade", marker = "extra == 'runners'", specifier = ">=1.4.0" },
+    { name = "liteparse", marker = "extra == 'jev'", specifier = "==2.14.4" },
+    { name = "liteparse", marker = "extra == 'runners'", specifier = "==2.14.4" },
     { name = "llama-cloud", marker = "extra == 'llamaextract'", specifier = ">=1.4.1" },
     { name = "llama-cloud", marker = "extra == 'runners'", specifier = ">=1.4.1" },
     { name = "lxml", specifier = ">=5.0.0" },
@@ -1824,7 +1845,7 @@ requires-dist = [
     { name = "unstructured-client", marker = "extra == 'runners'", specifier = ">=0.26.0" },
     { name = "warp-ingest", extras = ["ocr"], marker = "extra == 'runners'", specifier = ">=2.0.1" },
 ]
-provides-extras = ["anthropic", "aws", "azure", "datalab", "dev", "extend", "fast", "google", "landingai", "llamaextract", "local", "openai", "openweights", "reducto", "runners"]
+provides-extras = ["anthropic", "aws", "azure", "datalab", "dev", "extend", "fast", "google", "jev", "landingai", "llamaextract", "local", "openai", "openweights", "reducto", "runners"]
 
 [[package]]
 name = "llguidance"

@@ -35,7 +35,7 @@ Models and prices reflect each provider's official documentation as of September
 | 9 | Codex (GPT-5.6 Terra Evidence) | Coding Agents | 92.26 | 95.60 | 86.69 | 77.36 | 9.45¢ |
 | 10 | OpenAI GPT-6 Astra | Commercial VLM | 91.91 | **97.22** | 90.56 | 31.70 | 11.09¢ |
 
-Top 10 of 44 systems — full table in [leaderboard.csv](leaderboard.csv).
+Top 10 of 45 systems — full table in [leaderboard.csv](leaderboard.csv).
 <!-- LEADERBOARD:END -->
 
 <!-- GROUNDING:START -->
@@ -60,7 +60,7 @@ Top 10 of 44 systems — full table in [leaderboard.csv](leaderboard.csv).
   </tbody>
 </table>
 
-Top 10 of 44 systems — full table in [leaderboard.csv](leaderboard.csv).
+Top 10 of 45 systems — full table in [leaderboard.csv](leaderboard.csv).
 <!-- GROUNDING:END -->
 
 <details>

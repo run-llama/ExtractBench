@@ -71,6 +71,7 @@ runners = [
     "httpx>=0.28.0",
     "infinity-parser2>=0.3.0",
     "landingai-ade>=1.4.0",
+    "liteparse==2.14.4",
     "llama-cloud>=1.4.1",
     "openai>=1.0.0",
     "pdf2image>=1.16.0",
@@ -82,6 +83,7 @@ runners = [
     "unstructured-client>=0.26.0",
     "warp-ingest[ocr]>=2.0.1",
 ]
+jev = ["liteparse==2.14.4"]
 llamaextract = ["llama-cloud>=1.4.1", "httpx>=0.28.0"]
 openai = ["openai>=1.0.0", "pdf2image>=1.16.0", "pillow>=10.0.0", "pymupdf>=1.24.0", "pypdf>=6.4.0"]
 anthropic = ["anthropic>=0.77.1", "pdf2image>=1.16.0", "pillow>=10.0.0", "pymupdf>=1.24.0", "pypdf>=6.4.0"]
