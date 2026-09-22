@@ -140,3 +140,9 @@ run boundary (call 11,449). See [finance reconciliation](final/finance.json) and
 the remaining long-document attempts requires additional OpenRouter credit.
 The draft submission will explicitly label the current measurement as budget-limited;
 maintainer acceptance is pending.
+
+## Submission status
+
+[Draft leaderboard PR #61](https://github.com/run-llama/ExtractBench/pull/61)
+was opened on September 22, 2026. It proposes an explicitly budget-limited row;
+acceptance and the decision on funding the remaining attempts are pending.
