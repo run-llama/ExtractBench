@@ -32,9 +32,9 @@ uv run extract-bench run <pipeline_name>
 | `*_extract_twostage_parse_agentic_structured_output_text` | OpenAI / Gemini / Anthropic | LlamaParse agentic markdown → text extract; cost totals parse + extract |
 | `deepseek_v4_pro_extract_twostage_parse_agentic_structured_output_text` | DeepSeek (Fireworks) | two-stage text extract |
 | `kimi_k3_extract_oneshot_structured_output_file` | Kimi K3 (Fireworks) | one-shot vision (rasterized pages), json_object mode; uses `FIREWORKS_API_KEY` |
-| `claude_code_extract_opus_4_8` | Claude Code CLI | agentic extraction; cost from CLI `total_cost_usd` |
+| `claude_code_extract_opus_4_8` / `claude_code_extract_opus_5_5` | Claude Code CLI | agentic extraction; cost from CLI `total_cost_usd`; Opus 5.5 needs CLI 2.1.280+ |
 | `codex_code_extract_gpt_5_4_low` / `codex_code_extract_gpt_5_5_low` / `codex_code_extract_gpt_5_5_high` | Codex CLI | agentic extraction; cost estimated from token usage |
-| `claude_code_extract_opus_4_8_evidence` | Claude Code CLI | agentic extraction with page and box citations in `citations.json` |
+| `claude_code_extract_opus_4_8_evidence` / `claude_code_extract_opus_5_5_evidence` | Claude Code CLI | agentic extraction with page and box citations in `citations.json` |
 | `codex_code_extract_gpt_5_5_low_evidence` / `codex_code_extract_gpt_5_6_sol_low_evidence` / `codex_code_extract_gpt_5_6_terra_low_evidence` | Codex CLI | low-effort extraction with page and box citations; unrestricted shell |
 | `codex_code_extract_gpt_5_6_luna_medium_evidence` | Codex CLI | medium-effort extraction with page and box citations; unrestricted shell, no cost cap |
 | `codex_code_extract_gpt_6_luna_medium_evidence` / `codex_code_extract_gpt_6_luna_high_evidence` / `codex_code_extract_gpt_6_luna_xhigh_evidence` / `codex_code_extract_gpt_6_sol_low_evidence` / `codex_code_extract_gpt_6_sol_medium_evidence` / `codex_code_extract_gpt_6_sol_high_evidence` | Codex CLI | GPT-6 Luna and Sol extraction with page and box citations at the effort in the name; unrestricted shell, no cost cap |

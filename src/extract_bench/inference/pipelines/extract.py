@@ -313,6 +313,22 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
             config={"model": "claude-opus-4-8", "evidence_mode": True},
         )
     )
+    # Opus 5.5 needs Claude Code CLI 2.1.280 or newer; older releases reject
+    # the model id with a 400 before any document is read.
+    register_fn(
+        _pipeline_spec(
+            pipeline_name="claude_code_extract_opus_5_5",
+            provider_name="claude_code_extract",
+            config={"model": "claude-opus-5-5", "bare": True},
+        )
+    )
+    register_fn(
+        _pipeline_spec(
+            pipeline_name="claude_code_extract_opus_5_5_evidence",
+            provider_name="claude_code_extract",
+            config={"model": "claude-opus-5-5", "evidence_mode": True},
+        )
+    )
 
     for _model_slug, _model, _reasoning_effort in (
         ("gpt_5_4", "gpt-5.4", "low"),
