@@ -381,6 +381,26 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
         )
     )
 
+    # GPT-6 evidence sweep, same unrestricted config as the Luna pipeline above.
+    for _gpt6_slug, _gpt6_model, _gpt6_efforts in (
+        ("gpt_6_luna", "gpt-6-luna", ("medium", "high", "xhigh")),
+        ("gpt_6_sol", "gpt-6-sol", ("low", "medium", "high")),
+    ):
+        for _reasoning_effort in _gpt6_efforts:
+            register_fn(
+                _pipeline_spec(
+                    pipeline_name=f"codex_code_extract_{_gpt6_slug}_{_reasoning_effort}_evidence",
+                    provider_name="codex_code_extract",
+                    config={
+                        "model": _gpt6_model,
+                        "reasoning_effort": _reasoning_effort,
+                        "sandbox": "danger-full-access",
+                        "max_cost_usd": None,
+                        "evidence_mode": True,
+                    },
+                )
+            )
+
     # =========================================================================
     # Commercial extraction APIs
     # =========================================================================

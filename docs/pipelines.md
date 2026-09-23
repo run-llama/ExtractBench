@@ -37,6 +37,7 @@ uv run extract-bench run <pipeline_name>
 | `claude_code_extract_opus_4_8_evidence` / `claude_code_extract_opus_5_5_evidence` | Claude Code CLI | agentic extraction with page and box citations in `citations.json` |
 | `codex_code_extract_gpt_5_5_low_evidence` / `codex_code_extract_gpt_5_6_sol_low_evidence` / `codex_code_extract_gpt_5_6_terra_low_evidence` | Codex CLI | low-effort extraction with page and box citations; unrestricted shell |
 | `codex_code_extract_gpt_5_6_luna_medium_evidence` | Codex CLI | medium-effort extraction with page and box citations; unrestricted shell, no cost cap |
+| `codex_code_extract_gpt_6_luna_medium_evidence` / `codex_code_extract_gpt_6_luna_high_evidence` / `codex_code_extract_gpt_6_luna_xhigh_evidence` / `codex_code_extract_gpt_6_sol_low_evidence` / `codex_code_extract_gpt_6_sol_medium_evidence` / `codex_code_extract_gpt_6_sol_high_evidence` | Codex CLI | GPT-6 Luna and Sol extraction with page and box citations at the effort in the name; unrestricted shell, no cost cap |
 | `reducto_extract` / `reducto_deep_extract` | Reducto | deep variant adds citations |
 | `extend_extract` / `extend_extract_max` | Extend | citations enabled; max-context array strategy variant |
 | `landingai_extract` | LandingAI ADE | |

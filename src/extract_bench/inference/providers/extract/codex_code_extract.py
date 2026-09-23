@@ -77,6 +77,8 @@ _DEFAULT_DISABLED_FEATURES = (
 
 # USD per million tokens (input, cached input, output); estimates use Codex CLI JSONL usage.
 _OPENAI_CODEX_PRICING_PER_M: dict[str, tuple[float, float, float]] = {
+    "gpt-6-sol": (2.00, 0.20, 10.00),
+    "gpt-6-luna": (0.10, 0.01, 0.50),
     "gpt-5.6-sol": (4.00, 0.40, 20.00),
     "gpt-5.6-terra": (2.00, 0.20, 12.00),
     "gpt-5.6-luna": (0.20, 0.02, 1.20),
@@ -86,7 +88,16 @@ _OPENAI_CODEX_PRICING_PER_M: dict[str, tuple[float, float, float]] = {
     "gpt-5.4": (2.50, 0.25, 15.00),
 }
 
+# USD per million cache-write tokens (Codex's cache_write_input_tokens, a subset of
+# the uncached input). A model absent here prices cache writes as uncached input.
+_OPENAI_CODEX_CACHE_WRITE_PER_M: dict[str, float] = {
+    "gpt-6-sol": 2.50,
+    "gpt-6-luna": 0.125,
+}
+
 _LONG_CONTEXT_THRESHOLD_TOKENS = 272_000
+# GPT-6 is absent: Codex caps gpt-6-sol/luna at model_context_window=258400, so no
+# single request reaches OpenAI's per-request 272K threshold.
 _LONG_CONTEXT_MODELS = ("gpt-5.6-sol", "gpt-5.5", "gpt-5.4")
 
 
@@ -159,6 +170,17 @@ class CodexCodeExtractProvider(Provider):
             self.base_config.get("cached_input_price_per_1m", default_cached_input)
         )
         self._output_price_per_1m: float = float(self.base_config.get("output_price_per_1m", default_output))
+        cache_write_matches = [
+            (prefix, rate) for prefix, rate in _OPENAI_CODEX_CACHE_WRITE_PER_M.items() if self._model.startswith(prefix)
+        ]
+        default_cache_write = (
+            max(cache_write_matches, key=lambda item: len(item[0]))[1]
+            if cache_write_matches
+            else self._input_price_per_1m
+        )
+        self._cache_write_price_per_1m: float = float(
+            self.base_config.get("cache_write_price_per_1m", default_cache_write)
+        )
 
         self._procs: dict[str, subprocess.Popen[str]] = {}
         self._procs_lock = threading.Lock()
@@ -360,6 +382,7 @@ class CodexCodeExtractProvider(Provider):
         usage = {
             "input_tokens": 0,
             "cached_input_tokens": 0,
+            "cache_write_input_tokens": 0,
             "output_tokens": 0,
             "reasoning_output_tokens": 0,
             "total_tokens": 0,
@@ -370,7 +393,13 @@ class CodexCodeExtractProvider(Provider):
             event_usage = event.get("usage") or {}
             if not isinstance(event_usage, dict):
                 continue
-            for key in ("input_tokens", "cached_input_tokens", "output_tokens", "reasoning_output_tokens"):
+            for key in (
+                "input_tokens",
+                "cached_input_tokens",
+                "cache_write_input_tokens",
+                "output_tokens",
+                "reasoning_output_tokens",
+            ):
                 value = event_usage.get(key)
                 if isinstance(value, int):
                     usage[key] += value
@@ -601,15 +630,19 @@ class CodexCodeExtractProvider(Provider):
         cached_input_tokens = int(usage.get("cached_input_tokens", 0) or 0)
         output_tokens = int(usage.get("output_tokens", 0) or 0)
         uncached_input_tokens = max(0, input_tokens - cached_input_tokens)
+        cache_write_tokens = min(int(usage.get("cache_write_input_tokens", 0) or 0), uncached_input_tokens)
         input_rate = self._input_price_per_1m
         cached_input_rate = self._cached_input_price_per_1m
+        cache_write_rate = self._cache_write_price_per_1m
         output_rate = self._output_price_per_1m
         if self._uses_long_context_pricing(self._model, usage):
             input_rate *= 2
             cached_input_rate *= 2
+            cache_write_rate *= 2
             output_rate *= 1.5
         return (
-            uncached_input_tokens / 1_000_000 * input_rate
+            (uncached_input_tokens - cache_write_tokens) / 1_000_000 * input_rate
+            + cache_write_tokens / 1_000_000 * cache_write_rate
             + cached_input_tokens / 1_000_000 * cached_input_rate
             + output_tokens / 1_000_000 * output_rate
         )
@@ -618,6 +651,7 @@ class CodexCodeExtractProvider(Provider):
         long_context = self._uses_long_context_pricing(self._model, usage)
         input_rate = self._input_price_per_1m * (2 if long_context else 1)
         cached_input_rate = self._cached_input_price_per_1m * (2 if long_context else 1)
+        cache_write_rate = self._cache_write_price_per_1m * (2 if long_context else 1)
         output_rate = self._output_price_per_1m * (1.5 if long_context else 1)
         return {
             "pricing_basis": "openai_api_standard",
@@ -625,6 +659,7 @@ class CodexCodeExtractProvider(Provider):
             "long_context_threshold_tokens": _LONG_CONTEXT_THRESHOLD_TOKENS,
             "input_price_per_1m": input_rate,
             "cached_input_price_per_1m": cached_input_rate,
+            "cache_write_price_per_1m": cache_write_rate,
             "output_price_per_1m": output_rate,
         }
 
@@ -646,6 +681,7 @@ class CodexCodeExtractProvider(Provider):
             "evidence_mode": self._evidence_mode,
             "input_price_per_1m": self._input_price_per_1m,
             "cached_input_price_per_1m": self._cached_input_price_per_1m,
+            "cache_write_price_per_1m": self._cache_write_price_per_1m,
             "output_price_per_1m": self._output_price_per_1m,
             "pricing_basis": "openai_api_standard",
             "long_context_threshold_tokens": _LONG_CONTEXT_THRESHOLD_TOKENS,
