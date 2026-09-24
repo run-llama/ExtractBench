@@ -641,6 +641,34 @@ def test_over_cap_array_pairs_inside_identity_buckets(monkeypatch: pytest.Monkey
     assert _record_correct(expected, actual, identity_keys_by_field={"holdings": ["security"]}) == 3
 
 
+def test_identity_keys_do_not_apply_when_exact_peel_brings_residual_under_cap(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    expected = {
+        "as_of": None,
+        "holdings": [
+            {"security": "AAA", "coupon": 1.0, "note": "n1"},
+            {"security": "BBB", "coupon": 2.0, "note": "n2"},
+            {"security": "CCC", "coupon": 3.0, "note": "n3"},
+        ],
+    }
+    actual = {
+        "as_of": None,
+        "holdings": [
+            {"security": "AAA", "coupon": 1.0, "note": "n1"},
+            {"security": "BBB", "coupon": 2.0, "note": "n2"},
+            {"security": "DDD", "coupon": 3.0, "note": "n3"},
+        ],
+    }
+    monkeypatch.setattr(array_record_match_metric, "_MAX_RESIDUAL_ASSIGNMENT_CELLS", 1)
+
+    plain = _record_correct(expected, actual)
+    hinted = _record_correct(expected, actual, identity_keys_by_field={"holdings": ["security"]})
+
+    assert plain == 9
+    assert hinted == plain
+
+
 def test_over_cap_identity_bucket_still_skips(monkeypatch: pytest.MonkeyPatch) -> None:
     expected = {
         "as_of": None,
