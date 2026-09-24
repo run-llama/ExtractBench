@@ -576,3 +576,113 @@ def test_fuzzy_column_build_runs_both_of_its_compare_branches(monkeypatch) -> No
     assert cost[1][1] == 0
     assert ("alpha beta gamm", 42) not in ratio_calls
     assert cost[0][0] == 0
+
+
+def _holdings_schema() -> dict:
+    return {
+        "type": "object",
+        "properties": {
+            "as_of": {"type": ["string", "null"]},
+            "holdings": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "security": {"type": ["string", "null"]},
+                        "coupon": {"type": ["number", "null"]},
+                        "note": {"type": ["string", "null"]},
+                    },
+                },
+            },
+        },
+    }
+
+
+def _crossed_holdings() -> tuple[dict, dict]:
+    expected = {
+        "as_of": None,
+        "holdings": [
+            {"security": "AAA", "coupon": 1.0, "note": "n1"},
+            {"security": "BBB", "coupon": 2.0, "note": "n2"},
+        ],
+    }
+    actual = {
+        "as_of": None,
+        "holdings": [
+            {"security": "BBB", "coupon": 1.0, "note": "n1"},
+            {"security": "AAA", "coupon": 2.0, "note": "n2"},
+        ],
+    }
+    return expected, actual
+
+
+def _record_correct(expected: dict, actual: dict, **kwargs: object) -> int:
+    metrics = ArrayRecordMatchMetric().compute(
+        expected=expected,
+        actual=actual,
+        data_schema=_holdings_schema(),
+        **kwargs,
+    )
+    return next(metric.metadata["correct"] for metric in metrics if metric.metric_name == "array_record_f1")
+
+
+def test_identity_keys_do_not_change_pairing_below_the_cap() -> None:
+    expected, actual = _crossed_holdings()
+    plain = _record_correct(expected, actual)
+    hinted = _record_correct(expected, actual, identity_keys_by_field={"holdings": ["security"]})
+    assert hinted == plain
+    assert hinted == 5
+
+
+def test_over_cap_array_pairs_inside_identity_buckets(monkeypatch: pytest.MonkeyPatch) -> None:
+    expected, actual = _crossed_holdings()
+    monkeypatch.setattr(array_record_match_metric, "_MAX_RESIDUAL_ASSIGNMENT_CELLS", 1)
+    assert _record_correct(expected, actual) == 1
+    assert _record_correct(expected, actual, identity_keys_by_field={"holdings": ["security"]}) == 3
+
+
+def test_identity_keys_do_not_apply_when_exact_peel_brings_residual_under_cap(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    expected = {
+        "as_of": None,
+        "holdings": [
+            {"security": "AAA", "coupon": 1.0, "note": "n1"},
+            {"security": "BBB", "coupon": 2.0, "note": "n2"},
+            {"security": "CCC", "coupon": 3.0, "note": "n3"},
+        ],
+    }
+    actual = {
+        "as_of": None,
+        "holdings": [
+            {"security": "AAA", "coupon": 1.0, "note": "n1"},
+            {"security": "BBB", "coupon": 2.0, "note": "n2"},
+            {"security": "DDD", "coupon": 3.0, "note": "n3"},
+        ],
+    }
+    monkeypatch.setattr(array_record_match_metric, "_MAX_RESIDUAL_ASSIGNMENT_CELLS", 1)
+
+    plain = _record_correct(expected, actual)
+    hinted = _record_correct(expected, actual, identity_keys_by_field={"holdings": ["security"]})
+
+    assert plain == 9
+    assert hinted == plain
+
+
+def test_over_cap_identity_bucket_still_skips(monkeypatch: pytest.MonkeyPatch) -> None:
+    expected = {
+        "as_of": None,
+        "holdings": [
+            {"security": "AAA", "coupon": 1.0, "note": "n1"},
+            {"security": "AAA", "coupon": 2.0, "note": "n2"},
+        ],
+    }
+    actual = {
+        "as_of": None,
+        "holdings": [
+            {"security": "AAA", "coupon": 9.0, "note": "x1"},
+            {"security": "AAA", "coupon": 8.0, "note": "x2"},
+        ],
+    }
+    monkeypatch.setattr(array_record_match_metric, "_MAX_RESIDUAL_ASSIGNMENT_CELLS", 1)
+    assert _record_correct(expected, actual, identity_keys_by_field={"holdings": ["security"]}) == 1

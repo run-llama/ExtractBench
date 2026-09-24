@@ -13,6 +13,7 @@ from rapidfuzz import fuzz
 from scipy.optimize import linear_sum_assignment
 
 from extract_bench.evaluation.metrics.extract.json_subset_match import (
+    _identity_cell_key,
     normalize_date_string,
 )
 from extract_bench.inference.providers.extract.table_codegen.schema_utils import (
@@ -25,7 +26,10 @@ from extract_bench.schemas.evaluation import MetricValue
 # Above this many residual cells (unmatched_actual x unmatched_expected, after the
 # exact-row peel) the dense assignment matrix is skipped to bound eval memory.
 # Matches unified_evidence's _GROUNDED_MAX_CELLS; a 77.4k-row array would need
-# ~67 GB otherwise and OOM-kill the runner.
+# ~67 GB otherwise and OOM-kill the runner. When identity keys are supplied for
+# an array whose full row product is over this cap, rows are paired inside
+# those identity buckets first. A bucket that is still over the cap keeps the
+# residual skip.
 _MAX_RESIDUAL_ASSIGNMENT_CELLS = 100_000_000
 
 _PUNCT_RE = re.compile(r"[^\w\s]", re.U)
@@ -426,6 +430,7 @@ def _assign_rows(
     subfields: Sequence[str],
     fuzzy_field_thresholds: Mapping[str, float],
     field_schemas: Mapping[str, Any] | None = None,
+    identity_keys: Sequence[str] | None = None,
 ) -> list[tuple[int, int]]:
     assignment = peel_exact_row_matches(
         actual_list,
@@ -447,7 +452,33 @@ def _assign_rows(
     # 77,400-row array needs ~67 GB) and OOM-kills the eval runner. Over the cell
     # budget, skip the residual assignment: those rows stay unmatched (scored as
     # misses) rather than crashing the whole run -- a peel-only lower bound.
-    if len(residual_actual) * len(residual_expected) > _MAX_RESIDUAL_ASSIGNMENT_CELLS:
+    residual_cells = len(residual_actual) * len(residual_expected)
+    if residual_cells > _MAX_RESIDUAL_ASSIGNMENT_CELLS and identity_keys is not None and len(identity_keys) > 0:
+        actual_buckets: dict[tuple[str, ...], list[int]] = defaultdict(list)
+        expected_buckets: dict[tuple[str, ...], list[int]] = defaultdict(list)
+        for local_idx, row in enumerate(residual_actual):
+            actual_buckets[_row_identity(row, identity_keys)].append(local_idx)
+        for local_idx, row in enumerate(residual_expected):
+            expected_buckets[_row_identity(row, identity_keys)].append(local_idx)
+        for ident in set(actual_buckets) | set(expected_buckets):
+            actual_indices = actual_buckets.get(ident, [])
+            expected_indices = expected_buckets.get(ident, [])
+            bucket_pairs = _assign_rows(
+                [residual_actual[idx] for idx in actual_indices],
+                [residual_expected[idx] for idx in expected_indices],
+                subfields=subfields,
+                fuzzy_field_thresholds=fuzzy_field_thresholds,
+                field_schemas=field_schemas,
+            )
+            pairs.extend(
+                (
+                    assignment.unmatched_actual_indices[actual_indices[actual_idx]],
+                    assignment.unmatched_expected_indices[expected_indices[expected_idx]],
+                )
+                for actual_idx, expected_idx in bucket_pairs
+            )
+        return pairs
+    if residual_cells > _MAX_RESIDUAL_ASSIGNMENT_CELLS:
         return pairs
     cost = mismatch_cost_matrix(
         residual_actual,
@@ -522,6 +553,7 @@ def _score_array(
     subfields: Sequence[str],
     fuzzy_field_thresholds: Mapping[str, float],
     field_schemas: Mapping[str, Any] | None = None,
+    identity_keys: Sequence[str] | None = None,
 ) -> tuple[int, int, int, int, int]:
     expected_list = as_rows(expected_rows)
     actual_list = as_rows(actual_rows)
@@ -538,6 +570,7 @@ def _score_array(
         subfields=subfields,
         fuzzy_field_thresholds=fuzzy_field_thresholds,
         field_schemas=field_schemas,
+        identity_keys=identity_keys,
     ):
         actual_dict = actual_list[actual_idx] if isinstance(actual_list[actual_idx], Mapping) else {}
         expected_dict = expected_list[expected_idx] if isinstance(expected_list[expected_idx], Mapping) else {}
@@ -561,12 +594,20 @@ def _score_array(
     )
 
 
+def _row_identity(row: Any, keys: Sequence[str]) -> tuple[str, ...]:
+    """Canonical identity, same cell key as declared-identity pairing."""
+    if not isinstance(row, Mapping):
+        return tuple("" for _ in keys)
+    return tuple(_identity_cell_key(row.get(key)) for key in keys)
+
+
 def compute_array_record_match_counts(
     expected: Any,
     actual: Any,
     data_schema: Mapping[str, Any] | None = None,
     fuzzy_field_thresholds: Mapping[str, float] | None = None,
     normalize_dates: bool = True,
+    identity_keys_by_field: Mapping[str, Sequence[str]] | None = None,
 ) -> ArrayRecordMatchCounts | None:
     """Compute order-insensitive record matching counts for top-level arrays.
 
@@ -577,6 +618,11 @@ def compute_array_record_match_counts(
     When ``normalize_dates`` is set (the default), date-like strings on both
     sides are canonicalized to ISO format before comparison, aligned with the
     generic ``accuracy`` metric (json_subset_match).
+
+    ``identity_keys_by_field`` maps a top-level array name to the row fields
+    that identify a record. It applies only when the residual row product after
+    exact-row matches are peeled exceeds ``_MAX_RESIDUAL_ASSIGNMENT_CELLS``.
+    Otherwise pairing stays keyless.
     """
     expected = unwrap_value(expected)
     actual = unwrap_value(actual)
@@ -607,19 +653,24 @@ def compute_array_record_match_counts(
             if len(subfield_names) == 0:
                 continue
             field_schemas = array_item_properties(field_schema)
+            identity_keys = None if identity_keys_by_field is None else identity_keys_by_field.get(field)
+            expected_list = as_rows(expected_value)
+            actual_list = as_rows(actual_value)
+            scored = _score_array(
+                expected_list,
+                actual_list,
+                subfields=subfield_names,
+                fuzzy_field_thresholds=fuzzy,
+                field_schemas=field_schemas,
+                identity_keys=identity_keys,
+            )
             (
                 array_correct,
                 array_expected_total,
                 array_predicted_total,
                 array_expected_rows,
                 array_predicted_rows,
-            ) = _score_array(
-                expected_value,
-                actual_value,
-                subfields=subfield_names,
-                fuzzy_field_thresholds=fuzzy,
-                field_schemas=field_schemas,
-            )
+            ) = scored
             correct += array_correct
             expected_total += array_expected_total
             predicted_total += array_predicted_total
@@ -672,12 +723,14 @@ class ArrayRecordMatchMetric:
         data_schema = kwargs.get("data_schema")
         fuzzy_field_thresholds = kwargs.get("fuzzy_field_thresholds", self._fuzzy_field_thresholds)
         normalize_dates = kwargs.get("normalize_dates", self._normalize_dates)
+        identity_keys_by_field = kwargs.get("identity_keys_by_field")
         counts = compute_array_record_match_counts(
             expected=expected,
             actual=actual,
             data_schema=data_schema,
             fuzzy_field_thresholds=fuzzy_field_thresholds,
             normalize_dates=normalize_dates,
+            identity_keys_by_field=identity_keys_by_field,
         )
         if counts is None:
             return []
