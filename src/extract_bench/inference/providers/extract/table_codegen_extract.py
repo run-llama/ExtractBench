@@ -69,13 +69,26 @@ _PRICING_PER_1M: dict[str, tuple[float, float]] = {
 }
 
 # Claude cache prices, USD per 1M tokens: (cache read, 5m cache write). Listed
-# prices, not derived from the input price.
+# prices, not derived from the input price. Configurable via base_config["cache_pricing"].
 # Source: https://platform.claude.com/docs/en/about-claude/pricing (2026-09-28)
 _ANTHROPIC_CACHE_PRICING_PER_1M: dict[str, tuple[float, float]] = {
-    "claude-sonnet-4-6": (0.30, 3.75),
-    "claude-sonnet-5": (0.20, 2.50),
+    "claude-fable-5-1": (0.25, 12.50),
+    "claude-fable-5": (1.00, 12.50),
+    "claude-opus-5-5": (0.20, 5.00),
+    "claude-opus-5": (0.50, 6.25),
     "claude-opus-4-8": (0.50, 6.25),
+    "claude-opus-4-7": (0.50, 6.25),
+    "claude-opus-4-6": (0.50, 6.25),
+    "claude-opus-4-5": (0.50, 6.25),
+    "claude-opus-4-1": (1.50, 18.75),
+    "claude-opus-4": (1.50, 18.75),
+    "claude-sonnet-5-5": (0.20, 2.50),
+    "claude-sonnet-5": (0.20, 2.50),
+    "claude-sonnet-4-6": (0.30, 3.75),
+    "claude-sonnet-4-5": (0.30, 3.75),
+    "claude-sonnet-4": (0.30, 3.75),
     "claude-haiku-4-5": (0.10, 1.25),
+    "claude-3-5-haiku": (0.08, 1.00),
 }
 
 
@@ -133,7 +146,8 @@ class TableCodegenExtractProvider(Provider):
     (None default: review-loop runs echo the full output; an int caps each array
     for cheap smoke tests), ``parse_config`` (LlamaParse base_config; defaults to
     agentic/latest with product-default heuristics/HTML tables), ``pricing``
-    (model -> [in,out] per-1M), and optional ``api_key`` (model API key; else
+    (model -> [in,out] per-1M), ``cache_pricing`` (Claude model -> [cache read,
+    5m cache write] per-1M), and optional ``api_key`` (model API key; else
     from the provider-matched env var).
     """
 
@@ -233,6 +247,10 @@ class TableCodegenExtractProvider(Provider):
         self._script_timeout_s: float = float(self.base_config.get("script_timeout_s", self.DEFAULT_SCRIPT_TIMEOUT_S))
         self._parse_config: dict[str, Any] = {**self.DEFAULT_PARSE_CONFIG, **self.base_config.get("parse_config", {})}
         self._pricing: dict[str, tuple[float, float]] = {**_PRICING_PER_1M, **self.base_config.get("pricing", {})}
+        self._cache_pricing: dict[str, tuple[float, float]] = {
+            **_ANTHROPIC_CACHE_PRICING_PER_1M,
+            **self.base_config.get("cache_pricing", {}),
+        }
         # Model API key (provider-matched; no cross-provider fallback). None is
         # fine — the SDK raises its own clear auth error. Parse uses its own
         # LLAMA_CLOUD key. The google chain tries each Gemini var in order.
@@ -305,7 +323,12 @@ class TableCodegenExtractProvider(Provider):
         think = float(usage.get("thinking", 0) or 0)
         if self._llm_provider == "anthropic":
             # input_tokens EXCLUDES cache tokens, which bill at their own listed rates.
-            read_rate, write_rate = pricing_for_model(self._model, _ANTHROPIC_CACHE_PRICING_PER_1M)
+            read_rate, write_rate = pricing_for_model(self._model, self._cache_pricing)
+            if (read or write) and not (read_rate or write_rate):
+                logger.warning(
+                    "table_codegen_extract: no cache pricing for model %r — cache tokens will be reported as $0",
+                    self._model,
+                )
             in_cost = (n_in * cin + read * read_rate + write * write_rate) / 1e6
         elif self._llm_provider == "google":
             # Gemini prompt_token_count INCLUDES cached tokens; the cached subset bills
