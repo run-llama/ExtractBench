@@ -4,7 +4,7 @@ import base64
 import io
 import math
 import os
-from datetime import date, datetime
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -68,25 +68,27 @@ USER_PROMPT = (
 )
 
 
-# Anthropic pricing: USD per million tokens (input, output)
-# Source: https://platform.claude.com/docs/en/about-claude/pricing (2026-03-25)
-_ANTHROPIC_PRICING_PER_M: dict[str, tuple[float, float]] = {
-    # model-prefix: (input_per_M, output_per_M)
-    "claude-fable-5": (10.00, 50.00),
-    # Sonnet 5 has introductory pricing through 2026-08-31; handled in
-    # _get_pricing so benchmark costs switch to standard pricing on time.
-    "claude-sonnet-5": (3.00, 15.00),
-    "claude-haiku-4-5": (1.00, 5.00),
-    "claude-haiku-3-5": (0.80, 4.00),
-    "claude-haiku-3": (0.25, 1.25),
-    "claude-sonnet-4": (3.00, 15.00),
-    "claude-sonnet-3": (3.00, 15.00),
-    "claude-opus-4-8": (5.00, 25.00),
-    "claude-opus-4-7": (5.00, 25.00),
-    "claude-opus-4-6": (5.00, 25.00),
-    "claude-opus-4-5": (5.00, 25.00),
-    "claude-opus-4-1": (15.00, 75.00),
-    "claude-opus-4": (15.00, 75.00),
+# Anthropic pricing, USD per 1M tokens: (input, output, cache read, 5m cache write).
+# Every rate is the listed price, not derived from the input price.
+# Source: https://platform.claude.com/docs/en/about-claude/pricing (2026-09-28)
+_ANTHROPIC_PRICING_PER_M: dict[str, tuple[float, float, float, float]] = {
+    "claude-fable-5-1": (10.00, 50.00, 0.25, 12.50),
+    "claude-fable-5": (10.00, 50.00, 1.00, 12.50),
+    "claude-opus-5-5": (4.00, 20.00, 0.20, 5.00),
+    "claude-opus-5": (5.00, 25.00, 0.50, 6.25),
+    "claude-opus-4-8": (5.00, 25.00, 0.50, 6.25),
+    "claude-opus-4-7": (5.00, 25.00, 0.50, 6.25),
+    "claude-opus-4-6": (5.00, 25.00, 0.50, 6.25),
+    "claude-opus-4-5": (5.00, 25.00, 0.50, 6.25),
+    "claude-opus-4-1": (15.00, 75.00, 1.50, 18.75),
+    "claude-opus-4": (15.00, 75.00, 1.50, 18.75),
+    "claude-sonnet-5-5": (2.00, 10.00, 0.20, 2.50),
+    "claude-sonnet-5": (2.00, 10.00, 0.20, 2.50),
+    "claude-sonnet-4-6": (3.00, 15.00, 0.30, 3.75),
+    "claude-sonnet-4-5": (3.00, 15.00, 0.30, 3.75),
+    "claude-sonnet-4": (3.00, 15.00, 0.30, 3.75),
+    "claude-haiku-4-5": (1.00, 5.00, 0.10, 1.25),
+    "claude-3-5-haiku": (0.80, 4.00, 0.08, 1.00),
 }
 
 
@@ -207,17 +209,14 @@ class AnthropicProvider(Provider):
     # API limit is 5MB for base64 data; base64 adds ~33% overhead, so raw limit is 5MB * 3/4
     MAX_IMAGE_SIZE_BYTES = int(5 * 1024 * 1024 * 3 / 4)  # ~3.75 MB raw -> ~5 MB base64
 
-    def _get_pricing(self) -> tuple[float, float]:
-        """Return (input_rate, output_rate) in USD per million tokens.
+    def _get_pricing(self) -> tuple[float, float, float, float]:
+        """Return (input, output, cache read, 5m cache write) USD per million tokens.
 
         Uses longest-prefix matching to avoid ambiguity when one model
         prefix is a substring of another.
         """
-        if self._model.startswith("claude-sonnet-5") and date.today() <= date(2026, 8, 31):
-            return (2.00, 10.00)
-
         matches = [(p, r) for p, r in _ANTHROPIC_PRICING_PER_M.items() if self._model.startswith(p)]
-        return max(matches, key=lambda x: len(x[0]))[1] if matches else (0.0, 0.0)
+        return max(matches, key=lambda x: len(x[0]))[1] if matches else (0.0, 0.0, 0.0, 0.0)
 
     @staticmethod
     def _extract_text(response) -> str:  # type: ignore[no-untyped-def]
@@ -232,9 +231,18 @@ class AnthropicProvider(Provider):
         """Extract token counts from an Anthropic API response."""
         usage = getattr(response, "usage", None)
         if usage is None:
-            return {"input_tokens": 0, "output_tokens": 0, "thinking_tokens": 0, "total_tokens": 0}
+            return {
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "cache_read_tokens": 0,
+                "cache_write_tokens": 0,
+                "thinking_tokens": 0,
+                "total_tokens": 0,
+            }
         input_tok = getattr(usage, "input_tokens", 0) or 0
         output_tok = getattr(usage, "output_tokens", 0) or 0
+        cache_read = getattr(usage, "cache_read_input_tokens", 0) or 0
+        cache_write = getattr(usage, "cache_creation_input_tokens", 0) or 0
         # With extended thinking, output_tokens includes thinking tokens.
         # Try to count thinking tokens from content blocks for reporting.
         thinking_tok = 0
@@ -242,10 +250,12 @@ class AnthropicProvider(Provider):
             if getattr(block, "type", None) == "thinking":
                 # Token count not directly available; use output_tokens as-is.
                 break
-        total_tok = input_tok + output_tok
+        total_tok = input_tok + output_tok + cache_read + cache_write
         return {
             "input_tokens": input_tok,
             "output_tokens": output_tok,
+            "cache_read_tokens": cache_read,
+            "cache_write_tokens": cache_write,
             "thinking_tokens": thinking_tok,
             "total_tokens": total_tok,
         }
@@ -734,12 +744,18 @@ class AnthropicProvider(Provider):
             # Aggregate token usage across pages
             total_input = sum(u["input_tokens"] for u in page_usages)
             total_output = sum(u["output_tokens"] for u in page_usages)
+            total_cache_read = sum(u.get("cache_read_tokens", 0) for u in page_usages)
+            total_cache_write = sum(u.get("cache_write_tokens", 0) for u in page_usages)
             total_thinking = sum(u["thinking_tokens"] for u in page_usages)
             total_all = sum(u["total_tokens"] for u in page_usages)
 
-            # Compute cost
-            input_rate, output_rate = self._get_pricing()
-            cost = (total_input * input_rate + (total_output + total_thinking) * output_rate) / 1_000_000
+            input_rate, output_rate, cache_read_rate, cache_write_rate = self._get_pricing()
+            cost = (
+                total_input * input_rate
+                + (total_output + total_thinking) * output_rate
+                + total_cache_read * cache_read_rate
+                + total_cache_write * cache_write_rate
+            ) / 1_000_000
 
             raw_output = {
                 "pages": pages,
@@ -754,6 +770,8 @@ class AnthropicProvider(Provider):
                 },
                 "input_tokens": total_input,
                 "output_tokens": total_output,
+                "cache_read_tokens": total_cache_read,
+                "cache_write_tokens": total_cache_write,
                 "thinking_tokens": total_thinking,
                 "total_tokens": total_all,
                 "cost_usd": cost,

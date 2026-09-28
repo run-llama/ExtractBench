@@ -59,8 +59,6 @@ logger = logging.getLogger(__name__)
 # not duplicate the numbers here so the two paths can't drift.
 _PRICING_PER_1M: dict[str, tuple[float, float]] = {
     "claude-sonnet-4-6": (3.0, 15.0),
-    # Claude Sonnet 5 introductory pricing ($2/$10 per MTok) is in effect through
-    # 2026-08-31; it reverts to the standard $3/$15 after that — bump these then.
     "claude-sonnet-5": (2.0, 10.0),
     "claude-opus-4-8": (5.0, 25.0),
     "claude-haiku-4-5": (1.0, 5.0),
@@ -68,6 +66,16 @@ _PRICING_PER_1M: dict[str, tuple[float, float]] = {
     "gpt-5.4-mini": (0.75, 4.5),
     "gpt-5.4-nano": (0.2, 1.25),
     **GEMINI_PRICING_PER_MILLION,
+}
+
+# Claude cache prices, USD per 1M tokens: (cache read, 5m cache write). Listed
+# prices, not derived from the input price.
+# Source: https://platform.claude.com/docs/en/about-claude/pricing (2026-09-28)
+_ANTHROPIC_CACHE_PRICING_PER_1M: dict[str, tuple[float, float]] = {
+    "claude-sonnet-4-6": (0.30, 3.75),
+    "claude-sonnet-5": (0.20, 2.50),
+    "claude-opus-4-8": (0.50, 6.25),
+    "claude-haiku-4-5": (0.10, 1.25),
 }
 
 
@@ -296,8 +304,9 @@ class TableCodegenExtractProvider(Provider):
         # output_tokens/completion_tokens already fold in any reasoning tokens.
         think = float(usage.get("thinking", 0) or 0)
         if self._llm_provider == "anthropic":
-            # input_tokens EXCLUDES cache tokens; writes bill at 1.25x, reads at 0.1x.
-            in_cost = (n_in + 1.25 * write + 0.1 * read) / 1e6 * cin
+            # input_tokens EXCLUDES cache tokens, which bill at their own listed rates.
+            read_rate, write_rate = pricing_for_model(self._model, _ANTHROPIC_CACHE_PRICING_PER_1M)
+            in_cost = (n_in * cin + read * read_rate + write * write_rate) / 1e6
         elif self._llm_provider == "google":
             # Gemini prompt_token_count INCLUDES cached tokens; the cached subset bills
             # at the absolute cache-hit rate (≈0.1x input for flash-lite), the rest at

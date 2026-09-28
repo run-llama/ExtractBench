@@ -1,15 +1,11 @@
-"""Unit tests for Anthropic provider pricing, including the Sonnet 5
-introductory-rate transition."""
+"""Unit tests for Anthropic provider pricing."""
 
 from __future__ import annotations
-
-from datetime import date
 
 import pytest
 
 pytest.importorskip("PIL", reason="dev and runners extras required; run: uv sync --extra dev --extra runners")
 
-from extract_bench.inference.providers.parse import anthropic
 from extract_bench.inference.providers.parse.anthropic import AnthropicProvider
 
 
@@ -19,23 +15,36 @@ def _provider_for_model(model: str) -> AnthropicProvider:
     return provider
 
 
-def test_sonnet_5_uses_introductory_pricing_through_august_2026(monkeypatch: pytest.MonkeyPatch) -> None:
-    class IntroDate(date):
-        @classmethod
-        def today(cls) -> date:
-            return cls(2026, 8, 31)
+@pytest.mark.parametrize(
+    ("model", "expected"),
+    [
+        # Longest prefix wins: the x.5 ids must not fall through to the x entry.
+        ("claude-opus-5-5", (4.00, 20.00, 0.20, 5.00)),
+        ("claude-opus-5", (5.00, 25.00, 0.50, 6.25)),
+        ("claude-fable-5-1", (10.00, 50.00, 0.25, 12.50)),
+        ("claude-fable-5", (10.00, 50.00, 1.00, 12.50)),
+        ("claude-sonnet-5", (2.00, 10.00, 0.20, 2.50)),
+        # Dated snapshot ids resolve to their family entry.
+        ("claude-haiku-4-5-20251001", (1.00, 5.00, 0.10, 1.25)),
+        ("claude-unknown-model", (0.0, 0.0, 0.0, 0.0)),
+    ],
+)
+def test_get_pricing_resolves_longest_prefix(model: str, expected: tuple[float, float, float, float]) -> None:
+    assert _provider_for_model(model)._get_pricing() == expected
 
-    monkeypatch.setattr(anthropic, "date", IntroDate)
 
-    assert _provider_for_model("claude-sonnet-5")._get_pricing() == (2.00, 10.00)
+def test_extract_usage_reads_cache_tokens() -> None:
+    class Usage:
+        input_tokens = 100
+        output_tokens = 20
+        cache_read_input_tokens = 300
+        cache_creation_input_tokens = 50
 
+    class Response:
+        usage = Usage()
+        content: list = []
 
-def test_sonnet_5_uses_standard_pricing_after_intro_period(monkeypatch: pytest.MonkeyPatch) -> None:
-    class StandardDate(date):
-        @classmethod
-        def today(cls) -> date:
-            return cls(2026, 9, 1)
-
-    monkeypatch.setattr(anthropic, "date", StandardDate)
-
-    assert _provider_for_model("claude-sonnet-5")._get_pricing() == (3.00, 15.00)
+    usage = AnthropicProvider._extract_usage(Response())
+    assert usage["cache_read_tokens"] == 300
+    assert usage["cache_write_tokens"] == 50
+    assert usage["total_tokens"] == 470
