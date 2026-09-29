@@ -38,6 +38,7 @@ _RAW_OUTPUT_STATS: list[tuple[str, str]] = [
     ("input_tokens", "tokens"),
     ("tool_use_prompt_tokens", "tokens"),
     ("cached_content_tokens", "tokens"),
+    ("cache_read_tokens", "tokens"),
     ("cache_write_tokens", "tokens"),
     ("output_tokens", "tokens"),
     ("total_tokens", "tokens"),
