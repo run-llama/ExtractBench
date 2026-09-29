@@ -329,6 +329,13 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
             config={"model": "claude-opus-5-5", "evidence_mode": True},
         )
     )
+    register_fn(
+        _pipeline_spec(
+            pipeline_name="claude_code_extract_sonnet_5_5_evidence",
+            provider_name="claude_code_extract",
+            config={"model": "claude-sonnet-5-5", "evidence_mode": True},
+        )
+    )
 
     for _model_slug, _model, _reasoning_effort in (
         ("gpt_5_4", "gpt-5.4", "low"),

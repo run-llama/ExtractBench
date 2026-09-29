@@ -73,6 +73,12 @@ _MAX_BASH_CMD_CHARS = 2000
 _RATE_LIMIT_KEYWORDS = ("rate limit", "rate_limit", "429", "quota")
 _TRANSIENT_KEYWORDS = ("overloaded", "529", "503", "502", "504", "timeout", "timed out")
 
+# The prompt is one argv string, and Linux caps one at 128 KiB (MAX_ARG_STRLEN);
+# past it the exec fails with E2BIG before claude starts. A prompt over this size
+# gets its schema moved to ./schema.json instead (see ``_stage_prompt``).
+_MAX_INLINE_PROMPT_BYTES = 120_000
+_SCHEMA_FILE_NAME = "schema.json"
+
 
 @register_provider("claude_code_extract")
 class ClaudeCodeExtractProvider(Provider):
@@ -138,15 +144,24 @@ class ClaudeCodeExtractProvider(Provider):
             schema = add_additional_properties_false(schema)
         return schema
 
-    def _build_prompt(self, schema: dict[str, Any], staged_name: str) -> str:
-        schema_json = json.dumps(schema, indent=2)
+    def _build_prompt(self, schema: dict[str, Any], staged_name: str, schema_file: str | None = None) -> str:
+        if schema_file is None:
+            schema_json = json.dumps(schema, indent=2)
+            schema_ask = (
+                "Return a single JSON object conforming to this schema as your final answer:\n\n"
+                f"```json\n{schema_json}\n```\n\n"
+            )
+        else:
+            schema_ask = (
+                f"Return a single JSON object conforming to the JSON schema in `./{schema_file}` "
+                "as your final answer.\n\n"
+            )
         evidence_rule = f"\n{agent_evidence_instruction()}" if self._evidence_mode else ""
         return (
             f"Extract structured data from the document file `./{staged_name}` in the current directory.\n\n"
             "Use only local file inspection and shell commands. Do not use web search, network calls, "
             "browser tools, or external services. Temporary scratch files inside the current directory are OK.\n\n"
-            "Return a single JSON object conforming to this schema as your final answer:\n\n"
-            f"```json\n{schema_json}\n```\n\n"
+            f"{schema_ask}"
             "Rules:\n"
             "- Use null for fields not present in the document.\n"
             "- For list/array fields, enumerate every relevant row visible in the document; never collapse rows.\n"
@@ -155,6 +170,19 @@ class ClaudeCodeExtractProvider(Provider):
             "- Write the resulting JSON object to ./output.json and validate that it is valid JSON before stopping.\n"
             f"- Do not print the JSON to your assistant output.{evidence_rule}"
         )
+
+    def _stage_prompt(self, schema: dict[str, Any], staged_name: str, workdir: Path) -> tuple[str, str]:
+        """Return ``(prompt, schema_delivery)``; ``schema_delivery`` is ``inline`` or ``file``.
+
+        Only a prompt too large for argv falls back to ``file``: the schema is
+        written to ./schema.json and the prompt points there. Every other prompt
+        is unchanged.
+        """
+        prompt = self._build_prompt(schema, staged_name)
+        if len(prompt.encode("utf-8")) <= _MAX_INLINE_PROMPT_BYTES:
+            return prompt, "inline"
+        (workdir / _SCHEMA_FILE_NAME).write_text(json.dumps(schema, indent=2), encoding="utf-8")
+        return self._build_prompt(schema, staged_name, schema_file=_SCHEMA_FILE_NAME), "file"
 
     def _build_cmd(self, prompt: str, mcp_config_path: Path) -> list[str]:
         # ---------------------------------------------------------------
@@ -497,7 +525,7 @@ class ClaudeCodeExtractProvider(Provider):
             mcp_config = workdir / "mcp_config.json"
             mcp_config.write_text('{"mcpServers": {}}')
 
-            prompt = self._build_prompt(schema, staged_name)
+            prompt, schema_delivery = self._stage_prompt(schema, staged_name, workdir)
             cmd = self._build_cmd(prompt, mcp_config)
             lines: list[str] = []
             returncode, stderr_tail = self._run_cli(cmd, workdir, request.example_id, lines)
@@ -516,6 +544,7 @@ class ClaudeCodeExtractProvider(Provider):
             "model": self._model,
             "usage": usage,
             "num_pages": num_pages,
+            "schema_delivery": schema_delivery,
             "cost_usd": cost_usd,
             "cost_per_page_usd": (cost_usd / num_pages) if (cost_usd and num_pages) else None,
             "cost_exceeded_budget": (
