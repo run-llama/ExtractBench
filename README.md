@@ -17,7 +17,7 @@ The benchmark covers **370 documents (4,869 pages)** across 8 business domains a
 
 ## Leaderboard
 
-Models and prices reflect each provider's official documentation as of September 11, 2026; each system uses its recommended configuration.
+Models and prices reflect each provider's official documentation; each system uses its recommended configuration.
 
 <!-- LEADERBOARD:START -->
 **Unified value F1** — the headline metric. Every score is an unweighted mean over documents; each document counts once, whatever its length. For raw data including per-split precision and recall, cost, and latency, see [leaderboard.csv](leaderboard.csv). Equal displayed Overall scores are ordered by lower cost per page. The best score in each Overall, Short, Medium, and Long column is **bold**; the second-best distinct score is <u>underlined</u>.
@@ -103,7 +103,7 @@ uv run extract-bench serve llamaextract_agentic
 <details>
 <summary><strong>Rough cost of one full run</strong></summary>
 
-Costs use each provider's official listed price as of July 1, 2026.
+Costs use each provider's official listed price.
 
 | Category | One full run | Examples |
 |---|---:|---|
