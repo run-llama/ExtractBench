@@ -24,16 +24,16 @@ Models and prices reflect each provider's official documentation as of September
 
 | Rank | Provider | Category | Overall | Short | Medium | Long | ¢ / Page |
 |---:|---|---|---:|---:|---:|---:|---:|
-| 1 | LlamaExtract Agentic Plus | LlamaExtract | **95.91** | <u>96.94</u> | <u>94.45</u> | 90.18 | 8.11¢ |
-| 2 | Pulse (Effort) | Specialized APIs | **95.91** | 96.46 | **95.01** | **93.51** | 10.50¢ |
-| 3 | LlamaExtract Agentic | LlamaExtract | <u>94.77</u> | 96.04 | 92.11 | 91.83 | 3.31¢ |
+| 1 | LlamaExtract Agentic Plus | LlamaExtract | **96.38** | <u>97.15</u> | <u>94.77</u> | <u>94.60</u> | 7.50¢ |
+| 2 | LlamaExtract Agentic | LlamaExtract | <u>96.03</u> | 96.81 | 94.21 | **95.05** | 3.12¢ |
+| 3 | Pulse (Effort) | Specialized APIs | 95.91 | 96.46 | **95.01** | 93.51 | 10.50¢ |
 | 4 | Claude Code (Sonnet 5.5 Evidence) | Coding Agents | 94.68 | 96.22 | 92.97 | 83.69 | 5.69¢ |
 | 5 | Codex (GPT-6 Sol Evidence) | Coding Agents | 94.57 | 95.99 | 92.42 | 87.25 | 9.80¢ |
 | 6 | Codex (GPT-5.6 Sol Evidence) | Coding Agents | 93.77 | 96.04 | 90.19 | 82.73 | 21.65¢ |
-| 7 | Codex (GPT-5.5) | Coding Agents | 93.57 | 95.68 | 91.15 | 78.88 | 27.83¢ |
-| 8 | Codex (GPT-5.5 Evidence) | Coding Agents | 93.35 | 95.59 | 88.72 | 87.97 | 33.63¢ |
-| 9 | Pulse (Non-effort) | Specialized APIs | 92.70 | 93.17 | 92.22 | 89.07 | 3.00¢ |
-| 10 | LlamaExtract Cost-Effective | LlamaExtract | 92.27 | 94.03 | 89.51 | 83.73 | 1.06¢ |
+| 7 | LlamaExtract Cost-Effective | LlamaExtract | 93.67 | 96.07 | 90.21 | 80.48 | 1.00¢ |
+| 8 | Codex (GPT-5.5) | Coding Agents | 93.57 | 95.68 | 91.15 | 78.88 | 27.83¢ |
+| 9 | Codex (GPT-5.5 Evidence) | Coding Agents | 93.35 | 95.59 | 88.72 | 87.97 | 33.63¢ |
+| 10 | Pulse (Non-effort) | Specialized APIs | 92.70 | 93.17 | 92.22 | 89.07 | 3.00¢ |
 
 Top 10 of 48 systems — full table in [leaderboard.csv](leaderboard.csv).
 <!-- LEADERBOARD:END -->
@@ -47,16 +47,16 @@ Top 10 of 48 systems — full table in [leaderboard.csv](leaderboard.csv).
     <tr><th align="right">Overall</th><th align="right">Short</th><th align="right">Medium</th><th align="right">Long</th><th align="right">Overall</th><th align="right">Short</th><th align="right">Medium</th><th align="right">Long</th></tr>
   </thead>
   <tbody>
-    <tr><td align="right">1</td><td>Codex (GPT-6 Sol Evidence)</td><td align="right"><strong>77.11</strong></td><td align="right"><strong>77.61</strong></td><td align="right"><strong>75.53</strong></td><td align="right"><strong>78.31</strong></td><td align="right"><u>86.50</u></td><td align="right">87.20</td><td align="right"><u>85.12</u></td><td align="right"><strong>84.82</strong></td></tr>
-    <tr><td align="right">2</td><td>Claude Code (Opus 5.5 Evidence)</td><td align="right"><u>71.55</u></td><td align="right"><u>73.57</u></td><td align="right">65.54</td><td align="right"><u>74.87</u></td><td align="right">76.95</td><td align="right">79.27</td><td align="right">71.36</td><td align="right">76.47</td></tr>
-    <tr><td align="right">3</td><td>Codex (GPT-6 Luna Evidence)</td><td align="right">65.70</td><td align="right">62.91</td><td align="right"><u>71.11</u></td><td align="right">74.36</td><td align="right">83.93</td><td align="right">84.41</td><td align="right">83.47</td><td align="right">80.17</td></tr>
-    <tr><td align="right">4</td><td>Claude Code (Sonnet 5.5 Evidence)</td><td align="right">64.61</td><td align="right">64.59</td><td align="right">63.18</td><td align="right">71.22</td><td align="right">75.99</td><td align="right">77.93</td><td align="right">71.50</td><td align="right">74.98</td></tr>
-    <tr><td align="right">5</td><td>LlamaExtract Agentic Plus</td><td align="right">58.11</td><td align="right">54.11</td><td align="right">69.93</td><td align="right">68.31</td><td align="right"><strong>86.66</strong></td><td align="right"><strong>91.37</strong></td><td align="right">78.84</td><td align="right">66.25</td></tr>
-    <tr><td align="right">6</td><td>Codex (GPT-5.6 Sol Evidence)</td><td align="right">54.66</td><td align="right">50.87</td><td align="right">64.58</td><td align="right">69.01</td><td align="right">83.62</td><td align="right">85.12</td><td align="right">80.77</td><td align="right">78.84</td></tr>
-    <tr><td align="right">7</td><td>Codex (GPT-5.5 Evidence)</td><td align="right">52.57</td><td align="right">53.13</td><td align="right">48.01</td><td align="right">61.87</td><td align="right">80.64</td><td align="right">83.27</td><td align="right">73.87</td><td align="right">79.90</td></tr>
-    <tr><td align="right">8</td><td>Claude Code (Opus 4.8 Evidence)</td><td align="right">49.48</td><td align="right">45.31</td><td align="right">62.35</td><td align="right">58.43</td><td align="right">72.52</td><td align="right">74.84</td><td align="right">67.38</td><td align="right">68.03</td></tr>
-    <tr><td align="right">9</td><td>LlamaExtract Agentic</td><td align="right">44.47</td><td align="right">37.41</td><td align="right">63.83</td><td align="right">68.08</td><td align="right">81.30</td><td align="right"><u>87.68</u></td><td align="right">68.27</td><td align="right">64.56</td></tr>
-    <tr><td align="right">10</td><td>Codex (GPT-5.6 Terra Evidence)</td><td align="right">43.68</td><td align="right">40.48</td><td align="right">53.32</td><td align="right">51.17</td><td align="right">80.52</td><td align="right">83.51</td><td align="right">75.18</td><td align="right">69.32</td></tr>
+    <tr><td align="right">1</td><td>LlamaExtract Agentic Plus</td><td align="right"><strong>81.26</strong></td><td align="right"><strong>81.63</strong></td><td align="right"><u>81.18</u></td><td align="right">75.22</td><td align="right"><u>89.94</u></td><td align="right"><u>92.45</u></td><td align="right"><u>86.50</u></td><td align="right">74.71</td></tr>
+    <tr><td align="right">2</td><td>LlamaExtract Agentic</td><td align="right"><u>78.89</u></td><td align="right"><u>77.63</u></td><td align="right"><strong>81.86</strong></td><td align="right"><strong>80.89</strong></td><td align="right"><strong>90.64</strong></td><td align="right"><strong>92.58</strong></td><td align="right"><strong>86.68</strong></td><td align="right"><strong>87.09</strong></td></tr>
+    <tr><td align="right">3</td><td>Codex (GPT-6 Sol Evidence)</td><td align="right">77.11</td><td align="right">77.61</td><td align="right">75.53</td><td align="right"><u>78.31</u></td><td align="right">86.50</td><td align="right">87.20</td><td align="right">85.12</td><td align="right"><u>84.82</u></td></tr>
+    <tr><td align="right">4</td><td>Claude Code (Opus 5.5 Evidence)</td><td align="right">71.55</td><td align="right">73.57</td><td align="right">65.54</td><td align="right">74.87</td><td align="right">76.95</td><td align="right">79.27</td><td align="right">71.36</td><td align="right">76.47</td></tr>
+    <tr><td align="right">5</td><td>Codex (GPT-6 Luna Evidence)</td><td align="right">65.70</td><td align="right">62.91</td><td align="right">71.11</td><td align="right">74.36</td><td align="right">83.93</td><td align="right">84.41</td><td align="right">83.47</td><td align="right">80.17</td></tr>
+    <tr><td align="right">6</td><td>Claude Code (Sonnet 5.5 Evidence)</td><td align="right">64.61</td><td align="right">64.59</td><td align="right">63.18</td><td align="right">71.22</td><td align="right">75.99</td><td align="right">77.93</td><td align="right">71.50</td><td align="right">74.98</td></tr>
+    <tr><td align="right">7</td><td>Codex (GPT-5.6 Sol Evidence)</td><td align="right">54.66</td><td align="right">50.87</td><td align="right">64.58</td><td align="right">69.01</td><td align="right">83.62</td><td align="right">85.12</td><td align="right">80.77</td><td align="right">78.84</td></tr>
+    <tr><td align="right">8</td><td>LlamaExtract Cost-Effective</td><td align="right">53.65</td><td align="right">49.20</td><td align="right">64.84</td><td align="right">55.66</td><td align="right">80.09</td><td align="right">87.53</td><td align="right">66.47</td><td align="right">54.94</td></tr>
+    <tr><td align="right">9</td><td>Codex (GPT-5.5 Evidence)</td><td align="right">52.57</td><td align="right">53.13</td><td align="right">48.01</td><td align="right">61.87</td><td align="right">80.64</td><td align="right">83.27</td><td align="right">73.87</td><td align="right">79.90</td></tr>
+    <tr><td align="right">10</td><td>Claude Code (Opus 4.8 Evidence)</td><td align="right">49.48</td><td align="right">45.31</td><td align="right">62.35</td><td align="right">58.43</td><td align="right">72.52</td><td align="right">74.84</td><td align="right">67.38</td><td align="right">68.03</td></tr>
   </tbody>
 </table>
 
