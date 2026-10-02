@@ -24,16 +24,16 @@ Models and prices reflect each provider's official documentation; each system us
 
 | Rank | Provider | Category | Overall | Short | Medium | Long | ¢ / Page |
 |---:|---|---|---:|---:|---:|---:|---:|
-| 1 | LlamaExtract Agentic Plus | LlamaExtract | **96.38** | <u>97.15</u> | <u>94.77</u> | <u>94.60</u> | 8.11¢ |
-| 2 | LlamaExtract Agentic | LlamaExtract | <u>96.03</u> | 96.81 | 94.21 | **95.05** | 3.31¢ |
-| 3 | Pulse (Effort) | Specialized APIs | 95.91 | 96.46 | **95.01** | 93.51 | 10.50¢ |
-| 4 | Claude Code (Sonnet 5.5 Evidence) | Coding Agents | 94.68 | 96.22 | 92.97 | 83.69 | 5.69¢ |
-| 5 | Codex (GPT-6 Sol Evidence) | Coding Agents | 94.57 | 95.99 | 92.42 | 87.25 | 9.80¢ |
-| 6 | Codex (GPT-5.6 Sol Evidence) | Coding Agents | 93.77 | 96.04 | 90.19 | 82.73 | 21.65¢ |
-| 7 | LlamaExtract Cost-Effective | LlamaExtract | 93.67 | 96.07 | 90.21 | 80.48 | 1.06¢ |
-| 8 | Codex (GPT-5.5) | Coding Agents | 93.57 | 95.68 | 91.15 | 78.88 | 27.83¢ |
-| 9 | Codex (GPT-5.5 Evidence) | Coding Agents | 93.35 | 95.59 | 88.72 | 87.97 | 33.63¢ |
-| 10 | Pulse (Non-effort) | Specialized APIs | 92.70 | 93.17 | 92.22 | 89.07 | 3.00¢ |
+| 1 | LlamaExtract Agentic Plus | LlamaExtract | **96.38** | <u>97.15</u> | 94.77 | <u>94.60</u> | 8.11¢ |
+| 2 | Reducto Deep Extract | Specialized APIs | <u>96.08</u> | 96.84 | <u>94.80</u> | 92.85 | 6.35¢ |
+| 3 | LlamaExtract Agentic | LlamaExtract | 96.03 | 96.81 | 94.21 | **95.05** | 3.31¢ |
+| 4 | Pulse (Effort) | Specialized APIs | 95.91 | 96.46 | **95.01** | 93.51 | 10.50¢ |
+| 5 | Claude Code (Sonnet 5.5 Evidence) | Coding Agents | 94.68 | 96.22 | 92.97 | 83.69 | 5.69¢ |
+| 6 | Codex (GPT-6 Sol Evidence) | Coding Agents | 94.57 | 95.99 | 92.42 | 87.25 | 9.80¢ |
+| 7 | Codex (GPT-5.6 Sol Evidence) | Coding Agents | 93.77 | 96.04 | 90.19 | 82.73 | 21.65¢ |
+| 8 | LlamaExtract Cost-Effective | LlamaExtract | 93.67 | 96.07 | 90.21 | 80.48 | 1.06¢ |
+| 9 | Codex (GPT-5.5) | Coding Agents | 93.57 | 95.68 | 91.15 | 78.88 | 27.83¢ |
+| 10 | Codex (GPT-5.5 Evidence) | Coding Agents | 93.35 | 95.59 | 88.72 | 87.97 | 33.63¢ |
 
 Top 10 of 48 systems — full table in [leaderboard.csv](leaderboard.csv).
 <!-- LEADERBOARD:END -->
@@ -56,7 +56,7 @@ Top 10 of 48 systems — full table in [leaderboard.csv](leaderboard.csv).
     <tr><td align="right">7</td><td>Codex (GPT-5.6 Sol Evidence)</td><td align="right">54.66</td><td align="right">50.87</td><td align="right">64.58</td><td align="right">69.01</td><td align="right">83.62</td><td align="right">85.12</td><td align="right">80.77</td><td align="right">78.84</td></tr>
     <tr><td align="right">8</td><td>LlamaExtract Cost-Effective</td><td align="right">53.65</td><td align="right">49.20</td><td align="right">64.84</td><td align="right">55.66</td><td align="right">80.09</td><td align="right">87.53</td><td align="right">66.47</td><td align="right">54.94</td></tr>
     <tr><td align="right">9</td><td>Codex (GPT-5.5 Evidence)</td><td align="right">52.57</td><td align="right">53.13</td><td align="right">48.01</td><td align="right">61.87</td><td align="right">80.64</td><td align="right">83.27</td><td align="right">73.87</td><td align="right">79.90</td></tr>
-    <tr><td align="right">10</td><td>Claude Code (Opus 4.8 Evidence)</td><td align="right">49.48</td><td align="right">45.31</td><td align="right">62.35</td><td align="right">58.43</td><td align="right">72.52</td><td align="right">74.84</td><td align="right">67.38</td><td align="right">68.03</td></tr>
+    <tr><td align="right">10</td><td>Reducto Deep Extract</td><td align="right">50.76</td><td align="right">53.49</td><td align="right">46.08</td><td align="right">40.19</td><td align="right">69.75</td><td align="right">72.92</td><td align="right">62.27</td><td align="right">68.96</td></tr>
   </tbody>
 </table>
 
