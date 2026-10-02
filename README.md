@@ -24,14 +24,14 @@ Models and prices reflect each provider's official documentation; each system us
 
 | Rank | Provider | Category | Overall | Short | Medium | Long | ¢ / Page |
 |---:|---|---|---:|---:|---:|---:|---:|
-| 1 | LlamaExtract Agentic Plus | LlamaExtract | **96.38** | <u>97.15</u> | 94.77 | <u>94.60</u> | 8.11¢ |
+| 1 | LlamaExtract Agentic Plus | LlamaExtract | **96.38** | <u>97.15</u> | 94.77 | <u>94.60</u> | 7.50¢ |
 | 2 | Reducto Deep Extract | Specialized APIs | <u>96.08</u> | 96.84 | <u>94.80</u> | 92.85 | 6.35¢ |
-| 3 | LlamaExtract Agentic | LlamaExtract | 96.03 | 96.81 | 94.21 | **95.05** | 3.31¢ |
+| 3 | LlamaExtract Agentic | LlamaExtract | 96.03 | 96.81 | 94.21 | **95.05** | 3.12¢ |
 | 4 | Pulse (Effort) | Specialized APIs | 95.91 | 96.46 | **95.01** | 93.51 | 10.50¢ |
 | 5 | Claude Code (Sonnet 5.5 Evidence) | Coding Agents | 94.68 | 96.22 | 92.97 | 83.69 | 5.69¢ |
 | 6 | Codex (GPT-6 Sol Evidence) | Coding Agents | 94.57 | 95.99 | 92.42 | 87.25 | 9.80¢ |
 | 7 | Codex (GPT-5.6 Sol Evidence) | Coding Agents | 93.77 | 96.04 | 90.19 | 82.73 | 21.65¢ |
-| 8 | LlamaExtract Cost-Effective | LlamaExtract | 93.67 | 96.07 | 90.21 | 80.48 | 1.06¢ |
+| 8 | LlamaExtract Cost-Effective | LlamaExtract | 93.67 | 96.07 | 90.21 | 80.48 | 1.00¢ |
 | 9 | Codex (GPT-5.5) | Coding Agents | 93.57 | 95.68 | 91.15 | 78.88 | 27.83¢ |
 | 10 | Codex (GPT-5.5 Evidence) | Coding Agents | 93.35 | 95.59 | 88.72 | 87.97 | 33.63¢ |
 
