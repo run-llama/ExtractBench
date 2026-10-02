@@ -38,7 +38,7 @@ uv run extract-bench run <pipeline_name>
 | `codex_code_extract_gpt_5_5_low_evidence` / `codex_code_extract_gpt_5_6_sol_low_evidence` / `codex_code_extract_gpt_5_6_terra_low_evidence` | Codex CLI | low-effort extraction with page and box citations; unrestricted shell |
 | `codex_code_extract_gpt_5_6_luna_medium_evidence` | Codex CLI | medium-effort extraction with page and box citations; unrestricted shell, no cost cap |
 | `codex_code_extract_gpt_6_luna_medium_evidence` / `codex_code_extract_gpt_6_luna_high_evidence` / `codex_code_extract_gpt_6_luna_xhigh_evidence` / `codex_code_extract_gpt_6_sol_low_evidence` / `codex_code_extract_gpt_6_sol_medium_evidence` / `codex_code_extract_gpt_6_sol_high_evidence` | Codex CLI | GPT-6 Luna and Sol extraction with page and box citations at the effort in the name; unrestricted shell, no cost cap |
-| `reducto_extract` / `reducto_deep_extract` | Reducto | deep variant adds citations |
+| `reducto_extract` / `reducto_extract_v4` / `reducto_deep_extract` | Reducto | `_v4` uses Reducto's v4 extract model |
 | `extend_extract` / `extend_extract_max` | Extend | citations enabled; max-context array strategy variant |
 | `landingai_extract` | LandingAI ADE | |
 | `datalab_parse_accurate_extract_fast` / `_balanced` | Datalab | accurate parse + fast or balanced extraction, JSON tree citations |

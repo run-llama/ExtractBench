@@ -35,7 +35,7 @@ Models and prices reflect each provider's official documentation; each system us
 | 9 | Codex (GPT-5.5) | Coding Agents | 93.57 | 95.68 | 91.15 | 78.88 | 27.83¢ |
 | 10 | Codex (GPT-5.5 Evidence) | Coding Agents | 93.35 | 95.59 | 88.72 | 87.97 | 33.63¢ |
 
-Top 10 of 48 systems — full table in [leaderboard.csv](leaderboard.csv).
+Top 10 of 49 systems — full table in [leaderboard.csv](leaderboard.csv).
 <!-- LEADERBOARD:END -->
 
 <!-- GROUNDING:START -->
@@ -53,14 +53,14 @@ Top 10 of 48 systems — full table in [leaderboard.csv](leaderboard.csv).
     <tr><td align="right">4</td><td>Claude Code (Opus 5.5 Evidence)</td><td align="right">71.55</td><td align="right">73.57</td><td align="right">65.54</td><td align="right">74.87</td><td align="right">76.95</td><td align="right">79.27</td><td align="right">71.36</td><td align="right">76.47</td></tr>
     <tr><td align="right">5</td><td>Codex (GPT-6 Luna Evidence)</td><td align="right">65.70</td><td align="right">62.91</td><td align="right">71.11</td><td align="right">74.36</td><td align="right">83.93</td><td align="right">84.41</td><td align="right">83.47</td><td align="right">80.17</td></tr>
     <tr><td align="right">6</td><td>Claude Code (Sonnet 5.5 Evidence)</td><td align="right">64.61</td><td align="right">64.59</td><td align="right">63.18</td><td align="right">71.22</td><td align="right">75.99</td><td align="right">77.93</td><td align="right">71.50</td><td align="right">74.98</td></tr>
-    <tr><td align="right">7</td><td>Codex (GPT-5.6 Sol Evidence)</td><td align="right">54.66</td><td align="right">50.87</td><td align="right">64.58</td><td align="right">69.01</td><td align="right">83.62</td><td align="right">85.12</td><td align="right">80.77</td><td align="right">78.84</td></tr>
-    <tr><td align="right">8</td><td>LlamaExtract Cost-Effective</td><td align="right">53.65</td><td align="right">49.20</td><td align="right">64.84</td><td align="right">55.66</td><td align="right">80.09</td><td align="right">87.53</td><td align="right">66.47</td><td align="right">54.94</td></tr>
-    <tr><td align="right">9</td><td>Codex (GPT-5.5 Evidence)</td><td align="right">52.57</td><td align="right">53.13</td><td align="right">48.01</td><td align="right">61.87</td><td align="right">80.64</td><td align="right">83.27</td><td align="right">73.87</td><td align="right">79.90</td></tr>
-    <tr><td align="right">10</td><td>Reducto Deep Extract</td><td align="right">50.76</td><td align="right">53.49</td><td align="right">46.08</td><td align="right">40.19</td><td align="right">69.75</td><td align="right">72.92</td><td align="right">62.27</td><td align="right">68.96</td></tr>
+    <tr><td align="right">7</td><td>Reducto Extract (v4)</td><td align="right">54.97</td><td align="right">60.53</td><td align="right">49.35</td><td align="right">16.30</td><td align="right">75.28</td><td align="right">87.47</td><td align="right">57.38</td><td align="right">18.59</td></tr>
+    <tr><td align="right">8</td><td>Codex (GPT-5.6 Sol Evidence)</td><td align="right">54.66</td><td align="right">50.87</td><td align="right">64.58</td><td align="right">69.01</td><td align="right">83.62</td><td align="right">85.12</td><td align="right">80.77</td><td align="right">78.84</td></tr>
+    <tr><td align="right">9</td><td>LlamaExtract Cost-Effective</td><td align="right">53.65</td><td align="right">49.20</td><td align="right">64.84</td><td align="right">55.66</td><td align="right">80.09</td><td align="right">87.53</td><td align="right">66.47</td><td align="right">54.94</td></tr>
+    <tr><td align="right">10</td><td>Codex (GPT-5.5 Evidence)</td><td align="right">52.57</td><td align="right">53.13</td><td align="right">48.01</td><td align="right">61.87</td><td align="right">80.64</td><td align="right">83.27</td><td align="right">73.87</td><td align="right">79.90</td></tr>
   </tbody>
 </table>
 
-Top 10 of 48 systems — full table in [leaderboard.csv](leaderboard.csv).
+Top 10 of 49 systems — full table in [leaderboard.csv](leaderboard.csv).
 <!-- GROUNDING:END -->
 
 <details>
@@ -109,7 +109,7 @@ Costs use each provider's official listed price.
 |---|---:|---|
 | Commercial VLM | $10 – $49 | GPT-5.4 Nano ~$10, Gemini 3.5 Flash ~$49 |
 | LlamaExtract | $49 – $395 | Cost-Effective ~$49, Agentic ~$152, Agentic Plus ~$395 |
-| Specialized APIs | $170 – $1,677 | Datalab ~$170, Extend ~$487, Reducto Deep Extract ~$1,677 |
+| Specialized APIs | $170 – $487 | Datalab ~$170, Reducto Deep Extract ~$309, Extend ~$487 |
 | Coding agents | $787 – $1,355 | Claude Code (Opus 4.8) ~$787, Codex (GPT-5.5) ~$1,355 |
 | Self-hosted open weights | GPU time only | Qwen3.6 35B, Gemma4 26B, NuExtract3, Lift Datalab 9B |
 

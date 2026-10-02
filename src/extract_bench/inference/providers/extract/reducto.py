@@ -206,6 +206,7 @@ class ReductoExtractProvider(Provider):
         array_extract: bool = False,
         deep_extract: bool = False,
         cancel_event: threading.Event | None = None,
+        extract_model: str | None = None,
     ) -> dict[str, Any]:
         """
         Extract data from a PDF using Reducto API (async).
@@ -238,10 +239,14 @@ class ReductoExtractProvider(Provider):
             # Always include settings dict with explicit values (matching test script that works)
             # This ensures the SDK receives a consistent structure
             settings: dict[str, Any] = {
-                "citations": {"enabled": citations},
+                "citations": {"enabled": citations, "numerical_confidence": citations},
                 "array_extract": array_extract,
                 "deep_extract": deep_extract,
+                "include_images": False,
+                "optimize_for_latency": False,
             }
+            if extract_model:
+                settings["alpha"] = {"extract_model": extract_model}
 
             # Extract the document (run in executor since SDK is synchronous)
             # Note: Using asyncio.to_thread to run synchronous SDK in thread pool
@@ -328,6 +333,7 @@ class ReductoExtractProvider(Provider):
                 "citations": citations,
                 "array_extract": array_extract,
                 "deep_extract": deep_extract,
+                "extract_model": extract_model,
             }
 
             return raw_response
@@ -401,6 +407,9 @@ class ReductoExtractProvider(Provider):
             # Reducto's agentic high-quality mode and bills at a separate rate).
             deep_extract = extract_config.get("deep_extract", False)
 
+            # Alpha extract model version (e.g. "v4"); omitted -> Reducto default.
+            extract_model = extract_config.get("extract_model")
+
             # Run extraction (async), registering a cancel flag so a runner
             # timeout can stop the deep-extract poll loop.
             cancel_event = threading.Event()
@@ -416,6 +425,7 @@ class ReductoExtractProvider(Provider):
                         array_extract=array_extract,
                         deep_extract=deep_extract,
                         cancel_event=cancel_event,
+                        extract_model=extract_model,
                     )
                 )
             finally:

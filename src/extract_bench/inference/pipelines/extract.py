@@ -417,8 +417,20 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
             pipeline_name="reducto_extract",
             provider_name="reducto_extract",
             config={
-                "citations": False,
+                "citations": True,
                 "array_extract": False,
+            },
+        )
+    )
+
+    register_fn(
+        _pipeline_spec(
+            pipeline_name="reducto_extract_v4",
+            provider_name="reducto_extract",
+            config={
+                "citations": True,
+                "array_extract": False,
+                "extract_model": "v4",
             },
         )
     )
