@@ -1,0 +1,51 @@
+name: Native wheels
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  wheels:
+    name: Wheel (${{ matrix.platform }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux-x86_64
+            os: ubuntu-22.04
+          - platform: linux-aarch64
+            os: ubuntu-24.04-arm
+          - platform: macos-arm64
+            os: macos-14
+          - platform: macos-x86_64
+            os: macos-15-intel
+          - platform: windows-x86_64
+            os: windows-2022
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - name: Build release wheel
+        uses: PyO3/maturin-action@v1
+        with:
+          maturin-version: "1.14.1"
+          command: build
+          args: --release --locked --out dist
+          manylinux: auto
+      - name: Install and exercise the wheel
+        shell: bash
+        run: |
+          uv venv smoke
+          uv pip install --python smoke dist/*.whl
+          uv run --no-project --python smoke python -c 'from extract_bench.evaluation.metrics.field_grounding.core import BBox, compute_standard_iou_metrics; assert compute_standard_iou_metrics([BBox(1, (0.0, 0.0, 1.0, 1.0))], [BBox(1, (0.0, 0.0, 1.0, 1.0))]).iou == 1.0'
+          uv run --no-project --python smoke extract-bench version
+          uv run --no-project --python smoke extract-bench pipelines > /dev/null
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-wheel-${{ matrix.platform }}
+          path: dist/*.whl

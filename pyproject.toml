@@ -117,28 +117,25 @@ Changelog = "https://github.com/run-llama/ExtractBench/blob/main/CHANGELOG.md"
 extract-bench = "extract_bench.cli:main"
 
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+requires = ["maturin==1.14.1"]
+build-backend = "maturin"
 
-[tool.hatch.version]
-path = "src/extract_bench/__init__.py"
+[tool.maturin]
+manifest-path = "rust/bindings/python/Cargo.toml"
+python-source = "src"
+module-name = "extract_bench._native"
+features = ["pyo3/extension-module"]
+profile = "release"
+include = [{ path = "tests/**/*", format = "sdist" }]
 
-[tool.hatch.build.targets.wheel]
-# ``packages`` already carries analysis/static into the wheel; a force-include
-# for the same directory makes hatchling add every asset twice and abort.
-packages = ["src/extract_bench"]
-
-[tool.hatch.build.targets.sdist]
-only-include = [
-    "src/extract_bench",
-    "tests",
-    "README.md",
-    "LICENSE",
-    "CHANGELOG.md",
-]
-exclude = [
-    "**/__pycache__",
-    "**/.gitkeep",
+[tool.uv]
+cache-keys = [
+    { file = "pyproject.toml" },
+    { file = "src/**/*.py" },
+    { file = "src/**/*.pyi" },
+    { file = "rust/**/*.toml" },
+    { file = "rust/Cargo.lock" },
+    { file = "rust/**/*.rs" },
 ]
 
 [tool.ruff]

@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import re
+import tomllib
 from datetime import datetime
+from importlib.metadata import version
 from pathlib import Path
 from typing import Any, Literal
 
@@ -36,7 +38,9 @@ def test_version_is_the_single_source_of_truth() -> None:
     assert BenchCLI().version() == extract_bench.__version__
     pyproject = (Path(__file__).resolve().parents[2] / "pyproject.toml").read_text()
     assert 'dynamic = ["version"]' in pyproject
-    assert 'path = "src/extract_bench/__init__.py"' in pyproject
+    assert extract_bench.__version__ == version("llama-extract-bench")
+    manifest = Path(__file__).resolve().parents[2] / "rust/Cargo.toml"
+    assert tomllib.loads(manifest.read_text())["workspace"]["package"]["version"] == extract_bench.__version__
 
 
 def test_package_is_typed() -> None:

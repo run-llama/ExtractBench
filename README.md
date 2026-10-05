@@ -95,6 +95,13 @@ uv run extract-bench run llamaextract_agentic
 uv run extract-bench serve llamaextract_agentic
 ```
 
+Source installs require Rust 1.83 or newer and a C linker. Published wheels
+include the native geometry extension. Numerical coverage runs in Rust;
+Python retains text comparison, scoring decisions, and metric metadata.
+The release version lives in `rust/Cargo.toml`; `extract_bench.__version__`
+reads the installed package metadata.
+
+
 > [!WARNING]
 > A full run is **370 documents / 4,869 pages** against a metered API, and costs roughly
 > **$10 to $1,677** depending on which system you evaluate. Start with `--test`, which runs

@@ -5,12 +5,15 @@ from __future__ import annotations
 import math
 import re
 import unicodedata
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Any, cast
 
 from dateutil import parser as date_parser
 from rapidfuzz.distance import JaroWinkler
+
+from extract_bench._native import rect_union_areas
 
 STRING_MATCH_THRESHOLD = 0.90
 NUMERIC_ABSOLUTE_TOLERANCE = 1e-6
@@ -223,15 +226,17 @@ def compute_standard_iou_metrics(gt_boxes: list[BBox], pred_boxes: list[BBox]) -
         gt_rects = [_xywh_to_xyxy(box.bbox) for box in scope_gt]
         pred_rects = [_xywh_to_xyxy(box.bbox) for box in scope_pred]
 
-        gt_area += _rect_union_area(gt_rects)
-        pred_area += _rect_union_area(pred_rects)
-
         intersections: list[tuple[float, float, float, float]] = []
         for gt_rect in gt_rects:
             for pred_rect in pred_rects:
                 if (intersection := _intersect_xyxy(gt_rect, pred_rect)) is not None:
                     intersections.append(intersection)
-        intersection_area += _rect_union_area(intersections)
+        # Batch the three unions within one scope. Keeping the batch local
+        # bounds temporary memory by one page/group rather than the document.
+        areas = _rect_union_areas((gt_rects, pred_rects, intersections))
+        gt_area += areas[0]
+        pred_area += areas[1]
+        intersection_area += areas[2]
 
     union_area = gt_area + pred_area - intersection_area
     iou = intersection_area / union_area if union_area > 0.0 else 0.0
@@ -431,21 +436,15 @@ def _area_xyxy(bbox: tuple[float, float, float, float]) -> float:
     return max(0.0, bbox[2] - bbox[0]) * max(0.0, bbox[3] - bbox[1])
 
 
-def _rect_union_area(rectangles: list[tuple[float, float, float, float]]) -> float:
-    if not rectangles:
-        return 0.0
+def _rect_union_areas(
+    batches: Sequence[Sequence[tuple[float, float, float, float]]],
+) -> list[float]:
+    # Python owns set/sort semantics for NaNs and signed zero. Rust traverses
+    # these exact boundaries in the same order as the reference scorer.
+    xs = [sorted({coord for rect in rectangles for coord in (rect[0], rect[2])}) for rectangles in batches]
+    ys = [sorted({coord for rect in rectangles for coord in (rect[1], rect[3])}) for rectangles in batches]
+    return rect_union_areas(batches, xs, ys)
 
-    xs = sorted({coord for rect in rectangles for coord in (rect[0], rect[2])})
-    ys = sorted({coord for rect in rectangles for coord in (rect[1], rect[3])})
-    total = 0.0
-    for left, right in zip(xs, xs[1:], strict=False):
-        if right <= left:
-            continue
-        for top, bottom in zip(ys, ys[1:], strict=False):
-            if bottom <= top:
-                continue
-            if any(
-                rect[0] <= left and rect[2] >= right and rect[1] <= top and rect[3] >= bottom for rect in rectangles
-            ):
-                total += (right - left) * (bottom - top)
-    return total
+
+def _rect_union_area(rectangles: Sequence[tuple[float, float, float, float]]) -> float:
+    return _rect_union_areas((rectangles,))[0]

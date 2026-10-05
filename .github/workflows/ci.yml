@@ -9,6 +9,23 @@ permissions:
   contents: read
 
 jobs:
+  native-wheels:
+    uses: ./.github/workflows/native-wheels.yml
+
+  rust:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+      - run: cargo fmt --manifest-path rust/Cargo.toml --all --check
+      - run: cargo clippy --manifest-path rust/Cargo.toml --all-targets --locked -- -D warnings
+      - run: cargo test --manifest-path rust/Cargo.toml --locked
+
   lint-and-test:
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -24,6 +41,11 @@ jobs:
         with:
           enable-cache: true
           python-version: ${{ matrix.python-version }}
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
 
       # Lint and validate runner-free pass/skip behavior before installing heavy deps.
       - name: Sync dependencies (dev only)
@@ -49,7 +71,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
+      - uses: dtolnay/rust-toolchain@stable
       - run: uv build
+      - name: Build wheel from the source distribution
+        run: uv build dist/*.tar.gz --wheel --out-dir dist/from-sdist
       - name: Smoke-test the wheel in a clean environment
         run: |
           uv venv /tmp/smoke
