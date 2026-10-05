@@ -41,8 +41,9 @@ jobs:
         shell: bash
         run: |
           uv venv smoke
-          uv pip install --python smoke dist/*.whl
+          uv pip install --python smoke dist/*.whl pytest
           uv run --no-project --python smoke python -c 'from extract_bench.evaluation.metrics.field_grounding.core import BBox, compute_standard_iou_metrics; assert compute_standard_iou_metrics([BBox(1, (0.0, 0.0, 1.0, 1.0))], [BBox(1, (0.0, 0.0, 1.0, 1.0))]).iou == 1.0'
+          uv run --no-project --python smoke pytest tests/extract_bench/evaluation/metrics/field_grounding/test_native_geometry.py -q
           uv run --no-project --python smoke extract-bench version
           uv run --no-project --python smoke extract-bench pipelines > /dev/null
       - uses: actions/upload-artifact@v4
