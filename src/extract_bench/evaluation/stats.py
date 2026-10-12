@@ -59,23 +59,32 @@ _RAW_OUTPUT_STATS: list[tuple[str, str]] = [
 def build_operational_stats(inference_result: InferenceResult) -> list[RunStat]:
     """Build operational stats from an inference result.
 
-    Extracts latency from the dedicated field and cost-related stats
-    from raw_output (pre-computed by the provider).
+    Prefer explicit document-processing time to total provider time. Retrieval
+    of an existing artifact is reported separately from inference latency.
+    Cost-related stats come from raw_output (pre-computed by the provider).
     """
     stats: list[RunStat] = []
     raw = inference_result.raw_output
 
-    # Latency (from dedicated field)
-    if inference_result.latency_in_ms is not None:
-        stats.append(RunStat(name="latency_ms", value=float(inference_result.latency_in_ms), unit="ms"))
+    if inference_result.retrieval_duration_ms is not None:
+        latency_name = "retrieval_latency_ms"
+        latency = inference_result.retrieval_duration_ms
+    else:
+        latency_name = "latency_ms"
+        latency = (
+            inference_result.processing_duration_ms
+            if inference_result.processing_duration_ms is not None
+            else inference_result.latency_in_ms
+        )
+    if latency is not None:
+        stats.append(RunStat(name=latency_name, value=float(latency), unit="ms"))
 
-    # Per-page latency (computed from latency and num_pages)
     num_pages = raw.get("num_pages")
-    if inference_result.latency_in_ms is not None and isinstance(num_pages, (int, float)) and num_pages > 0:
+    if latency is not None and isinstance(num_pages, (int, float)) and num_pages > 0:
         stats.append(
             RunStat(
-                name="latency_ms_per_page",
-                value=float(inference_result.latency_in_ms) / float(num_pages),
+                name=latency_name + "_per_page",
+                value=float(latency) / float(num_pages),
                 unit="ms/page",
             )
         )

@@ -120,6 +120,12 @@ class RawInferenceResult(BaseModel):
     started_at: datetime = Field(description="Timestamp when inference started")
     completed_at: datetime = Field(description="Timestamp when inference completed")
     latency_in_ms: int = Field(ge=0, description="Latency in milliseconds")
+    processing_duration_ms: int | None = Field(
+        default=None, ge=0, description="Document processing time, excluding provider setup"
+    )
+    source: str | None = Field(default=None, description="Source of the processing timing measurement")
+    availability: dict[str, bool] = Field(default_factory=dict, description="Available timing measurements")
+    retrieval_duration_ms: int | None = Field(default=None, ge=0, description="Retained artifact retrieval time")
 
 
 class InferenceResult(BaseModel):
@@ -137,3 +143,9 @@ class InferenceResult(BaseModel):
     started_at: datetime = Field(description="Timestamp when inference started")
     completed_at: datetime = Field(description="Timestamp when inference completed")
     latency_in_ms: int = Field(ge=0, description="Latency in milliseconds")
+    processing_duration_ms: int | None = Field(
+        default=None, ge=0, description="Document processing time, excluding provider setup"
+    )
+    source: str | None = Field(default=None, description="Source of the processing timing measurement")
+    availability: dict[str, bool] = Field(default_factory=dict, description="Available timing measurements")
+    retrieval_duration_ms: int | None = Field(default=None, ge=0, description="Retained artifact retrieval time")

@@ -55,7 +55,12 @@ def test_cache_tokens_reach_evaluation_stats() -> None:
 
     from extract_bench.evaluation.stats import build_operational_stats
 
-    result = SimpleNamespace(latency_in_ms=None, raw_output={"cache_read_tokens": 300, "cache_write_tokens": 50})
+    result = SimpleNamespace(
+        latency_in_ms=None,
+        processing_duration_ms=None,
+        retrieval_duration_ms=None,
+        raw_output={"cache_read_tokens": 300, "cache_write_tokens": 50},
+    )
     stats = {stat.name: stat.value for stat in build_operational_stats(result)}  # type: ignore[arg-type]
     assert stats["cache_read_tokens"] == 300
     assert stats["cache_write_tokens"] == 50
