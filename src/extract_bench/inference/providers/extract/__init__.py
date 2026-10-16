@@ -30,6 +30,7 @@ _PROVIDER_MODULES = [
     "llamaextract_v2_api",
     "nuextract3_extract",
     "openai_responses",
+    "parseur",
     "pulse",
     "reducto",
     "table_codegen_extract",

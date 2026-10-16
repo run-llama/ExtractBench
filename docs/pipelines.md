@@ -41,6 +41,7 @@ uv run extract-bench run <pipeline_name>
 | `reducto_extract` / `reducto_extract_v4` / `reducto_deep_extract` | Reducto | `_v4` uses Reducto's v4 extract model |
 | `extend_extract` / `extend_extract_max` | Extend | citations enabled; max-context array strategy variant |
 | `landingai_extract` | LandingAI ADE | |
+| `parseur_extract_v3_vision` | Parseur | AI Vision engine v3; no citations (`PARSEUR_API_KEY`) |
 | `datalab_parse_accurate_extract_fast` / `_balanced` | Datalab | accurate parse + fast or balanced extraction, JSON tree citations |
 | `pulse_schema_non_effort` / `pulse_schema_effort` | Pulse | Pulse Ultra 2, WLBB enabled, then `/schema` with effort off/on (`PULSE_API_KEY`) |
 | `lift_extract` | Self-hosted lift SDK | requires `LIFT_ENDPOINT_URL` |

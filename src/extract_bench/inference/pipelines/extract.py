@@ -492,6 +492,19 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
         )
     )
 
+    # Parseur (REST API, one mailbox per schema, upload + poll).
+    register_fn(
+        _pipeline_spec(
+            pipeline_name="parseur_extract_v3_vision",
+            provider_name="parseur",
+            config={
+                "ai_engine": "GCP_AI_2",  # AI Vision engine v3
+                # List price of the plan covering 3k-10k pages/month (https://parseur.com/pricing).
+                "price_per_page_usd": 0.05,
+            },
+        )
+    )
+
     for _extraction_mode in ("fast", "balanced"):
         register_fn(
             _pipeline_spec(
