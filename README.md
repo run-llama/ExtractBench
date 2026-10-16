@@ -18,7 +18,11 @@ Read the [ExtractBench launch post](https://www.llamaindex.ai/blog/introducing-e
   <img src="docs/extractbench_teaser.png" alt="ExtractBench: JSON Schema and document in; JSON plus evidence out; scored on value F1, grounding F1, challenge tags, and cost" width="100%">
 </p>
 
-## Leaderboard
+## Leaderboards
+
+[ExtractBench](#extractbench-leaderboard) · [ExtractBench Pro](#extractbench-pro-leaderboard) · [Submit results](CONTRIBUTING.md#submitting-benchmark-results)
+
+### ExtractBench leaderboard
 
 Models and prices reflect each provider's official documentation; each system uses its recommended configuration.
 
@@ -74,6 +78,31 @@ Top 10 of 49 systems — full table in [leaderboard.csv](leaderboard.csv).
 3. We can adjust concurrency based on the provider's recommended settings, but providers should not require custom framework changes, so the evaluation stays fair across models.
 
 </details>
+
+### ExtractBench Pro leaderboard
+
+100 documents across six challenges. **Perfect documents** is the percentage with 100% Value F1. Failed documents and documents exceeding the 30-minute limit score zero. Grounding is evaluated on the 81 documents with verified evidence boxes.
+
+<!-- PRO_LEADERBOARD:START -->
+Scores are percentages; costs are USD per page, displayed in cents. Rows are ordered by perfect-document percentage, then Value F1, then lower cost. The best score in each metric is **bold**; the second-best distinct score is <u>underlined</u>. A dash means unreported, not zero.
+
+| Rank | Provider | Category | Perfect docs (%) | Value F1 | Box F1 | Page F1 | ¢ / Page |
+|---:|---|---|---:|---:|---:|---:|---:|
+| 1 | Codex GPT-6 Astra | Coding Agents | **58.00** | **94.53** | **70.97** | **79.10** | 95.20¢ |
+| 2 | Claude Code Opus 5.5 | Coding Agents | <u>51.00</u> | 74.87 | 45.29 | 56.85 | 41.20¢ |
+| 3 | LlamaExtract Agentic Plus | LlamaExtract | 38.00 | <u>77.70</u> | 60.39 | 66.01 | 7.50¢ |
+| 4 | Extend Operator | Specialized APIs | 34.00 | 73.87 | 57.75 | 68.84 | 9.88¢ |
+| 5 | Claude Code Sonnet 5.5 | Coding Agents | 32.00 | 73.62 | 40.47 | 53.00 | 19.98¢ |
+| 6 | LlamaExtract Agentic | LlamaExtract | 20.00 | 71.32 | 58.01 | 63.77 | 3.12¢ |
+| 7 | Pulse | Specialized APIs | 18.00 | 70.53 | 18.74 | <u>74.77</u> | 10.50¢ |
+| 8 | Codex GPT-6.1 Sol | Coding Agents | 12.00 | 74.06 | <u>63.96</u> | 72.26 | 13.86¢ |
+| 9 | Reducto Deep | Specialized APIs | 3.00 | 56.35 | 42.20 | 62.38 | 6.18¢ |
+| 10 | Datalab Accurate | Specialized APIs | 2.00 | 43.93 | 0.32 | 4.66 | 15.75¢ |
+| 11 | Codex GPT-6 Luna | Coding Agents | 0.00 | 48.75 | 44.27 | 60.78 | 1.14¢ |
+| 12 | LlamaExtract Cost Effective | LlamaExtract | 0.00 | 47.19 | 49.40 | 56.46 | 1.00¢ |
+<!-- PRO_LEADERBOARD:END -->
+
+The [Pro CSV](leaderboard-pro.csv) includes overall scores and all six challenge slices. See the [score definitions and launch snapshot](docs/pro-leaderboard.md), or [submit a new result](CONTRIBUTING.md#submitting-benchmark-results).
 
 ## Quick Start
 
@@ -208,7 +237,7 @@ uv run extract-bench status
 
 ## ExtractBench Pro
 
-[ExtractBench Pro](https://huggingface.co/datasets/llamaindex/ExtractBenchPro) contains 100 documents across six challenges: document conventions, house vocabulary, house counting rules, drawn relations, charts inside documents, and long chart sheets. It uses the same evaluator as ExtractBench. Read the [ExtractBench Pro launch post](https://www.llamaindex.ai/blog/introducing-extractbench-pro) for the challenges and results.
+[ExtractBench Pro](https://huggingface.co/datasets/llamaindex/ExtractBenchPro) contains 100 documents across six challenges: document conventions, house vocabulary, house counting rules, drawn relations, charts inside documents, and long chart sheets. It uses the same evaluator as ExtractBench. See the [Pro leaderboard](#extractbench-pro-leaderboard) or [submit results](CONTRIBUTING.md#submitting-benchmark-results). Read the [ExtractBench Pro launch post](https://www.llamaindex.ai/blog/introducing-extractbench-pro) for the challenges and results.
 
 Download the PDFs, schemas, ground truth, and scoring rules into the layout the harness reads:
 

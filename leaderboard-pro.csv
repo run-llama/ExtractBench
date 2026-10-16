@@ -1,0 +1,85 @@
+Provider,Category,Challenge,Documents,Grounding_Documents,Perfect_Documents,Value_F1,Word_Grounding,Page_Grounding,Cost_Per_Page
+LlamaExtract Agentic Plus,LlamaExtract,all,100,81,38.00,77.70,60.39,66.01,0.075000
+LlamaExtract Agentic Plus,LlamaExtract,document_conventions,22,22,22.73,97.45,73.21,83.57,0.075000
+LlamaExtract Agentic Plus,LlamaExtract,house_vocabulary,14,14,64.29,98.64,61.22,68.61,0.075000
+LlamaExtract Agentic Plus,LlamaExtract,house_counting_rules,12,9,41.67,67.64,33.23,33.23,0.075000
+LlamaExtract Agentic Plus,LlamaExtract,drawn_relations,20,19,10.00,49.27,71.42,75.52,0.075000
+LlamaExtract Agentic Plus,LlamaExtract,charts_inside_documents,25,10,68.00,94.35,76.75,78.00,0.075000
+LlamaExtract Agentic Plus,LlamaExtract,long_chart_sheets,7,7,0.00,12.73,0.00,4.76,0.075000
+LlamaExtract Agentic,LlamaExtract,all,100,81,20.00,71.32,58.01,63.77,0.031200
+LlamaExtract Agentic,LlamaExtract,document_conventions,22,22,13.64,95.54,76.03,87.92,0.031200
+LlamaExtract Agentic,LlamaExtract,house_vocabulary,14,14,35.71,95.39,55.62,65.16,0.031200
+LlamaExtract Agentic,LlamaExtract,house_counting_rules,12,9,16.67,53.95,32.80,32.80,0.031200
+LlamaExtract Agentic,LlamaExtract,drawn_relations,20,19,10.00,44.25,72.81,75.61,0.031200
+LlamaExtract Agentic,LlamaExtract,charts_inside_documents,25,10,32.00,86.14,56.88,58.75,0.031200
+LlamaExtract Agentic,LlamaExtract,long_chart_sheets,7,7,0.00,1.28,0.00,0.00,0.031200
+LlamaExtract Cost Effective,LlamaExtract,all,100,81,0.00,47.19,49.40,56.46,0.010000
+LlamaExtract Cost Effective,LlamaExtract,document_conventions,22,22,0.00,74.97,55.63,63.93,0.010000
+LlamaExtract Cost Effective,LlamaExtract,house_vocabulary,14,14,0.00,80.85,46.80,65.92,0.010000
+LlamaExtract Cost Effective,LlamaExtract,house_counting_rules,12,9,0.00,33.40,25.38,29.07,0.010000
+LlamaExtract Cost Effective,LlamaExtract,drawn_relations,20,19,0.00,29.85,62.41,65.74,0.010000
+LlamaExtract Cost Effective,LlamaExtract,charts_inside_documents,25,10,0.00,37.57,70.82,73.32,0.010000
+LlamaExtract Cost Effective,LlamaExtract,long_chart_sheets,7,7,0.00,0.10,0.00,0.00,0.010000
+Codex GPT-6 Astra,Coding Agents,all,100,81,58.00,94.53,70.97,79.10,0.952000
+Codex GPT-6 Astra,Coding Agents,document_conventions,22,22,27.27,92.58,87.67,88.87,0.170300
+Codex GPT-6 Astra,Coding Agents,house_vocabulary,14,14,64.29,99.51,63.53,63.62,0.141700
+Codex GPT-6 Astra,Coding Agents,house_counting_rules,12,9,58.33,83.07,33.33,33.33,0.175900
+Codex GPT-6 Astra,Coding Agents,drawn_relations,20,19,80.00,98.02,87.07,88.80,0.192700
+Codex GPT-6 Astra,Coding Agents,charts_inside_documents,25,10,64.00,94.72,87.78,87.78,0.150800
+Codex GPT-6 Astra,Coding Agents,long_chart_sheets,7,7,57.14,99.73,14.05,99.52,11.389700
+Claude Code Opus 5.5,Coding Agents,all,100,81,51.00,74.87,45.29,56.85,0.412000
+Claude Code Opus 5.5,Coding Agents,document_conventions,22,22,22.73,58.11,43.44,46.23,0.093700
+Claude Code Opus 5.5,Coding Agents,house_vocabulary,14,14,35.71,55.62,33.25,38.09,0.070000
+Claude Code Opus 5.5,Coding Agents,house_counting_rules,12,9,33.33,56.11,25.93,29.63,0.057100
+Claude Code Opus 5.5,Coding Agents,drawn_relations,20,19,80.00,88.19,61.34,67.55,0.127400
+Claude Code Opus 5.5,Coding Agents,charts_inside_documents,25,10,80.00,97.78,76.18,96.06,0.078000
+Claude Code Opus 5.5,Coding Agents,long_chart_sheets,7,7,14.29,78.28,12.36,77.65,4.665100
+Claude Code Sonnet 5.5,Coding Agents,all,100,81,32.00,73.62,40.47,53.00,0.199800
+Claude Code Sonnet 5.5,Coding Agents,document_conventions,22,22,22.73,58.17,44.74,46.93,0.043300
+Claude Code Sonnet 5.5,Coding Agents,house_vocabulary,14,14,7.14,81.73,33.41,66.55,0.038600
+Claude Code Sonnet 5.5,Coding Agents,house_counting_rules,12,9,33.33,64.57,25.40,29.10,0.026800
+Claude Code Sonnet 5.5,Coding Agents,drawn_relations,20,19,55.00,83.80,46.46,52.45,0.060600
+Claude Code Sonnet 5.5,Coding Agents,charts_inside_documents,25,10,44.00,88.04,64.87,78.41,0.047900
+Claude Code Sonnet 5.5,Coding Agents,long_chart_sheets,7,7,0.00,40.93,9.48,40.93,2.188200
+Codex GPT-6.1 Sol,Coding Agents,all,100,81,12.00,74.06,63.96,72.26,0.138600
+Codex GPT-6.1 Sol,Coding Agents,document_conventions,22,22,9.09,86.90,78.01,81.24,0.025000
+Codex GPT-6.1 Sol,Coding Agents,house_vocabulary,14,14,14.29,86.56,54.18,56.29,0.016300
+Codex GPT-6.1 Sol,Coding Agents,house_counting_rules,12,9,8.33,40.45,32.19,32.19,0.013600
+Codex GPT-6.1 Sol,Coding Agents,drawn_relations,20,19,25.00,75.11,80.28,83.35,0.022000
+Codex GPT-6.1 Sol,Coding Agents,charts_inside_documents,25,10,4.00,65.58,75.67,75.67,0.014500
+Codex GPT-6.1 Sol,Coding Agents,long_chart_sheets,7,7,14.29,93.64,19.17,92.60,1.730400
+Codex GPT-6 Luna,Coding Agents,all,100,81,0.00,48.75,44.27,60.78,0.011400
+Codex GPT-6 Luna,Coding Agents,document_conventions,22,22,0.00,68.05,50.91,63.08,0.003100
+Codex GPT-6 Luna,Coding Agents,house_vocabulary,14,14,0.00,54.72,33.41,55.82,0.002900
+Codex GPT-6 Luna,Coding Agents,house_counting_rules,12,9,0.00,30.37,18.20,30.05,0.003800
+Codex GPT-6 Luna,Coding Agents,drawn_relations,20,19,0.00,35.38,52.90,73.59,0.004100
+Codex GPT-6 Luna,Coding Agents,charts_inside_documents,25,10,0.00,55.05,82.96,90.88,0.005100
+Codex GPT-6 Luna,Coding Agents,long_chart_sheets,7,7,0.00,23.44,0.00,25.18,0.111100
+Extend Operator,Specialized APIs,all,100,81,34.00,73.87,57.75,68.84,0.098800
+Extend Operator,Specialized APIs,document_conventions,22,22,27.27,99.64,80.29,91.42,0.100100
+Extend Operator,Specialized APIs,house_vocabulary,14,14,64.29,97.55,78.24,91.14,0.087500
+Extend Operator,Specialized APIs,house_counting_rules,12,9,16.67,59.55,18.33,27.04,0.087500
+Extend Operator,Specialized APIs,drawn_relations,20,19,0.00,41.24,61.16,76.66,0.124700
+Extend Operator,Specialized APIs,charts_inside_documents,25,10,68.00,91.58,48.89,58.89,0.091900
+Extend Operator,Specialized APIs,long_chart_sheets,7,7,0.00,0.00,0.00,0.00,0.087500
+Pulse,Specialized APIs,all,100,81,18.00,70.53,18.74,74.77,0.105000
+Pulse,Specialized APIs,document_conventions,22,22,9.09,93.83,26.79,79.91,0.105000
+Pulse,Specialized APIs,house_vocabulary,14,14,50.00,82.13,23.30,77.34,0.105000
+Pulse,Specialized APIs,house_counting_rules,12,9,25.00,56.25,14.50,54.07,0.105000
+Pulse,Specialized APIs,drawn_relations,20,19,15.00,65.00,10.31,85.98,0.105000
+Pulse,Specialized APIs,charts_inside_documents,25,10,12.00,65.01,27.64,85.64,0.105000
+Pulse,Specialized APIs,long_chart_sheets,7,7,0.00,34.10,0.00,34.10,0.105000
+Reducto Deep,Specialized APIs,all,100,81,3.00,56.35,42.20,62.38,0.061800
+Reducto Deep,Specialized APIs,document_conventions,22,22,4.55,79.20,42.58,62.96,0.062800
+Reducto Deep,Specialized APIs,house_vocabulary,14,14,0.00,86.49,40.68,79.64,0.056300
+Reducto Deep,Specialized APIs,house_counting_rules,12,9,0.00,38.33,24.89,40.15,0.057600
+Reducto Deep,Specialized APIs,drawn_relations,20,19,5.00,39.00,58.32,67.58,0.060300
+Reducto Deep,Specialized APIs,charts_inside_documents,25,10,4.00,52.58,58.02,75.24,0.064900
+Reducto Deep,Specialized APIs,long_chart_sheets,7,7,0.00,18.16,0.00,22.15,0.070000
+Datalab Accurate,Specialized APIs,all,100,81,2.00,43.93,0.32,4.66,0.157500
+Datalab Accurate,Specialized APIs,document_conventions,22,22,4.55,67.25,0.04,1.10,0.150100
+Datalab Accurate,Specialized APIs,house_vocabulary,14,14,0.00,44.92,0.00,0.01,0.146100
+Datalab Accurate,Specialized APIs,house_counting_rules,12,9,0.00,45.78,0.00,0.00,0.027700
+Datalab Accurate,Specialized APIs,drawn_relations,20,19,0.00,33.48,1.32,18.57,0.038200
+Datalab Accurate,Specialized APIs,charts_inside_documents,25,10,4.00,42.63,0.00,0.00,0.019400
+Datalab Accurate,Specialized APIs,long_chart_sheets,7,7,0.00,0.00,0.00,0.00,1.260000

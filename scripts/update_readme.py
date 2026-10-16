@@ -1,20 +1,23 @@
-"""Regenerate the leaderboard tables in README.md from leaderboard.csv.
+"""Regenerate README leaderboard tables from leaderboard.csv and leaderboard-pro.csv.
 
-Two tables are generated:
+Three tables are generated:
 
     LEADERBOARD    unified value F1 (the headline metric)
     GROUNDING      word-level and page-level grounding F1, side by side
+    PRO_LEADERBOARD  perfect documents, value F1, grounding and cost on Pro
 
 Run: uv run python scripts/update_readme.py
 """
 
 from __future__ import annotations
 
+import argparse
 import csv
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 CSV_PATH = REPO_ROOT / "leaderboard.csv"
+PRO_CSV_PATH = REPO_ROOT / "leaderboard-pro.csv"
 README_PATH = REPO_ROOT / "README.md"
 
 
@@ -37,7 +40,7 @@ def column_ranks(rows: list[dict], columns: tuple[str, ...]) -> dict[str, dict[f
     """Return emphasis for the best and second-best distinct score in each column."""
     ranks = {}
     for column in columns:
-        values = sorted({float(row[column]) for row in rows}, reverse=True)
+        values = sorted({float(row[column]) for row in rows if row[column] != ""}, reverse=True)
         ranks[column] = dict(zip(values[:2], ("best", "second"), strict=False))
     return ranks
 
@@ -138,6 +141,39 @@ def grounding_table(rows: list[dict]) -> str:
     )
 
 
+def pro_table(rows: list[dict[str, str]]) -> str:
+    """Rank the overall Pro slice, retaining challenge rows in the source CSV."""
+    overall = [row for row in rows if row["Challenge"] == "all"]
+    ranked = sorted(
+        overall,
+        key=lambda row: (
+            -float(row["Perfect_Documents"]),
+            -float(row["Value_F1"]),
+            float(row["Cost_Per_Page"]) if row["Cost_Per_Page"] != "" else float("inf"),
+            row["Provider"],
+        ),
+    )
+    columns = ("Perfect_Documents", "Value_F1", "Word_Grounding", "Page_Grounding")
+    ranks = column_ranks(overall, columns)
+    return table(
+        "| Rank | Provider | Category | Perfect docs (%) | Value F1 | Box F1 | Page F1 | ¢ / Page |",
+        "|---:|---|---|---:|---:|---:|---:|---:|",
+        [
+            [
+                str(index),
+                row["Provider"],
+                row["Category"],
+                *(
+                    fmt_ranked(row[column], ranks[column].get(float(row[column]))) if row[column] != "" else "—"
+                    for column in columns
+                ),
+                fmt_cost(row["Cost_Per_Page"]),
+            ]
+            for index, row in enumerate(ranked, 1)
+        ],
+    )
+
+
 def replace_block(readme: str, name: str, body: str) -> str:
     start_marker, end_marker = f"<!-- {name}:START -->", f"<!-- {name}:END -->"
     start, end = readme.find(start_marker), readme.find(end_marker)
@@ -148,10 +184,17 @@ def replace_block(readme: str, name: str, body: str) -> str:
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--check", action="store_true", help="Fail if README tables are stale; do not write files")
+    args = parser.parse_args()
     with CSV_PATH.open() as f:
         rows = [r for r in csv.DictReader(f) if r.get("Provider")]
 
-    readme = README_PATH.read_text()
+    with PRO_CSV_PATH.open() as f:
+        pro_rows = [row for row in csv.DictReader(f) if row.get("Provider")]
+
+    original = README_PATH.read_text()
+    readme = original
     readme = replace_block(
         readme,
         "LEADERBOARD",
@@ -172,8 +215,21 @@ def main() -> None:
         + "\n\n"
         + grounding_table(rows),
     )
-    README_PATH.write_text(readme)
-    print(f"Updated README.md from {CSV_PATH.name} ({len(rows)} systems)")
+    readme = replace_block(
+        readme,
+        "PRO_LEADERBOARD",
+        "Scores are percentages; costs are USD per page, displayed in cents. Rows are ordered by "
+        "perfect-document percentage, then Value F1, then lower cost. The best score in each "
+        "metric is **bold**; the second-best distinct score is <u>underlined</u>. A dash means "
+        "unreported, not zero.\n\n" + pro_table(pro_rows),
+    )
+    if args.check:
+        if readme != original:
+            raise SystemExit("README leaderboard tables are stale. Run: uv run python scripts/update_readme.py")
+        print("README leaderboard tables are up to date")
+    else:
+        README_PATH.write_text(readme)
+        print(f"Updated README.md from {CSV_PATH.name} and {PRO_CSV_PATH.name}")
 
 
 if __name__ == "__main__":

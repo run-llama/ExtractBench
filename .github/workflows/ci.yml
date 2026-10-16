@@ -35,6 +35,9 @@ jobs:
       - name: Ruff lint
         run: uv run ruff check
 
+      - name: Check README leaderboards
+        run: uv run python scripts/update_readme.py --check
+
       - name: Pytest without runners
         run: uv run pytest tests/ -q
 
