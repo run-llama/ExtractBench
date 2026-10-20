@@ -55,7 +55,7 @@ Failed documents and Pro documents exceeding the 30-minute limit score zero.
 | 9 | Codex (GPT-5.6 Sol Evidence) | Coding Agents | 93.77 | 96.04 | 90.19 | 82.73 | 21.65¢ |
 | 10 | Codex (GPT-5.5) | Coding Agents | 93.57 | 95.68 | 91.15 | 78.88 | 27.83¢ |
 
-Top 10 of 49 systems — full table in [leaderboard.csv](leaderboard.csv).
+Top 10 of 50 systems — full table in [leaderboard.csv](leaderboard.csv).
 <!-- LEADERBOARD:END -->
 
 <!-- GROUNDING:START -->
@@ -80,7 +80,7 @@ Top 10 of 49 systems — full table in [leaderboard.csv](leaderboard.csv).
   </tbody>
 </table>
 
-Top 10 of 49 systems — full table in [leaderboard.csv](leaderboard.csv).
+Top 10 of 50 systems — full table in [leaderboard.csv](leaderboard.csv).
 <!-- GROUNDING:END -->
 
 ### ExtractBench Pro leaderboard
@@ -154,7 +154,7 @@ Costs use each provider's official listed price.
 |---|---:|---|
 | Commercial VLM | $10 – $49 | GPT-5.4 Nano ~$10, Gemini 3.5 Flash ~$49 |
 | LlamaExtract | $49 – $395 | Cost-Effective ~$49, Agentic ~$152, Agentic Plus ~$395 |
-| Specialized APIs | $170 – $487 | Datalab ~$170, Reducto Deep Extract ~$309, Extend ~$487 |
+| Specialized APIs | $170 – $487 | Datalab ~$170, Parseur ~$243, Reducto Deep Extract ~$309, Extend ~$487 |
 | Coding agents | $787 – $1,355 | Claude Code (Opus 4.8) ~$787, Codex (GPT-5.5) ~$1,355 |
 | Self-hosted open weights | GPU time only | Qwen3.6 35B, Gemma4 26B, NuExtract3, Lift Datalab 9B |
 

@@ -509,6 +509,19 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
         )
     )
 
+    # Parseur (REST API, one mailbox per schema, upload + poll).
+    register_fn(
+        _pipeline_spec(
+            pipeline_name="parseur_extract_v3_vision",
+            provider_name="parseur",
+            config={
+                "ai_engine": "GCP_AI_2",  # AI Vision engine v3
+                # List price of the plan covering 3k-10k pages/month (https://parseur.com/pricing).
+                "price_per_page_usd": 0.05,
+            },
+        )
+    )
+
     # Bypass Datalab's server cache: a cached result returns at once and bills
     # $0, so a rerun would report neither the real cost nor the real latency.
     for _extraction_mode in ("fast", "balanced", "accurate"):

@@ -43,6 +43,7 @@ uv run extract-bench run <pipeline_name>
 | `extend_extract` / `extend_extract_max` | Extend | citations enabled; max-context array strategy variant |
 | `extend_extract_operator` | Extend | Operator extraction on the 2026-02-09 API with word-level citations; cost from the run's reported usage (`EXTEND_API_KEY`) |
 | `landingai_extract` | LandingAI ADE | |
+| `parseur_extract_v3_vision` | Parseur | AI Vision engine v3; no citations (`PARSEUR_API_KEY`) |
 | `datalab_parse_accurate_extract_{fast,balanced,accurate}` | Datalab | accurate parse + fast, balanced or accurate extraction, JSON tree citations |
 | `pulse_schema_non_effort` / `pulse_schema_effort` | Pulse | Pulse Ultra 2, WLBB enabled, then `/schema` with effort off/on (`PULSE_API_KEY`) |
 | `lift_extract` | Self-hosted lift SDK | requires `LIFT_ENDPOINT_URL` |
