@@ -411,3 +411,7 @@ src/extract_bench/
 - **ExtractBench Pro dataset**: [llamaindex/ExtractBenchPro](https://huggingface.co/datasets/llamaindex/ExtractBenchPro) · [details](docs/extractbench-pro.md) · [launch post](https://www.llamaindex.ai/blog/introducing-extractbench-pro) · [website](https://www.extractbench.ai/pro/)
 - **Code**: [run-llama/ExtractBench](https://github.com/run-llama/ExtractBench)
 - **ParseBench**: [run-llama/ParseBench](https://github.com/run-llama/ParseBench) — A Document Parsing Benchmark for AI Agents
+
+## License
+
+The code and both datasets (ExtractBench and ExtractBench Pro) are released under the [Apache 2.0 License](LICENSE).
