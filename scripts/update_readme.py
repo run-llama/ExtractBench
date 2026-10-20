@@ -147,11 +147,11 @@ def pro_table(rows: list[dict[str, str]]) -> str:
             row["Provider"],
         ),
     )[:TOP_N]
-    columns = ("Perfect_Documents", "Value_F1", "Word_Grounding", "Page_Grounding")
+    columns = ("Perfect_Documents", "Value_F1", "Word_Grounding")
     ranks = column_ranks(overall, columns)
     body = table(
-        "| Rank | Provider | Category | % Perfect | Value F1 | Box F1 | Page F1 | ¢ / Page |",
-        "|---:|---|---|---:|---:|---:|---:|---:|",
+        "| Rank | Provider | Category | % Perfect | Value F1 | Grounding F1 | ¢ / Page |",
+        "|---:|---|---|---:|---:|---:|---:|",
         [
             [
                 str(index),

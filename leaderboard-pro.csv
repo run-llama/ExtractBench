@@ -62,13 +62,13 @@ Extend Operator,Specialized APIs,house_counting_rules,12,9,16.67,59.55,18.33,27.
 Extend Operator,Specialized APIs,drawn_relations,20,19,0.00,41.24,61.16,76.66,0.124700
 Extend Operator,Specialized APIs,charts_inside_documents,25,10,68.00,91.58,48.89,58.89,0.091900
 Extend Operator,Specialized APIs,long_chart_sheets,7,7,0.00,0.00,0.00,0.00,0.087500
-Pulse,Specialized APIs,all,100,81,18.00,70.53,18.74,74.77,0.105000
-Pulse,Specialized APIs,document_conventions,22,22,9.09,93.83,26.79,79.91,0.105000
-Pulse,Specialized APIs,house_vocabulary,14,14,50.00,82.13,23.30,77.34,0.105000
-Pulse,Specialized APIs,house_counting_rules,12,9,25.00,56.25,14.50,54.07,0.105000
-Pulse,Specialized APIs,drawn_relations,20,19,15.00,65.00,10.31,85.98,0.105000
-Pulse,Specialized APIs,charts_inside_documents,25,10,12.00,65.01,27.64,85.64,0.105000
-Pulse,Specialized APIs,long_chart_sheets,7,7,0.00,34.10,0.00,34.10,0.105000
+Pulse Effort,Specialized APIs,all,100,81,18.00,70.53,18.74,74.77,0.105000
+Pulse Effort,Specialized APIs,document_conventions,22,22,9.09,93.83,26.79,79.91,0.105000
+Pulse Effort,Specialized APIs,house_vocabulary,14,14,50.00,82.13,23.30,77.34,0.105000
+Pulse Effort,Specialized APIs,house_counting_rules,12,9,25.00,56.25,14.50,54.07,0.105000
+Pulse Effort,Specialized APIs,drawn_relations,20,19,15.00,65.00,10.31,85.98,0.105000
+Pulse Effort,Specialized APIs,charts_inside_documents,25,10,12.00,65.01,27.64,85.64,0.105000
+Pulse Effort,Specialized APIs,long_chart_sheets,7,7,0.00,34.10,0.00,34.10,0.105000
 Reducto Deep,Specialized APIs,all,100,81,3.00,56.35,42.20,62.38,0.061800
 Reducto Deep,Specialized APIs,document_conventions,22,22,4.55,79.20,42.58,62.96,0.062800
 Reducto Deep,Specialized APIs,house_vocabulary,14,14,0.00,86.49,40.68,79.64,0.056300

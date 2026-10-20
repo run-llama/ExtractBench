@@ -2,7 +2,8 @@
 
 [![Website](https://img.shields.io/badge/Website-extractbench.ai-blue)](https://www.extractbench.ai/)
 [![arXiv](https://img.shields.io/badge/arXiv-2607.29677-b31b1b.svg)](https://arxiv.org/abs/2607.29677)
-[![Dataset](https://img.shields.io/badge/HuggingFace-Dataset-yellow)](https://huggingface.co/datasets/llamaindex/ExtractBench)
+[![Dataset](https://img.shields.io/badge/HuggingFace-ExtractBench-yellow)](https://huggingface.co/datasets/llamaindex/ExtractBench)
+[![Pro Dataset](https://img.shields.io/badge/HuggingFace-ExtractBench_Pro-yellow)](https://huggingface.co/datasets/llamaindex/ExtractBenchPro)
 [![Papers with Code:ExtractBench](https://paperswithcode.co/api/v1/papers/2607.29677/leaderboard-badge.svg?eval=35030&live=1)](https://paperswithcode.co/api/v1/papers/2607.29677/leaderboard-badge-link?eval=35030)
 [![License](https://img.shields.io/badge/License-Apache_2.0-green.svg)](LICENSE)
 
@@ -10,9 +11,12 @@
 
 A schema defines one extraction task, and all documents of that type share it: one invoice schema covers invoices from every vendor, however different each one looks. Enterprises write a new schema for almost every workflow, so a system cannot be tuned to a fixed template. It has to handle schemas and documents it has never seen. And because agents increasingly act on extracted values before anyone reviews them, one truncated schedule or one invented value becomes a wrong payment or a wrong decision. The benchmark therefore scores completeness and traceability.
 
-The benchmark covers **370 documents (4,869 pages)** across 8 business domains and 67 document types, each type with its own schema. Every document is tagged along five independent axes: task challenge, perception challenge, table structure, length, and business domain, so a low score can be traced to its cause.
+This repository hosts two benchmarks. They share the task, the evaluator, the metrics, and the harness; they differ in their documents and in what makes a value hard to extract.
 
-Read the [ExtractBench launch post](https://www.llamaindex.ai/blog/introducing-extractbench) for the design and results. For the harder 100-document extension, see [ExtractBench Pro](#extractbench-pro).
+| Benchmark | What makes it hard | Size | Documents | Dataset | Details |
+|---|---|---|---|---|---|
+| **ExtractBench** | Long lists, needles in long documents, dense forms, scans, and handwriting | 370 documents, 4,869 pages, 67 document types | Real public records, plus synthetic long lists rendered from real layouts | [llamaindex/ExtractBench](https://huggingface.co/datasets/llamaindex/ExtractBench) | [docs/extractbench.md](docs/extractbench.md) · [launch post](https://www.llamaindex.ai/blog/introducing-extractbench) |
+| **ExtractBench Pro** | Values read off charts and drawings, counted under house rules, or decoded with house vocabulary | 100 documents, 2,622 pages, 86 document types | Synthetic, derived from real long-tail documents | [llamaindex/ExtractBenchPro](https://huggingface.co/datasets/llamaindex/ExtractBenchPro) | [docs/extractbench-pro.md](docs/extractbench-pro.md) · [launch post](https://www.llamaindex.ai/blog/introducing-extractbench-pro) |
 
 <p align="center">
   <img src="docs/extractbench_teaser.png" alt="ExtractBench: JSON Schema and document in; JSON plus evidence out; scored on value F1, grounding F1, challenge tags, and cost" width="100%">
@@ -30,7 +34,7 @@ Scores are percentages; costs are USD. The best score in each metric is **bold**
 <summary><strong>Metric details</strong></summary>
 
 - **Value F1:** F1 of extracted values, averaged across documents. Each document has equal weight, regardless of its length.
-- **Grounding F1:** requires both a correct value and correct evidence. **Box F1** requires the predicted box to overlap an accepted evidence box at IoU 0.5 or higher; **Page F1** requires the correct source page. Grounding is evaluated on the subset with verified ground-truth evidence for the corresponding metric.
+- **Grounding F1:** requires both a correct value and correct evidence: the predicted box must overlap an accepted evidence box at IoU 0.5 or higher (word level). **Page-level grounding F1** requires only the correct source page. Grounding is evaluated on the subset with verified ground-truth evidence for the corresponding metric.
 - **% Perfect:** percentage of documents with 100% Value F1.
 
 Failed documents and Pro documents exceeding the 30-minute limit score zero.
@@ -88,25 +92,27 @@ Top 10 of 49 systems — full table in [leaderboard.csv](leaderboard.csv).
 <!-- PRO_LEADERBOARD:START -->
 Rows are ordered by % Perfect, then Value F1, then lower cost.
 
-| Rank | Provider | Category | % Perfect | Value F1 | Box F1 | Page F1 | ¢ / Page |
-|---:|---|---|---:|---:|---:|---:|---:|
-| 1 | Codex GPT-6 Astra | Coding Agents | **58** | **94.53** | **70.97** | **79.10** | 95.20¢ |
-| 2 | Claude Code Opus 5.5 | Coding Agents | <u>51</u> | 74.87 | 45.29 | 56.85 | 41.20¢ |
-| 3 | LlamaExtract Agentic Plus | LlamaExtract | 38 | <u>77.70</u> | 60.39 | 66.01 | 7.50¢ |
-| 4 | Extend Operator | Specialized APIs | 34 | 73.87 | 57.75 | 68.84 | 9.88¢ |
-| 5 | Claude Code Sonnet 5.5 | Coding Agents | 32 | 73.62 | 40.47 | 53.00 | 19.98¢ |
-| 6 | LlamaExtract Agentic | LlamaExtract | 20 | 71.32 | 58.01 | 63.77 | 3.12¢ |
-| 7 | Pulse | Specialized APIs | 18 | 70.53 | 18.74 | <u>74.77</u> | 10.50¢ |
-| 8 | Codex GPT-6.1 Sol | Coding Agents | 12 | 74.06 | <u>63.96</u> | 72.26 | 13.86¢ |
-| 9 | Reducto Deep | Specialized APIs | 3 | 56.35 | 42.20 | 62.38 | 6.18¢ |
-| 10 | Datalab Accurate | Specialized APIs | 2 | 43.93 | 0.32 | 4.66 | 15.75¢ |
+| Rank | Provider | Category | % Perfect | Value F1 | Grounding F1 | ¢ / Page |
+|---:|---|---|---:|---:|---:|---:|
+| 1 | Codex GPT-6 Astra | Coding Agents | **58** | **94.53** | **70.97** | 95.20¢ |
+| 2 | Claude Code Opus 5.5 | Coding Agents | <u>51</u> | 74.87 | 45.29 | 41.20¢ |
+| 3 | LlamaExtract Agentic Plus | LlamaExtract | 38 | <u>77.70</u> | 60.39 | 7.50¢ |
+| 4 | Extend Operator | Specialized APIs | 34 | 73.87 | 57.75 | 9.88¢ |
+| 5 | Claude Code Sonnet 5.5 | Coding Agents | 32 | 73.62 | 40.47 | 19.98¢ |
+| 6 | LlamaExtract Agentic | LlamaExtract | 20 | 71.32 | 58.01 | 3.12¢ |
+| 7 | Pulse Effort | Specialized APIs | 18 | 70.53 | 18.74 | 10.50¢ |
+| 8 | Codex GPT-6.1 Sol | Coding Agents | 12 | 74.06 | <u>63.96</u> | 13.86¢ |
+| 9 | Reducto Deep | Specialized APIs | 3 | 56.35 | 42.20 | 6.18¢ |
+| 10 | Datalab Accurate | Specialized APIs | 2 | 43.93 | 0.32 | 15.75¢ |
 
 Top 10 of 12 systems — full table in [leaderboard-pro.csv](leaderboard-pro.csv).
 <!-- PRO_LEADERBOARD:END -->
 
 ### Submitting results
 
-Open a PR updating [leaderboard.csv](leaderboard.csv) or [leaderboard-pro.csv](leaderboard-pro.csv), with your pipeline configuration and evaluation reports. For Pro, include the overall (`all`) row and all six challenge rows. Scores are percentages; costs are USD per page. Regenerate the tables with `uv run python scripts/update_readme.py`.
+Open a PR updating [leaderboard.csv](leaderboard.csv) or [leaderboard-pro.csv](leaderboard-pro.csv), with your pipeline configuration and evaluation reports. Scores are percentages; costs are USD per page. Regenerate the tables with `uv run python scripts/update_readme.py`.
+
+The rows each CSV needs are described in [ExtractBench: submitting results](docs/extractbench.md#submitting-results) and [ExtractBench Pro: submitting results](docs/extractbench-pro.md#submitting-results). For Pro, include the overall (`all`) row and all six challenge rows.
 
 <details>
 <summary><strong>Inclusion criteria</strong></summary>
@@ -129,154 +135,69 @@ pip install "llama-extract-bench[llamaextract]" # or just one, e.g. llamaextract
 # Or, from a checkout of this repo
 uv sync --extra runners
 
-# Quick test run (6 documents — good for trying things out)
+# Quick test run on ExtractBench (6 documents — good for trying things out)
 # (drop the `uv run` prefix if you installed from PyPI)
 uv run extract-bench run llamaextract_agentic --test
 
-# Full benchmark run (replace with any pipeline name, see "Available Pipelines" below)
+# Full ExtractBench run (replace with any pipeline name, see "Pipelines" below)
 uv run extract-bench run llamaextract_agentic
+
+# Full ExtractBench Pro run
+uv run extract-bench run llamaextract_agentic --dataset pro
 
 # View interactive reports in your browser
 uv run extract-bench serve llamaextract_agentic
+uv run extract-bench serve output-pro/llamaextract_agentic
 ```
 
 > [!WARNING]
-> A full run is **370 documents / 4,869 pages** against a metered API, and costs roughly
-> **$10 to $1,677** depending on which system you evaluate. Start with `--test`, which runs
-> 6 documents for cents on any hosted system.
+> A full run calls a metered API. ExtractBench (370 documents / 4,869 pages) costs roughly
+> **$10 to $1,677**, and ExtractBench Pro (100 documents / 2,622 pages) roughly **$26 to $2,496**,
+> depending on which system you evaluate. Start with `--test` on ExtractBench, which runs 6 documents
+> for cents on any hosted system. Pro has no `--test` subset; run one challenge with `--group` instead.
+> Per-system estimates: [ExtractBench](docs/extractbench.md#cost-of-a-full-run), [ExtractBench Pro](docs/extractbench-pro.md#cost-of-a-full-run).
 
-<details>
-<summary><strong>Rough cost of one full run</strong></summary>
+## Datasets
 
-Costs use each provider's official listed price.
+Both datasets are hosted on Hugging Face and download automatically the first time you run a pipeline. Pass `--dataset pro` to any `run`, `download`, or `status` command to use ExtractBench Pro.
 
-| Category | One full run | Examples |
-|---|---:|---|
-| Commercial VLM | $10 – $49 | GPT-5.4 Nano ~$10, Gemini 3.5 Flash ~$49 |
-| LlamaExtract | $49 – $395 | Cost-Effective ~$49, Agentic ~$152, Agentic Plus ~$395 |
-| Specialized APIs | $170 – $487 | Datalab ~$170, Reducto Deep Extract ~$309, Extend ~$487 |
-| Coding agents | $787 – $1,355 | Claude Code (Opus 4.8) ~$787, Codex (GPT-5.5) ~$1,355 |
-| Self-hosted open weights | GPU time only | Qwen3.6 35B, Gemma4 26B, NuExtract3, Lift Datalab 9B |
+| | ExtractBench | ExtractBench Pro |
+|---|---|---|
+| Hugging Face | [`llamaindex/ExtractBench`](https://huggingface.co/datasets/llamaindex/ExtractBench) | [`llamaindex/ExtractBenchPro`](https://huggingface.co/datasets/llamaindex/ExtractBenchPro) |
+| `--dataset` | `extractbench` (default) | `pro` |
+| Local data | `data/` | `data-pro/` |
+| Results | `output/` | `output-pro/` |
+| `--group` values | `short`, `medium`, `long` | `document_conventions`, `house_vocabulary`, `house_counting_rules`, `drawn_relations`, `charts_inside_documents`, `long_chart_sheets` |
+| `--test` subset | 6 documents | none |
+| Splits, tags, sources, ground truth | [docs/extractbench.md](docs/extractbench.md) | [docs/extractbench-pro.md](docs/extractbench-pro.md) |
 
-These figures apply the reported mean cost per page to 4,869 pages. Per-system, per-split prices are in [leaderboard.csv](leaderboard.csv) (`Cost_Per_Page`, `Cost_Short`, `Cost_Medium`, `Cost_Long`, in dollars per page).
+To manage the data manually:
 
-</details>
+```bash
+# ExtractBench
+uv run extract-bench download            # full dataset
+uv run extract-bench download --test     # 6-document test dataset
+uv run extract-bench status              # check readiness and show summary statistics
 
-## Available Pipelines
+# ExtractBench Pro
+uv run extract-bench download --dataset pro
+uv run extract-bench status --dataset pro
+```
 
-A **pipeline** is an extraction system or configuration you want to evaluate. Run `uv run extract-bench pipelines` for the live list, or see [docs/pipelines.md](docs/pipelines.md).
+Each download writes a `<stem>.pdf` and `<stem>.test.json` per document and records the Hugging Face revision in a manifest. Re-running `download` resumes an incomplete download or refreshes a changed dataset.
 
-<details>
-<summary><strong>Paper baselines (the 14 systems on the leaderboard)</strong></summary>
+## Pipelines
 
-| Pipeline name | Name in paper |
-|---------------|---------------|
-| `llamaextract_agentic_plus` | LlamaExtract Agentic Plus |
-| `llamaextract_agentic` | LlamaExtract Agentic |
-| `llamaextract_cost_effective` | LlamaExtract Cost-Effective |
-| `reducto_deep_extract` | Reducto Deep Extract |
-| `extend_extract_max` | Extend (Max Context) |
-| `datalab_parse_accurate_extract_balanced` | Datalab (Accurate + Balanced) |
-| `codex_code_extract_gpt_5_5_low` | Codex (GPT-5.5) |
-| `claude_code_extract_opus_4_8` | Claude Code (Opus 4.8) |
-| `qwen3_6_35b_a3b_fp8_vllm_extract_oneshot_structured_output_file` | Qwen3.6 35B (self-hosted) |
-| `gemma4_26b_vllm_extract_oneshot_structured_output_file` | Gemma4 26B (self-hosted) |
-| `nuextract3_extract` | NuExtract3 (self-hosted) |
-| `lift_extract` | Lift Datalab 9B (self-hosted) |
-| `gemini_3_5_flash_extract_oneshot_structured_output_file` | Google Gemini 3.5 Flash |
-| `openai_gpt_5_4_nano_extract_oneshot_structured_output_file` | OpenAI GPT-5.4 Nano |
-
-The four self-hosted pipelines need an endpoint you run yourself; see [.env.example](.env.example). Other configurations of the same systems are registered too (`reducto_extract`, `extend_extract`, `codex_code_extract_gpt_5_5_high`, the two-stage parse baselines, and more). Run `uv run extract-bench pipelines` for the full roster.
-
-The three LlamaExtract leaderboard pipelines select Extract v2.6 with citations enabled and no custom Parse configuration. All three return word-level citation boxes.
-
-</details>
+A **pipeline** is an extraction system or configuration you want to evaluate. Run `uv run extract-bench pipelines` for the live list, or see [docs/pipelines.md](docs/pipelines.md). The pipeline names behind each leaderboard row are listed in [ExtractBench: leaderboard pipelines](docs/extractbench.md#leaderboard-pipelines) and [ExtractBench Pro: leaderboard pipelines](docs/extractbench-pro.md#leaderboard-pipelines).
 
 > [!NOTE]
 > `claude_code_extract_*` and `codex_code_extract_*` run a coding agent on your machine, so they execute local shell commands against benchmark documents. Run them in a container or VM. Every other pipeline is an ordinary API call.
 
 The parse and layout-detection rosters inherited from [ParseBench](https://github.com/run-llama/ParseBench) are still registered and runnable by name; list them with `extract-bench pipelines --parse`, `--layout`, or `--all`. They are hidden from the default listing because this benchmark scores extraction; the two-stage extract pipelines use them internally as their parse stage.
 
-## Dataset
-
-Hosted on HuggingFace: [`llamaindex/ExtractBench`](https://huggingface.co/datasets/llamaindex/ExtractBench)
-
-The benchmark is split by document length, with one JSONL row per (document, schema) test case plus the source PDFs:
-
-| Split | File | Documents | Pages | Length |
-|-------|------|----------:|------:|--------|
-| **Short** | `short.jsonl` | 252 | 615 | ≤10 pages |
-| **Medium** | `medium.jsonl` | 98 | 2,438 | 11–50 pages |
-| **Long** | `long.jsonl` | 20 | 1,816 | >50 pages |
-| **Total** | | **370** | **4,869** | |
-
-The benchmark spans 8 business domains and 67 document types: finance and fund holdings, energy-sector regulatory forms, government procurement and customs, auto valuation, supply chain, healthcare remittance, legal and bankruptcy filings, and real estate.
-
-<details>
-<summary><strong>Tag axes, sources, and ground truth</strong></summary>
-
-**What each task challenge tests:**
-
-- **T1: long-list completeness.** Recover *every* record of a repeated structure that can span many pages. Typical failures are truncation, duplicated or merged rows, hallucinated records, and values attached to the wrong record.
-- **T2: needle-in-haystack.** Find a small number of requested facts in a long document. T2 has few target records but many plausible mentions, only one of which is canonical; failures are missed targets, wrong occurrences, and unnormalized paraphrases.
-- **T3: dense documents.** Fill many fields from a document dense with labels, blanks, checkboxes, handwriting, and scan artifacts. The characteristic failure is over-extraction, inventing a value for a field that is actually blank, compounded by missed checkboxes and mislabeled fields.
-
-A document can carry more than one task challenge.
-
-The other axes are tagged independently of the task challenge:
-
-- **Table structure** — S1 merged headers, S2 header not at top / pivoted, S3 cross-page table, S4 enormous table, S5 table within a cell.
-- **Perception challenge** — P1 rotated or image-only capture, P2 scanned page images, and P3 handwriting. 38 documents are degraded re-captures of documents that also appear clean, so capture degradation is a paired measurement on the same documents.
-- **Business domain** — D1 finance (145), D2 energy (98), D3 government (49), D4 automotive (27), D5 supply chain (20), D6 healthcare (15), D7 legal (10), D8 real estate (6).
-
-**Sources.** All documents come from public records: SEC and regulatory filings, government procurement and customs forms, court and agency exhibits (including tax forms such as W-2, 1040, K-1, and 1099-B), Texas Railroad Commission energy filings, and published business documents. 325 are real; 45 are synthetic long lists rendered from real layouts. PDF metadata has been stripped from every file.
-
-**Ground truth** uses a method matched to each source: adjudicated agreement across independent extraction systems for real documents, values fixed before rendering for synthetic long lists, and human-verified values and boxes for forms. Each field's ground truth is an *evidence list* — the expected value plus any alternate acceptable readings, each with its source location — and scoring accepts a match against any listed reading.
-
-</details>
-
-The dataset is automatically downloaded when you run a pipeline. To manage it manually:
-
-```bash
-# Download the full dataset
-uv run extract-bench download
-
-# Download a small test dataset (6 documents, good for trying things out)
-uv run extract-bench download --test
-
-# Check whether the dataset has been downloaded and show summary statistics
-uv run extract-bench status
-```
-
-## ExtractBench Pro
-
-[ExtractBench Pro](https://huggingface.co/datasets/llamaindex/ExtractBenchPro) contains 100 documents across six challenges: document conventions, house vocabulary, house counting rules, drawn relations, charts inside documents, and long chart sheets. It uses the same evaluator as ExtractBench. See the [Pro leaderboard](#extractbench-pro-leaderboard) or [submit results](#submitting-results). Read the [ExtractBench Pro launch post](https://www.llamaindex.ai/blog/introducing-extractbench-pro) for the challenges and results.
-
-Download the PDFs, schemas, ground truth, and scoring rules into the layout the harness reads:
-
-```bash
-git clone https://github.com/run-llama/ExtractBench
-cd ExtractBench
-uv sync
-uv run extract-bench download --dataset pro
-uv run extract-bench status --dataset pro
-```
-
-Pro is stored in `data-pro/`, separate from original ExtractBench in `data/`. Each challenge has its own directory, with a `.pdf` and `.test.json` for each document. The download manifest records the Hugging Face revision. Re-running `download` resumes an incomplete download or refreshes a changed dataset.
-
-To evaluate a system, install its provider extra and set its API key as described in [Configuration](#configuration). For example:
-
-```bash
-uv sync --extra llamaextract
-uv run extract-bench run llamaextract_agentic --dataset pro
-uv run extract-bench serve output-pro/llamaextract_agentic
-```
-
-Inference calls the selected provider's paid API. `run --dataset pro` downloads the dataset automatically if needed and keeps results in `output-pro/`, separate from original ExtractBench results. To run just one challenge, add `--group house_vocabulary` (or another challenge name from the [dataset card](https://huggingface.co/datasets/llamaindex/ExtractBenchPro#challenge-subsets)). Pro does not currently have a `--test` subset.
-
 ## Metrics
 
-ExtractBench reports one metric for value accuracy and two for grounding. We score the grounding metrics only on fields that carry verified box ground truth.
+Both benchmarks use the same deterministic evaluator: one metric for value accuracy and two for grounding. We score the grounding metrics only on fields that carry verified box ground truth.
 
 - **Unified value F1** — whether the extracted *values* match the expected output, under one definition for scalar fields and arrays of records. Each output is flattened into cells, one per scalar field and per aligned record subfield, and a cell is correct when it matches its expected counterpart after normalization. Precision, recall, and F1 are computed over these cells per document; slices report unweighted document means.
 - **Word-level grounding F1** — a field is grounded-correct only when its value is accepted *and* its predicted box overlaps any accepted box on its evidence list, at IoU 0.5.
@@ -297,14 +218,16 @@ Failed and missing documents score zero rather than being dropped, so a pipeline
 
 ### Running the Benchmark
 
-The `run` command runs inference, evaluates against ground truth, and generates reports:
+The `run` command runs inference, evaluates against ground truth, and generates reports. Add `--dataset pro` to any of these to run ExtractBench Pro:
 
 ```bash
 # Evaluate an extraction system on the whole benchmark
 uv run extract-bench run <pipeline_name>
+uv run extract-bench run <pipeline_name> --dataset pro
 
-# Evaluate a single split only (short, medium, long)
+# Evaluate a single split (ExtractBench) or challenge (Pro) only
 uv run extract-bench run <pipeline_name> --group short
+uv run extract-bench run <pipeline_name> --dataset pro --group house_vocabulary
 
 # Skip calling the extraction system — just re-evaluate existing results
 uv run extract-bench run <pipeline_name> --skip_inference
@@ -312,21 +235,28 @@ uv run extract-bench run <pipeline_name> --skip_inference
 # Control how many documents are processed in parallel
 uv run extract-bench run <pipeline_name> --max_concurrent 10
 
-# Run on the small test dataset only
+# Run on the small ExtractBench test dataset only
 uv run extract-bench run <pipeline_name> --test
 ```
 
+For a reproducible submission order (`--shuffle_seed`), a cap on concurrent source pages (`--max_concurrent_pages`), and row identity hints in annotations, see [docs/advanced-usage.md](docs/advanced-usage.md).
+
 ### Viewing & Comparing Results
+
+Pipeline names resolve to `output/<name>`; pass `output-pro/<name>` paths for Pro results.
 
 ```bash
 # View reports in your browser (needed because browsers block PDF rendering from file:// URLs)
 uv run extract-bench serve <pipeline_name>
+uv run extract-bench serve output-pro/<pipeline_name>
 
 # Compare two extraction systems side-by-side
 uv run extract-bench compare <pipeline_a> <pipeline_b>
+uv run extract-bench compare output-pro/<pipeline_a> output-pro/<pipeline_b>
 
 # Generate a leaderboard across all evaluated systems
 uv run extract-bench leaderboard
+uv run extract-bench leaderboard --output_dir output-pro
 
 # Leaderboard for specific systems only
 uv run extract-bench leaderboard llamaextract_agentic llamaextract_cost_effective
@@ -347,8 +277,6 @@ uv run extract-bench evaluation run output/<pipeline_name> --test_cases_dir data
 # Generate detailed HTML report from evaluation results
 uv run extract-bench analysis generate_report --evaluation_dir ./output/<pipeline_name>
 ```
-
-For `.test.json` annotations, `_identity_hints` can declare row identity beside `data_schema`, for example `"_identity_hints": {"holdings": ["cusip"]}`. Array-record metrics use these hints to partition top-level arrays only when the residual assignment exceeds 100 million cells after exact-row matching. Each bucket keeps the same cap; smaller assignments remain keyless. Hints are evaluation-only and are not added to the schema sent to providers.
 
 </details>
 
@@ -407,11 +335,13 @@ Advanced subcommands: `inference`, `evaluation`, `analysis`, `pipeline`, `data`
 <details>
 <summary><strong>Output Structure</strong></summary>
 
+ExtractBench results go to `output/`, with one directory per split. Pro results go to `output-pro/`, with one directory per challenge.
+
 ```
-output/
+output/                                     # output-pro/ for ExtractBench Pro
 ├── _leaderboard.html                       # Cross-pipeline leaderboard
 └── <pipeline_name>/
-    ├── short/
+    ├── short/                              # one directory per split or challenge
     │   ├── *.result.json                    # Inference results
     │   ├── _evaluation_report.json          # Evaluation summary
     │   ├── _evaluation_report_detailed.html # Interactive detailed report
@@ -474,35 +404,7 @@ src/extract_bench/
 
 ## Links
 
-- **HuggingFace Dataset**: [llamaindex/ExtractBench](https://huggingface.co/datasets/llamaindex/ExtractBench)
+- **ExtractBench dataset**: [llamaindex/ExtractBench](https://huggingface.co/datasets/llamaindex/ExtractBench) · [details](docs/extractbench.md) · [launch post](https://www.llamaindex.ai/blog/introducing-extractbench)
+- **ExtractBench Pro dataset**: [llamaindex/ExtractBenchPro](https://huggingface.co/datasets/llamaindex/ExtractBenchPro) · [details](docs/extractbench-pro.md) · [launch post](https://www.llamaindex.ai/blog/introducing-extractbench-pro) · [extractbenchpro.ai](https://extractbenchpro.ai)
 - **Code**: [run-llama/ExtractBench](https://github.com/run-llama/ExtractBench)
 - **ParseBench**: [run-llama/ParseBench](https://github.com/run-llama/ParseBench) — A Document Parsing Benchmark for AI Agents
-
-### Reproducible submission order
-
-Pass `--shuffle_seed 0` to `extract-bench run`, `pipeline run`, or `inference run`
-to shuffle test cases after sorting their IDs. The same seed and selected IDs give
-all pipelines the same planned order, independent of filesystem discovery order.
-Omit the flag to preserve discovery order. Each inference output directory saves
-`_submission_order.json` with the seed and ordered IDs; cached results are still
-skipped normally. Parallel requests can complete in a different order.
-
-### Limit concurrent source pages
-
-With the `local` (or `runners`) extra installed, add `--max_concurrent_pages 100`
-alongside `--max_concurrent 8` to bound both documents and source PDF pages.
-The default is no page limit. This option requires readable, unencrypted PDFs;
-all source page counts are checked before any submissions.
-
-Admission follows input order (or the seeded shuffle). It waits for the next
-PDF to fit rather than backfilling smaller PDFs. A PDF larger than the page
-budget runs alone. Capacity stays reserved through provider processing,
-polling, and retries; cached documents consume no capacity. Document errors
-are recorded and subsequent documents continue. These limits bound local
-attempts: timed-out remote jobs may still be running after capacity is released.
-
-Each run saves `_admission_plan.json` (limits and source page counts) and
-`_admission_events.jsonl` (timestamped admissions, releases, and active counts).
-Resuming archives the previous plan and event log under `_admission_history/`
-before creating the current session's files, including when cached documents
-are skipped. These describe client admission, not backend worker capacity.
