@@ -1,11 +1,14 @@
 # ExtractBench
 
+**ExtractBench** &nbsp;
 [![Website](https://img.shields.io/badge/Website-extractbench.ai-blue)](https://www.extractbench.ai/)
 [![arXiv](https://img.shields.io/badge/arXiv-2607.29677-b31b1b.svg)](https://arxiv.org/abs/2607.29677)
-[![Dataset](https://img.shields.io/badge/HuggingFace-ExtractBench-yellow)](https://huggingface.co/datasets/llamaindex/ExtractBench)
-[![Pro Dataset](https://img.shields.io/badge/HuggingFace-ExtractBench_Pro-yellow)](https://huggingface.co/datasets/llamaindex/ExtractBenchPro)
+[![Dataset](https://img.shields.io/badge/HuggingFace-Dataset-yellow)](https://huggingface.co/datasets/llamaindex/ExtractBench)
 [![Papers with Code:ExtractBench](https://paperswithcode.co/api/v1/papers/2607.29677/leaderboard-badge.svg?eval=35030&live=1)](https://paperswithcode.co/api/v1/papers/2607.29677/leaderboard-badge-link?eval=35030)
-[![License](https://img.shields.io/badge/License-Apache_2.0-green.svg)](LICENSE)
+<br>
+**ExtractBench Pro** &nbsp;
+[![Website](https://img.shields.io/badge/Website-extractbench.ai%2Fpro-blue)](https://www.extractbench.ai/pro/)
+[![Dataset](https://img.shields.io/badge/HuggingFace-Dataset-yellow)](https://huggingface.co/datasets/llamaindex/ExtractBenchPro)
 
 **ExtractBench** is a benchmark for **schema-guided extraction** from enterprise documents. Given a document and a user-defined JSON Schema, a system must return schema-valid JSON with the correct values, *every* record of each repeated structure, missing fields marked `null` rather than invented, and source evidence for each value.
 
@@ -405,6 +408,6 @@ src/extract_bench/
 ## Links
 
 - **ExtractBench dataset**: [llamaindex/ExtractBench](https://huggingface.co/datasets/llamaindex/ExtractBench) · [details](docs/extractbench.md) · [launch post](https://www.llamaindex.ai/blog/introducing-extractbench)
-- **ExtractBench Pro dataset**: [llamaindex/ExtractBenchPro](https://huggingface.co/datasets/llamaindex/ExtractBenchPro) · [details](docs/extractbench-pro.md) · [launch post](https://www.llamaindex.ai/blog/introducing-extractbench-pro) · [extractbenchpro.ai](https://extractbenchpro.ai)
+- **ExtractBench Pro dataset**: [llamaindex/ExtractBenchPro](https://huggingface.co/datasets/llamaindex/ExtractBenchPro) · [details](docs/extractbench-pro.md) · [launch post](https://www.llamaindex.ai/blog/introducing-extractbench-pro) · [website](https://www.extractbench.ai/pro/)
 - **Code**: [run-llama/ExtractBench](https://github.com/run-llama/ExtractBench)
 - **ParseBench**: [run-llama/ParseBench](https://github.com/run-llama/ParseBench) — A Document Parsing Benchmark for AI Agents

@@ -3,7 +3,7 @@
 Details specific to ExtractBench Pro. Installation, download, usage, metrics and configuration shared with ExtractBench are in the [README](../README.md).
 
 - **Dataset:** [`llamaindex/ExtractBenchPro`](https://huggingface.co/datasets/llamaindex/ExtractBenchPro)
-- **Website:** [extractbenchpro.ai](https://extractbenchpro.ai)
+- **Website:** [extractbench.ai/pro](https://www.extractbench.ai/pro/)
 - **Launch post:** [Introducing ExtractBench Pro](https://www.llamaindex.ai/blog/introducing-extractbench-pro)
 - **Leaderboard:** [README](../README.md#extractbench-pro-leaderboard), full table with per-challenge rows in [leaderboard-pro.csv](../leaderboard-pro.csv)
 
