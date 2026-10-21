@@ -36,6 +36,13 @@ def progress(*items: Any) -> None:
     print(datetime.now(UTC).isoformat(), *items, flush=True)
 
 
+def validate_source_splits(snapshot: Path, splits: Sequence[str]) -> None:
+    expected = {f"{split}.jsonl" for split in splits}
+    actual = {path.name for path in snapshot.glob("*.jsonl")}
+    if actual != expected:
+        raise ValueError(f"HF JSONL splits differ from the dataset configuration: {actual ^ expected}")
+
+
 def validate_task(task: Path, row: Mapping[str, Any], source_pdf: Path) -> None:
     """Compare exported inputs/references directly to their source JSONL row."""
     expected = {
@@ -113,6 +120,7 @@ def smoke(output: Path, extractbench_revision: str = "main", pro_revision: str =
         raise RuntimeError("Expected one checkout wheel; use a fresh output directory")
     wheel = wheels[0]
     wheel_hash = digest(wheel)
+    lock_hash = digest(checkout / "uv.lock")
     api = HfApi()
     data_summaries = []
     container_summaries = []
@@ -137,6 +145,7 @@ def smoke(output: Path, extractbench_revision: str = "main", pro_revision: str =
                 ],
             )
         )
+        validate_source_splits(snapshot, config.splits)
         exported = output / "exported" / dataset / revision
         manifest = export_snapshot(snapshot, exported, dataset, revision, scorer_revision)
         rows = {}
@@ -161,14 +170,17 @@ def smoke(output: Path, extractbench_revision: str = "main", pro_revision: str =
             progress(dataset, index, "/", len(rows), row["id"], "START")
             validate_task(task, row, snapshot / row["pdf"])
             with fitz.open(task / "environment/document.pdf") as pdf:
-                if pdf.page_count == 0 or pdf.is_encrypted:
+                if pdf.page_count == 0 or pdf.needs_pass:
                     raise ValueError(f"{row['id']}: PDF has no readable pages")
                 pages = pdf.page_count
             # Exact wheel/reference hashes permit interrupted runs to resume,
             # while any data or scorer change forces regrading.
             key = hashlib.sha256(
                 (
-                    wheel_hash + entry["files"]["tests/reference.test.json"] + entry["files"]["solution/expected.json"]
+                    wheel_hash
+                    + lock_hash
+                    + entry["files"]["tests/reference.test.json"]
+                    + entry["files"]["solution/expected.json"]
                 ).encode()
             ).hexdigest()
             receipt = output / "audit" / dataset / task_id / f"{key}.json"
@@ -195,6 +207,7 @@ def smoke(output: Path, extractbench_revision: str = "main", pro_revision: str =
                 "dataset": dataset,
                 "source_revision": revision,
                 "wheel_sha256": wheel_hash,
+                "dependency_lock_sha256": lock_hash,
                 "published_tasks_checked": published,
                 "cases": case_summaries,
             }

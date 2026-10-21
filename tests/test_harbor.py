@@ -274,3 +274,12 @@ def test_smoke_container_build_context_uses_the_wheel_built_from_the_checkout(tm
     smoke["container_task"](source, target, wheel)
     assert (target / "tests" / wheel.name).read_bytes() == wheel.read_bytes()
     assert f'"/tests/{wheel.name}"' in (target / "tests/Dockerfile").read_text()
+
+
+def test_smoke_rejects_unregistered_hf_splits_instead_of_silently_skipping_their_cases(snapshot):
+    smoke = runpy.run_path(str(Path(__file__).parents[1] / "scripts/smoke_harbor.py"))
+    splits = dataset_config().splits
+    smoke["validate_source_splits"](snapshot, splits)
+    (snapshot / "new_split.jsonl").write_text('{"id": "new_split/unvalidated"}\n')
+    with pytest.raises(ValueError, match="HF JSONL splits differ"):
+        smoke["validate_source_splits"](snapshot, splits)
