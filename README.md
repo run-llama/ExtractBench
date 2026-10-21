@@ -295,25 +295,6 @@ Failed and missing documents score zero rather than being dropped, so a pipeline
 
 ## Usage
 
-### Using the Harbor datasets
-
-[ExtractBench](https://huggingface.co/datasets/llamaindex/ExtractBench) and
-[ExtractBench Pro](https://huggingface.co/datasets/llamaindex/ExtractBenchPro) are
-available as Harbor tasks. With Harbor 0.24.0+, Docker, Git LFS, and your model's
-API credentials configured, these commands download the tasks and run an agent:
-
-```bash
-git lfs install
-harbor run --repo https://huggingface.co/datasets/llamaindex/ExtractBench -p tasks \
-  -a codex -m MODEL --allow-agent-host MODEL_API_HOST
-harbor run --repo https://huggingface.co/datasets/llamaindex/ExtractBenchPro -p tasks \
-  -a codex -m MODEL --allow-agent-host MODEL_API_HOST
-```
-
-Replace `MODEL` and `MODEL_API_HOST` with your model and its API hostname. Add
-`-l 1 -n 1` to try a single task. See [Harbor usage](docs/harbor.md) for downloading
-without running, local runs, and scoring details.
-
 ### Running the Benchmark
 
 The `run` command runs inference, evaluates against ground truth, and generates reports:
@@ -383,6 +364,25 @@ To add a new extraction system, use [Claude Code](https://claude.ai/code):
 This creates the provider, registers the pipeline, and updates docs. The skill definition lives in [`.claude/commands/integrate-pipeline.md`](.claude/commands/integrate-pipeline.md) and can be adapted for other AI coding agents.
 
 </details>
+
+### Harbor
+
+[ExtractBench](https://huggingface.co/datasets/llamaindex/ExtractBench) and
+[ExtractBench Pro](https://huggingface.co/datasets/llamaindex/ExtractBenchPro) are
+available as Harbor tasks. With Harbor 0.24.0+, Docker, Git LFS, and your model's
+API credentials configured, these commands download the tasks and run an agent:
+
+```bash
+git lfs install
+harbor run --repo https://huggingface.co/datasets/llamaindex/ExtractBench -p tasks \
+  -a codex -m <model_name> --allow-agent-host <model_api_host>
+harbor run --repo https://huggingface.co/datasets/llamaindex/ExtractBenchPro -p tasks \
+  -a codex -m <model_name> --allow-agent-host <model_api_host>
+```
+
+Replace `<model_name>` and `<model_api_host>` with your model and its API hostname. Add
+`-l 1 -n 1` to try a single task. See [Harbor usage](docs/harbor.md) for downloading
+without running, local runs, and scoring details.
 
 ## Configuration
 

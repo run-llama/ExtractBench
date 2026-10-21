@@ -15,17 +15,17 @@ uv tool install harbor==0.24.0
 git lfs install
 
 harbor run --repo https://huggingface.co/datasets/llamaindex/ExtractBench -p tasks \
-  -a codex -m MODEL --allow-agent-host MODEL_API_HOST
+  -a codex -m <model_name> --allow-agent-host <model_api_host>
 
 harbor run --repo https://huggingface.co/datasets/llamaindex/ExtractBenchPro -p tasks \
-  -a codex -m MODEL --allow-agent-host MODEL_API_HOST
+  -a codex -m <model_name> --allow-agent-host <model_api_host>
 ```
 
 Harbor downloads the repository's tasks and runs the selected agent/model. Add
 `-l 1 -n 1` to run one task before evaluating the full dataset. Model runs use
 your provider's API and are billed by that provider.
 
-Replace `MODEL` with your model identifier and `MODEL_API_HOST` with the model
+Replace `<model_name>` with your model identifier and `<model_api_host>` with the model
 endpoint's hostname, such as `api.openai.com`. Repeat `--allow-agent-host` only
 for additional required model API hosts. During extraction, other network
 destinations are blocked, including public dataset hosts. Setup can install the
@@ -46,7 +46,7 @@ Run the downloaded tasks by replacing `--repo ... -p tasks` with the local path:
 
 ```bash
 harbor run -p extractbench-harbor/tasks \
-  -a codex -m MODEL --allow-agent-host MODEL_API_HOST
+  -a codex -m <model_name> --allow-agent-host <model_api_host>
 ```
 
 For a one-task check without model calls, use the reference solution:
@@ -57,7 +57,7 @@ harbor run -p extractbench-harbor/tasks -a oracle -l 1 -n 1
 
 The oracle checks that packaging and grading work; it does not measure extraction
 ability. For reproducible evaluations, pin remote repositories with
-`--repo https://huggingface.co/datasets/llamaindex/ExtractBench@COMMIT` and retain
+`--repo https://huggingface.co/datasets/llamaindex/ExtractBench@<commit>` and retain
 the Harbor job configuration and dataset's `harbor-manifest.json`.
 
 ## Scoring and outputs
