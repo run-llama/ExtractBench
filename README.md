@@ -295,8 +295,24 @@ Failed and missing documents score zero rather than being dropped, so a pipeline
 
 ## Usage
 
-For Harbor task generation, the published coding-agent prompt, and verifier
-validation, see [Harbor datasets](docs/harbor.md).
+### Using the Harbor datasets
+
+[ExtractBench](https://huggingface.co/datasets/llamaindex/ExtractBench) and
+[ExtractBench Pro](https://huggingface.co/datasets/llamaindex/ExtractBenchPro) are
+available as Harbor tasks. With Harbor 0.24.0+, Docker, Git LFS, and your model's
+API credentials configured, these commands download the tasks and run an agent:
+
+```bash
+git lfs install
+harbor run --repo https://huggingface.co/datasets/llamaindex/ExtractBench -p tasks \
+  -a codex -m MODEL --allow-agent-host MODEL_API_HOST
+harbor run --repo https://huggingface.co/datasets/llamaindex/ExtractBenchPro -p tasks \
+  -a codex -m MODEL --allow-agent-host MODEL_API_HOST
+```
+
+Replace `MODEL` and `MODEL_API_HOST` with your model and its API hostname. Add
+`-l 1 -n 1` to try a single task. See [Harbor usage](docs/harbor.md) for downloading
+without running, local runs, and scoring details.
 
 ### Running the Benchmark
 
