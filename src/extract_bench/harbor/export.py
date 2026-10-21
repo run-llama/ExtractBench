@@ -154,7 +154,8 @@ def export_snapshot(snapshot: Path, output: Path, dataset: str, revision: str, s
 
 ## Harbor
 
-Requires Harbor 0.24.0 or later and Docker. Run the tasks directly from this repository:
+Requires Harbor 0.24.0 or later, Git with Git LFS, and Docker.
+Run `git lfs install` before the first use, then run the tasks directly from this repository:
 
 ```bash
 harbor run --repo https://huggingface.co/datasets/{config.repo} -p tasks -a codex -m MODEL

@@ -47,7 +47,9 @@ names are bounded lowercase slugs with a source-ID hash to avoid collisions.
 
 ## Run and validate
 
-Install Harbor 0.24.0 or later and start Docker. For a local packaging smoke test:
+Install Harbor 0.24.0 or later and start Docker. Remote `--repo` runs also require
+Git LFS; install it and run `git lfs install` before the first remote run so the
+source PDFs are downloaded. For a local packaging smoke test:
 
 ```bash
 harbor run -p output/harbor/ExtractBench/tasks -a oracle -l 1 -n 1
