@@ -64,6 +64,12 @@ harbor run --repo https://huggingface.co/datasets/llamaindex/ExtractBench -p tas
 harbor run --repo https://huggingface.co/datasets/llamaindex/ExtractBenchPro -p tasks -a codex -m MODEL
 ```
 
+`uv run python scripts/smoke_harbor.py` runs both agents on one real case from
+each dataset and checks the trial rewards, including Harbor's per-trial errors
+(a job process can exit successfully despite a failed trial). The `Harbor smoke`
+PR check runs this on a clean Docker runner. Its reduced fixtures are only for
+testing and must not be published as full datasets.
+
 These remote commands become usable when the generated tasks are published.
 For evaluation, pin a dataset repository commit with Harbor's `@COMMIT` syntax
 and preserve the Harbor job configuration alongside the export manifest.
