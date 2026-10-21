@@ -11,7 +11,7 @@ Install Harbor 0.24.0 or later, Git with Git LFS, and start Docker. Configure yo
 model provider's API credentials for Harbor, then run:
 
 ```bash
-uv tool install harbor==0.24.0
+uv tool install harbor
 git lfs install
 
 harbor run --repo https://huggingface.co/datasets/llamaindex/ExtractBench -p tasks \
