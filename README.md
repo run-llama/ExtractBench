@@ -102,14 +102,16 @@ Rows are ordered by % Perfect, then Value F1, then lower cost.
 | 3 | LlamaExtract Agentic Plus | LlamaExtract | 38 | <u>77.70</u> | 60.39 | 7.50¢ |
 | 4 | Extend Operator | Specialized APIs | 34 | 73.87 | 57.75 | 9.88¢ |
 | 5 | Claude Code Sonnet 5.5 | Coding Agents | 32 | 73.62 | 40.47 | 19.98¢ |
-| 6 | LlamaExtract Agentic | LlamaExtract | 20 | 71.32 | 58.01 | 3.12¢ |
-| 7 | Pulse Effort | Specialized APIs | 18 | 70.53 | 18.74 | 10.50¢ |
-| 8 | Codex GPT-6.1 Sol | Coding Agents | 12 | 74.06 | <u>63.96</u> | 13.86¢ |
-| 9 | Reducto Deep | Specialized APIs | 3 | 56.35 | 42.20 | 6.18¢ |
-| 10 | Datalab Accurate | Specialized APIs | 2 | 43.93 | 0.32 | 15.75¢ |
+| 6 | Gemini CLI (Gemini 4 Argon Medium) | Coding Agents | 30 | 42.44 | 33.90 | 18.16¢ |
+| 7 | LlamaExtract Agentic | LlamaExtract | 20 | 71.32 | 58.01 | 3.12¢ |
+| 8 | Pulse Effort | Specialized APIs | 18 | 70.53 | 18.74 | 10.50¢ |
+| 9 | Codex GPT-6.1 Sol | Coding Agents | 12 | 74.06 | <u>63.96</u> | 13.86¢ |
+| 10 | Reducto Deep | Specialized APIs | 3 | 56.35 | 42.20 | 6.18¢ |
 
-Top 10 of 12 systems — full table in [leaderboard-pro.csv](leaderboard-pro.csv).
+Top 10 of 13 systems — full table in [leaderboard-pro.csv](leaderboard-pro.csv).
 <!-- PRO_LEADERBOARD:END -->
+
+Gemini CLI costs are estimates; its [submission report](submissions/gemini-4-argon/README.md) details cost accounting and the 30-minute cutoff.
 
 ### Submitting results
 

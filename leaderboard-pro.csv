@@ -83,3 +83,10 @@ Datalab Accurate,Specialized APIs,house_counting_rules,12,9,0.00,45.78,0.00,0.00
 Datalab Accurate,Specialized APIs,drawn_relations,20,19,0.00,33.48,1.32,18.57,0.038200
 Datalab Accurate,Specialized APIs,charts_inside_documents,25,10,4.00,42.63,0.00,0.00,0.019400
 Datalab Accurate,Specialized APIs,long_chart_sheets,7,7,0.00,0.00,0.00,0.00,1.260000
+Gemini CLI (Gemini 4 Argon Medium),Coding Agents,all,100,81,30.00,42.44,33.90,35.81,0.181650
+Gemini CLI (Gemini 4 Argon Medium),Coding Agents,document_conventions,22,22,9.09,13.49,12.70,12.78,0.078295
+Gemini CLI (Gemini 4 Argon Medium),Coding Agents,house_vocabulary,14,14,50.00,50.00,31.24,35.19,0.046008
+Gemini CLI (Gemini 4 Argon Medium),Coding Agents,house_counting_rules,12,9,16.67,40.93,22.22,22.22,0.052237
+Gemini CLI (Gemini 4 Argon Medium),Coding Agents,drawn_relations,20,19,45.00,59.95,57.05,59.29,0.065557
+Gemini CLI (Gemini 4 Argon Medium),Coding Agents,charts_inside_documents,25,10,36.00,58.29,70.00,70.00,0.113076
+Gemini CLI (Gemini 4 Argon Medium),Coding Agents,long_chart_sheets,7,7,14.29,14.29,6.45,14.29,1.576212
