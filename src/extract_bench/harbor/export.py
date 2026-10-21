@@ -136,7 +136,7 @@ def export_snapshot(snapshot: Path, output: Path, dataset: str, revision: str, s
         "scorer_revision": scorer_revision,
         "prompt_source": PAPER_URL,
         "reward": "extract_unified_value_f1",
-        "agent_timeout_sec": 1800 if dataset == "pro" else 1200,
+        "agent_timeout_sec": 1800,
         "source_files": {},
         "tasks": {},
     }

@@ -131,9 +131,8 @@ an error status. A failed grader removes stale feedback and produces no reward.
 
 The published prompt does not ask for citations, so this lane does not report
 grounding quality. It does not impose a new schema-validation penalty beyond
-the existing evaluator. Timeouts are 1,200 seconds for original ExtractBench
-(the paper's coding-agent protocol) and 1,800 seconds for Pro (its released
-benchmark limit). Verifier time is separate from agent time.
+the existing evaluator. Both original ExtractBench and Pro allow 1,800 seconds
+per document for the agent. Verifier time is separate from agent time.
 
 Before publishing, validate all task configurations, compare representative
 predictions through the normal evaluator and verifier, run the oracle and nop
