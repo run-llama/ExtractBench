@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import shutil
 import subprocess
 from datetime import UTC, datetime
@@ -18,7 +19,7 @@ from huggingface_hub import hf_hub_download
 from extract_bench.data.download import dataset_config
 from extract_bench.harbor.export import export_snapshot
 
-SCORER = "741c1b651e8851c1bd3424ac4d41b643b9e41761"
+SCORER = "2f27f100730afc7c395602e26a2a87e07ea66b31"
 CASES = (
     ("extractbench", "51bf3a03eb7feeaef8952be1fc2fc7f924ee72dc", "short/dd1155_schedule_continuation_0002"),
     ("pro", "16f6672e06cf77491ec6d18c817d67864b90d845", "house_counting_rules/vendor_statement_reconciliation_01"),
@@ -84,6 +85,14 @@ def smoke(output: Path) -> None:
             rewards = verdict["verifier_result"]["rewards"]
             if verdict["exception_info"] is not None or rewards != {"reward": expected}:
                 raise RuntimeError(f"{name}: expected reward {expected}, got {verdict}")
+            feedback = json.loads((trial.parent / "verifier/feedback.json").read_text())
+            if agent == "oracle":
+                if len(feedback["cells"]) == 0 or not math.isclose(
+                    sum(cell["f1_credit"] for cell in feedback["cells"]), expected
+                ):
+                    raise RuntimeError(f"{name}: cell credits do not explain the reward")
+            elif feedback["status"] != "invalid_submission" or len(feedback["cells"]) != 0:
+                raise RuntimeError(f"{name}: missing output has misleading feedback")
             summaries.append({"dataset": dataset, "case_id": case_id, "agent": agent, "reward": expected})
             print(datetime.now(UTC).isoformat(), name, "COMPLETE", rewards, flush=True)
     (output / "container-smokes.json").write_text(json.dumps(summaries, indent=2) + "\n", encoding="utf-8")

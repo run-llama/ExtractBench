@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - src/extract_bench/harbor/**
+      - src/extract_bench/evaluation/evaluators/extract.py
+      - src/extract_bench/evaluation/metrics/extract/unified_evidence_metric.py
       - tests/test_harbor.py
       - scripts/smoke_harbor.py
       - .github/workflows/harbor.yml

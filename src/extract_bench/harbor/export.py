@@ -165,6 +165,10 @@ Instructions reproduce the [published coding-agent prompt]({PAPER_URL}), with a 
 Agents receive only `document.pdf` and `schema.json` and write `output.json`.
 The separate verifier uses the existing ExtractBench evaluator at commit `{scorer_revision}`.
 The reward is Value F1 in [0, 1]; `metrics.json` also records perfect-document status.
+`feedback.json` records aligned output/reference cell paths, value outcomes, and
+each matched cell's contribution to the same F1 reward. Paths refer to normalized
+scoring inputs; one-sided cells contribute to the denominator. This feedback does
+not change the reward or assign credit to reasoning steps.
 This prompt does not request citations, so this lane does not measure grounding.
 The agent timeout is {manifest["agent_timeout_sec"]} seconds per document.
 

@@ -8,6 +8,7 @@ from unittest.mock import patch
 import pytest
 
 from extract_bench.data.download import dataset_config
+from extract_bench.evaluation.metrics.extract.unified_evidence_metric import ValueCell, compute_unified_evidence_metrics
 from extract_bench.harbor.export import export_snapshot
 from extract_bench.harbor.publish import publish
 from extract_bench.harbor.verifier import verify
@@ -78,6 +79,11 @@ def test_verifier_honors_acceptable_values_and_order_insensitive_alignment(tmp_p
     report = verify(test_json, prediction, tmp_path / "logs")
     assert report["value_f1"] == 1.0
     assert report["perfect"] == 1
+    feedback = json.loads((tmp_path / "logs/feedback.json").read_text())
+    cells = {cell["output_path"]: cell for cell in feedback["cells"]}
+    assert cells["rows[1].value"]["reference_path"] == "rows[0].value"
+    assert cells["rows[1].value"]["outcome"] == "matched"
+    assert sum(cell["f1_credit"] for cell in cells.values()) == pytest.approx(report["value_f1"])
     prediction.write_text(json.dumps({"rows": [{"id": "A", "value": 7}]}))
     assert 0 < verify(test_json, prediction, tmp_path / "logs")["value_f1"] < 1
 
@@ -91,15 +97,108 @@ def test_invalid_submission_scores_zero_without_reusing_previous_reward(tmp_path
     report = verify(tmp_path / "reference.test.json", prediction, tmp_path)
     assert report["status"] == "invalid_submission"
     assert float((tmp_path / "reward.txt").read_text()) == 0.0
+    feedback = json.loads((tmp_path / "feedback.json").read_text())
+    assert feedback["status"] == "invalid_submission"
+    assert feedback["cells"] == []
 
 
 def test_broken_reference_fails_grading_instead_of_assigning_model_zero(tmp_path):
     prediction = tmp_path / "output.json"
     prediction.write_text('{"answer": 42}')
     (tmp_path / "reward.txt").write_text("1")
+    (tmp_path / "feedback.json").write_text('{"status": "scored"}')
     with pytest.raises((ValueError, FileNotFoundError)):
         verify(tmp_path / "missing.test.json", prediction, tmp_path)
     assert not (tmp_path / "reward.txt").exists()
+    assert not (tmp_path / "feedback.json").exists()
+
+
+@pytest.mark.parametrize("side", ["reference", "prediction"])
+def test_value_cells_cover_nested_unmatched_rows_and_opaque_arrays_without_changing_scores(side):
+    """Grounding-only observers lose uncited cells; realigning subtrees can misattribute reordered rows."""
+    schema = {
+        "type": "object",
+        "properties": {
+            "groups": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "id": {"type": "string"},
+                        "details": {"type": "object", "properties": {"n": {"type": "integer"}}},
+                        "values": {
+                            "type": "array",
+                            "items": {"type": "object", "properties": {"n": {"type": "integer"}}},
+                        },
+                    },
+                },
+            },
+            "tags": {"type": "array", "items": {"type": "string"}},
+            "defaulted": {"type": "string", "default": "same"},
+            "absent": {"type": "string"},
+        },
+    }
+    expected = {
+        "groups": [
+            {"id": "A", "details": {"n": 1}, "values": [{"n": 10}, {"n": 20}]},
+            {"id": "B", "details": {"n": 2}, "values": [{"n": 30}]},
+        ],
+        "tags": ["x", "y"],
+    }
+    actual = {
+        "groups": [
+            {"id": "B", "details": {"n": 2}, "values": [{"n": 30}]},
+            {"id": "A", "details": {"n": 999}, "values": [{"n": 20}, {"n": 10}]},
+        ],
+        "tags": ["wrong"],
+    }
+    one_sided = {"id": "C", "details": {"n": 3}, "values": [{"n": 40}]}
+    (expected if side == "reference" else actual)["groups"].append(one_sided)
+    cells: list[ValueCell] = []
+    metrics = compute_unified_evidence_metrics(expected, actual, [], data_schema=schema, value_cells=cells)
+    assert metrics == compute_unified_evidence_metrics(expected, actual, [], data_schema=schema)
+    metadata = next(metric.metadata for metric in metrics if metric.metric_name == "extract_unified_value_f1")
+    assert sum(cell.gt_path is not None for cell in cells) == metadata["expected_cells"]
+    assert sum(cell.pred_path is not None for cell in cells) == metadata["predicted_cells"]
+    assert sum(cell.value_correct for cell in cells) == metadata["v_correct"]
+    assert ValueCell("groups[0].values[0].n", "groups[1].values[1].n", True) in cells
+    assert ValueCell("groups[0].details.n", "groups[1].details.n", False) in cells
+    assert ValueCell("tags", "tags", False) in cells
+    assert ValueCell("defaulted", "defaulted", True) in cells
+    assert all(cell.gt_path != "absent" and cell.pred_path != "absent" for cell in cells)
+    unpaired = [cell for cell in cells if cell.gt_path is None or cell.pred_path is None]
+    assert len(unpaired) == 3
+    assert all((cell.pred_path is None) == (side == "reference") for cell in unpaired)
+
+
+def test_feedback_reports_one_sided_cells_and_does_not_assign_credit_to_wrong_values(tmp_path):
+    reference = tmp_path / "reference.test.json"
+    reference.write_text(
+        json.dumps(
+            {
+                "data_schema": {
+                    "type": "object",
+                    "properties": {name: {"type": "integer"} for name in ("ok", "wrong", "missing")},
+                },
+                "expected_output": {"ok": 1, "wrong": 2, "missing": 3},
+            }
+        )
+    )
+    prediction = tmp_path / "output.json"
+    prediction.write_text(json.dumps({"ok": 1, "wrong": 999, "extra": 4}))
+    report = verify(reference, prediction, tmp_path / "logs")
+    feedback = json.loads((tmp_path / "logs/feedback.json").read_text())
+    cells = {cell["output_path"] or cell["reference_path"]: cell for cell in feedback["cells"]}
+    assert {name: cell["outcome"] for name, cell in cells.items()} == {
+        "ok": "matched",
+        "wrong": "value_differs",
+        "missing": "reference_only",
+        "extra": "prediction_only",
+    }
+    assert cells["missing"]["output_path"] is None
+    assert cells["extra"]["reference_path"] is None
+    assert all(cell["f1_credit"] == 0 for name, cell in cells.items() if name != "ok")
+    assert sum(cell["f1_credit"] for cell in cells.values()) == pytest.approx(report["value_f1"])
 
 
 def test_export_rejects_case_ids_that_escape_tasks_directory(tmp_path, snapshot):
