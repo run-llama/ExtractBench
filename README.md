@@ -37,7 +37,7 @@ Scores are percentages; costs are USD. The best score in each metric is **bold**
 <summary><strong>Metric details</strong></summary>
 
 - **Value F1:** F1 of extracted values, averaged across documents. Each document has equal weight, regardless of its length.
-- **Grounding F1:** requires both a correct value and correct evidence: the predicted box must overlap an accepted evidence box at IoU 0.5 or higher (word level). **Page-level grounding F1** requires only the correct source page. Grounding is evaluated on the subset with verified ground-truth evidence for the corresponding metric.
+- **Grounding F1:** requires both a correct value and correct evidence: the predicted box must overlap an accepted evidence box at IoU 0.5 or higher (word level). Grounding is evaluated on the subset with verified ground-truth evidence for the corresponding metric.
 - **% Perfect:** percentage of documents with 100% Value F1.
 
 Failed documents and Pro documents exceeding the 30-minute limit score zero.
@@ -221,7 +221,7 @@ Failed and missing documents score zero rather than being dropped, so a pipeline
 
 ### Running the Benchmark
 
-The `run` command runs inference, evaluates against ground truth, and generates reports. Add `--dataset pro` to any of these to run ExtractBench Pro:
+The `run` command runs inference, evaluates against ground truth, and generates reports. Add `--dataset pro` to run ExtractBench Pro:
 
 ```bash
 # Evaluate an extraction system on the whole benchmark
@@ -341,10 +341,10 @@ Advanced subcommands: `inference`, `evaluation`, `analysis`, `pipeline`, `data`
 ExtractBench results go to `output/`, with one directory per split. Pro results go to `output-pro/`, with one directory per challenge.
 
 ```
-output/                                     # output-pro/ for ExtractBench Pro
-├── _leaderboard.html                       # Cross-pipeline leaderboard
+output/                                      # output-pro/ for ExtractBench Pro
+├── _leaderboard.html                        # Cross-pipeline leaderboard
 └── <pipeline_name>/
-    ├── short/                              # one directory per split or challenge
+    ├── short/                               # one directory per split or challenge
     │   ├── *.result.json                    # Inference results
     │   ├── _evaluation_report.json          # Evaluation summary
     │   ├── _evaluation_report_detailed.html # Interactive detailed report
