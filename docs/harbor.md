@@ -77,7 +77,7 @@ update without matching task regeneration fails.
 One case per dataset also runs oracle/nop through Harbor, including checks for
 per-trial errors (a job can exit successfully despite a failed trial).
 
-The `Harbor smoke` workflow runs on relevant PRs/main changes, daily, and on
+The `Harbor smoke` workflow runs on relevant PRs/main changes and on
 manual dispatch. Its artifacts record resolved HF revisions, the tested wheel
 hash, per-case results, and container results. Exact wheel/reference hashes
 permit interrupted local audits to resume. Use `--extractbench-revision` and
