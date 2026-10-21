@@ -66,11 +66,25 @@ harbor run --repo https://huggingface.co/datasets/llamaindex/ExtractBench -p tas
 harbor run --repo https://huggingface.co/datasets/llamaindex/ExtractBenchPro -p tasks -a codex -m MODEL
 ```
 
-`uv run python scripts/smoke_harbor.py` runs both agents on one real case from
-each dataset and checks the trial rewards, including Harbor's per-trial errors
-(a job process can exit successfully despite a failed trial). The `Harbor smoke`
-PR check runs this on a clean Docker runner. Its reduced fixtures are only for
-testing and must not be published as full datasets.
+`uv run --with pymupdf==1.26.6 python scripts/smoke_harbor.py` resolves the current
+HF `main` revisions on every run. It exports and validates every case: source
+JSONL preservation, PDF readability, schema/reference agreement, perfect
+reference rewards, and cell-credit accounting. It builds a wheel from the
+current checkout and installs that wheel in the smoke verifier containers.
+When the HF revision contains published Harbor tasks, their hashes, coverage,
+inputs, and references are also checked against the current HF rows, so a data
+update without matching task regeneration fails.
+One case per dataset also runs oracle/nop through Harbor, including checks for
+per-trial errors (a job can exit successfully despite a failed trial).
+
+The `Harbor smoke` workflow runs on relevant PRs/main changes, daily, and on
+manual dispatch. Its artifacts record resolved HF revisions, the tested wheel
+hash, per-case results, and container results. Exact wheel/reference hashes
+permit interrupted local audits to resume. Use `--extractbench-revision` and
+`--pro-revision` to reproduce a reported revision; defaults track `main`.
+These checks establish data/export/scorer consistency, not an independent
+annotation review against the PDFs. Smoke container tasks install a local wheel
+and must not be published as dataset tasks.
 
 These remote commands become usable when the generated tasks are published.
 For evaluation, pin a dataset repository commit with Harbor's `@COMMIT` syntax

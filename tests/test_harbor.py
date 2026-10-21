@@ -1,7 +1,10 @@
 """Contracts at the JSONL → sandbox → existing evaluator boundaries."""
 
 import json
+import runpy
+import shutil
 import tomllib
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -226,3 +229,48 @@ def test_publish_opens_pr_without_overwriting_source_data_and_refuses_modified_t
         with pytest.raises(ValueError, match="changed after generation"):
             publish(output)
         api.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "damaged", ["environment/schema.json", "environment/document.pdf", "tests/reference.test.json"]
+)
+def test_smoke_rejects_exported_inputs_or_references_that_disagree_with_the_hf_row(tmp_path, snapshot, damaged):
+    smoke = runpy.run_path(str(Path(__file__).parents[1] / "scripts/smoke_harbor.py"))
+    output = tmp_path / "export"
+    manifest = export_snapshot(snapshot, output, "extractbench", "a" * 40, "b" * 40)
+    task_id = next(iter(manifest["tasks"]))
+    task = output / "tasks" / task_id
+    row = json.loads((snapshot / "short.jsonl").read_text())
+    smoke["validate_task"](task, row, snapshot / row["pdf"])
+    (task / damaged).write_bytes(b"{}" if damaged.endswith(".json") else b"%PDF-another-document")
+    with pytest.raises(ValueError, match="differs"):
+        smoke["validate_task"](task, row, snapshot / row["pdf"])
+
+
+def test_smoke_rejects_published_tasks_when_source_jsonl_changed_without_regeneration(tmp_path, snapshot):
+    smoke = runpy.run_path(str(Path(__file__).parents[1] / "scripts/smoke_harbor.py"))
+    output = tmp_path / "published"
+    export_snapshot(snapshot, output, "extractbench", "a" * 40, "b" * 40)
+    shutil.copytree(snapshot / "docs", output / "docs")
+    files = [f"{split}.jsonl" for split in dataset_config().splits]
+    rows = {row["id"]: row for file in files for row in [json.loads((snapshot / file).read_text())]}
+    smoke["validate_published"](output, rows, files)
+    path = output / "short.jsonl"
+    row = json.loads(path.read_text())
+    row["expected_output"] = json.dumps({"rows": []})
+    path.write_text(json.dumps(row) + "\n")
+    with pytest.raises(ValueError, match="source hashes"):
+        smoke["validate_published"](output, rows, files)
+
+
+def test_smoke_container_build_context_uses_the_wheel_built_from_the_checkout(tmp_path):
+    """A stale image/package install would exercise a different scorer than the checkout."""
+    smoke = runpy.run_path(str(Path(__file__).parents[1] / "scripts/smoke_harbor.py"))
+    source = tmp_path / "task"
+    (source / "tests").mkdir(parents=True)
+    wheel = tmp_path / "checkout_build-1.0.0-py3-none-any.whl"
+    wheel.write_bytes(b"checkout wheel contents")
+    target = tmp_path / "container-task"
+    smoke["container_task"](source, target, wheel)
+    assert (target / "tests" / wheel.name).read_bytes() == wheel.read_bytes()
+    assert f'"/tests/{wheel.name}"' in (target / "tests/Dockerfile").read_text()
