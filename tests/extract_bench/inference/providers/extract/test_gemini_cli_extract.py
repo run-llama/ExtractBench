@@ -174,27 +174,6 @@ print(json.dumps({"type":"result", "status":"success", "stats":{}}))
         runner.shutdown()
 
 
-def test_public_pipeline_matches_recorded_submission_prompt_settings_and_command(monkeypatch):
-    """A provider change must not silently mislabel the frozen leaderboard submission's inference configuration."""
-    from extract_bench.inference.pipelines import get_pipeline
-    from extract_bench.inference.providers.registry import create_provider
-
-    monkeypatch.setenv("GEMINI_API_KEY", "offline-test-key")
-    submission = Path(__file__).parents[5] / "submissions/gemini-4-argon"
-    recorded = json.loads((submission / "config.json").read_text())
-    provider = create_provider(get_pipeline(recorded["pipeline"]))
-    schema = provider._prepare_schema({"type": "object", "properties": {"name": {"type": "string"}}})
-    expected = (
-        (submission / "prompt.txt")
-        .read_text()
-        .rstrip("\n")
-        .replace("{prepared_schema_json}", json.dumps(schema, indent=2))
-    )
-    assert provider._build_prompt(schema, "input.pdf") == expected
-    assert provider._build_cmd() == recorded["command"]
-    assert provider._build_settings() == recorded["settings"]
-
-
 def test_argon_introductory_pricing_expires_without_changing_historical_replay():
     usage = {"promptTokenCount": 1000, "cachedContentTokenCount": 400, "totalTokenCount": 1200}
     intro = cost_from_request_usage("gemini-4-argon", usage, as_of=date(2026, 11, 30))

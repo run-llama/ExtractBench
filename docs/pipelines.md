@@ -31,7 +31,7 @@ uv run extract-bench run <pipeline_name>
 | `*_extract_twostage_parse_agentic_structured_output_text` | OpenAI / Gemini / Anthropic | LlamaParse agentic markdown → text extract; cost totals parse + extract |
 | `deepseek_v4_pro_extract_twostage_parse_agentic_structured_output_text` | DeepSeek (Fireworks) | two-stage text extract |
 | `kimi_k3_extract_oneshot_structured_output_file` | Kimi K3 (Fireworks) | one-shot vision (rasterized pages), json_object mode; uses `FIREWORKS_API_KEY` |
-| `gemini_cli_extract_gemini_4_argon_medium_thinking_vision_evidence` | Gemini CLI 0.59.0 | Argon medium thinking with page/box citations; [setup and accounting](../submissions/gemini-4-argon/README.md#run-the-pipeline) |
+| `gemini_cli_extract_gemini_4_argon_medium_thinking_vision_evidence` | Gemini CLI 0.59.0 | Argon medium thinking with page/box citations; [setup](#gemini-cli) |
 | `claude_code_extract_opus_4_8` / `claude_code_extract_opus_5_5` | Claude Code CLI | agentic extraction; cost from CLI `total_cost_usd`; Opus 5.5 needs CLI 2.1.280+ |
 | `codex_code_extract_gpt_5_4_low` / `codex_code_extract_gpt_5_5_low` / `codex_code_extract_gpt_5_5_high` | Codex CLI | agentic extraction; cost estimated from token usage |
 | `claude_code_extract_opus_4_8_evidence` / `claude_code_extract_opus_5_5_evidence` | Claude Code CLI | agentic extraction with page and box citations in `citations.json` |
@@ -83,6 +83,24 @@ Copy `.env.example` to `.env` and fill in the API keys / endpoints for the provi
 ```bash
 cp .env.example .env
 ```
+
+### Gemini CLI
+
+With Node.js 20+ installed:
+
+```bash
+uv sync --extra google
+npm install -g @google/gemini-cli@0.59.0
+export GEMINI_API_KEY="your-google-api-key"
+uv run extract-bench run gemini_cli_extract_gemini_4_argon_medium_thinking_vision_evidence \
+  --dataset pro --max_concurrent 1
+```
+
+Run coding-agent pipelines in a container or VM: they execute local shell commands. This pipeline uses medium thinking, an isolated CLI home, local tools and `citations.json` evidence. The runner enforces a 1,800-second deadline without restarting failed documents. `max_cost_usd` is a post-hoc flag, not a spending limit.
+
+Requests use Google's native Gemini API. To use a native Gemini-compatible gateway, set `GOOGLE_GEMINI_BASE_URL` and any required `GEMINI_CLI_CUSTOM_HEADERS` (`name: value, name: value`). Credentials remain in the recorder, outside CLI/tool subprocess environments.
+
+Incremental JSONL journals under the output directory's `traces/` contain prompts, CLI events, native request/response content, timing, usage and outcomes. Each event is flushed and synced; use a durable output volume to survive machine loss. Costs include helper models, thinking tokens and observed failed-request usage. Missing usage stays unknown: `known_cost_usd` records the measured subtotal, while `total_cost_usd` is populated only when accounting is complete. Separate attempts have separate journals; include all applicable attempts when reporting total spend.
 
 ---
 
