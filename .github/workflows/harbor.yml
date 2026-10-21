@@ -3,7 +3,11 @@ name: Harbor smoke
 on:
   pull_request:
     paths:
-      - src/extract_bench/**
+      - src/extract_bench/harbor/**
+      - src/extract_bench/data/**
+      - src/extract_bench/evaluation/**
+      - src/extract_bench/test_cases/**
+      - src/extract_bench/schemas/**
       - tests/test_harbor.py
       - scripts/smoke_harbor.py
       - pyproject.toml
@@ -12,7 +16,11 @@ on:
   push:
     branches: [main]
     paths:
-      - src/extract_bench/**
+      - src/extract_bench/harbor/**
+      - src/extract_bench/data/**
+      - src/extract_bench/evaluation/**
+      - src/extract_bench/test_cases/**
+      - src/extract_bench/schemas/**
       - scripts/smoke_harbor.py
       - pyproject.toml
       - uv.lock

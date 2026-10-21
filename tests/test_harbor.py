@@ -91,6 +91,21 @@ def test_verifier_honors_acceptable_values_and_order_insensitive_alignment(tmp_p
     assert 0 < verify(test_json, prediction, tmp_path / "logs")["value_f1"] < 1
 
 
+def test_refresh_replaces_old_harbor_sections_without_removing_other_card_sections(tmp_path, snapshot):
+    """Exporting an existing HF overlay must not retain duplicate, stale scorer instructions."""
+    card = snapshot / "README.md"
+    card.write_text(card.read_text() + "\n## Harbor\nstale scorer\n\n## License\nKeep this.\n\n## Harbor\nolder\n")
+    output = tmp_path / "export"
+    export_snapshot(snapshot, output, "extractbench", "a" * 40, "b" * 40)
+    refreshed = (output / "README.md").read_text()
+    assert refreshed.count("\n## Harbor\n") == 1
+    assert "stale scorer" not in refreshed and "older" not in refreshed
+    assert "## License\nKeep this." in refreshed
+    card.write_text(refreshed)
+    export_snapshot(snapshot, output, "extractbench", "a" * 40, "b" * 40)
+    assert (output / "README.md").read_text() == refreshed
+
+
 @pytest.mark.parametrize("submission", [None, "{broken", "[]"])
 def test_invalid_submission_scores_zero_without_reusing_previous_reward(tmp_path, submission):
     prediction = tmp_path / "output.json"
@@ -263,17 +278,25 @@ def test_smoke_rejects_published_tasks_when_source_jsonl_changed_without_regener
         smoke["validate_published"](output, rows, files)
 
 
-def test_smoke_container_build_context_uses_the_wheel_built_from_the_checkout(tmp_path):
-    """A stale image/package install would exercise a different scorer than the checkout."""
+def test_smoke_keeps_production_dockerfile_scaffolding_and_installs_the_checkout_wheel(tmp_path, snapshot):
+    """Replacing the whole Dockerfile would hide broken production setup from the smoke."""
     smoke = runpy.run_path(str(Path(__file__).parents[1] / "scripts/smoke_harbor.py"))
-    source = tmp_path / "task"
-    (source / "tests").mkdir(parents=True)
+    output = tmp_path / "export"
+    export_snapshot(snapshot, output, "extractbench", "a" * 40, "b" * 40)
+    source = next((output / "tasks").iterdir())
+    dockerfile = source / "tests/Dockerfile"
+    dockerfile.write_text(dockerfile.read_text() + "RUN echo additional-production-setup\n")
+    production = dockerfile.read_text()
     wheel = tmp_path / "checkout_build-1.0.0-py3-none-any.whl"
     wheel.write_bytes(b"checkout wheel contents")
     target = tmp_path / "container-task"
     smoke["container_task"](source, target, wheel)
     assert (target / "tests" / wheel.name).read_bytes() == wheel.read_bytes()
-    assert f'"/tests/{wheel.name}"' in (target / "tests/Dockerfile").read_text()
+    smoke_dockerfile = (target / "tests/Dockerfile").read_text()
+    assert f'"/tmp/{wheel.name}"' in smoke_dockerfile
+    requirement = "llama-extract-bench @ git+https://github.com/run-llama/ExtractBench.git@" + "b" * 40
+    restored = smoke_dockerfile.replace(f"COPY {wheel.name} /tmp/{wheel.name}\n", "")
+    assert restored.replace(f"/tmp/{wheel.name}", requirement) == production
 
 
 def test_smoke_rejects_unregistered_hf_splits_instead_of_silently_skipping_their_cases(snapshot):

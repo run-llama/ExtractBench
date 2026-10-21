@@ -66,6 +66,8 @@ def validate_task(task: Path, row: Mapping[str, Any], source_pdf: Path) -> None:
     config = tomllib.loads((task / "task.toml").read_text())
     if config["metadata"]["source_case_id"] != row["id"] or config["verifier"]["environment_mode"] != "separate":
         raise ValueError(f"{row['id']}: task configuration does not identify/isolate its case")
+    if config["agent"].get("network_mode") != "allowlist" or config["agent"].get("allowed_hosts") != []:
+        raise ValueError(f"{row['id']}: agent network policy permits external data access")
     case = load_extract_test_case(reference, source_file=source_pdf)
     if json.loads((task / "solution/expected.json").read_text()) != case.expected_output:
         raise ValueError(f"{row['id']}: oracle differs from the normal loader's reference")
@@ -76,11 +78,38 @@ def container_task(source: Path, target: Path, wheel: Path) -> None:
     shutil.copytree(source, target, dirs_exist_ok=True)
     tests = target / "tests"
     shutil.copyfile(wheel, tests / wheel.name)
-    (tests / "Dockerfile").write_text(
-        "FROM python:3.12-slim-bookworm\n"
-        "WORKDIR /app\nCOPY . /tests/\n"
-        f'RUN pip install --no-cache-dir "/tests/{wheel.name}" "parse-bench==1.0.4"\n',
-        encoding="utf-8",
+    config = tomllib.loads((source / "task.toml").read_text())
+    requirement = json.dumps(
+        "llama-extract-bench @ git+https://github.com/run-llama/ExtractBench.git@"
+        + config["metadata"]["scorer_revision"]
+    )
+    dockerfile = (tests / "Dockerfile").read_text()
+    if dockerfile.count(requirement) != 1:
+        raise ValueError("Expected exactly one pinned scorer requirement in the production Dockerfile")
+    # Copy only the package before pip install, preserving the shared dependency
+    # layer across documents in production instead of copying references first.
+    install = "RUN pip install --no-cache-dir " + requirement
+    dockerfile = dockerfile.replace(install, f"COPY {wheel.name} /tmp/{wheel.name}\n" + install)
+    (tests / "Dockerfile").write_text(dockerfile.replace(requirement, json.dumps(f"/tmp/{wheel.name}")))
+    # Execute inside Harbor's agent phase, under the same policy as a coding agent.
+    # An unauthenticated HEAD checks connectivity without making a model call.
+    solve = target / "solution/solve.sh"
+    solve.write_text(
+        "#!/bin/bash\nset -euo pipefail\n"
+        "curl --noproxy '*' -sS -I --connect-timeout 10 --max-time 30 https://api.openai.com/ >/dev/null\n"
+        "python - <<'PY'\n"
+        "import socket, ssl\n"
+        "tls = ssl._create_unverified_context()\n"
+        "for host in ('huggingface.co', 'github.com', '1.1.1.1'):\n"
+        "    try:\n"
+        "        with socket.create_connection((host, 443), timeout=3) as connection:\n"
+        "            with tls.wrap_socket(connection, server_hostname=host):\n"
+        "                pass\n"
+        "    except OSError:\n"
+        "        continue\n"
+        "    raise RuntimeError(f'Agent can reach forbidden destination: {host}')\n"
+        "print('Model host reachable; dataset hosts and direct IP blocked', flush=True)\n"
+        "PY\n" + solve.read_text()
     )
 
 
@@ -230,6 +259,8 @@ def smoke(output: Path, extractbench_revision: str = "main", pro_revision: str =
                     str(task),
                     "-a",
                     agent,
+                    "--allow-agent-host",
+                    "api.openai.com",
                     "-n",
                     "1",
                     "--jobs-dir",

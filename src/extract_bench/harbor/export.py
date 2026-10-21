@@ -79,6 +79,8 @@ tags = {json.dumps(row.get("tags", []))}
 
 [agent]
 timeout_sec = {timeout}
+network_mode = "allowlist"
+allowed_hosts = []
 
 [environment]
 cpus = 2
@@ -92,6 +94,7 @@ timeout_sec = 1800
 [verifier.environment]
 cpus = 2
 memory_mb = 8192
+network_mode = "no-network"
 """
 
 
@@ -150,6 +153,7 @@ def export_snapshot(snapshot: Path, output: Path, dataset: str, revision: str, s
     card = (snapshot / "README.md").read_text(encoding="utf-8")
     if "\n- harbor\n" not in card:
         card = card.replace("tags:\n", "tags:\n- rl-environment\n- harbor\n", 1)
+    card = re.sub(r"(?ms)^## Harbor[ \t]*\n.*?(?=^## |\Z)", "", card).rstrip()
     card += f"""
 
 ## Harbor
@@ -158,11 +162,17 @@ Requires Harbor 0.24.0 or later, Git with Git LFS, and Docker.
 Run `git lfs install` before the first use, then run the tasks directly from this repository:
 
 ```bash
-harbor run --repo https://huggingface.co/datasets/{config.repo} -p tasks -a codex -m MODEL
+harbor run --repo https://huggingface.co/datasets/{config.repo} -p tasks \\
+  -a codex -m MODEL --allow-agent-host MODEL_API_HOST
 ```
 
 Instructions reproduce the [published coding-agent prompt]({PAPER_URL}), with a standardized document filename.
 Agents receive only `document.pdf` and `schema.json` and write `output.json`.
+During agent execution, network access is denied except for explicitly allowed
+model API hosts. Set `MODEL_API_HOST` to the hostname of your model endpoint;
+repeat `--allow-agent-host` only for additional required model API hosts.
+Do not allow dataset hosts, public proxies, or broad IP ranges. Setup can download
+agent tools before extraction begins; the separate verifier runs without networking.
 The separate verifier uses the existing ExtractBench evaluator at commit `{scorer_revision}`.
 The reward is Value F1 in [0, 1]; `metrics.json` also records perfect-document status.
 `feedback.json` records aligned output/reference cell paths, value outcomes, and

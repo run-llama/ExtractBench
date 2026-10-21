@@ -62,20 +62,30 @@ an extraction agent can solve the case. `-a nop` exercises missing output, which
 must receive zero. Real extraction runs use the desired agent and model, e.g.:
 
 ```bash
-harbor run --repo https://huggingface.co/datasets/llamaindex/ExtractBench -p tasks -a codex -m MODEL
-harbor run --repo https://huggingface.co/datasets/llamaindex/ExtractBenchPro -p tasks -a codex -m MODEL
+harbor run --repo https://huggingface.co/datasets/llamaindex/ExtractBench -p tasks -a codex -m MODEL --allow-agent-host MODEL_API_HOST
+harbor run --repo https://huggingface.co/datasets/llamaindex/ExtractBenchPro -p tasks -a codex -m MODEL --allow-agent-host MODEL_API_HOST
 ```
+
+Set `MODEL_API_HOST` to your model endpoint's hostname (for example,
+`api.openai.com`), repeating the flag only for additional required model API
+hosts. The agent phase denies all other network destinations, including public
+dataset hosts. Do not allow public proxies or broad IP ranges. Setup can install
+the coding agent before this restriction takes effect. The separate verifier
+runs without networking. Harbor rejects backends that cannot enforce the policy.
 
 `uv run --with pymupdf==1.26.6 python scripts/smoke_harbor.py` resolves the current
 HF `main` revisions on every run. It exports and validates every case: source
 JSONL preservation, PDF readability, schema/reference agreement, perfect
 reference rewards, and cell-credit accounting. It builds a wheel from the
-current checkout and installs that wheel in the smoke verifier containers.
+current checkout and substitutes only that package source in the production
+verifier Dockerfile.
 When the HF revision contains published Harbor tasks, their hashes, coverage,
 inputs, and references are also checked against the current HF rows, so a data
 update without matching task regeneration fails.
 One case per dataset also runs oracle/nop through Harbor, including checks for
-per-trial errors (a job can exit successfully despite a failed trial).
+per-trial errors (a job can exit successfully despite a failed trial). The oracle
+also checks that its allowed model API host is reachable without credentials,
+while Hugging Face, GitHub, and a direct public IP are blocked during execution.
 
 The `Harbor smoke` workflow runs on relevant PRs/main changes and on
 manual dispatch. Its artifacts record resolved HF revisions, the tested wheel
