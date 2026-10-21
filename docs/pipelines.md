@@ -31,6 +31,7 @@ uv run extract-bench run <pipeline_name>
 | `*_extract_twostage_parse_agentic_structured_output_text` | OpenAI / Gemini / Anthropic | LlamaParse agentic markdown → text extract; cost totals parse + extract |
 | `deepseek_v4_pro_extract_twostage_parse_agentic_structured_output_text` | DeepSeek (Fireworks) | two-stage text extract |
 | `kimi_k3_extract_oneshot_structured_output_file` | Kimi K3 (Fireworks) | one-shot vision (rasterized pages), json_object mode; uses `FIREWORKS_API_KEY` |
+| `gemini_cli_extract_gemini_4_argon_medium_thinking_vision_evidence` | Gemini CLI 0.59.0 | Argon medium thinking with page/box citations; [setup and accounting](../submissions/gemini-4-argon/README.md#run-the-pipeline) |
 | `claude_code_extract_opus_4_8` / `claude_code_extract_opus_5_5` | Claude Code CLI | agentic extraction; cost from CLI `total_cost_usd`; Opus 5.5 needs CLI 2.1.280+ |
 | `codex_code_extract_gpt_5_4_low` / `codex_code_extract_gpt_5_5_low` / `codex_code_extract_gpt_5_5_high` | Codex CLI | agentic extraction; cost estimated from token usage |
 | `claude_code_extract_opus_4_8_evidence` / `claude_code_extract_opus_5_5_evidence` | Claude Code CLI | agentic extraction with page and box citations in `citations.json` |

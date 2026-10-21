@@ -274,6 +274,14 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
     # documents. Run them in a container or VM.
     register_fn(
         _pipeline_spec(
+            pipeline_name="gemini_cli_extract_gemini_4_argon_medium_thinking_vision_evidence",
+            provider_name="gemini_cli_extract",
+            config={"model": "gemini-4-argon", "thinking_level": "medium", "evidence_mode": True, "max_cost_usd": 5.0},
+            per_file_timeout=1800,
+        )
+    )
+    register_fn(
+        _pipeline_spec(
             pipeline_name="claude_code_extract_opus_4_8",
             provider_name="claude_code_extract",
             config={"model": "claude-opus-4-8", "bare": True},

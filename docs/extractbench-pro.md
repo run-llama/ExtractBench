@@ -76,7 +76,7 @@ Pro has no `--test` subset. To try a pipeline on a smaller slice, run a single c
 | `llamaextract_cost_effective` | LlamaExtract Cost Effective |
 | `codex_code_extract_gpt_6_luna_medium_evidence_prompt_opt` | Codex GPT-6 Luna |
 
-See [pipelines.md](pipelines.md) for registered configurations. The Gemini CLI submission records an external harness configuration and includes an offline score replay.
+See [pipelines.md](pipelines.md) for registered configurations. The [Gemini CLI submission](../submissions/gemini-4-argon/README.md) includes a runnable pipeline and an offline score replay.
 
 ## Cost of a full run
 

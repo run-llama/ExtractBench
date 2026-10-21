@@ -85,7 +85,7 @@ runners = [
 llamaextract = ["llama-cloud>=1.4.1", "httpx>=0.28.0"]
 openai = ["openai>=1.0.0", "pdf2image>=1.16.0", "pillow>=10.0.0", "pymupdf>=1.24.0", "pypdf>=6.4.0"]
 anthropic = ["anthropic>=0.77.1", "pdf2image>=1.16.0", "pillow>=10.0.0", "pymupdf>=1.24.0", "pypdf>=6.4.0"]
-google = ["google-genai>=1.0.0", "pdf2image>=1.16.0", "pillow>=10.0.0", "pymupdf>=1.24.0", "pypdf>=6.4.0"]
+google = ["google-genai>=1.0.0", "httpx>=0.28.0", "pdf2image>=1.16.0", "pillow>=10.0.0", "pymupdf>=1.24.0", "pypdf>=6.4.0"]
 # Self-hosted open-weight models served over an OpenAI-compatible endpoint (vLLM).
 openweights = ["openai>=1.0.0", "pdf2image>=1.16.0", "pillow>=10.0.0", "pymupdf>=1.24.0", "pypdf>=6.4.0"]
 reducto = ["reductoai>=0.13.0"]

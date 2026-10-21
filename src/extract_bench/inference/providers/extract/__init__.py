@@ -23,6 +23,7 @@ _PROVIDER_MODULES = [
     "extend",
     "extend_operator",
     "gemini_direct",
+    "gemini_cli_extract",
     "glm_extract",
     "glm_zai_extract",
     "kimi_extract",

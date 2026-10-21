@@ -196,7 +196,7 @@ Each download writes a `<stem>.pdf` and `<stem>.test.json` per document and reco
 A **pipeline** is an extraction system or configuration you want to evaluate. Run `uv run extract-bench pipelines` for the live list, or see [docs/pipelines.md](docs/pipelines.md). The pipeline names behind each leaderboard row are listed in [ExtractBench: leaderboard pipelines](docs/extractbench.md#leaderboard-pipelines) and [ExtractBench Pro: leaderboard pipelines](docs/extractbench-pro.md#leaderboard-pipelines).
 
 > [!NOTE]
-> `claude_code_extract_*` and `codex_code_extract_*` run a coding agent on your machine, so they execute local shell commands against benchmark documents. Run them in a container or VM. Every other pipeline is an ordinary API call.
+> `claude_code_extract_*`, `codex_code_extract_*`, and `gemini_cli_extract_*` run a coding agent on your machine, so they execute local shell commands against benchmark documents. Run them in a container or VM. Every other pipeline is an ordinary API call.
 
 The parse and layout-detection rosters inherited from [ParseBench](https://github.com/run-llama/ParseBench) are still registered and runnable by name; list them with `extract-bench pipelines --parse`, `--layout`, or `--all`. They are hidden from the default listing because this benchmark scores extraction; the two-stage extract pipelines use them internally as their parse stage.
 

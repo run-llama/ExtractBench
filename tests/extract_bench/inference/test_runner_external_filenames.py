@@ -77,6 +77,7 @@ def test_provider_sees_random_name_but_saved_request_keeps_source_path(tmp_path:
     source = tmp_path / "acme_invoice_2024.pdf"
     source.write_text("same bytes")
     runner, provider = _runner("openai_extract")
+    runner.output_dir = tmp_path / "output"
 
     raw = runner._run_provider_inference(_request(source))
 
@@ -95,5 +96,6 @@ def test_opted_out_pipeline_passes_the_original_path(tmp_path: Path) -> None:
     source = tmp_path / "acme_invoice_2024.pdf"
     source.write_text("x")
     runner, provider = _runner("openai_extract", {"randomize_external_filename": False})
+    runner.output_dir = tmp_path / "output"
     runner._run_provider_inference(_request(source))
     assert provider.seen_paths == [str(source)]

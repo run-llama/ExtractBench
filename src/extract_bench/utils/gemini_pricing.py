@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+from datetime import UTC, date, datetime
+from typing import Any
+
 # Gemini pricing: USD per million tokens (input, output).
 # Thinking tokens are billed at the output token rate.
 # Source: https://ai.google.dev/gemini-api/docs/pricing (2026-03-25)
@@ -65,3 +69,31 @@ def _longest_prefix_match(
 ) -> tuple[float, float]:
     matches = [(prefix, rates) for prefix, rates in pricing.items() if model.startswith(prefix)]
     return max(matches, key=lambda item: len(item[0]))[1] if matches else default
+
+
+def cost_from_request_usage(model: str, usage: Mapping[str, Any], *, as_of: date | None = None) -> float | None:
+    """Price native CLI requests, including hidden thinking; unsupported accounting stays unknown.
+
+    Argon introductory rates end 2026-11-30:
+    https://ai.google.dev/gemini-api/docs/latest-model
+    The CLI's Flash and Pro helpers use the shared standard Gemini pricing maps.
+    """
+    if any(type(usage.get(key)) is not int or usage[key] < 0 for key in ("promptTokenCount", "totalTokenCount")):
+        return None
+    prompt, total = usage["promptTokenCount"], usage["totalTokenCount"]
+    cached = usage.get("cachedContentTokenCount", 0)
+    if type(cached) is not int or not 0 <= cached <= prompt or total < prompt:
+        return None
+    if usage.get("toolUsePromptTokenCount", 0) != 0:
+        return None
+    if model.startswith("gemini-4-argon"):
+        day = datetime.now(UTC).date() if as_of is None else as_of
+        input_rate, output_rate, cache_rate = (2.0, 10.0, 0.1) if day < date(2026, 12, 1) else (4.0, 20.0, 0.2)
+    elif model.startswith(("gemini-3-flash-preview", "gemini-3.1-pro-preview")):
+        input_rate, output_rate = gemini_pricing_per_million(model)
+        cache_rate, _ = gemini_context_cache_pricing_per_million(model)
+        if model.startswith("gemini-3.1-pro-preview") and prompt > 200_000:
+            input_rate, output_rate, cache_rate = (4.0, 18.0, 0.4)
+    else:
+        return None
+    return float(((prompt - cached) * input_rate + cached * cache_rate + (total - prompt) * output_rate) / 1e6)

@@ -1671,6 +1671,7 @@ fast = [
 ]
 google = [
     { name = "google-genai" },
+    { name = "httpx" },
     { name = "pdf2image" },
     { name = "pillow" },
     { name = "pymupdf" },
@@ -1761,6 +1762,7 @@ requires-dist = [
     { name = "google-genai", marker = "extra == 'google'", specifier = ">=1.0.0" },
     { name = "google-genai", marker = "extra == 'runners'", specifier = ">=1.0.0" },
     { name = "httpx", marker = "extra == 'azure'", specifier = ">=0.28.0" },
+    { name = "httpx", marker = "extra == 'google'", specifier = ">=0.28.0" },
     { name = "httpx", marker = "extra == 'llamaextract'", specifier = ">=0.28.0" },
     { name = "httpx", marker = "extra == 'runners'", specifier = ">=0.28.0" },
     { name = "huggingface-hub", specifier = ">=0.20.0" },

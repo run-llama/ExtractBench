@@ -9,6 +9,24 @@ Submission on the 100-document public release of [ExtractBench Pro](https://hugg
 
 `config.json` and `prompt.txt` record the Gemini CLI 0.59.0 configuration and prompt. The model may use CLI helper models; their reported usage is included in cost. `documents.csv` records every document's scores, elapsed time, cost sample, original workflow/source revision, trace filename, and input hashes. Source workflow IDs identify the original attempt, including carried-forward outputs.
 
+## Run the pipeline
+
+From the repository root, with Node.js 20+ installed:
+
+```bash
+uv sync --extra google
+npm install -g @google/gemini-cli@0.59.0
+export GEMINI_API_KEY="your-google-api-key"
+uv run extract-bench run gemini_cli_extract_gemini_4_argon_medium_thinking_vision_evidence \
+  --dataset pro --max_concurrent 1
+```
+
+This runs inference and costs money. Like the other coding-agent pipelines, run it in a container or VM: the CLI can execute shell commands. It uses the recorded prompt, schema transformations, medium-thinking override, isolated CLI home, local tools and evidence sidecar. The public runner enforces the 1,800-second deadline without restarting failed documents. Model and tool behavior remain nondeterministic; this reproduces the pipeline, not an exact score guarantee. The recorded `$5` setting only flags completed attempts above that amount; it does not stop spending.
+
+By default, requests go to Google's Gemini API. For a native Gemini-compatible gateway, set `GOOGLE_GEMINI_BASE_URL` and, when required, `GEMINI_CLI_CUSTOM_HEADERS` (`name: value, name: value`). API credentials and custom headers stay in the recorder, outside CLI/tool subprocess environments. Neither route translates model requests or changes CLI retries.
+
+Every attempt writes an incremental JSONL journal under the runner's output directory in `traces/`: prompt/settings, CLI events, native request/response bytes, timings, usage and final outcome. These files contain document content and model output. Each event is flushed and synced; use a durable output volume to survive machine loss. Costs include helper models and observed failed-request usage, including thinking tokens. Missing usage stays unknown; `known_cost_usd` is a lower bound and `total_cost_usd` is only populated when accounting is complete. Later attempts have separate journals and must be included when calculating retry-inclusive spend. No network trace upload service is required.
+
 ## Cost estimate
 
 The estimated sample costs total **$165.8092313**: 93 original measurements ($158.3381986) plus seven fresh measurements ($7.4710327) replacing documents whose original attempts never reported usage. The replacements change cost only; original quality outcomes remain zero. Unknown failed-request usage is assumed to incur no additional charge. This is not a complete historical billing total: the seven original unmeasured attempts are excluded, as are infrastructure failures and diagnostic runs.

@@ -49,6 +49,7 @@ class InferenceRequest(BaseModel):
         default=None,
         description=("Optional configuration override to merge with pipeline config"),
     )
+    artifact_dir: str | None = Field(default=None, description="Runner-owned directory for incremental provider traces")
     trace_metadata: dict[str, str] | None = Field(
         default=None,
         description="Metadata to forward to trace spans (unused when tracing is disabled)",
