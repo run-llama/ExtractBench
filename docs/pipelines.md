@@ -32,8 +32,8 @@ uv run extract-bench run <pipeline_name>
 | `deepseek_v4_pro_extract_twostage_parse_agentic_structured_output_text` | DeepSeek (Fireworks) | two-stage text extract |
 | `kimi_k3_extract_oneshot_structured_output_file` | Kimi K3 (Fireworks) | one-shot vision (rasterized pages), json_object mode; uses `FIREWORKS_API_KEY` |
 | `gemini_cli_extract_gemini_4_argon_medium_thinking_vision_evidence` | Gemini CLI 0.59.0 | Argon medium thinking with page/box citations; [setup](#gemini-cli) |
-| `claude_code_extract_opus_4_8` / `claude_code_extract_opus_5_5` | Claude Code CLI | agentic extraction; cost from CLI `total_cost_usd`; Opus 5.5 needs CLI 2.1.280+ |
-| `codex_code_extract_gpt_5_4_low` / `codex_code_extract_gpt_5_5_low` / `codex_code_extract_gpt_5_5_high` | Codex CLI | agentic extraction; cost estimated from token usage |
+| `claude_code_extract_opus_4_8` / `claude_code_extract_opus_5_5` | Claude Code CLI | agentic extraction; cost from CLI `total_cost_usd`; Opus 5.5 needs CLI 2.1.280+; [setup](#claude-code) |
+| `codex_code_extract_gpt_5_4_low` / `codex_code_extract_gpt_5_5_low` / `codex_code_extract_gpt_5_5_high` | Codex CLI | agentic extraction; cost estimated from token usage; [setup](#codex-cli) |
 | `claude_code_extract_opus_4_8_evidence` / `claude_code_extract_opus_5_5_evidence` | Claude Code CLI | agentic extraction with page and box citations in `citations.json` |
 | `codex_code_extract_gpt_5_5_low_evidence` / `codex_code_extract_gpt_5_6_sol_low_evidence` / `codex_code_extract_gpt_5_6_terra_low_evidence` | Codex CLI | low-effort extraction with page and box citations; unrestricted shell |
 | `codex_code_extract_gpt_5_6_luna_medium_evidence` | Codex CLI | medium-effort extraction with page and box citations; unrestricted shell, no cost cap |
@@ -84,19 +84,56 @@ Copy `.env.example` to `.env` and fill in the API keys / endpoints for the provi
 cp .env.example .env
 ```
 
-### Gemini CLI
+### Coding-agent setup
 
-With Node.js 20+ installed:
+These pipelines use a separately installed CLI to inspect documents and write extraction results with local tools. Run them in a container or VM: they execute shell commands without interactive approval, and evidence pipelines can have unrestricted shell access.
+
+Run the commands below from the repository root, with Node.js 22+ and npm installed. Each example runs the full public Pro dataset at concurrency 1; the benchmark downloads it automatically. For a single document, replace `--dataset pro` with `--file /path/to/document.pdf`, keeping its matching `document.test.json` beside it. Omit `--dataset pro` to use original ExtractBench.
+
+#### Claude Code
+
+Install [Claude Code](https://code.claude.com/docs/en/setup) and set an Anthropic API key with access to the selected model:
+
+```bash
+uv sync --extra anthropic
+npm install -g @anthropic-ai/claude-code@latest
+claude --version
+export ANTHROPIC_API_KEY="your-anthropic-api-key"
+uv run extract-bench run claude_code_extract_opus_5_5_evidence \
+  --dataset pro --max_concurrent 1
+```
+
+Opus 5.5 requires CLI 2.1.280 or newer. The non-evidence Opus pipelines use `--bare`, which requires `ANTHROPIC_API_KEY` or a configured `apiKeyHelper`; a logged-in Claude session alone is insufficient. The evidence variants do not enable `--bare` and can also use a logged-in session. Cost comes from the CLI's `total_cost_usd`.
+
+#### Codex CLI
+
+Install [Codex CLI](https://learn.chatgpt.com/docs/codex/cli) and set `CODEX_API_KEY` to an OpenAI API key with access to the selected model:
+
+```bash
+uv sync --extra openai
+npm install -g @openai/codex@latest
+codex --version
+export CODEX_API_KEY="your-openai-api-key"
+uv run extract-bench run codex_code_extract_gpt_5_5_low_evidence \
+  --dataset pro --max_concurrent 1
+```
+
+The adapter reads `CODEX_API_KEY`, rather than the `OPENAI_API_KEY` used by direct API pipelines. Use a CLI release supporting `exec --json --ephemeral --ignore-user-config --ignore-rules`; this repository does not pin a Codex CLI version. Record the installed version with your results. Evidence variants write page/box citations and use `danger-full-access`; non-evidence variants use `workspace-write`. Cost is estimated from reported token usage.
+
+#### Gemini CLI
+
+Install the pinned Gemini CLI version and set a Google API key with access to Argon:
 
 ```bash
 uv sync --extra google
 npm install -g @google/gemini-cli@0.59.0
+gemini --version
 export GEMINI_API_KEY="your-google-api-key"
 uv run extract-bench run gemini_cli_extract_gemini_4_argon_medium_thinking_vision_evidence \
   --dataset pro --max_concurrent 1
 ```
 
-Run coding-agent pipelines in a container or VM: they execute local shell commands. This pipeline uses medium thinking, an isolated CLI home, local tools and `citations.json` evidence. The runner enforces a 1,800-second deadline without restarting failed documents. `max_cost_usd` is a post-hoc flag, not a spending limit.
+This pipeline uses medium thinking, an isolated CLI home, local tools and `citations.json` evidence. The runner enforces a 1,800-second deadline without restarting failed documents. `max_cost_usd` is a post-hoc flag, not a spending limit.
 
 Requests use Google's native Gemini API. To use a native Gemini-compatible gateway, set `GOOGLE_GEMINI_BASE_URL` and any required `GEMINI_CLI_CUSTOM_HEADERS` (`name: value, name: value`). Credentials remain in the recorder, outside CLI/tool subprocess environments.
 
