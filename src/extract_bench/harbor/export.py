@@ -152,7 +152,7 @@ def export_snapshot(snapshot: Path, output: Path, dataset: str, revision: str, s
         manifest["source_files"][source.name] = _sha256(source)
     card = (snapshot / "README.md").read_text(encoding="utf-8")
     if "\n- harbor\n" not in card:
-        card = card.replace("tags:\n", "tags:\n- rl-environment\n- harbor\n", 1)
+        card = card.replace("tags:\n", "tags:\n- harbor\n", 1)
     card = re.sub(r"(?ms)^## Harbor[ \t]*\n.*?(?=^## |\Z)", "", card).rstrip()
     card += f"""
 
