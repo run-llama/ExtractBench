@@ -20,6 +20,9 @@ Read the [ExtractBench launch post](https://www.llamaindex.ai/blog/introducing-e
 
 ## Leaderboards
 
+For Harbor task generation, the published coding-agent prompt, and verifier
+validation, see [Harbor datasets](docs/harbor.md).
+
 [ExtractBench](#extractbench-leaderboard) · [ExtractBench Pro](#extractbench-pro-leaderboard) · [Submit results](#submitting-results)
 
 Models and prices reflect each provider's official documentation; each system uses its recommended configuration.
