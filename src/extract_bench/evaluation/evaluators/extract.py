@@ -7,6 +7,7 @@ package's metric selection, adds its own metrics, and builds its own result —
 without either side having to copy the other's metric wiring.
 """
 
+from collections.abc import MutableSequence
 from dataclasses import dataclass, field
 from typing import Any, TypeGuard
 
@@ -232,7 +233,7 @@ class ExtractEvaluator(BaseEvaluator):
         inference_result: InferenceResult,
         test_case: TestCase,
         *,
-        value_cells: list[ValueCell] | None = None,
+        value_cells: MutableSequence[ValueCell] | None = None,
     ) -> ExtractMetricBundle:
         """
         Compute this package's extract metrics, without building a result model.

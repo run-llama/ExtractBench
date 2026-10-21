@@ -91,7 +91,7 @@ from __future__ import annotations
 
 import math
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping, MutableSequence, Sequence
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import Any, SupportsFloat
@@ -682,7 +682,7 @@ class Scorer:
         evidence_targets: TargetIndex | None = None,
         bbox_match_mode: str = DEFAULT_BBOX_MATCH_MODE,
         graded_cells: list[GradedCell] | None = None,
-        value_cells: list[ValueCell] | None = None,
+        value_cells: MutableSequence[ValueCell] | None = None,
     ) -> None:
         if bbox_match_mode not in BBOX_MATCH_MODES:
             raise ValueError(f"unknown bbox_match_mode {bbox_match_mode!r}; supported: {sorted(BBOX_MATCH_MODES)}")
@@ -1532,7 +1532,7 @@ def compute_unified_evidence_metrics(
     bbox_iou_threshold: float = 0.5,
     bbox_match_mode: str = DEFAULT_BBOX_MATCH_MODE,
     graded_cells: list[GradedCell] | None = None,
-    value_cells: list[ValueCell] | None = None,
+    value_cells: MutableSequence[ValueCell] | None = None,
 ) -> list[MetricValue]:
     """Value + grounded precision/recall/F1 under keyless Hungarian alignment.
 

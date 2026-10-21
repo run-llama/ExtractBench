@@ -20,9 +20,6 @@ Read the [ExtractBench launch post](https://www.llamaindex.ai/blog/introducing-e
 
 ## Leaderboards
 
-For Harbor task generation, the published coding-agent prompt, and verifier
-validation, see [Harbor datasets](docs/harbor.md).
-
 [ExtractBench](#extractbench-leaderboard) · [ExtractBench Pro](#extractbench-pro-leaderboard) · [Submit results](#submitting-results)
 
 Models and prices reflect each provider's official documentation; each system uses its recommended configuration.
@@ -297,6 +294,9 @@ ExtractBench reports one metric for value accuracy and two for grounding. We sco
 Failed and missing documents score zero rather than being dropped, so a pipeline cannot raise its average by erroring out on the documents it finds hardest.
 
 ## Usage
+
+For Harbor task generation, the published coding-agent prompt, and verifier
+validation, see [Harbor datasets](docs/harbor.md).
 
 ### Running the Benchmark
 
