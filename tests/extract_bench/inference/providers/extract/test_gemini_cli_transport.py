@@ -4,8 +4,6 @@ import base64
 import concurrent.futures
 import json
 import threading
-from datetime import date
-from functools import partial
 from pathlib import Path
 
 import pytest
@@ -18,9 +16,7 @@ import httpx
 
 from extract_bench.inference.providers.extract.gemini_cli_trace import GeminiCliTrace
 from extract_bench.inference.providers.extract.gemini_cli_transport import GeminiCliTransport
-from extract_bench.utils.gemini_pricing import cost_from_request_usage as price_request
-
-cost_from_request_usage = partial(price_request, as_of=date(2026, 10, 21))
+from extract_bench.utils.gemini_pricing import cost_from_request_usage
 
 
 class Stream(httpx.SyncByteStream):
@@ -101,13 +97,13 @@ def test_stream_usage_is_durable_before_eof_and_cumulative_updates_are_not_doubl
             assert usage_seen.wait(5)
             assert not future.done()
             accounting = [e for e in journal(trace) if e["event"] == "attempt.accounting"][-1]
-            assert accounting["cost_usd"] == pytest.approx(0.00324)
+            assert accounting["cost_usd"] == pytest.approx(0.00648)
             assert accounting["cost_complete"] is False
         finally:
             release.set()
         assert future.result(timeout=5).content == first + last
     proxy.raise_if_failed()
-    assert proxy.summary()["total_cost_usd"] == pytest.approx(0.00424)
+    assert proxy.summary()["total_cost_usd"] == pytest.approx(0.00848)
     assert requests[0].url == "http://gateway.test/genai/v1beta/models/gemini-4-argon:streamGenerateContent?alt=sse"
     assert requests[0].content == payload
     assert requests[0].headers["x-goog-api-key"] == "configured-key"
@@ -142,7 +138,7 @@ def test_failed_stream_cost_survives_retry_without_treating_missing_usage_as_fre
         client.post(url, json={})
     summary = proxy.summary()
     assert len(summary["requests"]) == 2
-    assert summary["known_cost_usd"] == pytest.approx(0.00748)
+    assert summary["known_cost_usd"] == pytest.approx(0.01496)
     assert summary["total_cost_usd"] is None
     assert [item["outcome"] for item in summary["requests"]] == ["error", "success"]
     assert sum(e["event"] == "model.request.started" for e in journal(trace)) == 2
@@ -212,7 +208,7 @@ def test_cancellation_retains_observed_usage_and_closes_active_stream_without_ch
             trace.cancel("per-file timeout")
         future.result(timeout=5)
     summary = proxy.summary()
-    assert summary["known_cost_usd"] == pytest.approx(0.00324)
+    assert summary["known_cost_usd"] == pytest.approx(0.00648)
     assert summary["total_cost_usd"] is None
     saved = journal(trace)
     assert [e["reason"] for e in saved if e["event"] == "attempt.cancelled"] == ["per-file timeout"]
@@ -236,7 +232,7 @@ def test_error_frame_after_usage_does_not_claim_complete_cost(tmp_path: Path) ->
             client.post(proxy.cli_base_url + "/v1beta/models/gemini-4-argon:streamGenerateContent", json={}).content
             == payload
         )
-    assert proxy.summary()["known_cost_usd"] == pytest.approx(0.00324)
+    assert proxy.summary()["known_cost_usd"] == pytest.approx(0.00648)
     assert proxy.summary()["total_cost_usd"] is None
     assert proxy.summary()["requests"][0]["outcome"] == "response_error"
 
@@ -370,6 +366,6 @@ def test_gateway_error_with_closed_cli_is_not_mislabeled_as_capture_failure(tmp_
     assert not cancelled.is_set()
     summary = proxy.summary()
     assert len(summary["requests"]) == 2
-    assert summary["known_cost_usd"] == pytest.approx(0.00324)
+    assert summary["known_cost_usd"] == pytest.approx(0.00648)
     assert summary["total_cost_usd"] is None
     assert sum(e["event"] == "model.request.finished" for e in journal(trace)) == 2

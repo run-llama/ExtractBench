@@ -31,7 +31,7 @@ This repository hosts two benchmarks. They share the task, the evaluator, the me
 
 Models and prices reflect each provider's official documentation; each system uses its recommended configuration.
 
-Scores are percentages; costs are USD. The best score in each metric is **bold**; the second-best distinct score is <u>underlined</u>.
+Scores are percentages; costs are USD at standard public rates, excluding introductory discounts. The best score in each metric is **bold**; the second-best distinct score is <u>underlined</u>.
 
 <details>
 <summary><strong>Metric details</strong></summary>
@@ -102,7 +102,7 @@ Rows are ordered by % Perfect, then Value F1, then lower cost.
 | 3 | LlamaExtract Agentic Plus | LlamaExtract | 38 | <u>77.70</u> | 60.39 | 7.50¢ |
 | 4 | Extend Operator | Specialized APIs | 34 | 73.87 | 57.75 | 9.88¢ |
 | 5 | Claude Code Sonnet 5.5 | Coding Agents | 32 | 73.62 | 40.47 | 19.98¢ |
-| 6 | Gemini CLI (Gemini 4 Argon Medium) | Coding Agents | 30 | 42.44 | 33.90 | 18.16¢ |
+| 6 | Gemini CLI (Gemini 4 Argon Medium) | Coding Agents | 30 | 42.44 | 33.90 | 36.16¢ |
 | 7 | LlamaExtract Agentic | LlamaExtract | 20 | 71.32 | 58.01 | 3.12¢ |
 | 8 | Pulse Effort | Specialized APIs | 18 | 70.53 | 18.74 | 10.50¢ |
 | 9 | Codex GPT-6.1 Sol | Coding Agents | 12 | 74.06 | <u>63.96</u> | 13.86¢ |

@@ -3,7 +3,6 @@
 import json
 import sys
 from collections import deque
-from datetime import date
 from pathlib import Path
 
 import pytest
@@ -31,7 +30,7 @@ from extract_bench.inference.providers.extract.gemini_cli_trace import GeminiCli
                 "candidatesTokenCount": 500,
                 "totalTokenCount": 1643,
             },
-            0.00767,
+            0.01534,
         ),
         ("gemini-3.1-pro-preview-customtools", {"promptTokenCount": 200_000, "totalTokenCount": 200_100}, 0.4012),
         ("gemini-3.1-pro-preview-customtools", {"promptTokenCount": 200_001, "totalTokenCount": 200_101}, 0.801804),
@@ -46,7 +45,7 @@ from extract_bench.inference.providers.extract.gemini_cli_trace import GeminiCli
 )
 def test_native_pricing_includes_thinking_and_context_tiers_and_preserves_unknown(model, usage, expected) -> None:
     """Visible output alone underprices thinking; absent usage and unknown rates must not become zero."""
-    cost = cost_from_request_usage(model, usage, as_of=date(2026, 10, 21))
+    cost = cost_from_request_usage(model, usage)
     assert cost is None if expected is None else cost == pytest.approx(expected)
 
 
@@ -172,10 +171,3 @@ print(json.dumps({"type":"result", "status":"success", "stats":{}}))
         assert "gateway-secret" not in journal.read_text()
     finally:
         runner.shutdown()
-
-
-def test_argon_introductory_pricing_expires_without_changing_historical_replay():
-    usage = {"promptTokenCount": 1000, "cachedContentTokenCount": 400, "totalTokenCount": 1200}
-    intro = cost_from_request_usage("gemini-4-argon", usage, as_of=date(2026, 11, 30))
-    standard = cost_from_request_usage("gemini-4-argon", usage, as_of=date(2026, 12, 1))
-    assert standard == pytest.approx(2 * intro)
