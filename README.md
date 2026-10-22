@@ -31,7 +31,9 @@ This repository hosts two benchmarks. They share the task, the evaluator, the me
 
 Models and prices reflect each provider's official documentation; each system uses its recommended configuration.
 
-Scores are percentages; costs are USD at standard public rates, excluding introductory discounts. The best score in each metric is **bold**; the second-best distinct score is <u>underlined</u>.
+Scores are percentages; costs are USD. The best score in each metric is **bold**; the second-best distinct score is <u>underlined</u>.
+
+Report costs using each provider's official public prices intended to remain in effect indefinitely, excluding discounts, free credits, and other promotions. Permanent changes to those prices change reported costs; temporary offers do not.
 
 <details>
 <summary><strong>Metric details</strong></summary>
