@@ -173,7 +173,7 @@ def pro_table(rows: list[dict[str, str]]) -> str:
     )
     return (
         f"{body}\n\nTop {len(ranked)} of {len(overall)} systems — "
-        "full table in [leaderboard-pro.csv](leaderboard-pro.csv)."
+        "full table in [leaderboard-pro.csv](leaderboard-pro.csv). Scores with no time limit are also available there."
     )
 
 

@@ -50,7 +50,9 @@ Seven of the eight short documents are single plotter sheets 13 to 17 feet long 
 
 Every document is synthetic: its values are fictional and fixed before the page is rendered, so the expected output is exact by construction. Each value's scoring rule lists its accepted readings with their source locations (`page`, `bbox`, `quote`, `value`), and any accepted reading counts as correct.
 
-Grounding F1 (box level) and page-level grounding F1 are computed on the 81 documents with verified ground-truth evidence. Value F1 and % Perfect use all 100 documents. A document that fails, or exceeds the 30-minute limit, scores zero.
+Grounding F1 (box level) and page-level grounding F1 are computed on the 81 documents with verified ground-truth evidence. Value F1 and % Perfect use all 100 documents.
+
+Both leaderboard views use the same runs and document denominators. The **30-minute limit** view gives zero to documents taking longer than 1,800 seconds. The **no time limit** view scores all completed outputs regardless of elapsed time. Failed extractions, including attempts that timed out without a usable output, score zero in both views. Removing the scoring cutoff does not recover an output from a terminated attempt. Costs are shared between the two views.
 
 ## Local layout
 
@@ -92,4 +94,13 @@ These figures apply the reported mean cost per page to 2,622 pages. Per-system p
 
 ## Submitting results
 
-Add seven rows per system to [leaderboard-pro.csv](../leaderboard-pro.csv): the overall row (`Challenge` = `all`) and one row for each of the six challenges. Each row carries `Documents`, `Grounding_Documents`, `Perfect_Documents` (% Perfect), `Value_F1`, `Word_Grounding` (Grounding F1), `Page_Grounding` (page-level grounding F1), and `Cost_Per_Page`. Then follow the shared steps in [Submitting results](../README.md#submitting-results).
+Add seven rows per system to [leaderboard-pro.csv](../leaderboard-pro.csv): the overall row (`Challenge` = `all`) and one row for each of the six challenges. Each row carries `Documents`, `Grounding_Documents`, `Cost_Per_Page`, and both score views:
+
+| Metric | 30-minute limit | No time limit |
+|---|---|---|
+| % Perfect | `Perfect_Documents` | `Perfect_Documents_No_Time_Limit` |
+| Value F1 | `Value_F1` | `Value_F1_No_Time_Limit` |
+| Grounding F1 | `Word_Grounding` | `Word_Grounding_No_Time_Limit` |
+| Page-level grounding F1 | `Page_Grounding` | `Page_Grounding_No_Time_Limit` |
+
+Scores are percentages. Use an empty cell for an unreported metric; zero means a measured zero. Then follow the shared steps in [Submitting results](../README.md#submitting-results).

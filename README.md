@@ -40,7 +40,7 @@ Scores are percentages; costs are USD. The best score in each metric is **bold**
 - **Grounding F1:** requires both a correct value and correct evidence: the predicted box must overlap an accepted evidence box at IoU 0.5 or higher (word level). Grounding is evaluated on the subset with verified ground-truth evidence for the corresponding metric.
 - **% Perfect:** percentage of documents with 100% Value F1.
 
-Failed documents and Pro documents exceeding the 30-minute limit score zero.
+In the official benchmark, documents that fail or exceed a 30-minute limit score zero. However, due to the additional thinking required to handle Pro documents, we also maintain an unofficial leaderboard where completed outputs count regardless of elapsed time.
 
 </details>
 
@@ -108,14 +108,14 @@ Rows are ordered by % Perfect, then Value F1, then lower cost.
 | 9 | Codex GPT-6.1 Sol | Coding Agents | 12 | 74.06 | <u>63.96</u> | 13.86¢ |
 | 10 | Reducto Deep | Specialized APIs | 3 | 56.35 | 42.20 | 6.18¢ |
 
-Top 10 of 13 systems — full table in [leaderboard-pro.csv](leaderboard-pro.csv).
+Top 10 of 13 systems — full table in [leaderboard-pro.csv](leaderboard-pro.csv). Scores with no time limit are also available there.
 <!-- PRO_LEADERBOARD:END -->
 
 ### Submitting results
 
 Open a PR updating [leaderboard.csv](leaderboard.csv) or [leaderboard-pro.csv](leaderboard-pro.csv), with your pipeline configuration and evaluation reports. Scores are percentages; costs are USD per page. Regenerate the tables with `uv run python scripts/update_readme.py`.
 
-The rows each CSV needs are described in [ExtractBench: submitting results](docs/extractbench.md#submitting-results) and [ExtractBench Pro: submitting results](docs/extractbench-pro.md#submitting-results). For Pro, include the overall (`all`) row and all six challenge rows.
+The rows each CSV needs are described in [ExtractBench: submitting results](docs/extractbench.md#submitting-results) and [ExtractBench Pro: submitting results](docs/extractbench-pro.md#submitting-results). For Pro, include the overall (`all`) row and all six challenge rows, with scores for both time-limit views.
 
 <details>
 <summary><strong>Inclusion criteria</strong></summary>
