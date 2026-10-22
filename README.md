@@ -62,7 +62,7 @@ In the official benchmark, documents that fail or exceed a 30-minute limit score
 | 9 | Codex (GPT-5.6 Sol Evidence) | Coding Agents | 93.77 | 96.04 | 90.19 | 82.73 | 21.65¢ |
 | 10 | Codex (GPT-5.5) | Coding Agents | 93.57 | 95.68 | 91.15 | 78.88 | 27.83¢ |
 
-Top 10 of 49 systems — full table in [leaderboard.csv](leaderboard.csv).
+Top 10 of 50 systems — full table in [leaderboard.csv](leaderboard.csv).
 <!-- LEADERBOARD:END -->
 
 <!-- GROUNDING:START -->
@@ -87,7 +87,7 @@ Top 10 of 49 systems — full table in [leaderboard.csv](leaderboard.csv).
   </tbody>
 </table>
 
-Top 10 of 49 systems — full table in [leaderboard.csv](leaderboard.csv).
+Top 10 of 50 systems — full table in [leaderboard.csv](leaderboard.csv).
 <!-- GROUNDING:END -->
 
 ### ExtractBench Pro leaderboard
@@ -339,6 +339,20 @@ CODEX_API_KEY=...
 ```
 
 ExtractBench does not use LLM-as-a-judge; all value scoring is deterministic. Your keys only ever call the extraction system you are evaluating.
+
+### KYNEX
+
+`kynex_gpt_5_4` automatically clones [the harness](https://github.com/Nikit117/kynex-harness)
+at revision `4e0d9dcd741173287dc361408143a95f9538de1b` and installs its
+`requirements.txt` in an isolated virtual environment on the first extraction.
+Git and Python's `venv`/pip support must be available. Subsequent requests reuse
+the installation under `~/.cache/extract-bench/kynex/`; set `KYNEX_CACHE_DIR`
+to choose another cache location. Concurrent requests share one setup lock.
+
+Configure `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_API_KEY`,
+`AZURE_OPENAI_CHAT_DEPLOYMENT`, and `AZURE_OPENAI_API_VERSION` for the GPT-5.4
+deployment, plus `AZURE_DI_ENDPOINT` and `AZURE_DI_API_KEY` for Document Intelligence.
+Then run `uv run extract-bench run kynex_gpt_5_4 --test`.
 
 ### CLI Reference
 

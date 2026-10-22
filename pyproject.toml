@@ -29,6 +29,7 @@ dependencies = [
     "autoevals>=0.0.20",
     "beautifulsoup4>=4.12.0",
     "bleach>=6.0.0",
+    "filelock>=3.13",
     "fire>=0.7.1",
     "fuzzysearch>=0.7.3",
     "huggingface-hub>=0.20.0",

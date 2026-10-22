@@ -949,3 +949,15 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
             },
         )
     )
+
+    # The provider provisions a pinned KYNEX checkout and isolated dependencies.
+    register_fn(
+        _pipeline_spec(
+            pipeline_name="kynex_gpt_5_4",
+            provider_name="kynex_extract",
+            config={"timeout": 3600},
+            # The harness enumerates long record lists page by page, so a
+            # 192-page document needs more than the 600s run default.
+            per_file_timeout=3600.0,
+        )
+    )
