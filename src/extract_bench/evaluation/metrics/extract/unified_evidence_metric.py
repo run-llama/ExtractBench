@@ -1361,9 +1361,8 @@ class Scorer:
     ) -> _Counts:
         c = _Counts()
         # Schema names first: a defaulted field omitted on both sides must still
-        # compare. Instance extras (keys not in the schema) stay in the union so
-        # a hallucinated key is still a scalar cell — shape of that cell is
-        # still schema (empty → opaque), not the Python type of the value.
+        # compare. Only schema keys earn recall; an off-schema root key is one
+        # opaque predicted cell, nested ones are ignored (#94).
         names = (set(schema_props) | set(expected) | set(actual)) - RESERVED_OUTPUT_KEYS
         for name in sorted(names):
             schema = schema_props.get(name, {})
