@@ -375,6 +375,7 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
         ("gpt_6_luna", "gpt-6-luna", ("medium", "high", "xhigh")),
         ("gpt_6_sol", "gpt-6-sol", ("low", "medium", "high")),
         ("gpt_6_1_sol", "gpt-6.1-sol", ("low", "medium", "high", "xhigh")),
+        ("gpt_6_1_terra", "gpt-6.1-terra", ("low", "medium")),
     ):
         for _reasoning_effort in _gpt6_efforts:
             register_fn(

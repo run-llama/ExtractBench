@@ -80,11 +80,12 @@ _DEFAULT_DISABLED_FEATURES = (
 )
 
 # USD per million tokens (input, cached input, output); estimates use Codex CLI JSONL usage.
-# Cached input is input/10 across the table (input/20 for gpt-6.1-sol), matching
+# Cached input is input/10 across the table (input/20 for gpt-6.1-sol and gpt-6.1-terra), matching
 # OpenAI's cached-token discount.
 _OPENAI_CODEX_PRICING_PER_M: dict[str, tuple[float, float, float]] = {
     "gpt-6-astra": (10.00, 1.00, 50.00),
     "gpt-6.1-sol": (2.00, 0.10, 10.00),
+    "gpt-6.1-terra": (1.00, 0.05, 5.00),
     "gpt-6-sol": (2.00, 0.20, 10.00),
     "gpt-6-luna": (0.10, 0.01, 0.50),
     "gpt-5.6-sol": (4.00, 0.40, 20.00),
@@ -101,6 +102,7 @@ _OPENAI_CODEX_PRICING_PER_M: dict[str, tuple[float, float, float]] = {
 _OPENAI_CODEX_CACHE_WRITE_PER_M: dict[str, float] = {
     "gpt-6-astra": 12.50,
     "gpt-6.1-sol": 2.50,
+    "gpt-6.1-terra": 1.25,
     "gpt-6-sol": 2.50,
     "gpt-6-luna": 0.125,
 }
