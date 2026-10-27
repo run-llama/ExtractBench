@@ -1,6 +1,7 @@
 Provider,Category,Overall,Short,Medium,Long,Cost_Per_Page,Cost_Short,Cost_Medium,Cost_Long,P_Short,P_Medium,P_Long,R_Short,R_Medium,R_Long,Word_Grounding,Word_Grounding_Short,Word_Grounding_Medium,Word_Grounding_Long,Page_Grounding,Page_Grounding_Short,Page_Grounding_Medium,Page_Grounding_Long,Latency_S_Per_Doc_Short,Latency_S_Per_Doc_Medium,Latency_S_Per_Doc_Long
 LlamaExtract Agentic Plus,LlamaExtract,96.17,97.02,94.30,94.65,0.0750,0.0750,0.0750,0.0750,97.08,94.86,94.77,97.02,93.93,94.54,83.25,83.22,83.44,82.84,88.26,87.97,88.48,90.61,106.7,172.9,495.2
 Pulse (Effort),Specialized APIs,96.07,96.83,94.70,93.24,0.1050,0.1050,0.1050,0.1050,96.85,94.93,93.71,96.86,94.60,92.96,14.94,12.58,20.80,15.96,83.62,81.32,87.95,90.08,118.0,249.7,507.3
+Codex (GPT-6.1 Sol Evidence),Coding Agents,95.31,97.01,92.96,85.46,0.0713,0.0924,0.0287,0.0098,96.88,93.44,85.24,97.19,92.84,85.69,87.61,89.03,84.38,85.70,89.37,89.63,89.25,86.80,112.5,101.5,136.2
 Claude Code (Sonnet 5.5 Evidence),Coding Agents,94.68,96.22,92.97,83.69,0.0569,0.0735,0.0237,0.0091,96.68,94.47,83.36,95.93,91.83,84.05,64.61,64.59,63.18,71.22,75.99,77.93,71.50,74.98,82.5,87.7,187.0
 Codex (GPT-6 Sol Evidence),Coding Agents,94.57,95.99,92.42,87.25,0.0980,0.1279,0.0388,0.0122,96.33,93.49,91.28,95.80,91.72,86.70,77.11,77.61,75.53,78.31,86.50,87.20,85.12,84.82,104.2,89.9,101.4
 Codex (GPT-6.1 Terra Evidence),Coding Agents,94.28,96.26,91.86,81.21,0.0468,0.0612,0.0179,0.0052,97.23,92.18,95.51,95.86,91.71,81.37,85.69,88.13,81.32,77.21,87.42,88.49,86.10,81.15,86.0,77.3,86.5
