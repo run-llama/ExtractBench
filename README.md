@@ -105,12 +105,12 @@ Rows are ordered by % Perfect, then Value F1, then lower cost.
 | 4 | Extend Operator | Specialized APIs | 34 | 73.87 | 57.75 | 9.88¢ |
 | 5 | Claude Code Sonnet 5.5 | Coding Agents | 32 | 73.62 | 40.47 | 19.98¢ |
 | 6 | Gemini CLI (Gemini 4 Argon Medium) | Coding Agents | 30 | 42.98 | 33.90 | 36.16¢ |
-| 7 | LlamaExtract Agentic | LlamaExtract | 20 | 71.32 | 58.01 | 3.12¢ |
-| 8 | Pulse Effort | Specialized APIs | 18 | 70.53 | 18.74 | 10.50¢ |
-| 9 | Codex GPT-6.1 Sol | Coding Agents | 12 | 74.06 | <u>63.96</u> | 13.86¢ |
-| 10 | Reducto Deep | Specialized APIs | 3 | 56.35 | 42.20 | 6.18¢ |
+| 7 | Codex GPT-6.1 Terra Medium | Coding Agents | 27 | 74.19 | 60.16 | 4.06¢ |
+| 8 | LlamaExtract Agentic | LlamaExtract | 20 | 71.32 | 58.01 | 3.12¢ |
+| 9 | Pulse Effort | Specialized APIs | 18 | 70.53 | 18.74 | 10.50¢ |
+| 10 | Codex GPT-6.1 Sol | Coding Agents | 12 | 74.06 | <u>63.96</u> | 13.86¢ |
 
-Top 10 of 13 systems — full table in [leaderboard-pro.csv](leaderboard-pro.csv). Scores with no time limit are also available there.
+Top 10 of 15 systems — full table in [leaderboard-pro.csv](leaderboard-pro.csv). Scores with no time limit are also available there.
 <!-- PRO_LEADERBOARD:END -->
 
 ### Submitting results

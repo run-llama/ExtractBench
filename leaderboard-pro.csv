@@ -55,6 +55,20 @@ Codex GPT-6 Luna,Coding Agents,house_counting_rules,12,9,0.00,30.37,18.20,30.05,
 Codex GPT-6 Luna,Coding Agents,drawn_relations,20,19,0.00,35.38,52.90,73.59,0.004100,0.00,39.59,57.04,77.74
 Codex GPT-6 Luna,Coding Agents,charts_inside_documents,25,10,0.00,55.05,82.96,90.88,0.005100,0.00,55.05,82.96,90.88
 Codex GPT-6 Luna,Coding Agents,long_chart_sheets,7,7,0.00,23.44,0.00,25.18,0.111100,0.00,23.44,0.00,25.18
+Codex GPT-6.1 Terra Medium,Coding Agents,all,100,81,27.00,74.19,60.16,64.80,0.040600,27.00,74.19,60.16,64.80
+Codex GPT-6.1 Terra Medium,Coding Agents,document_conventions,22,22,9.09,67.53,63.57,65.50,0.008900,9.09,67.53,63.57,65.50
+Codex GPT-6.1 Terra Medium,Coding Agents,house_vocabulary,14,14,14.29,89.19,53.66,55.23,0.011000,14.29,89.19,53.66,55.23
+Codex GPT-6.1 Terra Medium,Coding Agents,house_counting_rules,12,9,25.00,63.55,29.63,29.63,0.010300,25.00,63.55,29.63,29.63
+Codex GPT-6.1 Terra Medium,Coding Agents,drawn_relations,20,19,30.00,74.38,79.43,81.38,0.013800,30.00,74.38,79.43,81.38
+Codex GPT-6.1 Terra Medium,Coding Agents,charts_inside_documents,25,10,56.00,87.68,94.11,95.11,0.010200,56.00,87.68,94.11,95.11
+Codex GPT-6.1 Terra Medium,Coding Agents,long_chart_sheets,7,7,0.00,34.57,0.89,38.63,0.436700,0.00,34.57,0.89,38.63
+Codex GPT-6.1 Terra Low,Coding Agents,all,100,81,11.00,51.30,52.72,56.53,0.026200,11.00,51.30,52.72,56.53
+Codex GPT-6.1 Terra Low,Coding Agents,document_conventions,22,22,9.09,58.72,53.05,55.86,0.004300,9.09,58.72,53.05,55.86
+Codex GPT-6.1 Terra Low,Coding Agents,house_vocabulary,14,14,7.14,55.94,40.56,44.15,0.006400,7.14,55.94,40.56,44.15
+Codex GPT-6.1 Terra Low,Coding Agents,house_counting_rules,12,9,16.67,43.04,24.78,28.48,0.009100,16.67,43.04,24.78,28.48
+Codex GPT-6.1 Terra Low,Coding Agents,drawn_relations,20,19,5.00,39.42,78.63,80.56,0.007500,5.00,39.42,78.63,80.56
+Codex GPT-6.1 Terra Low,Coding Agents,charts_inside_documents,25,10,20.00,65.46,81.85,81.85,0.007200,20.00,65.46,81.85,81.85
+Codex GPT-6.1 Terra Low,Coding Agents,long_chart_sheets,7,7,0.00,16.20,0.00,18.05,0.284800,0.00,16.20,0.00,18.05
 Extend Operator,Specialized APIs,all,100,81,34.00,73.87,57.75,68.84,0.098800,34.00,73.87,57.75,68.84
 Extend Operator,Specialized APIs,document_conventions,22,22,27.27,99.64,80.29,91.42,0.100100,27.27,99.64,80.29,91.42
 Extend Operator,Specialized APIs,house_vocabulary,14,14,64.29,97.55,78.24,91.14,0.087500,64.29,97.55,78.24,91.14
