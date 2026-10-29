@@ -19,7 +19,7 @@ This repository hosts two benchmarks. They share the task, the evaluator, the me
 | Benchmark | What makes it hard | Size | Documents | Dataset | Details |
 |---|---|---|---|---|---|
 | **ExtractBench** | Long lists, needles in long documents, dense forms, scans, and handwriting | 370 documents, 4,869 pages, 67 document types | Real public records, plus synthetic long lists rendered from real layouts | [llamaindex/ExtractBench](https://huggingface.co/datasets/llamaindex/ExtractBench) | [docs/extractbench.md](docs/extractbench.md) · [launch post](https://www.llamaindex.ai/blog/introducing-extractbench) |
-| **ExtractBench Pro** | Values read off charts and drawings, counted under house rules, or decoded with house vocabulary | 100 documents, 2,622 pages, 86 document types | Synthetic, derived from real long-tail documents | [llamaindex/ExtractBenchPro](https://huggingface.co/datasets/llamaindex/ExtractBenchPro) | [docs/extractbench-pro.md](docs/extractbench-pro.md) · [launch post](https://www.llamaindex.ai/blog/introducing-extractbench-pro) |
+| **ExtractBench Pro** | Values read off charts and drawings, counted under house rules, or decoded with custom terminology | 100 documents, 2,622 pages, 86 document types | Synthetic, derived from real long-tail documents | [llamaindex/ExtractBenchPro](https://huggingface.co/datasets/llamaindex/ExtractBenchPro) | [docs/extractbench-pro.md](docs/extractbench-pro.md) · [launch post](https://www.llamaindex.ai/blog/introducing-extractbench-pro) |
 
 <p align="center">
   <img src="docs/extractbench_teaser.png" alt="ExtractBench: JSON Schema and document in; JSON plus evidence out; scored on value F1, grounding F1, challenge tags, and cost" width="100%">

@@ -124,3 +124,7 @@ per document for the agent. Verifier time is separate from agent time.
 
 For regenerating or publishing task exports, see the
 [maintainer guide](harbor-maintenance.md).
+
+## ExtractBench Pro challenge names
+
+The [challenge table](extractbench-pro.md#challenges) pairs the public challenge names with their published split identifiers. Harbor exports retain the existing source split, case ID, task directory, and scorer revision. A label update does not require regenerating tasks or rerunning evaluations.

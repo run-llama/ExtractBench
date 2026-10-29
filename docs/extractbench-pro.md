@@ -17,15 +17,17 @@ Pro contains **100 documents (2,622 pages, 1–83 pages each)** across 86 docume
 
 Each document belongs to exactly one challenge: the one a naive reader most often gets wrong in it. A document can also contain values of other challenges, and values that are read directly from the page.
 
-| Challenge (`--group`) | What it tests | Documents | Pages | Expected values |
-|---|---|---:|---:|---:|
-| `document_conventions` | One part of the document, such as a legend, rule or amendment, changes how the rest must be read | 22 | 875 | 121,287 |
-| `house_vocabulary` | The organization's own definitions of its jargon decide the value | 14 | 606 | 15,242 |
-| `house_counting_rules` | Counts and sums computed under definitions from the schema and the document | 12 | 225 | 409 |
-| `drawn_relations` | All or part of the value depends on a line in a diagram rather than a printed value | 20 | 352 | 2,349 |
-| `charts_inside_documents` | Values read off charts, as the range between the tick marks the value falls in | 25 | 557 | 1,347 |
-| `long_chart_sheets` | Hundreds of values on one extremely long, narrow chart sheet, such as a well log or a time-location chart | 7 | 7 | 3,507 |
-| **Total** | | **100** | **2,622** | **144,141** |
+| Challenge | Identifier (`--group`) | What it tests | Documents | Pages | Expected values |
+|---|---|---|---:|---:|---:|
+| Document conventions | `document_conventions` | One part of the document, such as a legend, rule or amendment, changes how the rest must be read | 22 | 875 | 121,287 |
+| Custom terminology | `house_vocabulary` | The organization's own definitions of its jargon decide the value | 14 | 606 | 15,242 |
+| Counting | `house_counting_rules` | Counts and sums computed under definitions from the schema and the document | 12 | 225 | 409 |
+| Relational diagrams | `drawn_relations` | All or part of the value depends on a line in a diagram rather than a printed value | 20 | 352 | 2,349 |
+| Charts | `charts_inside_documents` | Values read off charts, as the range between the tick marks the value falls in | 25 | 557 | 1,347 |
+| Long dense pages | `long_chart_sheets` | Hundreds of values on one extremely long, narrow chart sheet, such as a well log or a time-location chart | 7 | 7 | 3,507 |
+| **Total** | | | **100** | **2,622** | **144,141** |
+
+Challenge labels describe the task or page format. The published identifiers in `--group`, Hugging Face splits, case IDs, file paths, and Harbor task metadata remain stable so existing commands and results continue to refer to the same cases. This naming update changes no documents, split membership, ground truth, or scoring.
 
 The document types in each challenge are listed on the [dataset card](https://huggingface.co/datasets/llamaindex/ExtractBenchPro#challenge-subsets).
 
