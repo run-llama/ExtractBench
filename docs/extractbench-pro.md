@@ -80,7 +80,7 @@ Pro has no `--test` subset. To try a pipeline on a smaller slice, run a single c
 
 See [pipelines.md](pipelines.md) for registered configurations.
 
-The **LlamaExtract Agentic Plus (Max Effort)** leaderboard entry uses `tier="agentic_plus"`, `effort="max"`, `version="latest"`, citations and confidence scores enabled, and no custom Parse configuration. It was evaluated on the development API on October 30, 2026; the resolved release version was not recorded, and production parity was not measured. The [aggregate run evidence](agentic-plus-max-effort-results.json) records all six source runs, their configurations, and unrounded scores.
+The **LlamaExtract Agentic Plus (Max Effort)** leaderboard entry uses `tier="agentic_plus"`, `effort="max"`, `version="latest"`, citations and confidence scores enabled, and no custom Parse configuration. It was evaluated on October 30, 2026. The [aggregate run evidence](agentic-plus-max-effort-results.json) records all six source runs, their configurations, and unrounded scores.
 
 All 100 documents completed within 30 minutes, so the official and no-time-limit scores agree. Value F1 and % Perfect weight all 100 documents equally; grounding metrics weight the 81 documents with evidence equally. Cost is total billed credits at $1.25 per 1,000 credits, including Parse, divided by the 2,622 source pages: $333.33 / 2,622 = $0.127128 per page. Max effort uses [model-usage billing with an Agentic Plus page-charge minimum](https://developers.llamaindex.ai/llamaparse/general/pricing/), so its cost varies by document.
 
