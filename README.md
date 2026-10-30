@@ -94,8 +94,6 @@ Top 10 of 52 systems — full table in [leaderboard.csv](leaderboard.csv).
 
 ### ExtractBench Pro leaderboard
 
-The Max Effort entry was evaluated on October 30, 2026. See its [configuration and aggregate run evidence](docs/agentic-plus-max-effort-results.json).
-
 <!-- PRO_LEADERBOARD:START -->
 Rows are ordered by % Perfect, then Value F1, then lower cost.
 
