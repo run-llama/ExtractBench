@@ -163,7 +163,9 @@ def _collect_node_citations(
     if not node_map:
         return []
 
-    page = _extract_page(node_map) or default_page
+    page = _extract_page(node_map)
+    if page is None:
+        page = default_page
     dimensions = _extract_dimensions(node_map) or default_dimensions
     citations: list[FieldCitation] = []
     for citation in _iter_citation_entries(node_map):
@@ -177,19 +179,13 @@ def _collect_node_citations(
                 default_confidence=_extract_confidence(node_map),
             )
         )
-    if not citations:
-        # Confidence-only fallback: when a node has confidence but no bbox/citation
-        # entries, emit a page-only FieldCitation so the metric can still read the
-        # signal. If descendants later emit their own citations they keep distinct
-        # field paths, so both coexist without double-counting — the consumer
-        # picks the leaf via exact-path lookup and falls back to the parent only
-        # when nothing leaf-level matches.
+    if len(citations) == 0:
         confidence = _extract_confidence(node_map)
         if confidence is not None:
             citations.append(
                 FieldCitation(
                     field_path=field_path,
-                    page=page or 1,
+                    page=page,
                     bbox=None,
                     source=source,
                     confidence=confidence,
@@ -324,7 +320,7 @@ def _landingai_reference_to_citation(
         return None
 
     page_index = _coerce_int(grounding_entry.get("page"))
-    page = page_index + 1 if page_index is not None and page_index >= 0 else 1
+    page = page_index + 1 if page_index is not None and page_index >= 0 else None
     confidence = _extract_confidence(grounding_entry)
     metadata = {"reference": reference}
     grounding_type = grounding_entry.get("type")
@@ -373,7 +369,11 @@ def _normalize_citation(
     if not citation_map:
         return []
 
-    page = _extract_page(citation_map) or _extract_nested_bbox_page(citation_map) or default_page or 1
+    page = _extract_page(citation_map)
+    if page is None:
+        page = _extract_nested_bbox_page(citation_map)
+    if page is None:
+        page = default_page
     dimensions = _extract_dimensions(citation_map) or default_dimensions
     polygon = _extract_polygon(citation_map)
     reference_text = _extract_reference_text(citation_map)
@@ -468,7 +468,10 @@ def _extract_bbox_list(node: Mapping[str, Any]) -> list[list[float]] | None:
 
 def _extract_page(node: Mapping[str, Any]) -> int | None:
     for key in ("page", "page_number", "pageNumber"):
-        value = _coerce_int(node.get(key))
+        raw_value = node.get(key)
+        if key == "page" and isinstance(raw_value, Mapping):
+            raw_value = raw_value.get("number")
+        value = _coerce_int(raw_value)
         if value is not None and value >= 1:
             return value
     for key in ("page_index", "pageIndex"):
@@ -492,7 +495,16 @@ def _extract_dimensions(node: Mapping[str, Any]) -> tuple[float, float] | None:
     if width is not None and height is not None and width > 0 and height > 0:
         return width, height
 
-    for key in ("page_dimensions", "pageDimensions", "page_size", "pageSize", "dimensions", "image_size", "imageSize"):
+    for key in (
+        "page",
+        "page_dimensions",
+        "pageDimensions",
+        "page_size",
+        "pageSize",
+        "dimensions",
+        "image_size",
+        "imageSize",
+    ):
         size = _as_mapping(node.get(key))
         width = _coerce_float(_first_present(size, ("width", "w")))
         height = _coerce_float(_first_present(size, ("height", "h")))
@@ -825,7 +837,10 @@ def _refine_chunk_citations_via_text_search(
             if not queries:
                 refined.append(citation)
                 continue
-            page_index = (citation.page or 1) - 1
+            if citation.page is None:
+                refined.append(citation)
+                continue
+            page_index = citation.page - 1
             if page_index < 0 or page_index >= document.page_count:
                 refined.append(citation)
                 continue

@@ -557,7 +557,7 @@ def _citation_from_block_id(
         # resolve a bbox (e.g. the user asked for output_format != "json").
         return FieldCitation(
             field_path=field_path,
-            page=1,
+            page=None,
             bbox=None,
             source="datalab",
             metadata={"block_id": block_id, **_score_metadata(score_obj)},
@@ -585,7 +585,7 @@ def _citation_from_block_id(
 
     return FieldCitation(
         field_path=field_path,
-        page=int(info.get("page_number") or 1),
+        page=int(info["page_number"]),
         bbox=bbox_norm,
         polygon=None,
         reference_text=reference_text,
