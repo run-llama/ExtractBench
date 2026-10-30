@@ -77,14 +77,6 @@ The four self-hosted pipelines need an endpoint you run yourself; see [.env.exam
 
 The three LlamaExtract leaderboard pipelines select Extract v2.6 with citations enabled and no custom Parse configuration. All three return word-level citation boxes.
 
-### Parseur verification
-
-The Parseur row uses our independent verification of all 370 documents, completed on 2026-10-30. Outputs affected by the account’s page limit and processing failures were reprocessed. There are 369 successful documents; `medium/nport__advisors_inner_circle_fund.pdf` still fails and scores zero. Overall and split quality scores include that failure.
-
-This verification used frozen dataset revision `f6180e9` and our internal unified scorer, rather than the submission’s dataset and scorer revisions.
-
-The pipeline is `parseur_extract_v3_vision` (AI Vision v3). Cost remains the listed flat $0.05/page. The latency columns retain Parseur’s submitted upload-to-result measurements; our reprocess timings are separate and do not verify those columns.
-
 ## Cost of a full run
 
 Costs use each provider's official listed price.
