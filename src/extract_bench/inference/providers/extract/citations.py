@@ -467,11 +467,11 @@ def _extract_bbox_list(node: Mapping[str, Any]) -> list[list[float]] | None:
 
 
 def _extract_page(node: Mapping[str, Any]) -> int | None:
-    page = node.get("page")
-    if isinstance(page, Mapping):
-        return _extract_page({"page": page.get("number")})
     for key in ("page", "page_number", "pageNumber"):
-        value = _coerce_int(node.get(key))
+        raw_value = node.get(key)
+        if key == "page" and isinstance(raw_value, Mapping):
+            raw_value = raw_value.get("number")
+        value = _coerce_int(raw_value)
         if value is not None and value >= 1:
             return value
     for key in ("page_index", "pageIndex"):

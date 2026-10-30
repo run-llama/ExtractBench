@@ -212,3 +212,35 @@ def test_azure_unresolved_source_preserves_confidence_without_claiming_page_one(
     assert citation.page is None
     assert citation.bbox is None
     assert citation.confidence == 0.8
+
+
+@pytest.mark.parametrize(
+    ("nested_number", "alternate_key", "alternate_value", "expected_page"),
+    [
+        (None, "page_number", 2, 2),
+        (0, "pageNumber", 3, 3),
+        ("unknown", "page_index", 0, 1),
+        (4, "page_number", 2, 4),
+    ],
+)
+def test_extend_invalid_nested_page_does_not_hide_explicit_page(
+    nested_number: int | str | None,
+    alternate_key: str,
+    alternate_value: int,
+    expected_page: int,
+) -> None:
+    from extract_bench.inference.providers.extract.citations import extract_extend_field_citations
+
+    citations = extract_extend_field_citations(
+        {
+            "processor_run": {
+                "output": {
+                    "metadata": {
+                        "amount": {"citations": [{"page": {"number": nested_number}, alternate_key: alternate_value}]},
+                    }
+                }
+            }
+        }
+    )
+    assert len(citations) == 1
+    assert citations[0].page == expected_page
