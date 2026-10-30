@@ -79,17 +79,9 @@ The three LlamaExtract leaderboard pipelines select Extract v2.6 with citations 
 
 ## Cost of a full run
 
-Costs use each provider's official listed price.
+Costs use each provider's official listed price. A run's total cost is the sum of its recorded per-document costs; unreported usage leaves that total incomplete. Self-hosted models also incur GPU costs.
 
-| Category | One full run | Examples |
-|---|---:|---|
-| Commercial VLM | $10 – $49 | GPT-5.4 Nano ~$10, Gemini 3.5 Flash ~$49 |
-| LlamaExtract | $49 – $395 | Cost-Effective ~$49, Agentic ~$152, Agentic Plus ~$395 |
-| Specialized APIs | $170 – $487 | Datalab ~$170, Reducto Deep Extract ~$309, Extend ~$487 |
-| Coding agents | $787 – $1,355 | Claude Code (Opus 4.8) ~$787, Codex (GPT-5.5) ~$1,355 |
-| Self-hosted open weights | GPU time only | Qwen3.6 35B, Gemma4 26B, NuExtract3, Lift Datalab 9B |
-
-These figures apply the reported mean cost per page to 4,869 pages. Per-system, per-split prices are in [leaderboard.csv](../leaderboard.csv) (`Cost_Per_Page`, `Cost_Short`, `Cost_Medium`, `Cost_Long`, in dollars per page).
+The leaderboard reports the unweighted mean of each document's cost divided by its page count, overall and within each split. The overall mean pools documents across splits. Use the evaluation reports' recorded totals when budgeting a full run. Per-system rates are in [leaderboard.csv](../leaderboard.csv) (`Cost_Per_Page`, `Cost_Short`, `Cost_Medium`, `Cost_Long`, in dollars per page).
 
 ## Results layout
 

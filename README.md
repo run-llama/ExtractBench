@@ -99,7 +99,7 @@ Rows are ordered by % Perfect, then Value F1, then lower cost.
 
 | Rank | Provider | Category | % Perfect | Value F1 | Grounding F1 | ¢ / Page |
 |---:|---|---|---:|---:|---:|---:|
-| 1 | LlamaExtract Agentic Plus (Max Effort) | LlamaExtract | **61** | <u>94.32</u> | 57.02 | 12.71¢ |
+| 1 | LlamaExtract Agentic Plus (Max Effort) | LlamaExtract | **61** | <u>94.32</u> | 57.02 | 42.19¢ |
 | 2 | Codex GPT-6 Astra | Coding Agents | <u>58</u> | **94.53** | **70.97** | 95.20¢ |
 | 3 | Claude Code Opus 5.5 | Coding Agents | 51 | 74.87 | 45.29 | 41.20¢ |
 | 4 | LlamaExtract Agentic Plus | LlamaExtract | 38 | 77.70 | 60.39 | 7.50¢ |
@@ -115,7 +115,7 @@ Top 10 of 16 systems — full table in [leaderboard-pro.csv](leaderboard-pro.csv
 
 ### Submitting results
 
-Open a PR updating [leaderboard.csv](leaderboard.csv) or [leaderboard-pro.csv](leaderboard-pro.csv), with your pipeline configuration and evaluation reports. Scores are percentages; costs are USD per page. Regenerate the tables with `uv run python scripts/update_readme.py`.
+Open a PR updating [leaderboard.csv](leaderboard.csv) or [leaderboard-pro.csv](leaderboard-pro.csv), with your pipeline configuration and evaluation reports. Scores are percentages. Costs are USD per page: compute each document's cost divided by its page count, then take the unweighted mean over documents with recorded costs. Pool documents across splits or challenges for the overall cost. Regenerate the tables with `uv run python scripts/update_readme.py`.
 
 The rows each CSV needs are described in [ExtractBench: submitting results](docs/extractbench.md#submitting-results) and [ExtractBench Pro: submitting results](docs/extractbench-pro.md#submitting-results). For Pro, include the overall (`all`) row and all six challenge rows, with scores for both time-limit views.
 
@@ -156,11 +156,9 @@ uv run extract-bench serve output-pro/llamaextract_agentic
 ```
 
 > [!WARNING]
-> A full run calls a metered API. ExtractBench (370 documents / 4,869 pages) costs roughly
-> **$10 to $1,677**, and ExtractBench Pro (100 documents / 2,622 pages) roughly **$26 to $2,496**,
-> depending on which system you evaluate. Start with `--test` on ExtractBench, which runs 6 documents
-> for cents on any hosted system. Pro has no `--test` subset; run one challenge with `--group` instead.
-> Per-system estimates: [ExtractBench](docs/extractbench.md#cost-of-a-full-run), [ExtractBench Pro](docs/extractbench-pro.md#cost-of-a-full-run).
+> A full run calls a metered API. Start with `--test` on ExtractBench, which runs 6 documents.
+> Pro has no `--test` subset; run one challenge with `--group` instead.
+> Cost accounting: [ExtractBench](docs/extractbench.md#cost-of-a-full-run), [ExtractBench Pro](docs/extractbench-pro.md#cost-of-a-full-run).
 
 ## Datasets
 

@@ -82,15 +82,15 @@ See [pipelines.md](pipelines.md) for registered configurations.
 
 ## Cost of a full run
 
-Costs use each provider's official listed price.
+Costs use each provider's official listed price. The totals below sum recorded document costs for the published runs; unreported usage is excluded.
 
 | Category | One full run | Examples |
 |---|---:|---|
 | LlamaExtract | $26 – $333 | Cost Effective ~$26, Agentic ~$82, Agentic Plus ~$197, Agentic Plus (Max Effort) ~$333 |
-| Specialized APIs | $162 – $413 | Reducto Deep ~$162, Extend Operator ~$259, Pulse Effort ~$275, Datalab Accurate ~$413 |
-| Coding agents | $30 – $2,496 | Codex GPT-6 Luna ~$30, Codex GPT-6.1 Sol ~$363, Claude Code Sonnet 5.5 ~$524, Claude Code Opus 5.5 ~$1,080, Codex GPT-6 Astra ~$2,496 |
+| Specialized APIs | $157 – $285 | Reducto Deep ~$157, Extend Operator ~$259, Pulse Effort ~$265, Datalab Accurate ~$285 |
+| Coding agents | $9 – $471 | Codex GPT-6 Luna ~$9, Codex GPT-6.1 Sol ~$60, Claude Code Sonnet 5.5 ~$114, Claude Code Opus 5.5 ~$247, Codex GPT-6 Astra ~$471 |
 
-These figures apply the reported mean cost per page to 2,622 pages. Per-system prices are in [leaderboard-pro.csv](../leaderboard-pro.csv) (`Cost_Per_Page`, in dollars per page).
+The leaderboard reports the unweighted mean of each document's cost divided by its page count, pooling documents across challenges for the overall mean. Per-system rates are in [leaderboard-pro.csv](../leaderboard-pro.csv) (`Cost_Per_Page`, in dollars per page).
 
 ## Submitting results
 
