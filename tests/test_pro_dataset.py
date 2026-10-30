@@ -47,7 +47,7 @@ def test_public_cli_download_reconstructs_all_pro_challenges_for_loader(tmp_path
     assert len(cases) == 6
     assert all(case.expected_output == {"answer": 42} for case in cases)
     assert not is_dataset_ready(root)
-    (root / "drawn_relations/sample.pdf").unlink()
+    (root / "relational_diagrams/sample.pdf").unlink()
     assert BenchCLI().status(dataset="pro") == 1
 
 
@@ -94,7 +94,7 @@ def test_pro_refresh_updates_pdf_and_prunes_replaced_documents(tmp_path, pro_sna
     root = tmp_path / "download"
     with patch("huggingface_hub.snapshot_download", return_value=str(pro_snapshot)):
         download_dataset(root, dataset="pro")
-    split = "drawn_relations"
+    split = "relational_diagrams"
     old = root / split / "removed.test.json"
     old.write_text("{}")
     old.with_name("removed.pdf").write_bytes(b"old")
@@ -112,17 +112,32 @@ def test_failed_refresh_cannot_leave_a_ready_manifest(tmp_path, pro_snapshot):
     root = tmp_path / "download"
     with patch("huggingface_hub.snapshot_download", return_value=str(pro_snapshot)):
         download_dataset(root, dataset="pro")
-    last_split = pro_snapshot / "long_chart_sheets.jsonl"
+    last_split = pro_snapshot / "long_dense_pages.jsonl"
     rows = last_split.read_text()
     last_split.unlink()
     with patch("huggingface_hub.snapshot_download", return_value=str(pro_snapshot)):
-        with pytest.raises(RuntimeError, match="missing"):
+        with pytest.raises(RuntimeError, match="source split"):
             download_dataset(root, dataset="pro", force=True)
     assert not is_dataset_ready(root, "pro")
 
     last_split.write_text(rows)
-    (pro_snapshot / "docs/long_chart_sheets/sample.pdf").write_bytes(b"%PDF-resumed")
+    (pro_snapshot / "docs/long_dense_pages/sample.pdf").write_bytes(b"%PDF-resumed")
     with patch("huggingface_hub.snapshot_download", return_value=str(pro_snapshot)):
         download_dataset(root, dataset="pro")
-    assert (root / "long_chart_sheets/sample.pdf").read_bytes() == b"%PDF-resumed"
+    assert (root / "long_dense_pages/sample.pdf").read_bytes() == b"%PDF-resumed"
     assert is_dataset_ready(root, "pro")
+
+
+def test_pro_run_refuses_unmigrated_results_before_starting_paid_inference(tmp_path, monkeypatch):
+    """Canonical case IDs must not turn existing predictions into cache misses and rerun the provider."""
+    monkeypatch.chdir(tmp_path)
+    result = tmp_path / "output-pro/dummy/house_vocabulary/sample.result.json"
+    result.parent.mkdir(parents=True)
+    result.write_text('{"output":{"extracted_data":{"answer":42}}}')
+    with (
+        patch("extract_bench.pipeline.cli.is_dataset_ready", return_value=True),
+        patch("extract_bench.pipeline.cli.InferenceCLI") as inference,
+    ):
+        assert BenchCLI().run("dummy", dataset="pro", open_report=False) == 1
+        inference.assert_not_called()
+    assert result.exists()

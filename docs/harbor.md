@@ -127,4 +127,4 @@ For regenerating or publishing task exports, see the
 
 ## ExtractBench Pro challenge names
 
-The [challenge table](extractbench-pro.md#challenges) pairs the public challenge names with their published split identifiers. Harbor exports retain the existing source split, case ID, task directory, and scorer revision. A label update does not require regenerating tasks or rerunning evaluations.
+The [challenge table](extractbench-pro.md#challenges) pairs the public challenge names with their published split identifiers. The canonical split and case names are used to generate fresh Harbor task IDs. The renamed release does not provide aliases for old Harbor task/package names. PDFs, schemas, reference answers, prompt, scorer, and reward remain unchanged; validating the export requires no model inference.

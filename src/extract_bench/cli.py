@@ -183,10 +183,12 @@ class BenchCLI:
         force: bool = False,
         test: bool = False,
         dataset: str = "extractbench",
+        revision: str | None = None,
     ) -> int:
         """Download the benchmark dataset from HuggingFace.
 
         Args:
+            revision: Optional pinned HF commit, tag, branch, or PR reference.
             data_dir: Directory to store dataset (default: ./data)
             force: Force re-download even if data exists
             dataset: "extractbench" (default) or "pro"; Pro uses ./data-pro and ./output-pro
@@ -196,7 +198,7 @@ class BenchCLI:
             extract-bench download
             extract-bench download --test
         """
-        return self.data.download(data_dir=data_dir, force=force, test=test, dataset=dataset)
+        return self.data.download(data_dir=data_dir, force=force, test=test, dataset=dataset, revision=revision)
 
     def status(
         self,

@@ -98,3 +98,20 @@ The command verifies task hashes and opens a Hugging Face dataset PR using
 `create_pr=True` and a `parent_commit` guard against the pinned source revision.
 Only `README.md`, `.gitattributes`, `harbor-manifest.json`, and `tasks/**` are
 uploaded; original JSONL/PDF source files are never uploaded or replaced.
+
+## Canonical Pro split-name migration
+
+`custom_terminology`, `counting`, `relational_diagrams`, `charts`, and `long_dense_pages` replace the original split names; `document_conventions` is unchanged. `scripts/rename_pro_splits.py` stages the renamed JSONL/PDF paths and records the complete case mapping plus unchanged PDF SHA-256 hashes. It never publishes. Verify source row payloads and PDFs, then review the data commit before regenerating Harbor against that commit. The HF migration must remove the original split files, PDF paths, and superseded task directories; an ordinary overlay upload alone does not perform those deletions.
+
+The new task directories are derived directly from canonical case IDs. No aliases are provided for the original Harbor names. Validate the same PDFs, schemas, prompt, reference answers, verifier, and scorer pin before releasing the new packages.
+
+Prepare an unpublished Hub candidate from the validated export:
+
+```bash
+uv run --with harbor==0.24.0 python scripts/stage_pro_hub.py \
+  --export <validated-canonical-export> \
+  --output <fresh-hub-staging-directory> \
+  --hf-revision <full-reviewed-HF-commit>
+```
+
+The script adds explicit `llamaindex/<canonical-task-id>` package names with schema 1.4, verifies the execution settings, and writes content-pinned task references to `dataset.toml`. Review it before any separate `harbor publish` operation. Publishing the candidate changes the Hub release and requires release approval.

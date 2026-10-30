@@ -22,6 +22,8 @@ from typing import Any
 from huggingface_hub import HfApi, snapshot_download
 
 from extract_bench.data.download import dataset_config
+from extract_bench.data.pro_names import LEGACY_PRO_SPLITS
+from extract_bench.data.pro_release import stage_pro_snapshot
 from extract_bench.evaluation.score_case import load_extract_test_case
 from extract_bench.harbor.export import export_snapshot
 from extract_bench.harbor.verifier import score_prediction
@@ -167,6 +169,7 @@ def smoke(output: Path, extractbench_revision: str = "main", pro_revision: str =
                 allow_patterns=[
                     "README.md",
                     ".gitattributes",
+                    "eval.yaml",
                     "*.jsonl",
                     "docs/**",
                     "harbor-manifest.json",
@@ -174,7 +177,26 @@ def smoke(output: Path, extractbench_revision: str = "main", pro_revision: str =
                 ],
             )
         )
-        validate_source_splits(snapshot, config.splits)
+        original_snapshot = snapshot
+        source_splits = config.splits
+        if dataset == "pro" and (snapshot / "house_vocabulary.jsonl").is_file():
+            source_splits = ("document_conventions", *LEGACY_PRO_SPLITS)
+        validate_source_splits(snapshot, source_splits)
+        original_rows = {
+            row["id"]: row
+            for split in source_splits
+            for line in (snapshot / f"{split}.jsonl").read_text().splitlines()
+            if len(line.strip()) > 0
+            for row in [json.loads(line)]
+        }
+        published = (snapshot / "harbor-manifest.json").is_file()
+        if published:
+            validate_published(snapshot, original_rows, [f"{split}.jsonl" for split in source_splits])
+        elif (snapshot / "tasks").exists():
+            raise ValueError(f"{dataset}: published tasks have no manifest")
+        if source_splits != config.splits:
+            snapshot = output / "canonical-sources" / dataset / revision
+            stage_pro_snapshot(original_snapshot, snapshot, revision)
         exported = output / "exported" / dataset / revision
         manifest = export_snapshot(snapshot, exported, dataset, revision, scorer_revision)
         rows = {}
@@ -187,11 +209,6 @@ def smoke(output: Path, extractbench_revision: str = "main", pro_revision: str =
                     rows[row["id"]] = row
         if len(rows) == 0 or len(rows) != len(manifest["tasks"]):
             raise ValueError(f"{dataset}: source/task coverage differs or is empty")
-        published = (snapshot / "harbor-manifest.json").is_file()
-        if published:
-            validate_published(snapshot, rows, [f"{split}.jsonl" for split in config.splits])
-        elif (snapshot / "tasks").exists():
-            raise ValueError(f"{dataset}: published tasks have no manifest")
         case_summaries = []
         for index, (task_id, entry) in enumerate(manifest["tasks"].items(), start=1):
             task = exported / "tasks" / task_id

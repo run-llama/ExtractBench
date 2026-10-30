@@ -172,7 +172,7 @@ Both datasets are hosted on Hugging Face and download automatically the first ti
 | `--dataset` | `extractbench` (default) | `pro` |
 | Local data | `data/` | `data-pro/` |
 | Results | `output/` | `output-pro/` |
-| `--group` values | `short`, `medium`, `long` | `document_conventions`, `house_vocabulary`, `house_counting_rules`, `drawn_relations`, `charts_inside_documents`, `long_chart_sheets` |
+| `--group` values | `short`, `medium`, `long` | `document_conventions`, `custom_terminology`, `counting`, `relational_diagrams`, `charts`, `long_dense_pages` |
 | `--test` subset | 6 documents | none |
 | Splits, tags, sources, ground truth | [docs/extractbench.md](docs/extractbench.md) | [docs/extractbench-pro.md](docs/extractbench-pro.md) |
 
@@ -232,7 +232,7 @@ uv run extract-bench run <pipeline_name> --dataset pro
 
 # Evaluate a single split (ExtractBench) or challenge (Pro) only
 uv run extract-bench run <pipeline_name> --group short
-uv run extract-bench run <pipeline_name> --dataset pro --group house_vocabulary
+uv run extract-bench run <pipeline_name> --dataset pro --group custom_terminology
 
 # Skip calling the extraction system — just re-evaluate existing results
 uv run extract-bench run <pipeline_name> --skip_inference

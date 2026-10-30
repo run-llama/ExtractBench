@@ -6,6 +6,11 @@ All notable changes to `llama-extract-bench` are recorded here. The format follo
 
 ## [Unreleased]
 
+### Dataset layout
+
+- ExtractBench Pro uses canonical challenge names in splits, case IDs, paths, and leaderboard rows. The downloader accepts original HF split names, `run --dataset pro` accepts old group aliases, and `data migrate_pro_names` translates existing local data and cached prediction envelopes without inference. Harbor exports use new task IDs without legacy aliases. Benchmark content and scoring are unchanged.
+
+
 ### Packaging
 
 - The PyPI distribution is `llama-extract-bench` (the `extract-bench` name is

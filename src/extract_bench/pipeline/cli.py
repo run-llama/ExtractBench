@@ -10,6 +10,7 @@ from extract_bench.analysis.aggregation_report import generate_aggregation_repor
 from extract_bench.analysis.cli import AnalysisCLI
 from extract_bench.analysis.leaderboard_report import generate_leaderboard_report
 from extract_bench.data.download import dataset_config, default_data_dir, download_dataset, is_dataset_ready
+from extract_bench.data.pro_names import LEGACY_PRO_SPLITS, canonical_pro_split
 from extract_bench.evaluation.cli import EvaluationCLI
 from extract_bench.inference.cli import InferenceCLI
 from extract_bench.utils.browser import open_browser
@@ -111,6 +112,8 @@ class PipelineCLI:
         """
         try:
             dataset_config(dataset, test)
+            if dataset == "pro" and group is not None:
+                group = canonical_pro_split(group)
             output_base = (
                 Path(output_dir) if output_dir is not None else Path("./output-pro" if dataset == "pro" else "./output")
             )
@@ -142,6 +145,13 @@ class PipelineCLI:
 
             input_path = Path(input_dir)
             pipeline_output_dir = output_base / pipeline
+            if dataset == "pro":
+                legacy_results = [name for name in LEGACY_PRO_SPLITS if (pipeline_output_dir / name).is_dir()]
+                if len(legacy_results) > 0:
+                    raise ValueError(
+                        "Original Pro result directories would miss the canonical inference cache. "
+                        f"Run `extract-bench data migrate_pro_names {pipeline_output_dir} --write` before continuing."
+                    )
 
             # Auto-download dataset only when using the default location.
             if not input_dir_explicit and not is_dataset_ready(input_path, dataset=dataset, test=test):

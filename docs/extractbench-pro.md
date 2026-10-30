@@ -20,14 +20,25 @@ Each document belongs to exactly one challenge: the one a naive reader most ofte
 | Challenge | Identifier (`--group`) | What it tests | Documents | Pages | Expected values |
 |---|---|---|---:|---:|---:|
 | Document conventions | `document_conventions` | One part of the document, such as a legend, rule or amendment, changes how the rest must be read | 22 | 875 | 121,287 |
-| Custom terminology | `house_vocabulary` | The organization's own definitions of its jargon decide the value | 14 | 606 | 15,242 |
-| Counting | `house_counting_rules` | Counts and sums computed under definitions from the schema and the document | 12 | 225 | 409 |
-| Relational diagrams | `drawn_relations` | All or part of the value depends on a line in a diagram rather than a printed value | 20 | 352 | 2,349 |
-| Charts | `charts_inside_documents` | Values read off charts, as the range between the tick marks the value falls in | 25 | 557 | 1,347 |
-| Long dense pages | `long_chart_sheets` | Hundreds of values on one extremely long, narrow chart sheet, such as a well log or a time-location chart | 7 | 7 | 3,507 |
+| Custom terminology | `custom_terminology` | The organization's own definitions of its jargon decide the value | 14 | 606 | 15,242 |
+| Counting | `counting` | Counts and sums computed under definitions from the schema and the document | 12 | 225 | 409 |
+| Relational diagrams | `relational_diagrams` | All or part of the value depends on a line in a diagram rather than a printed value | 20 | 352 | 2,349 |
+| Charts | `charts` | Values read off charts, as the range between the tick marks the value falls in | 25 | 557 | 1,347 |
+| Long dense pages | `long_dense_pages` | Hundreds of values on one extremely long, narrow chart sheet, such as a well log or a time-location chart | 7 | 7 | 3,507 |
 | **Total** | | | **100** | **2,622** | **144,141** |
 
-Challenge labels describe the task or page format. The published identifiers in `--group`, Hugging Face splits, case IDs, file paths, and Harbor task metadata remain stable so existing commands and results continue to refer to the same cases. This naming update changes no documents, split membership, ground truth, or scoring.
+Challenge names are also the canonical split identifiers, case-ID prefixes, and file paths. The new layout contains the same 100 documents and uses the same schemas, expected values, and scoring rules. Older HF revisions retain their original layout.
+
+The downloader translates the original HF split names when reading an older revision. Existing local data and cached predictions can be migrated without inference:
+
+```bash
+extract-bench data migrate_pro_names data-pro                 # inspect the plan
+extract-bench data migrate_pro_names data-pro --write
+extract-bench data migrate_pro_names output-pro/<pipeline> --write
+extract-bench run <pipeline> --dataset pro --skip_inference
+```
+
+Run the migrator once per dataset or pipeline directory while no benchmark is writing to it. A Pro run refuses to start inference when it finds old result directories, so the rename cannot silently turn those cached predictions into paid reruns. It updates directory names and identity metadata, preserves schemas, expected/extracted values, raw model responses, and PDF bytes, and refuses conflicting old/new directories. Derived reports should be regenerated after migration. Old `--group` names are accepted by `run --dataset pro` and translated to canonical names. Pin a dataset revision with `download --dataset pro --revision <HF_COMMIT>` when reproducing an older release.
 
 The document types in each challenge are listed on the [dataset card](https://huggingface.co/datasets/llamaindex/ExtractBenchPro#challenge-subsets).
 
@@ -60,7 +71,7 @@ Both leaderboard views use the same runs and document denominators. The **30-min
 
 `extract-bench download --dataset pro` writes one directory per challenge under `data-pro/`, with a `<stem>.pdf` and `<stem>.test.json` for each document. Results go to `output-pro/<pipeline_name>/<challenge>/`. Both are kept separate from the original ExtractBench `data/` and `output/`.
 
-Pro has no `--test` subset. To try a pipeline on a smaller slice, run a single challenge with `--group`; `long_chart_sheets` is the smallest by page count (7 documents, 7 pages).
+Pro has no `--test` subset. To try a pipeline on a smaller slice, run a single challenge with `--group`; `long_dense_pages` is the smallest by page count (7 documents, 7 pages).
 
 ## Leaderboard pipelines
 
