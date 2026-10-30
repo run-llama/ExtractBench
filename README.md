@@ -172,7 +172,7 @@ Both datasets are hosted on Hugging Face and download automatically the first ti
 | `--dataset` | `extractbench` (default) | `pro` |
 | Local data | `data/` | `data-pro/` |
 | Results | `output/` | `output-pro/` |
-| `--group` values | `short`, `medium`, `long` | `document_conventions`, `custom_terminology`, `counting`, `relational_diagrams`, `charts`, `long_dense_pages` |
+| `--group` values | `short`, `medium`, `long` | `interpretation_rules`, `custom_terminology`, `conditional_aggregation`, `relational_diagrams`, `charts_and_maps`, `long_single_pages` |
 | `--test` subset | 6 documents | none |
 | Splits, tags, sources, ground truth | [docs/extractbench.md](docs/extractbench.md) | [docs/extractbench-pro.md](docs/extractbench-pro.md) |
 

@@ -75,7 +75,7 @@ def test_legacy_hf_snapshot_download_reconstructs_canonical_paths_and_tags(tmp_p
 
     snapshot = tmp_path / ("a" * 40)
     snapshot.mkdir()
-    for old in ("document_conventions", *LEGACY_PRO_SPLITS):
+    for old in LEGACY_PRO_SPLITS:
         document = snapshot / "docs" / old / "sample.pdf"
         document.parent.mkdir(parents=True)
         document.write_bytes(b"source PDF bytes")

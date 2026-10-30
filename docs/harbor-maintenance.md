@@ -105,9 +105,9 @@ uploaded; original JSONL/PDF source files are never uploaded or replaced.
 
 ## Canonical Pro split-name migration
 
-`custom_terminology`, `counting`, `relational_diagrams`, `charts`, and `long_dense_pages` replace the original split names; `document_conventions` is unchanged. `scripts/rename_pro_splits.py` stages the renamed JSONL/PDF paths and records the complete case mapping plus unchanged PDF SHA-256 hashes. It never publishes. Verify source row payloads and PDFs, then review the data commit before regenerating Harbor against that commit. The HF migration must remove the original split files, PDF paths, and superseded task directories; an ordinary overlay upload alone does not perform those deletions.
+All six original split names are replaced by `interpretation_rules`, `custom_terminology`, `conditional_aggregation`, `relational_diagrams`, `charts_and_maps`, and `long_single_pages`. `scripts/rename_pro_splits.py` stages the renamed JSONL/PDF paths and records the complete case mapping plus unchanged PDF SHA-256 hashes. It never publishes. Verify source row payloads and PDFs, then review the data commit before regenerating Harbor against that commit. The HF migration must remove the original split files, PDF paths, and superseded task directories; an ordinary overlay upload alone does not perform those deletions.
 
-The new Pro task directories omit the challenge component from both the slug and its hash. All 100 task names change, including the Document conventions tasks. No aliases are provided for the original Harbor names. Validate the same PDFs, schemas, prompt, reference answers, verifier, and scorer pin before releasing the new packages.
+The new Pro task directories omit the challenge component from both the slug and its hash. All 100 task names change, including the Interpretation rules tasks. No aliases are provided for the original Harbor names. Validate the same PDFs, schemas, prompt, reference answers, verifier, and scorer pin before releasing the new packages.
 
 Prepare an unpublished Hub candidate from the validated export:
 

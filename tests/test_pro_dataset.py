@@ -112,7 +112,7 @@ def test_failed_refresh_cannot_leave_a_ready_manifest(tmp_path, pro_snapshot):
     root = tmp_path / "download"
     with patch("huggingface_hub.snapshot_download", return_value=str(pro_snapshot)):
         download_dataset(root, dataset="pro")
-    last_split = pro_snapshot / "long_dense_pages.jsonl"
+    last_split = pro_snapshot / "long_single_pages.jsonl"
     rows = last_split.read_text()
     last_split.unlink()
     with patch("huggingface_hub.snapshot_download", return_value=str(pro_snapshot)):
@@ -121,10 +121,10 @@ def test_failed_refresh_cannot_leave_a_ready_manifest(tmp_path, pro_snapshot):
     assert not is_dataset_ready(root, "pro")
 
     last_split.write_text(rows)
-    (pro_snapshot / "docs/long_dense_pages/sample.pdf").write_bytes(b"%PDF-resumed")
+    (pro_snapshot / "docs/long_single_pages/sample.pdf").write_bytes(b"%PDF-resumed")
     with patch("huggingface_hub.snapshot_download", return_value=str(pro_snapshot)):
         download_dataset(root, dataset="pro")
-    assert (root / "long_dense_pages/sample.pdf").read_bytes() == b"%PDF-resumed"
+    assert (root / "long_single_pages/sample.pdf").read_bytes() == b"%PDF-resumed"
     assert is_dataset_ready(root, "pro")
 
 

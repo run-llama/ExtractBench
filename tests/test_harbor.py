@@ -312,7 +312,7 @@ def test_pro_task_identity_survives_challenge_reclassification(tmp_path, snapsho
     """Changing a Pro split must not change either the task slug or its hash."""
     row = json.loads((snapshot / "short.jsonl").read_text())
     manifests = []
-    for split in ("charts", "counting"):
+    for split in ("charts_and_maps", "conditional_aggregation"):
         for name in dataset_config("pro").splits:
             (snapshot / f"{name}.jsonl").write_text("")
         pdf = snapshot / "docs" / split / "sample.pdf"

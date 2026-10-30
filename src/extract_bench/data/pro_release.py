@@ -24,7 +24,7 @@ def stage_pro_snapshot(source: Path, output: Path, revision: str) -> dict:
         raise ValueError("Source revision must be a full commit SHA")
     output.mkdir(parents=True, exist_ok=True)
     migration = {"source_revision": revision, "split_names": dict(LEGACY_PRO_SPLITS), "cases": []}
-    for old in ("document_conventions", *LEGACY_PRO_SPLITS):
+    for old in LEGACY_PRO_SPLITS:
         new = canonical_pro_split(old)
         rows = []
         for line in (source / f"{old}.jsonl").read_text(encoding="utf-8").splitlines():

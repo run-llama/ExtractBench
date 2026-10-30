@@ -1,106 +1,106 @@
 Provider,Category,Challenge,Documents,Grounding_Documents,Perfect_Documents,Value_F1,Word_Grounding,Page_Grounding,Cost_Per_Page,Perfect_Documents_No_Time_Limit,Value_F1_No_Time_Limit,Word_Grounding_No_Time_Limit,Page_Grounding_No_Time_Limit
 LlamaExtract Agentic Plus,LlamaExtract,all,100,81,38.00,77.70,60.39,66.01,0.075000,38.00,77.70,60.39,66.01
-LlamaExtract Agentic Plus,LlamaExtract,document_conventions,22,22,22.73,97.45,73.21,83.57,0.075000,22.73,97.45,73.21,83.57
+LlamaExtract Agentic Plus,LlamaExtract,interpretation_rules,22,22,22.73,97.45,73.21,83.57,0.075000,22.73,97.45,73.21,83.57
 LlamaExtract Agentic Plus,LlamaExtract,custom_terminology,14,14,64.29,98.64,61.22,68.61,0.075000,64.29,98.64,61.22,68.61
-LlamaExtract Agentic Plus,LlamaExtract,counting,12,9,41.67,67.64,33.23,33.23,0.075000,41.67,67.64,33.23,33.23
+LlamaExtract Agentic Plus,LlamaExtract,conditional_aggregation,12,9,41.67,67.64,33.23,33.23,0.075000,41.67,67.64,33.23,33.23
 LlamaExtract Agentic Plus,LlamaExtract,relational_diagrams,20,19,10.00,49.27,71.42,75.52,0.075000,10.00,49.27,71.42,75.52
-LlamaExtract Agentic Plus,LlamaExtract,charts,25,10,68.00,94.35,76.75,78.00,0.075000,68.00,94.35,76.75,78.00
-LlamaExtract Agentic Plus,LlamaExtract,long_dense_pages,7,7,0.00,12.73,0.00,4.76,0.075000,0.00,12.73,0.00,4.76
+LlamaExtract Agentic Plus,LlamaExtract,charts_and_maps,25,10,68.00,94.35,76.75,78.00,0.075000,68.00,94.35,76.75,78.00
+LlamaExtract Agentic Plus,LlamaExtract,long_single_pages,7,7,0.00,12.73,0.00,4.76,0.075000,0.00,12.73,0.00,4.76
 LlamaExtract Agentic,LlamaExtract,all,100,81,20.00,71.32,58.01,63.77,0.031200,20.00,71.32,58.01,63.77
-LlamaExtract Agentic,LlamaExtract,document_conventions,22,22,13.64,95.54,76.03,87.92,0.031200,13.64,95.54,76.03,87.92
+LlamaExtract Agentic,LlamaExtract,interpretation_rules,22,22,13.64,95.54,76.03,87.92,0.031200,13.64,95.54,76.03,87.92
 LlamaExtract Agentic,LlamaExtract,custom_terminology,14,14,35.71,95.39,55.62,65.16,0.031200,35.71,95.39,55.62,65.16
-LlamaExtract Agentic,LlamaExtract,counting,12,9,16.67,53.95,32.80,32.80,0.031200,16.67,53.95,32.80,32.80
+LlamaExtract Agentic,LlamaExtract,conditional_aggregation,12,9,16.67,53.95,32.80,32.80,0.031200,16.67,53.95,32.80,32.80
 LlamaExtract Agentic,LlamaExtract,relational_diagrams,20,19,10.00,44.25,72.81,75.61,0.031200,10.00,44.25,72.81,75.61
-LlamaExtract Agentic,LlamaExtract,charts,25,10,32.00,86.14,56.88,58.75,0.031200,32.00,86.14,56.88,58.75
-LlamaExtract Agentic,LlamaExtract,long_dense_pages,7,7,0.00,1.28,0.00,0.00,0.031200,0.00,1.28,0.00,0.00
+LlamaExtract Agentic,LlamaExtract,charts_and_maps,25,10,32.00,86.14,56.88,58.75,0.031200,32.00,86.14,56.88,58.75
+LlamaExtract Agentic,LlamaExtract,long_single_pages,7,7,0.00,1.28,0.00,0.00,0.031200,0.00,1.28,0.00,0.00
 LlamaExtract Cost Effective,LlamaExtract,all,100,81,0.00,47.19,49.40,56.46,0.010000,0.00,47.19,49.40,56.46
-LlamaExtract Cost Effective,LlamaExtract,document_conventions,22,22,0.00,74.97,55.63,63.93,0.010000,0.00,74.97,55.63,63.93
+LlamaExtract Cost Effective,LlamaExtract,interpretation_rules,22,22,0.00,74.97,55.63,63.93,0.010000,0.00,74.97,55.63,63.93
 LlamaExtract Cost Effective,LlamaExtract,custom_terminology,14,14,0.00,80.85,46.80,65.92,0.010000,0.00,80.85,46.80,65.92
-LlamaExtract Cost Effective,LlamaExtract,counting,12,9,0.00,33.40,25.38,29.07,0.010000,0.00,33.40,25.38,29.07
+LlamaExtract Cost Effective,LlamaExtract,conditional_aggregation,12,9,0.00,33.40,25.38,29.07,0.010000,0.00,33.40,25.38,29.07
 LlamaExtract Cost Effective,LlamaExtract,relational_diagrams,20,19,0.00,29.85,62.41,65.74,0.010000,0.00,29.85,62.41,65.74
-LlamaExtract Cost Effective,LlamaExtract,charts,25,10,0.00,37.57,70.82,73.32,0.010000,0.00,37.57,70.82,73.32
-LlamaExtract Cost Effective,LlamaExtract,long_dense_pages,7,7,0.00,0.10,0.00,0.00,0.010000,0.00,0.10,0.00,0.00
+LlamaExtract Cost Effective,LlamaExtract,charts_and_maps,25,10,0.00,37.57,70.82,73.32,0.010000,0.00,37.57,70.82,73.32
+LlamaExtract Cost Effective,LlamaExtract,long_single_pages,7,7,0.00,0.10,0.00,0.00,0.010000,0.00,0.10,0.00,0.00
 Codex GPT-6 Astra,Coding Agents,all,100,81,58.00,94.53,70.97,79.10,0.952000,58.00,95.53,72.19,80.34
-Codex GPT-6 Astra,Coding Agents,document_conventions,22,22,27.27,92.58,87.67,88.87,0.170300,27.27,97.12,92.15,93.41
+Codex GPT-6 Astra,Coding Agents,interpretation_rules,22,22,27.27,92.58,87.67,88.87,0.170300,27.27,97.12,92.15,93.41
 Codex GPT-6 Astra,Coding Agents,custom_terminology,14,14,64.29,99.51,63.53,63.62,0.141700,64.29,99.51,63.53,63.62
-Codex GPT-6 Astra,Coding Agents,counting,12,9,58.33,83.07,33.33,33.33,0.175900,58.33,83.07,33.33,33.33
+Codex GPT-6 Astra,Coding Agents,conditional_aggregation,12,9,58.33,83.07,33.33,33.33,0.175900,58.33,83.07,33.33,33.33
 Codex GPT-6 Astra,Coding Agents,relational_diagrams,20,19,80.00,98.02,87.07,88.80,0.192700,80.00,98.02,87.07,88.80
-Codex GPT-6 Astra,Coding Agents,charts,25,10,64.00,94.72,87.78,87.78,0.150800,64.00,94.72,87.78,87.78
-Codex GPT-6 Astra,Coding Agents,long_dense_pages,7,7,57.14,99.73,14.05,99.52,11.389700,57.14,99.73,14.05,99.52
+Codex GPT-6 Astra,Coding Agents,charts_and_maps,25,10,64.00,94.72,87.78,87.78,0.150800,64.00,94.72,87.78,87.78
+Codex GPT-6 Astra,Coding Agents,long_single_pages,7,7,57.14,99.73,14.05,99.52,11.389700,57.14,99.73,14.05,99.52
 Claude Code Opus 5.5,Coding Agents,all,100,81,51.00,74.87,45.29,56.85,0.412000,60.00,91.49,59.62,72.79
-Claude Code Opus 5.5,Coding Agents,document_conventions,22,22,22.73,58.11,43.44,46.23,0.093700,31.82,92.93,72.47,76.41
+Claude Code Opus 5.5,Coding Agents,interpretation_rules,22,22,22.73,58.11,43.44,46.23,0.093700,31.82,92.93,72.47,76.41
 Claude Code Opus 5.5,Coding Agents,custom_terminology,14,14,35.71,55.62,33.25,38.09,0.070000,71.43,98.45,54.96,61.68
-Claude Code Opus 5.5,Coding Agents,counting,12,9,33.33,56.11,25.93,29.63,0.057100,33.33,56.11,25.93,29.63
+Claude Code Opus 5.5,Coding Agents,conditional_aggregation,12,9,33.33,56.11,25.93,29.63,0.057100,33.33,56.11,25.93,29.63
 Claude Code Opus 5.5,Coding Agents,relational_diagrams,20,19,80.00,88.19,61.34,67.55,0.127400,90.00,98.19,71.87,78.08
-Claude Code Opus 5.5,Coding Agents,charts,25,10,80.00,97.78,76.18,96.06,0.078000,80.00,97.78,76.18,96.06
-Claude Code Opus 5.5,Coding Agents,long_dense_pages,7,7,14.29,78.28,12.36,77.65,4.665100,14.29,92.13,15.02,91.51
+Claude Code Opus 5.5,Coding Agents,charts_and_maps,25,10,80.00,97.78,76.18,96.06,0.078000,80.00,97.78,76.18,96.06
+Claude Code Opus 5.5,Coding Agents,long_single_pages,7,7,14.29,78.28,12.36,77.65,4.665100,14.29,92.13,15.02,91.51
 Claude Code Sonnet 5.5,Coding Agents,all,100,81,32.00,73.62,40.47,53.00,0.199800,33.00,84.69,46.11,64.07
-Claude Code Sonnet 5.5,Coding Agents,document_conventions,22,22,22.73,58.17,44.74,46.93,0.043300,22.73,86.85,59.84,66.33
+Claude Code Sonnet 5.5,Coding Agents,interpretation_rules,22,22,22.73,58.17,44.74,46.93,0.043300,22.73,86.85,59.84,66.33
 Claude Code Sonnet 5.5,Coding Agents,custom_terminology,14,14,7.14,81.73,33.41,66.55,0.038600,14.29,95.96,37.47,80.69
-Claude Code Sonnet 5.5,Coding Agents,counting,12,9,33.33,64.57,25.40,29.10,0.026800,33.33,64.57,25.40,29.10
+Claude Code Sonnet 5.5,Coding Agents,conditional_aggregation,12,9,33.33,64.57,25.40,29.10,0.026800,33.33,64.57,25.40,29.10
 Claude Code Sonnet 5.5,Coding Agents,relational_diagrams,20,19,55.00,83.80,46.46,52.45,0.060600,55.00,83.80,46.46,52.45
-Claude Code Sonnet 5.5,Coding Agents,charts,25,10,44.00,88.04,64.87,78.41,0.047900,44.00,88.04,64.87,78.41
-Claude Code Sonnet 5.5,Coding Agents,long_dense_pages,7,7,0.00,40.93,9.48,40.93,2.188200,0.00,80.44,19.13,79.71
+Claude Code Sonnet 5.5,Coding Agents,charts_and_maps,25,10,44.00,88.04,64.87,78.41,0.047900,44.00,88.04,64.87,78.41
+Claude Code Sonnet 5.5,Coding Agents,long_single_pages,7,7,0.00,40.93,9.48,40.93,2.188200,0.00,80.44,19.13,79.71
 Codex GPT-6.1 Sol,Coding Agents,all,100,81,12.00,74.06,63.96,72.26,0.138600,12.00,75.06,65.05,73.49
-Codex GPT-6.1 Sol,Coding Agents,document_conventions,22,22,9.09,86.90,78.01,81.24,0.025000,9.09,91.43,82.02,85.73
+Codex GPT-6.1 Sol,Coding Agents,interpretation_rules,22,22,9.09,86.90,78.01,81.24,0.025000,9.09,91.43,82.02,85.73
 Codex GPT-6.1 Sol,Coding Agents,custom_terminology,14,14,14.29,86.56,54.18,56.29,0.016300,14.29,86.56,54.18,56.29
-Codex GPT-6.1 Sol,Coding Agents,counting,12,9,8.33,40.45,32.19,32.19,0.013600,8.33,40.45,32.19,32.19
+Codex GPT-6.1 Sol,Coding Agents,conditional_aggregation,12,9,8.33,40.45,32.19,32.19,0.013600,8.33,40.45,32.19,32.19
 Codex GPT-6.1 Sol,Coding Agents,relational_diagrams,20,19,25.00,75.11,80.28,83.35,0.022000,25.00,75.11,80.28,83.35
-Codex GPT-6.1 Sol,Coding Agents,charts,25,10,4.00,65.58,75.67,75.67,0.014500,4.00,65.58,75.67,75.67
-Codex GPT-6.1 Sol,Coding Agents,long_dense_pages,7,7,14.29,93.64,19.17,92.60,1.730400,14.29,93.64,19.17,92.60
+Codex GPT-6.1 Sol,Coding Agents,charts_and_maps,25,10,4.00,65.58,75.67,75.67,0.014500,4.00,65.58,75.67,75.67
+Codex GPT-6.1 Sol,Coding Agents,long_single_pages,7,7,14.29,93.64,19.17,92.60,1.730400,14.29,93.64,19.17,92.60
 Codex GPT-6 Luna,Coding Agents,all,100,81,0.00,48.75,44.27,60.78,0.011400,0.00,53.06,47.59,65.23
-Codex GPT-6 Luna,Coding Agents,document_conventions,22,22,0.00,68.05,50.91,63.08,0.003100,0.00,71.92,52.72,65.49
+Codex GPT-6 Luna,Coding Agents,interpretation_rules,22,22,0.00,68.05,50.91,63.08,0.003100,0.00,71.92,52.72,65.49
 Codex GPT-6 Luna,Coding Agents,custom_terminology,14,14,0.00,54.72,33.41,55.82,0.002900,0.00,73.37,44.13,72.15
-Codex GPT-6 Luna,Coding Agents,counting,12,9,0.00,30.37,18.20,30.05,0.003800,0.00,30.37,18.20,30.05
+Codex GPT-6 Luna,Coding Agents,conditional_aggregation,12,9,0.00,30.37,18.20,30.05,0.003800,0.00,30.37,18.20,30.05
 Codex GPT-6 Luna,Coding Agents,relational_diagrams,20,19,0.00,35.38,52.90,73.59,0.004100,0.00,39.59,57.04,77.74
-Codex GPT-6 Luna,Coding Agents,charts,25,10,0.00,55.05,82.96,90.88,0.005100,0.00,55.05,82.96,90.88
-Codex GPT-6 Luna,Coding Agents,long_dense_pages,7,7,0.00,23.44,0.00,25.18,0.111100,0.00,23.44,0.00,25.18
+Codex GPT-6 Luna,Coding Agents,charts_and_maps,25,10,0.00,55.05,82.96,90.88,0.005100,0.00,55.05,82.96,90.88
+Codex GPT-6 Luna,Coding Agents,long_single_pages,7,7,0.00,23.44,0.00,25.18,0.111100,0.00,23.44,0.00,25.18
 Codex GPT-6.1 Terra Medium,Coding Agents,all,100,81,27.00,74.19,60.16,64.80,0.040600,27.00,74.19,60.16,64.80
-Codex GPT-6.1 Terra Medium,Coding Agents,document_conventions,22,22,9.09,67.53,63.57,65.50,0.008900,9.09,67.53,63.57,65.50
+Codex GPT-6.1 Terra Medium,Coding Agents,interpretation_rules,22,22,9.09,67.53,63.57,65.50,0.008900,9.09,67.53,63.57,65.50
 Codex GPT-6.1 Terra Medium,Coding Agents,custom_terminology,14,14,14.29,89.19,53.66,55.23,0.011000,14.29,89.19,53.66,55.23
-Codex GPT-6.1 Terra Medium,Coding Agents,counting,12,9,25.00,63.55,29.63,29.63,0.010300,25.00,63.55,29.63,29.63
+Codex GPT-6.1 Terra Medium,Coding Agents,conditional_aggregation,12,9,25.00,63.55,29.63,29.63,0.010300,25.00,63.55,29.63,29.63
 Codex GPT-6.1 Terra Medium,Coding Agents,relational_diagrams,20,19,30.00,74.38,79.43,81.38,0.013800,30.00,74.38,79.43,81.38
-Codex GPT-6.1 Terra Medium,Coding Agents,charts,25,10,56.00,87.68,94.11,95.11,0.010200,56.00,87.68,94.11,95.11
-Codex GPT-6.1 Terra Medium,Coding Agents,long_dense_pages,7,7,0.00,34.57,0.89,38.63,0.436700,0.00,34.57,0.89,38.63
+Codex GPT-6.1 Terra Medium,Coding Agents,charts_and_maps,25,10,56.00,87.68,94.11,95.11,0.010200,56.00,87.68,94.11,95.11
+Codex GPT-6.1 Terra Medium,Coding Agents,long_single_pages,7,7,0.00,34.57,0.89,38.63,0.436700,0.00,34.57,0.89,38.63
 Codex GPT-6.1 Terra Low,Coding Agents,all,100,81,11.00,51.30,52.72,56.53,0.026200,11.00,51.30,52.72,56.53
-Codex GPT-6.1 Terra Low,Coding Agents,document_conventions,22,22,9.09,58.72,53.05,55.86,0.004300,9.09,58.72,53.05,55.86
+Codex GPT-6.1 Terra Low,Coding Agents,interpretation_rules,22,22,9.09,58.72,53.05,55.86,0.004300,9.09,58.72,53.05,55.86
 Codex GPT-6.1 Terra Low,Coding Agents,custom_terminology,14,14,7.14,55.94,40.56,44.15,0.006400,7.14,55.94,40.56,44.15
-Codex GPT-6.1 Terra Low,Coding Agents,counting,12,9,16.67,43.04,24.78,28.48,0.009100,16.67,43.04,24.78,28.48
+Codex GPT-6.1 Terra Low,Coding Agents,conditional_aggregation,12,9,16.67,43.04,24.78,28.48,0.009100,16.67,43.04,24.78,28.48
 Codex GPT-6.1 Terra Low,Coding Agents,relational_diagrams,20,19,5.00,39.42,78.63,80.56,0.007500,5.00,39.42,78.63,80.56
-Codex GPT-6.1 Terra Low,Coding Agents,charts,25,10,20.00,65.46,81.85,81.85,0.007200,20.00,65.46,81.85,81.85
-Codex GPT-6.1 Terra Low,Coding Agents,long_dense_pages,7,7,0.00,16.20,0.00,18.05,0.284800,0.00,16.20,0.00,18.05
+Codex GPT-6.1 Terra Low,Coding Agents,charts_and_maps,25,10,20.00,65.46,81.85,81.85,0.007200,20.00,65.46,81.85,81.85
+Codex GPT-6.1 Terra Low,Coding Agents,long_single_pages,7,7,0.00,16.20,0.00,18.05,0.284800,0.00,16.20,0.00,18.05
 Extend Operator,Specialized APIs,all,100,81,34.00,73.87,57.75,68.84,0.098800,34.00,73.87,57.75,68.84
-Extend Operator,Specialized APIs,document_conventions,22,22,27.27,99.64,80.29,91.42,0.100100,27.27,99.64,80.29,91.42
+Extend Operator,Specialized APIs,interpretation_rules,22,22,27.27,99.64,80.29,91.42,0.100100,27.27,99.64,80.29,91.42
 Extend Operator,Specialized APIs,custom_terminology,14,14,64.29,97.55,78.24,91.14,0.087500,64.29,97.55,78.24,91.14
-Extend Operator,Specialized APIs,counting,12,9,16.67,59.55,18.33,27.04,0.087500,16.67,59.55,18.33,27.04
+Extend Operator,Specialized APIs,conditional_aggregation,12,9,16.67,59.55,18.33,27.04,0.087500,16.67,59.55,18.33,27.04
 Extend Operator,Specialized APIs,relational_diagrams,20,19,0.00,41.24,61.16,76.66,0.124700,0.00,41.24,61.16,76.66
-Extend Operator,Specialized APIs,charts,25,10,68.00,91.58,48.89,58.89,0.091900,68.00,91.58,48.89,58.89
-Extend Operator,Specialized APIs,long_dense_pages,7,7,0.00,0.00,0.00,0.00,0.087500,0.00,0.00,0.00,0.00
+Extend Operator,Specialized APIs,charts_and_maps,25,10,68.00,91.58,48.89,58.89,0.091900,68.00,91.58,48.89,58.89
+Extend Operator,Specialized APIs,long_single_pages,7,7,0.00,0.00,0.00,0.00,0.087500,0.00,0.00,0.00,0.00
 Pulse Effort,Specialized APIs,all,100,81,18.00,70.53,18.74,74.77,0.105000,18.00,70.53,18.74,74.77
-Pulse Effort,Specialized APIs,document_conventions,22,22,9.09,93.83,26.79,79.91,0.105000,9.09,93.83,26.79,79.91
+Pulse Effort,Specialized APIs,interpretation_rules,22,22,9.09,93.83,26.79,79.91,0.105000,9.09,93.83,26.79,79.91
 Pulse Effort,Specialized APIs,custom_terminology,14,14,50.00,82.13,23.30,77.34,0.105000,50.00,82.13,23.30,77.34
-Pulse Effort,Specialized APIs,counting,12,9,25.00,56.25,14.50,54.07,0.105000,25.00,56.25,14.50,54.07
+Pulse Effort,Specialized APIs,conditional_aggregation,12,9,25.00,56.25,14.50,54.07,0.105000,25.00,56.25,14.50,54.07
 Pulse Effort,Specialized APIs,relational_diagrams,20,19,15.00,65.00,10.31,85.98,0.105000,15.00,65.00,10.31,85.98
-Pulse Effort,Specialized APIs,charts,25,10,12.00,65.01,27.64,85.64,0.105000,12.00,65.01,27.64,85.64
-Pulse Effort,Specialized APIs,long_dense_pages,7,7,0.00,34.10,0.00,34.10,0.105000,0.00,34.10,0.00,34.10
+Pulse Effort,Specialized APIs,charts_and_maps,25,10,12.00,65.01,27.64,85.64,0.105000,12.00,65.01,27.64,85.64
+Pulse Effort,Specialized APIs,long_single_pages,7,7,0.00,34.10,0.00,34.10,0.105000,0.00,34.10,0.00,34.10
 Reducto Deep,Specialized APIs,all,100,81,3.00,56.35,42.20,62.38,0.061800,3.00,56.35,42.20,62.38
-Reducto Deep,Specialized APIs,document_conventions,22,22,4.55,79.20,42.58,62.96,0.062800,4.55,79.20,42.58,62.96
+Reducto Deep,Specialized APIs,interpretation_rules,22,22,4.55,79.20,42.58,62.96,0.062800,4.55,79.20,42.58,62.96
 Reducto Deep,Specialized APIs,custom_terminology,14,14,0.00,86.49,40.68,79.64,0.056300,0.00,86.49,40.68,79.64
-Reducto Deep,Specialized APIs,counting,12,9,0.00,38.33,24.89,40.15,0.057600,0.00,38.33,24.89,40.15
+Reducto Deep,Specialized APIs,conditional_aggregation,12,9,0.00,38.33,24.89,40.15,0.057600,0.00,38.33,24.89,40.15
 Reducto Deep,Specialized APIs,relational_diagrams,20,19,5.00,39.00,58.32,67.58,0.060300,5.00,39.00,58.32,67.58
-Reducto Deep,Specialized APIs,charts,25,10,4.00,52.58,58.02,75.24,0.064900,4.00,52.58,58.02,75.24
-Reducto Deep,Specialized APIs,long_dense_pages,7,7,0.00,18.16,0.00,22.15,0.070000,0.00,18.16,0.00,22.15
+Reducto Deep,Specialized APIs,charts_and_maps,25,10,4.00,52.58,58.02,75.24,0.064900,4.00,52.58,58.02,75.24
+Reducto Deep,Specialized APIs,long_single_pages,7,7,0.00,18.16,0.00,22.15,0.070000,0.00,18.16,0.00,22.15
 Datalab Accurate,Specialized APIs,all,100,81,2.00,43.93,0.32,4.66,0.157500,3.00,54.36,0.32,4.68
-Datalab Accurate,Specialized APIs,document_conventions,22,22,4.55,67.25,0.04,1.10,0.150100,9.09,89.20,0.04,1.18
+Datalab Accurate,Specialized APIs,interpretation_rules,22,22,4.55,67.25,0.04,1.10,0.150100,9.09,89.20,0.04,1.18
 Datalab Accurate,Specialized APIs,custom_terminology,14,14,0.00,44.92,0.00,0.01,0.146100,0.00,84.94,0.01,0.03
-Datalab Accurate,Specialized APIs,counting,12,9,0.00,45.78,0.00,0.00,0.027700,0.00,45.78,0.00,0.00
+Datalab Accurate,Specialized APIs,conditional_aggregation,12,9,0.00,45.78,0.00,0.00,0.027700,0.00,45.78,0.00,0.00
 Datalab Accurate,Specialized APIs,relational_diagrams,20,19,0.00,33.48,1.32,18.57,0.038200,0.00,33.48,1.32,18.57
-Datalab Accurate,Specialized APIs,charts,25,10,4.00,42.63,0.00,0.00,0.019400,4.00,42.63,0.00,0.00
-Datalab Accurate,Specialized APIs,long_dense_pages,7,7,0.00,0.00,0.00,0.00,1.260000,0.00,0.00,0.00,0.00
+Datalab Accurate,Specialized APIs,charts_and_maps,25,10,4.00,42.63,0.00,0.00,0.019400,4.00,42.63,0.00,0.00
+Datalab Accurate,Specialized APIs,long_single_pages,7,7,0.00,0.00,0.00,0.00,1.260000,0.00,0.00,0.00,0.00
 Gemini CLI (Gemini 4 Argon Medium),Coding Agents,all,100,81,30.00,42.98,33.90,35.81,0.361595,46.00,67.08,51.54,55.42
-Gemini CLI (Gemini 4 Argon Medium),Coding Agents,document_conventions,22,22,9.09,13.49,12.70,12.78,0.155289,27.27,45.07,42.01,42.57
+Gemini CLI (Gemini 4 Argon Medium),Coding Agents,interpretation_rules,22,22,9.09,13.49,12.70,12.78,0.155289,27.27,45.07,42.01,42.57
 Gemini CLI (Gemini 4 Argon Medium),Coding Agents,custom_terminology,14,14,50.00,50.00,31.24,35.19,0.091454,78.57,85.67,59.14,66.65
-Gemini CLI (Gemini 4 Argon Medium),Coding Agents,counting,12,9,16.67,45.45,22.22,22.22,0.104433,16.67,48.72,25.93,25.93
+Gemini CLI (Gemini 4 Argon Medium),Coding Agents,conditional_aggregation,12,9,16.67,45.45,22.22,22.22,0.104433,16.67,48.72,25.93,25.93
 Gemini CLI (Gemini 4 Argon Medium),Coding Agents,relational_diagrams,20,19,45.00,59.95,57.05,59.29,0.130325,55.00,79.77,70.70,72.94
-Gemini CLI (Gemini 4 Argon Medium),Coding Agents,charts,25,10,36.00,58.29,70.00,70.00,0.224565,56.00,85.47,80.00,80.00
-Gemini CLI (Gemini 4 Argon Medium),Coding Agents,long_dense_pages,7,7,14.29,14.29,6.45,14.29,3.141275,28.57,28.57,6.55,28.57
+Gemini CLI (Gemini 4 Argon Medium),Coding Agents,charts_and_maps,25,10,36.00,58.29,70.00,70.00,0.224565,56.00,85.47,80.00,80.00
+Gemini CLI (Gemini 4 Argon Medium),Coding Agents,long_single_pages,7,7,14.29,14.29,6.45,14.29,3.141275,28.57,28.57,6.55,28.57

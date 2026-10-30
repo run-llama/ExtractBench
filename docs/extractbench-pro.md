@@ -19,12 +19,12 @@ Each document belongs to exactly one challenge: the one a naive reader most ofte
 
 | Challenge | Identifier (`--group`) | What it tests | Documents | Pages | Expected values |
 |---|---|---|---:|---:|---:|
-| Document conventions | `document_conventions` | One part of the document, such as a legend, rule or amendment, changes how the rest must be read | 22 | 875 | 121,287 |
-| Custom terminology | `custom_terminology` | The organization's own definitions of its jargon decide the value | 14 | 606 | 15,242 |
-| Counting | `counting` | Counts and sums computed under definitions from the schema and the document | 12 | 225 | 409 |
+| Interpretation rules | `interpretation_rules` | Document instructions govern records, versions, scopes, codes and units | 22 | 875 | 121,287 |
+| Custom terminology | `custom_terminology` | Definitions in the document determine the meanings of terms and categories | 14 | 606 | 15,242 |
+| Conditional aggregation | `conditional_aggregation` | Conditions determine which records contribute to counts and sums | 12 | 225 | 409 |
 | Relational diagrams | `relational_diagrams` | All or part of the value depends on a line in a diagram rather than a printed value | 20 | 352 | 2,349 |
-| Charts | `charts` | Values read off charts, as the range between the tick marks the value falls in | 25 | 557 | 1,347 |
-| Long dense pages | `long_dense_pages` | Hundreds of values on one extremely long, narrow chart sheet, such as a well log or a time-location chart | 7 | 7 | 3,507 |
+| Charts and maps | `charts_and_maps` | Read charts, maps and other graphics alongside the document’s instructions | 25 | 557 | 1,347 |
+| Long single pages | `long_single_pages` | Hundreds of values on one extremely long, narrow chart sheet, such as a well log or a time-location chart | 7 | 7 | 3,507 |
 | **Total** | | | **100** | **2,622** | **144,141** |
 
 Challenge names are also the canonical split identifiers, case-ID prefixes, and file paths. The new layout contains the same 100 documents and uses the same schemas, expected values, and scoring rules. Older HF revisions retain their original layout.
@@ -57,7 +57,7 @@ Each document is also tagged by how most of its pages were captured, by length, 
 - **Length:** `short` (10 pages or fewer) 8 documents, `medium` (11–50 pages) 81 documents, `long` (more than 50 pages) 11 documents.
 - **Domain:** D1 finance (27), D2 energy (19), D3 government (16), D5 supply chain (9), D6 healthcare (13), D7 legal (3), D8 real estate (13), using the [ExtractBench domain codes](extractbench.md#tag-axes).
 
-Seven of the eight short documents are single plotter sheets 13 to 17 feet long (well logs, a borehole core log, a track chart, and time-location charts), scanned or photocopied, with no text layer; each asks for 390 to 715 values. Charts and drawings in other documents are often page images too, so their values cannot be read from a text layer. Some scanned documents carry a text layer that does not match the printed page; the printed page is authoritative.
+Seven of the eight short documents are single plotter sheets 13 to 17 feet long (well logs, a borehole core log, a track chart, and time-location charts), scanned or photocopied, with no text layer; each asks for 390 to 715 values. Charts, maps and drawings in other documents are often page images too, so their values cannot be read from a text layer. Some scanned documents carry a text layer that does not match the printed page; the printed page is authoritative.
 
 ## Sources and ground truth
 
@@ -71,7 +71,7 @@ Both leaderboard views use the same runs and document denominators. The **30-min
 
 `extract-bench download --dataset pro` writes one directory per challenge under `data-pro/`, with a `<stem>.pdf` and `<stem>.test.json` for each document. Results go to `output-pro/<pipeline_name>/<challenge>/`. Both are kept separate from the original ExtractBench `data/` and `output/`.
 
-Pro has no `--test` subset. To try a pipeline on a smaller slice, run a single challenge with `--group`; `long_dense_pages` is the smallest by page count (7 documents, 7 pages).
+Pro has no `--test` subset. To try a pipeline on a smaller slice, run a single challenge with `--group`; `long_single_pages` is the smallest by page count (7 documents, 7 pages).
 
 ## Leaderboard pipelines
 

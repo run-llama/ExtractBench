@@ -14,19 +14,20 @@ from pathlib import Path
 from typing import Any
 
 LEGACY_PRO_SPLITS: Mapping[str, str] = {
+    "document_conventions": "interpretation_rules",
     "house_vocabulary": "custom_terminology",
-    "house_counting_rules": "counting",
+    "house_counting_rules": "conditional_aggregation",
     "drawn_relations": "relational_diagrams",
-    "charts_inside_documents": "charts",
-    "long_chart_sheets": "long_dense_pages",
+    "charts_inside_documents": "charts_and_maps",
+    "long_chart_sheets": "long_single_pages",
 }
 PRO_SPLITS = (
-    "document_conventions",
+    "interpretation_rules",
     "custom_terminology",
-    "counting",
+    "conditional_aggregation",
     "relational_diagrams",
-    "charts",
-    "long_dense_pages",
+    "charts_and_maps",
+    "long_single_pages",
 )
 
 
