@@ -142,3 +142,18 @@ def test_pro_run_refuses_unmigrated_results_before_starting_paid_inference(tmp_p
         assert BenchCLI().run("dummy", dataset="pro", open_report=False) == 1
         inference.assert_not_called()
     assert result.exists()
+
+
+def test_original_pro_group_alias_reaches_both_inference_and_evaluation(tmp_path, monkeypatch):
+    """Normalizing only one phase would infer a group whose predictions the evaluator cannot find."""
+    monkeypatch.chdir(tmp_path)
+    cli = BenchCLI()
+    with (
+        patch("extract_bench.pipeline.cli.is_dataset_ready", return_value=True),
+        patch("extract_bench.pipeline.cli.InferenceCLI") as inference,
+        patch.object(cli.pipeline, "_run_evaluation_and_report", return_value=0) as evaluate,
+    ):
+        inference.return_value.run.return_value = 0
+        assert cli.run("dummy", dataset="pro", group="drawn_relations", open_report=False) == 0
+    assert inference.return_value.run.call_args.kwargs["group"] == "relational_diagrams"
+    assert evaluate.call_args.kwargs["group"] == "relational_diagrams"
