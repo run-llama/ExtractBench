@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import math
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -20,35 +20,39 @@ def extract_extend_field_citations(raw_output: Mapping[str, Any]) -> list[FieldC
     return _dedupe(_collect_field_map(metadata, source="extend"))
 
 
-def extract_reducto_field_citations(raw_output: Mapping[str, Any]) -> list[FieldCitation]:
+def extract_reducto_field_citations(raw_output: Mapping[str, Any]) -> Sequence[FieldCitation]:
     """Extract citations from Reducto's value/citations field wrappers."""
     result = raw_output.get("result")
     if isinstance(result, list) and len(result) > 0:
         result = result[0]
-    return _dedupe(_collect_reducto_citations(result, path=[]))
+    return _dedupe(_collect_reducto_citations(result, path=()))
 
 
-def _collect_reducto_citations(node: Any, *, path: list[str]) -> list[FieldCitation]:
+def _collect_reducto_citations(node: Any, *, path: Sequence[str]) -> Sequence[FieldCitation]:
     citations: list[FieldCitation] = []
-    if isinstance(node, Mapping):
-        if "value" in node and "citations" in node:
-            citations.extend(
-                _collect_node_citations(
-                    field_path=format_field_path(path),
-                    node=node,
-                    source="reducto",
-                    default_page=None,
-                    default_dimensions=None,
-                )
+    if isinstance(node, Mapping) and "value" in node and "citations" in node:
+        citations.extend(
+            _collect_node_citations(
+                field_path=format_field_path(path),
+                node=node,
+                source="reducto",
+                default_page=None,
+                default_dimensions=None,
             )
-            citations.extend(_collect_reducto_citations(node["value"], path=path))
-        else:
-            for key, value in node.items():
-                citations.extend(_collect_reducto_citations(value, path=[*path, key]))
+        )
+        citations.extend(_collect_reducto_citations(node["value"], path=path))
+    else:
+        for token, child in _iter_field_children(node):
+            citations.extend(_collect_reducto_citations(child, path=(*path, token)))
+    return citations
+
+
+def _iter_field_children(node: Any) -> Iterator[tuple[str, Any]]:
+    if isinstance(node, Mapping):
+        yield from node.items()
     elif isinstance(node, Sequence) and not isinstance(node, (str, bytes, bytearray)):
         for index, item in enumerate(node):
-            citations.extend(_collect_reducto_citations(item, path=[*path, f"[{index}]"]))
-    return citations
+            yield f"[{index}]", item
 
 
 def extract_landingai_field_citations(
@@ -89,7 +93,7 @@ def extract_landingai_field_citations(
     return citations
 
 
-def extract_llamaextract_field_citations(metadata: Any, *, source: str) -> list[FieldCitation]:
+def extract_llamaextract_field_citations(metadata: Any, *, source: str) -> Sequence[FieldCitation]:
     """Unwrap LlamaExtract's document, page, and row metadata envelopes."""
     metadata_map = _as_mapping(metadata)
     field_metadata = _as_mapping(metadata_map.get("field_metadata"))
@@ -99,10 +103,10 @@ def extract_llamaextract_field_citations(metadata: Any, *, source: str) -> list[
         envelope = field_metadata
     else:
         envelope = metadata_map
-        citations.extend(_collect_field_tree(node=field_metadata, source=source, path=[]))
+        citations.extend(_collect_field_tree(node=field_metadata, source=source, path=()))
 
     for key in ("document_metadata", "fields"):
-        citations.extend(_collect_field_tree(node=envelope.get(key), source=source, path=[]))
+        citations.extend(_collect_field_tree(node=envelope.get(key), source=source, path=()))
 
     for key in ("page_metadata", "row_metadata"):
         for entry in _as_sequence(envelope.get(key)):
@@ -116,7 +120,7 @@ def extract_llamaextract_field_citations(metadata: Any, *, source: str) -> list[
                 _collect_field_tree(
                     node=field_tree,
                     source=source,
-                    path=[],
+                    path=(),
                     default_page=_extract_page(entry_map),
                     default_dimensions=_extract_dimensions(entry_map),
                 )
@@ -208,10 +212,10 @@ def _collect_field_tree(
     *,
     node: Any,
     source: str,
-    path: list[str],
+    path: Sequence[str],
     default_page: int | None = None,
     default_dimensions: tuple[float, float] | None = None,
-) -> list[FieldCitation]:
+) -> Sequence[FieldCitation]:
     citations: list[FieldCitation] = []
     if isinstance(node, Mapping):
         page = _extract_page(node)
@@ -230,29 +234,18 @@ def _collect_field_tree(
                     default_dimensions=default_dimensions,
                 )
             )
-        for key, value in node.items():
-            if key in ("citation", "citations"):
-                continue
-            citations.extend(
-                _collect_field_tree(
-                    node=value,
-                    source=source,
-                    path=[*path, key],
-                    default_page=default_page,
-                    default_dimensions=default_dimensions,
-                )
+    for token, child in _iter_field_children(node):
+        if token in ("citation", "citations"):
+            continue
+        citations.extend(
+            _collect_field_tree(
+                node=child,
+                source=source,
+                path=(*path, token),
+                default_page=default_page,
+                default_dimensions=default_dimensions,
             )
-    elif isinstance(node, Sequence) and not isinstance(node, (str, bytes, bytearray)):
-        for index, item in enumerate(node):
-            citations.extend(
-                _collect_field_tree(
-                    node=item,
-                    source=source,
-                    path=[*path, f"[{index}]"],
-                    default_page=default_page,
-                    default_dimensions=default_dimensions,
-                )
-            )
+        )
     return citations
 
 
@@ -349,7 +342,7 @@ def _landingai_reference_to_citation(
     )
 
 
-def format_field_path(path: list[str]) -> str:
+def format_field_path(path: Sequence[str]) -> str:
     """Render path tokens so list-index tokens (`[N]`) attach to the prior key without a dot.
 
     GT field paths use bracket notation (`employees[0].basic_salary`). We collect tokens during
@@ -720,7 +713,7 @@ def _compact_metadata(node: Mapping[str, Any]) -> dict[str, Any] | None:
     return dict(metadata) if metadata else None
 
 
-def _dedupe(citations: list[FieldCitation]) -> list[FieldCitation]:
+def _dedupe(citations: Sequence[FieldCitation]) -> list[FieldCitation]:
     seen: set[tuple[Any, ...]] = set()
     deduped: list[FieldCitation] = []
     for citation in citations:

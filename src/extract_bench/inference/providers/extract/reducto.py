@@ -517,7 +517,7 @@ class ReductoExtractProvider(Provider):
             example_id=raw_result.request.example_id,
             pipeline_name=raw_result.pipeline_name,
             extracted_data=extracted_data,
-            field_citations=extract_reducto_field_citations(raw_result.raw_output),
+            field_citations=list(extract_reducto_field_citations(raw_result.raw_output)),
         )
 
         return InferenceResult(

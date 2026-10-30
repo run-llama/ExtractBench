@@ -215,9 +215,11 @@ class LlamaExtractV2Provider(Provider):
             example_id=raw_result.request.example_id,
             pipeline_name=raw_result.pipeline_name,
             extracted_data=extracted_data if extracted_data is not None else {},
-            field_citations=extract_llamaextract_field_citations(
-                raw_result.raw_output.get("extract_metadata"),
-                source="llamaextract_v2",
+            field_citations=list(
+                extract_llamaextract_field_citations(
+                    raw_result.raw_output.get("extract_metadata"),
+                    source="llamaextract_v2",
+                )
             ),
         )
 
