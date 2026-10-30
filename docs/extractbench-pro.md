@@ -17,28 +17,15 @@ Pro contains **100 documents (2,622 pages, 1–83 pages each)** across 86 docume
 
 Each document belongs to exactly one challenge: the one a naive reader most often gets wrong in it. A document can also contain values of other challenges, and values that are read directly from the page.
 
-| Challenge | Identifier (`--group`) | What it tests | Documents | Pages | Expected values |
-|---|---|---|---:|---:|---:|
-| Interpretation rules | `interpretation_rules` | Document instructions govern records, versions, scopes, codes and units | 22 | 875 | 121,287 |
-| Custom terminology | `custom_terminology` | Definitions in the document determine the meanings of terms and categories | 14 | 606 | 15,242 |
-| Conditional aggregation | `conditional_aggregation` | Conditions determine which records contribute to counts and sums | 12 | 225 | 409 |
-| Relational diagrams | `relational_diagrams` | All or part of the value depends on a line in a diagram rather than a printed value | 20 | 352 | 2,349 |
-| Charts and maps | `charts_and_maps` | Read charts, maps and other graphics alongside the document’s instructions | 25 | 557 | 1,347 |
-| Long single pages | `long_single_pages` | Hundreds of values on one extremely long, narrow chart sheet, such as a well log or a time-location chart | 7 | 7 | 3,507 |
-| **Total** | | | **100** | **2,622** | **144,141** |
-
-Challenge names are also the canonical split identifiers, case-ID prefixes, and file paths. The new layout contains the same 100 documents and uses the same schemas, expected values, and scoring rules. Older HF revisions retain their original layout.
-
-The downloader translates the original HF split names when reading an older revision. Existing local data and cached predictions can be migrated without inference:
-
-```bash
-extract-bench data migrate_pro_names data-pro                 # inspect the plan
-extract-bench data migrate_pro_names data-pro --write
-extract-bench data migrate_pro_names output-pro/<pipeline> --write
-extract-bench run <pipeline> --dataset pro --skip_inference
-```
-
-Run the migrator once per dataset or pipeline directory while no benchmark is writing to it. A Pro run refuses to start inference when it finds old result directories, so the rename cannot silently turn those cached predictions into paid reruns. It updates directory names and identity metadata, preserves schemas, expected/extracted values, raw model responses, and PDF bytes, and refuses conflicting old/new directories. Derived reports should be regenerated after migration. Old `--group` names are accepted by `run --dataset pro` and translated to canonical names. Pin a dataset revision with `download --dataset pro --revision <HF_COMMIT>` when reproducing an older release.
+| Challenge (`--group`) | What it tests | Documents | Pages | Expected values |
+|---|---|---:|---:|---:|
+| `interpretation_rules` | Document instructions govern records, versions, scopes, codes and units | 22 | 875 | 121,287 |
+| `custom_terminology` | Definitions in the document determine the meanings of terms and categories | 14 | 606 | 15,242 |
+| `conditional_aggregation` | Conditions determine which records contribute to counts and sums | 12 | 225 | 409 |
+| `relational_diagrams` | All or part of the value depends on a line in a diagram rather than a printed value | 20 | 352 | 2,349 |
+| `charts_and_maps` | Read charts, maps and other graphics alongside the document’s instructions | 25 | 557 | 1,347 |
+| `long_single_pages` | Hundreds of values on one extremely long, narrow chart sheet, such as a well log or a time-location chart | 7 | 7 | 3,507 |
+| **Total** | | **100** | **2,622** | **144,141** |
 
 The document types in each challenge are listed on the [dataset card](https://huggingface.co/datasets/llamaindex/ExtractBenchPro#challenge-subsets).
 
@@ -72,6 +59,19 @@ Both leaderboard views use the same runs and document denominators. The **30-min
 `extract-bench download --dataset pro` writes one directory per challenge under `data-pro/`, with a `<stem>.pdf` and `<stem>.test.json` for each document. Results go to `output-pro/<pipeline_name>/<challenge>/`. Both are kept separate from the original ExtractBench `data/` and `output/`.
 
 Pro has no `--test` subset. To try a pipeline on a smaller slice, run a single challenge with `--group`; `long_single_pages` is the smallest by page count (7 documents, 7 pages).
+
+### Existing downloads and results
+
+The renamed splits change local paths and case IDs. To reuse existing downloads and cached predictions, stop any active Pro runs and migrate each dataset or pipeline directory. Omit `--write` to preview the changes:
+
+```bash
+extract-bench data migrate_pro_names data-pro --write
+extract-bench data migrate_pro_names output-pro/<pipeline> --write
+extract-bench run <pipeline> --dataset pro --skip_inference
+```
+
+Migration preserves PDF and prediction content; the last command regenerates evaluations without inference. Original HF split names and `--group` names remain accepted by the framework.
+
 
 ## Leaderboard pipelines
 
