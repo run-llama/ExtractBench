@@ -38,7 +38,7 @@ dependencies = [
     "numpy>=1.24.0",
     "pandas>=2.0.0",
     # Shared citation schema permits an explicitly unknown page.
-    "parse-bench>=1.0.6",
+    "parse-bench>=1.0.7",
     "pydantic>=2.0.0",
     "python-dateutil>=2.9.0",
     "python-dotenv>=1.0.0",
@@ -219,4 +219,4 @@ python_functions = ["test_*"]
 addopts = ["--verbose", "--strict-markers", "--tb=short", "-rs"]
 
 [tool.uv.sources]
-parse-bench = { git = "https://github.com/run-llama/ParseBench", rev = "49dab17c91fade77da090c508de3de4eb4ce96a0" }
+parse-bench = { git = "https://github.com/run-llama/ParseBench", rev = "063372093b80250aec9526c0f2adf0201e89ea57" }

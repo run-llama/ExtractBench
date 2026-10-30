@@ -1788,7 +1788,7 @@ requires-dist = [
     { name = "openai", marker = "extra == 'openweights'", specifier = ">=1.0.0" },
     { name = "openai", marker = "extra == 'runners'", specifier = ">=1.0.0" },
     { name = "pandas", specifier = ">=2.0.0" },
-    { name = "parse-bench", git = "https://github.com/run-llama/ParseBench?rev=49dab17c91fade77da090c508de3de4eb4ce96a0" },
+    { name = "parse-bench", git = "https://github.com/run-llama/ParseBench?rev=063372093b80250aec9526c0f2adf0201e89ea57" },
     { name = "pdf2image", marker = "extra == 'anthropic'", specifier = ">=1.16.0" },
     { name = "pdf2image", marker = "extra == 'google'", specifier = ">=1.16.0" },
     { name = "pdf2image", marker = "extra == 'local'", specifier = ">=1.16.0" },
@@ -2724,8 +2724,8 @@ wheels = [
 
 [[package]]
 name = "parse-bench"
-version = "1.0.6"
-source = { git = "https://github.com/run-llama/ParseBench?rev=49dab17c91fade77da090c508de3de4eb4ce96a0#49dab17c91fade77da090c508de3de4eb4ce96a0" }
+version = "1.0.7"
+source = { git = "https://github.com/run-llama/ParseBench?rev=063372093b80250aec9526c0f2adf0201e89ea57#063372093b80250aec9526c0f2adf0201e89ea57" }
 dependencies = [
     { name = "anls-star" },
     { name = "apted" },
