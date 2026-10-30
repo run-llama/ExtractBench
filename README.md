@@ -115,7 +115,7 @@ Top 10 of 16 systems — full table in [leaderboard-pro.csv](leaderboard-pro.csv
 
 ### Submitting results
 
-Open a PR updating [leaderboard.csv](leaderboard.csv) or [leaderboard-pro.csv](leaderboard-pro.csv), with your pipeline configuration and evaluation reports. Scores are percentages. Costs are USD per page: compute each document's cost divided by its page count, then take the unweighted mean over documents with recorded costs. Pool documents across splits or challenges for the overall cost. Regenerate the tables with `uv run python scripts/update_readme.py`.
+Open a PR updating [leaderboard.csv](leaderboard.csv) or [leaderboard-pro.csv](leaderboard-pro.csv), with your pipeline configuration and evaluation reports. Scores are percentages. Costs are computed by averaging each document's USD per page, with equal weighting given to all documents. Regenerate the tables with `uv run python scripts/update_readme.py`.
 
 The rows each CSV needs are described in [ExtractBench: submitting results](docs/extractbench.md#submitting-results) and [ExtractBench Pro: submitting results](docs/extractbench-pro.md#submitting-results). For Pro, include the overall (`all`) row and all six challenge rows, with scores for both time-limit views.
 
