@@ -217,6 +217,3 @@ python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 addopts = ["--verbose", "--strict-markers", "--tb=short", "-rs"]
-
-[tool.uv.sources]
-parse-bench = { git = "https://github.com/run-llama/ParseBench", rev = "063372093b80250aec9526c0f2adf0201e89ea57" }
