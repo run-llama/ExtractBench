@@ -41,7 +41,7 @@ dependencies = [
     # schemas/). The floor is 1.0.2 because that is what the internal harness
     # pins (a 1.0.2 rev carrying the v2.1 contract backport); every re-exported
     # module is identical from 1.0.2 through 1.0.4.
-    "parse-bench>=1.0.2",
+    "parse-bench>=1.0.6",
     "pydantic>=2.0.0",
     "python-dateutil>=2.9.0",
     "python-dotenv>=1.0.0",
@@ -220,3 +220,6 @@ python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 addopts = ["--verbose", "--strict-markers", "--tb=short", "-rs"]
+
+[tool.uv.sources]
+parse-bench = { git = "https://github.com/run-llama/ParseBench", rev = "49dab17c91fade77da090c508de3de4eb4ce96a0" }
