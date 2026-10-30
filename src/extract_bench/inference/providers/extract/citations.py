@@ -93,7 +93,9 @@ def extract_landingai_field_citations(
     return citations
 
 
-def extract_llamaextract_field_citations(metadata: Any, *, source: str) -> Sequence[FieldCitation]:
+def extract_llamaextract_field_citations(
+    metadata: Any, *, source: str, include_confidence_only: bool = True
+) -> Sequence[FieldCitation]:
     """Unwrap LlamaExtract's document, page, and row metadata envelopes."""
     metadata_map = _as_mapping(metadata)
     field_metadata = _as_mapping(metadata_map.get("field_metadata"))
@@ -103,10 +105,18 @@ def extract_llamaextract_field_citations(metadata: Any, *, source: str) -> Seque
         envelope = field_metadata
     else:
         envelope = metadata_map
-        citations.extend(_collect_field_tree(node=field_metadata, source=source, path=()))
+        citations.extend(
+            _collect_field_tree(
+                node=field_metadata, source=source, path=(), include_confidence_only=include_confidence_only
+            )
+        )
 
     for key in ("document_metadata", "fields"):
-        citations.extend(_collect_field_tree(node=envelope.get(key), source=source, path=()))
+        citations.extend(
+            _collect_field_tree(
+                node=envelope.get(key), source=source, path=(), include_confidence_only=include_confidence_only
+            )
+        )
 
     for key in ("page_metadata", "row_metadata"):
         for entry in _as_sequence(envelope.get(key)):
@@ -120,6 +130,7 @@ def extract_llamaextract_field_citations(metadata: Any, *, source: str) -> Seque
                 _collect_field_tree(
                     node=field_tree,
                     source=source,
+                    include_confidence_only=include_confidence_only,
                     path=(),
                     default_page=_extract_page(entry_map),
                     default_dimensions=_extract_dimensions(entry_map),
@@ -158,6 +169,7 @@ def _collect_node_citations(
     source: str,
     default_page: int | None,
     default_dimensions: tuple[float, float] | None,
+    include_confidence_only: bool = True,
 ) -> list[FieldCitation]:
     node_map = _as_mapping(node)
     if not node_map:
@@ -177,7 +189,7 @@ def _collect_node_citations(
                 default_confidence=_extract_confidence(node_map),
             )
         )
-    if not citations:
+    if len(citations) == 0 and include_confidence_only:
         # Confidence-only fallback: when a node has confidence but no bbox/citation
         # entries, emit a page-only FieldCitation so the metric can still read the
         # signal. If descendants later emit their own citations they keep distinct
@@ -215,6 +227,7 @@ def _collect_field_tree(
     path: Sequence[str],
     default_page: int | None = None,
     default_dimensions: tuple[float, float] | None = None,
+    include_confidence_only: bool = True,
 ) -> Sequence[FieldCitation]:
     citations: list[FieldCitation] = []
     if isinstance(node, Mapping):
@@ -230,6 +243,7 @@ def _collect_field_tree(
                     field_path=format_field_path(path),
                     node=node,
                     source=source,
+                    include_confidence_only=include_confidence_only,
                     default_page=default_page,
                     default_dimensions=default_dimensions,
                 )
@@ -242,6 +256,7 @@ def _collect_field_tree(
                 node=child,
                 source=source,
                 path=(*path, token),
+                include_confidence_only=include_confidence_only,
                 default_page=default_page,
                 default_dimensions=default_dimensions,
             )

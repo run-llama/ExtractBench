@@ -77,3 +77,28 @@ def test_reducto_citations_follow_wrapped_object_values() -> None:
         }
     )
     assert [(c.field_path, c.page) for c in citations] == [("portfolio.name", 2)]
+
+
+@pytest.mark.parametrize("include_confidence_only", [False, True])
+def test_confidence_only_option_keeps_genuine_page_citations(include_confidence_only: bool) -> None:
+    metadata = {
+        "field_metadata": {
+            "document_metadata": {
+                "properties": [
+                    {
+                        "uncited": {"confidence": 0.8},
+                        "page_only": {"confidence": 0.9, "citation": [{"page": 3}]},
+                        "boxed": {"confidence": 0.95, "citation": [{"page": 2, "bbox": [0.1, 0.2, 0.1, 0.1]}]},
+                    }
+                ],
+            }
+        }
+    }
+    citations = extract_llamaextract_field_citations(
+        metadata, source="llamaextract", include_confidence_only=include_confidence_only
+    )
+    by_path = {citation.field_path: citation for citation in citations}
+    assert ("properties[0].uncited" in by_path) == include_confidence_only
+    assert by_path["properties[0].page_only"].page == 3
+    assert by_path["properties[0].page_only"].bbox is None
+    assert by_path["properties[0].boxed"].bbox == [0.1, 0.2, 0.1, 0.1]
