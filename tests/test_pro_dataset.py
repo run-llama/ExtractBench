@@ -138,6 +138,7 @@ def test_pro_run_refuses_unmigrated_results_before_starting_paid_inference(tmp_p
         patch("extract_bench.pipeline.cli.is_dataset_ready", return_value=True),
         patch("extract_bench.pipeline.cli.InferenceCLI") as inference,
     ):
+        inference.return_value.run.return_value = 1
         assert BenchCLI().run("dummy", dataset="pro", open_report=False) == 1
         inference.assert_not_called()
     assert result.exists()
