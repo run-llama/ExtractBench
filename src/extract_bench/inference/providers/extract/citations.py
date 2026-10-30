@@ -482,6 +482,9 @@ def _extract_bbox_list(node: Mapping[str, Any]) -> list[list[float]] | None:
 
 
 def _extract_page(node: Mapping[str, Any]) -> int | None:
+    page = node.get("page")
+    if isinstance(page, Mapping):
+        return _extract_page({"page": page.get("number")})
     for key in ("page", "page_number", "pageNumber"):
         value = _coerce_int(node.get(key))
         if value is not None and value >= 1:
@@ -507,7 +510,16 @@ def _extract_dimensions(node: Mapping[str, Any]) -> tuple[float, float] | None:
     if width is not None and height is not None and width > 0 and height > 0:
         return width, height
 
-    for key in ("page_dimensions", "pageDimensions", "page_size", "pageSize", "dimensions", "image_size", "imageSize"):
+    for key in (
+        "page",
+        "page_dimensions",
+        "pageDimensions",
+        "page_size",
+        "pageSize",
+        "dimensions",
+        "image_size",
+        "imageSize",
+    ):
         size = _as_mapping(node.get(key))
         width = _coerce_float(_first_present(size, ("width", "w")))
         height = _coerce_float(_first_present(size, ("height", "h")))

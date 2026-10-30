@@ -102,3 +102,32 @@ def test_confidence_only_option_keeps_genuine_page_citations(include_confidence_
     assert by_path["properties[0].page_only"].page == 3
     assert by_path["properties[0].page_only"].bbox is None
     assert by_path["properties[0].boxed"].bbox == [0.1, 0.2, 0.1, 0.1]
+
+
+def test_extend_nested_page_object_normalizes_pixel_polygon() -> None:
+    from extract_bench.inference.providers.extract.citations import extract_extend_field_citations
+
+    citations = extract_extend_field_citations(
+        {
+            "processor_run": {
+                "output": {
+                    "metadata": {
+                        "amount": {
+                            "citations": [
+                                {
+                                    "page": {"number": 2, "width": 1000, "height": 2000},
+                                    "polygon": [
+                                        {"x": 100, "y": 200},
+                                        {"x": 300, "y": 200},
+                                        {"x": 300, "y": 260},
+                                        {"x": 100, "y": 260},
+                                    ],
+                                }
+                            ]
+                        },
+                    }
+                }
+            }
+        }
+    )
+    assert [(c.field_path, c.page, c.bbox) for c in citations] == [("amount", 2, [0.1, 0.1, 0.2, 0.03])]
