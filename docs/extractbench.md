@@ -77,6 +77,14 @@ The four self-hosted pipelines need an endpoint you run yourself; see [.env.exam
 
 The three LlamaExtract leaderboard pipelines select Extract v2.6 with citations enabled and no custom Parse configuration. All three return word-level citation boxes.
 
+### Parseur verification
+
+The Parseur row uses our independent verification of all 370 documents, completed on 2026-10-30. Outputs affected by the account’s page limit and processing failures were reprocessed. There are 369 successful documents; `medium/nport__advisors_inner_circle_fund.pdf` still fails and scores zero. Overall and split quality scores include that failure.
+
+This verification used frozen dataset revision `f6180e9` and our internal unified scorer, rather than the submission’s dataset and scorer revisions.
+
+The pipeline is `parseur_extract_v3_vision` (AI Vision v3). Cost remains the listed flat $0.05/page. The latency columns retain Parseur’s submitted upload-to-result measurements; our reprocess timings are separate and do not verify those columns.
+
 ## Cost of a full run
 
 Costs use each provider's official listed price.
@@ -85,7 +93,7 @@ Costs use each provider's official listed price.
 |---|---:|---|
 | Commercial VLM | $10 – $49 | GPT-5.4 Nano ~$10, Gemini 3.5 Flash ~$49 |
 | LlamaExtract | $49 – $395 | Cost-Effective ~$49, Agentic ~$152, Agentic Plus ~$395 |
-| Specialized APIs | $170 – $487 | Datalab ~$170, Reducto Deep Extract ~$309, Extend ~$487 |
+| Specialized APIs | $170 – $487 | Datalab ~$170, Parseur ~$243, Reducto Deep Extract ~$309, Extend ~$487 |
 | Coding agents | $787 – $1,355 | Claude Code (Opus 4.8) ~$787, Codex (GPT-5.5) ~$1,355 |
 | Self-hosted open weights | GPU time only | Qwen3.6 35B, Gemma4 26B, NuExtract3, Lift Datalab 9B |
 

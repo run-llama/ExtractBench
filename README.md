@@ -64,7 +64,7 @@ In the official benchmark, documents that fail or exceed a 30-minute limit score
 | 9 | Codex (GPT-6.1 Terra Evidence) | Coding Agents | 94.28 | 96.26 | 91.86 | 81.21 | 4.68¢ |
 | 10 | LlamaExtract Cost-Effective | LlamaExtract | 94.21 | 95.49 | 91.58 | 90.86 | 1.00¢ |
 
-Top 10 of 52 systems — full table in [leaderboard.csv](leaderboard.csv).
+Top 10 of 53 systems — full table in [leaderboard.csv](leaderboard.csv).
 <!-- LEADERBOARD:END -->
 
 <!-- GROUNDING:START -->
@@ -89,7 +89,7 @@ Top 10 of 52 systems — full table in [leaderboard.csv](leaderboard.csv).
   </tbody>
 </table>
 
-Top 10 of 52 systems — full table in [leaderboard.csv](leaderboard.csv).
+Top 10 of 53 systems — full table in [leaderboard.csv](leaderboard.csv).
 <!-- GROUNDING:END -->
 
 ### ExtractBench Pro leaderboard
