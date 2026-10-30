@@ -85,7 +85,7 @@ Costs use each provider's official listed price.
 |---|---:|---|
 | Commercial VLM | $10 – $49 | GPT-5.4 Nano ~$10, Gemini 3.5 Flash ~$49 |
 | LlamaExtract | $49 – $395 | Cost-Effective ~$49, Agentic ~$152, Agentic Plus ~$395 |
-| Specialized APIs | $170 – $487 | Datalab ~$170, Reducto Deep Extract ~$309, Extend ~$487 |
+| Specialized APIs | $170 – $487 | Datalab ~$170, Parseur ~$243, Reducto Deep Extract ~$309, Extend ~$487 |
 | Coding agents | $787 – $1,355 | Claude Code (Opus 4.8) ~$787, Codex (GPT-5.5) ~$1,355 |
 | Self-hosted open weights | GPU time only | Qwen3.6 35B, Gemma4 26B, NuExtract3, Lift Datalab 9B |
 

@@ -33,6 +33,7 @@ _PROVIDER_MODULES = [
     "nuextract3_extract",
     "openai_responses",
     "kynex",
+    "parseur",
     "pulse",
     "reducto",
     "table_codegen_extract",
