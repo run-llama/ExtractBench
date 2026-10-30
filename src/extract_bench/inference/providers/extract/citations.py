@@ -12,18 +12,6 @@ from extract_bench.schemas.extract_output import FieldCitation
 
 logger = logging.getLogger(__name__)
 
-_STRUCTURAL_KEYS = {
-    "citation",
-    "citations",
-    "document_metadata",
-    "field_metadata",
-    "fields",
-    "metadata",
-    "page_metadata",
-    "properties",
-    "row_metadata",
-}
-
 
 def extract_extend_field_citations(raw_output: Mapping[str, Any]) -> list[FieldCitation]:
     """Extract citations from Extend AI processor-run metadata."""
@@ -33,11 +21,34 @@ def extract_extend_field_citations(raw_output: Mapping[str, Any]) -> list[FieldC
 
 
 def extract_reducto_field_citations(raw_output: Mapping[str, Any]) -> list[FieldCitation]:
-    """Extract citations from Reducto Extract result payloads."""
+    """Extract citations from Reducto's value/citations field wrappers."""
     result = raw_output.get("result")
-    if isinstance(result, list) and result:
+    if isinstance(result, list) and len(result) > 0:
         result = result[0]
-    return _dedupe(_collect_recursive(node=_as_mapping(result), source="reducto", path=[]))
+    return _dedupe(_collect_reducto_citations(result, path=[]))
+
+
+def _collect_reducto_citations(node: Any, *, path: list[str]) -> list[FieldCitation]:
+    citations: list[FieldCitation] = []
+    if isinstance(node, Mapping):
+        if "value" in node and "citations" in node:
+            citations.extend(
+                _collect_node_citations(
+                    field_path=format_field_path(path),
+                    node=node,
+                    source="reducto",
+                    default_page=None,
+                    default_dimensions=None,
+                )
+            )
+            citations.extend(_collect_reducto_citations(node["value"], path=path))
+        else:
+            for key, value in node.items():
+                citations.extend(_collect_reducto_citations(value, path=[*path, key]))
+    elif isinstance(node, Sequence) and not isinstance(node, (str, bytes, bytearray)):
+        for index, item in enumerate(node):
+            citations.extend(_collect_reducto_citations(item, path=[*path, f"[{index}]"]))
+    return citations
 
 
 def extract_landingai_field_citations(
@@ -79,35 +90,37 @@ def extract_landingai_field_citations(
 
 
 def extract_llamaextract_field_citations(metadata: Any, *, source: str) -> list[FieldCitation]:
-    """Extract citations from LlamaExtract metadata in known and fallback shapes."""
+    """Unwrap LlamaExtract's document, page, and row metadata envelopes."""
     metadata_map = _as_mapping(metadata)
-    if not metadata_map:
-        return []
-
+    field_metadata = _as_mapping(metadata_map.get("field_metadata"))
+    sections = ("document_metadata", "page_metadata", "row_metadata")
     citations: list[FieldCitation] = []
+    if any(key in field_metadata for key in sections):
+        envelope = field_metadata
+    else:
+        envelope = metadata_map
+        citations.extend(_collect_field_tree(node=field_metadata, source=source, path=[]))
 
-    for key in ("field_metadata", "document_metadata", "fields"):
-        citations.extend(_collect_field_map(_as_mapping(metadata_map.get(key)), source=source))
+    for key in ("document_metadata", "fields"):
+        citations.extend(_collect_field_tree(node=envelope.get(key), source=source, path=[]))
 
     for key in ("page_metadata", "row_metadata"):
-        entries = metadata_map.get(key)
-        if not isinstance(entries, Sequence) or isinstance(entries, (str, bytes, bytearray)):
-            continue
-        for entry in entries:
+        for entry in _as_sequence(envelope.get(key)):
             entry_map = _as_mapping(entry)
-            default_page = _extract_page(entry_map)
-            default_dimensions = _extract_dimensions(entry_map)
+            field_tree = entry_map
             for field_key in ("field_metadata", "document_metadata", "fields"):
-                citations.extend(
-                    _collect_field_map(
-                        _as_mapping(entry_map.get(field_key)),
-                        source=source,
-                        default_page=default_page,
-                        default_dimensions=default_dimensions,
-                    )
+                if field_key in entry_map:
+                    field_tree = _as_mapping(entry_map[field_key])
+                    break
+            citations.extend(
+                _collect_field_tree(
+                    node=field_tree,
+                    source=source,
+                    path=[],
+                    default_page=_extract_page(entry_map),
+                    default_dimensions=_extract_dimensions(entry_map),
                 )
-
-    citations.extend(_collect_recursive(node=metadata_map, source=source, path=[], root_wrappers_only=True))
+            )
     return _dedupe(citations)
 
 
@@ -191,62 +204,55 @@ def _iter_citation_entries(node: Mapping[str, Any]) -> list[Any]:
     return entries
 
 
-def _collect_recursive(
-    *, node: Any, source: str, path: list[str], root_wrappers_only: bool = False
+def _collect_field_tree(
+    *,
+    node: Any,
+    source: str,
+    path: list[str],
+    default_page: int | None = None,
+    default_dimensions: tuple[float, float] | None = None,
 ) -> list[FieldCitation]:
-    node_map = _as_mapping(node)
-    if not node_map:
-        return []
-
     citations: list[FieldCitation] = []
-    explicit_path = _extract_field_path(node_map)
-    field_path = explicit_path or format_field_path(path)
-    if field_path:
-        for citation in _iter_citation_entries(node_map):
+    if isinstance(node, Mapping):
+        page = _extract_page(node)
+        dimensions = _extract_dimensions(node)
+        if page is not None:
+            default_page = page
+        if dimensions is not None:
+            default_dimensions = dimensions
+        if len(path) > 0:
             citations.extend(
-                _normalize_citation(
-                    field_path=field_path,
-                    citation=citation,
+                _collect_node_citations(
+                    field_path=format_field_path(path),
+                    node=node,
                     source=source,
-                    default_page=_extract_page(node_map),
-                    default_dimensions=_extract_dimensions(node_map),
-                    default_confidence=_extract_confidence(node_map),
+                    default_page=default_page,
+                    default_dimensions=default_dimensions,
                 )
             )
-        if not citations:
-            # See _collect_node_citations: parent-level confidence-only citations
-            # coexist with any leaf citations from the descendant walk below.
-            # Distinct field paths keep them from colliding in the consumer maps.
-            confidence = _extract_confidence(node_map)
-            if confidence is not None:
-                citations.append(
-                    FieldCitation(
-                        field_path=field_path,
-                        page=_extract_page(node_map) or 1,
-                        bbox=None,
-                        source=source,
-                        confidence=confidence,
-                        metadata=_compact_metadata(node_map),
-                    )
-                )
-
-    for key, value in node_map.items():
-        if key in ("citations", "citation"):
-            continue
-        # LlamaExtract wrappers end where the user-defined field tree begins.
-        structural = key in _STRUCTURAL_KEYS and (not root_wrappers_only or (len(path) == 0 and key != "properties"))
-        next_path = path if structural else [*path, key]
-        if isinstance(value, Mapping):
+        for key, value in node.items():
+            if key in ("citation", "citations"):
+                continue
             citations.extend(
-                _collect_recursive(node=value, source=source, path=next_path, root_wrappers_only=root_wrappers_only)
-            )
-        elif isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
-            for index, item in enumerate(value):
-                item_path = next_path if structural else [*next_path, f"[{index}]"]
-                citations.extend(
-                    _collect_recursive(node=item, source=source, path=item_path, root_wrappers_only=root_wrappers_only)
+                _collect_field_tree(
+                    node=value,
+                    source=source,
+                    path=[*path, key],
+                    default_page=default_page,
+                    default_dimensions=default_dimensions,
                 )
-
+            )
+    elif isinstance(node, Sequence) and not isinstance(node, (str, bytes, bytearray)):
+        for index, item in enumerate(node):
+            citations.extend(
+                _collect_field_tree(
+                    node=item,
+                    source=source,
+                    path=[*path, f"[{index}]"],
+                    default_page=default_page,
+                    default_dimensions=default_dimensions,
+                )
+            )
     return citations
 
 
@@ -465,14 +471,6 @@ def _extract_bbox_list(node: Mapping[str, Any]) -> list[list[float]] | None:
         if bbox is not None:
             bboxes.append(bbox)
     return bboxes or None
-
-
-def _extract_field_path(node: Mapping[str, Any]) -> str | None:
-    for key in ("field_path", "fieldPath", "path", "field", "name", "key"):
-        value = node.get(key)
-        if isinstance(value, str) and value:
-            return value
-    return None
 
 
 def _extract_page(node: Mapping[str, Any]) -> int | None:
