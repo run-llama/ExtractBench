@@ -82,7 +82,7 @@ def migrate_pro_layout(root: Path, write: bool = False) -> tuple[str, ...]:
     moves = []
     for old, new in LEGACY_PRO_SPLITS.items():
         source, target = root / old, root / new
-        if source.exists():
+        if source.exists() or source.is_symlink():
             if source.is_symlink() or not source.is_dir() or target.exists():
                 raise ValueError(f"Cannot migrate {source}: unsafe source or target {target} already exists")
             moves.append((source, target))
@@ -110,3 +110,16 @@ def migrate_pro_layout(root: Path, write: bool = False) -> tuple[str, ...]:
         for source, target in moves:
             source.rename(target)
     return plan
+
+
+def repair_pro_layout(root: Path) -> None:
+    """Migrate released split directories before data discovery or cache lookup.
+
+    Canonical trees need only the directory checks. Legacy trees use the full
+    migration preflight so malformed metadata and conflicting paths stop the
+    command before inference can replace a cached prediction.
+    """
+    if not any((root / old).exists() or (root / old).is_symlink() for old in LEGACY_PRO_SPLITS):
+        return
+    changes = migrate_pro_layout(root, write=True)
+    print(f"Updated original Pro names in {root} ({len(changes)} changes).")

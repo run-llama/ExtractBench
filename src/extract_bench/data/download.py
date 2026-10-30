@@ -27,7 +27,7 @@ from collections.abc import Set
 from dataclasses import dataclass
 from pathlib import Path
 
-from extract_bench.data.pro_names import LEGACY_PRO_SPLITS, PRO_SPLITS, canonical_pro_tag
+from extract_bench.data.pro_names import LEGACY_PRO_SPLITS, PRO_SPLITS, canonical_pro_tag, repair_pro_layout
 
 DATASET_REPO = "llamaindex/ExtractBench"
 DATASET_REPO_TYPE = "dataset"
@@ -256,6 +256,9 @@ def download_dataset(
             f"{data_dir} already holds the {kind_existing}; refusing to overlay the "
             f"{kind_requested} into the same directory. Use a different --data_dir."
         )
+
+    if dataset == "pro":
+        repair_pro_layout(data_dir)
 
     if not force and is_dataset_ready(data_dir, dataset, test) and not _revision_is_stale(data_dir, revision, dataset):
         print(f"Dataset already downloaded at: {data_dir}")

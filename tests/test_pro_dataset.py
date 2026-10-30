@@ -1,8 +1,9 @@
 """Pro must remain isolated from original EB through download, loading and run routing."""
 
 import json
+from datetime import UTC, datetime
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import pytest
 
@@ -55,11 +56,15 @@ def test_public_cli_download_reconstructs_all_pro_challenges_for_loader(tmp_path
 def test_download_refuses_other_dataset_even_with_force(tmp_path, existing, requested):
     manifest = {"repo": dataset_config(existing).repo, "test": False}
     (tmp_path / MANIFEST_NAME).write_text(json.dumps(manifest))
+    original = tmp_path / "house_vocabulary/sample.test.json"
+    original.parent.mkdir()
+    original.write_text('{"test_id":"house_vocabulary/sample"}', encoding="utf-8")
     with patch("huggingface_hub.snapshot_download") as snapshot:
         with pytest.raises(RuntimeError, match="belongs to"):
             download_dataset(tmp_path, dataset=requested, force=True)
         snapshot.assert_not_called()
     assert json.loads((tmp_path / MANIFEST_NAME).read_text()) == manifest
+    assert original.read_text(encoding="utf-8") == '{"test_id":"house_vocabulary/sample"}'
 
 
 @pytest.mark.parametrize("kwargs", [{"dataset": "pro", "test": True}, {"dataset": "typo"}])
@@ -128,20 +133,116 @@ def test_failed_refresh_cannot_leave_a_ready_manifest(tmp_path, pro_snapshot):
     assert is_dataset_ready(root, "pro")
 
 
-def test_pro_run_refuses_unmigrated_results_before_starting_paid_inference(tmp_path, monkeypatch):
-    """Canonical case IDs must not turn existing predictions into cache misses and rerun the provider."""
+def test_pro_run_migrates_dataset_and_reuses_prediction_without_calling_provider(tmp_path, monkeypatch) -> None:
+    """Renamed inputs and outputs must meet at the real runner's cache before any model call."""
+    from extract_bench.inference.pipelines import get_pipeline
+    from extract_bench.inference.providers.base import Provider
+    from extract_bench.schemas.extract_output import ExtractOutput
+    from extract_bench.schemas.pipeline_io import InferenceRequest, InferenceResult
+
     monkeypatch.chdir(tmp_path)
-    result = tmp_path / "output-pro/dummy/house_vocabulary/sample.result.json"
+    source = tmp_path / "data-pro/house_vocabulary/sample.pdf"
+    source.parent.mkdir(parents=True)
+    source.write_bytes(b"%PDF-1.4\n")
+    sidecar = {
+        "data_schema": {"type": "object", "properties": {"answer": {"type": "integer"}}},
+        "expected_output": {"answer": 42},
+        "tags": ["challenge:house_vocabulary"],
+    }
+    source.with_suffix(".test.json").write_text(json.dumps(sidecar), encoding="utf-8")
+    pipeline = get_pipeline("llamaextract_agentic")
+    now = datetime.now(UTC)
+    payload = InferenceResult(
+        request=InferenceRequest(
+            example_id="house_vocabulary/sample", source_file_path=str(source), product_type="extract"
+        ),
+        pipeline=pipeline,
+        pipeline_name=pipeline.pipeline_name,
+        product_type="extract",
+        output=ExtractOutput(
+            example_id="house_vocabulary/sample", pipeline_name=pipeline.pipeline_name, extracted_data={"answer": 42}
+        ),
+        raw_output={"example_id": "house_vocabulary/sample"},
+        started_at=now,
+        completed_at=now,
+        latency_in_ms=0,
+    )
+    result = tmp_path / "output-pro" / pipeline.pipeline_name / "house_vocabulary/sample.result.json"
     result.parent.mkdir(parents=True)
-    result.write_text('{"output":{"extracted_data":{"answer":42}}}')
+    result.write_text(payload.model_dump_json(), encoding="utf-8")
+    provider = Mock(spec=Provider)
+    with patch("extract_bench.inference.cli.create_provider", return_value=provider):
+        assert (
+            BenchCLI().run(
+                pipeline.pipeline_name,
+                input_dir="data-pro",
+                dataset="pro",
+                group="house_vocabulary",
+                max_concurrent=1,
+                verbose=True,
+                open_report=False,
+            )
+            == 0
+        )
+    provider.run_inference.assert_not_called()
+    provider.normalize.assert_not_called()
+    current = result.parent.parent / "custom_terminology/sample.result.json"
+    actual = json.loads(current.read_text(encoding="utf-8"))
+    assert actual["request"]["example_id"] == "custom_terminology/sample"
+    assert actual["request"]["source_file_path"] == str(tmp_path / "data-pro/custom_terminology/sample.pdf")
+    assert actual["output"]["extracted_data"] == {"answer": 42}
+    assert actual["raw_output"] == payload.raw_output
+    assert (current.parent.parent / "_evaluation_report_detailed.html").is_file()
+
+
+def test_download_migrates_original_layout_without_downloading_it_again(tmp_path, pro_snapshot) -> None:
+    """A complete original download must become ready without fetching or reconstructing its PDFs."""
+    from extract_bench.data.pro_names import LEGACY_PRO_SPLITS
+
+    root = tmp_path / "data-pro"
+    with patch("huggingface_hub.snapshot_download", return_value=str(pro_snapshot)):
+        download_dataset(root, dataset="pro")
+    manifest = json.loads((root / MANIFEST_NAME).read_text(encoding="utf-8"))
+    for old, new in LEGACY_PRO_SPLITS.items():
+        (root / new).rename(root / old)
+        manifest["per_split"][old] = manifest["per_split"].pop(new)
+    (root / MANIFEST_NAME).write_text(json.dumps(manifest), encoding="utf-8")
     with (
-        patch("extract_bench.pipeline.cli.is_dataset_ready", return_value=True),
-        patch("extract_bench.pipeline.cli.InferenceCLI") as inference,
+        patch("huggingface_hub.HfApi") as api,
+        patch(
+            "huggingface_hub.snapshot_download", side_effect=AssertionError("Complete legacy download fetched again")
+        ) as snapshot,
     ):
-        inference.return_value.run.return_value = 1
-        assert BenchCLI().run("dummy", dataset="pro", open_report=False) == 1
-        inference.assert_not_called()
-    assert result.exists()
+        api.return_value.repo_info.return_value.sha = manifest["revision"]
+        assert download_dataset(root, dataset="pro") == root
+        snapshot.assert_not_called()
+    assert is_dataset_ready(root, "pro")
+    assert all((root / split / "sample.pdf").read_bytes() == b"%PDF-1.4\n" for split in dataset_config("pro").splits)
+
+
+@pytest.mark.parametrize("damage", ["collision", "malformed"])
+def test_unsafe_result_migration_stops_before_provider_creation(tmp_path, pro_snapshot, damage) -> None:
+    """Conflicting or malformed cached results must survive unchanged without starting inference."""
+    result = tmp_path / "output/llamaextract_agentic/house_vocabulary/sample.result.json"
+    result.parent.mkdir(parents=True)
+    original = '{"truncated":' if damage == "malformed" else '{"request":{},"output":{}}'
+    result.write_text(original, encoding="utf-8")
+    if damage == "collision":
+        (result.parent.parent / "custom_terminology").mkdir()
+    with patch("extract_bench.inference.cli.create_provider") as provider:
+        assert (
+            BenchCLI().run(
+                "llamaextract_agentic",
+                input_dir=pro_snapshot,
+                output_dir=tmp_path / "output",
+                dataset="pro",
+                max_concurrent=1,
+                open_report=False,
+            )
+            == 1
+        )
+        provider.assert_not_called()
+    assert result.read_text(encoding="utf-8") == original
 
 
 def test_original_pro_group_alias_reaches_both_inference_and_evaluation(tmp_path, monkeypatch):

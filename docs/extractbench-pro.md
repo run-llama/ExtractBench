@@ -60,18 +60,7 @@ Both leaderboard views use the same runs and document denominators. The **30-min
 
 Pro has no `--test` subset. To try a pipeline on a smaller slice, run a single challenge with `--group`; `long_single_pages` is the smallest by page count (7 documents, 7 pages).
 
-### Existing downloads and results
-
-The renamed splits change local paths and case IDs. To reuse existing downloads and cached predictions, stop any active Pro runs and migrate each dataset or pipeline directory. Omit `--write` to preview the changes:
-
-```bash
-extract-bench data migrate_pro_names data-pro --write
-extract-bench data migrate_pro_names output-pro/<pipeline> --write
-extract-bench run <pipeline> --dataset pro --skip_inference
-```
-
-Migration preserves PDF and prediction content; the last command regenerates evaluations without inference. Original HF split names and `--group` names remain accepted by the framework.
-
+`download --dataset pro` updates existing downloads to the current names. `run --dataset pro` also updates cached prediction paths and IDs before inference, preserving PDF and prediction content. Conflicting paths or malformed legacy metadata stop the repair. Original `--group` names remain accepted.
 
 ## Leaderboard pipelines
 

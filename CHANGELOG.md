@@ -8,7 +8,7 @@ All notable changes to `llama-extract-bench` are recorded here. The format follo
 
 ### Dataset layout
 
-- ExtractBench Pro uses canonical challenge names in splits, case IDs, paths, and leaderboard rows. The downloader accepts original HF split names, `run --dataset pro` accepts old group aliases, and `data migrate_pro_names` translates existing local data and cached prediction envelopes without inference. Pro Harbor task IDs use only the document identifier, independent of challenge names, without legacy aliases. Benchmark content and scoring are unchanged.
+- ExtractBench Pro uses canonical challenge names in splits, case IDs, paths, and leaderboard rows. Pro downloads and runs automatically repair original local paths and identity metadata before reusing cached predictions; original HF split names and group aliases remain accepted. Pro Harbor task IDs use only the document identifier, independent of challenge names, without legacy aliases. Benchmark content and scoring are unchanged.
 
 
 ### Packaging
