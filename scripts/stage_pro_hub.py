@@ -54,7 +54,8 @@ def stage(export: Path, output: Path, revision: str) -> None:
     readme = (export / "README.md").read_text()
     readme += (
         "\n## Harbor Hub release\n\n"
-        f"This candidate is based on HF commit `{revision}` and uses canonical task names. "
+        f"This candidate is based on HF commit `{revision}` and uses task names "
+        "derived from document identifiers, independent of challenge labels. "
         "Original Harbor task names have no aliases in this release.\n\n"
         f"```bash\nharbor run -d llamaindex/extractbench-pro@hf-{revision[:12]} "
         "-a codex -m MODEL --allow-agent-host MODEL_API_HOST\n```\n"

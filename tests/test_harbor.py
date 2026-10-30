@@ -306,3 +306,41 @@ def test_smoke_rejects_unregistered_hf_splits_instead_of_silently_skipping_their
     (snapshot / "new_split.jsonl").write_text('{"id": "new_split/unvalidated"}\n')
     with pytest.raises(ValueError, match="HF JSONL splits differ"):
         smoke["validate_source_splits"](snapshot, splits)
+
+
+def test_pro_task_identity_survives_challenge_reclassification(tmp_path, snapshot):
+    """Changing a Pro split must not change either the task slug or its hash."""
+    row = json.loads((snapshot / "short.jsonl").read_text())
+    manifests = []
+    for split in ("charts", "counting"):
+        for name in dataset_config("pro").splits:
+            (snapshot / f"{name}.jsonl").write_text("")
+        pdf = snapshot / "docs" / split / "sample.pdf"
+        pdf.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(snapshot / "docs/short/sample.pdf", pdf)
+        row.update(
+            id=f"{split}/sample", category=split, pdf=str(pdf.relative_to(snapshot)), tags=[f"challenge:{split}"]
+        )
+        (snapshot / f"{split}.jsonl").write_text(json.dumps(row) + "\n")
+        output = tmp_path / split
+        manifest = export_snapshot(snapshot, output, "pro", "a" * 40, "b" * 40)
+        task_id = next(iter(manifest["tasks"]))
+        config = tomllib.loads((output / "tasks" / task_id / "task.toml").read_text())
+        assert config["metadata"]["source_case_id"] == row["id"]
+        assert config["metadata"]["source_split"] == split
+        assert config["metadata"]["tags"] == row["tags"]
+        manifests.append(manifest)
+    assert manifests[0]["tasks"].keys() == manifests[1]["tasks"].keys()
+    assert next(iter(manifests[0]["tasks"])).startswith("sample-")
+
+
+def test_pro_duplicate_document_names_across_challenges_fail_before_export(tmp_path, snapshot):
+    """Removing the split must not silently overwrite another document's task."""
+    row = json.loads((snapshot / "short.jsonl").read_text())
+    for split in dataset_config("pro").splits:
+        row.update(id=f"{split}/sample", category=split)
+        (snapshot / f"{split}.jsonl").write_text(json.dumps(row) + "\n")
+    output = tmp_path / "export"
+    with pytest.raises(ValueError, match="Colliding case ID"):
+        export_snapshot(snapshot, output, "pro", "a" * 40, "b" * 40)
+    assert not output.exists()
