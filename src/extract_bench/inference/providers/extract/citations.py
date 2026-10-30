@@ -107,7 +107,7 @@ def extract_llamaextract_field_citations(metadata: Any, *, source: str) -> list[
                     )
                 )
 
-    citations.extend(_collect_recursive(node=metadata_map, source=source, path=[]))
+    citations.extend(_collect_recursive(node=metadata_map, source=source, path=[], root_wrappers_only=True))
     return _dedupe(citations)
 
 
@@ -191,7 +191,9 @@ def _iter_citation_entries(node: Mapping[str, Any]) -> list[Any]:
     return entries
 
 
-def _collect_recursive(*, node: Any, source: str, path: list[str]) -> list[FieldCitation]:
+def _collect_recursive(
+    *, node: Any, source: str, path: list[str], root_wrappers_only: bool = False
+) -> list[FieldCitation]:
     node_map = _as_mapping(node)
     if not node_map:
         return []
@@ -231,13 +233,19 @@ def _collect_recursive(*, node: Any, source: str, path: list[str]) -> list[Field
     for key, value in node_map.items():
         if key in ("citations", "citation"):
             continue
-        next_path = path if key in _STRUCTURAL_KEYS else [*path, key]
+        # LlamaExtract wrappers end where the user-defined field tree begins.
+        structural = key in _STRUCTURAL_KEYS and (not root_wrappers_only or (len(path) == 0 and key != "properties"))
+        next_path = path if structural else [*path, key]
         if isinstance(value, Mapping):
-            citations.extend(_collect_recursive(node=value, source=source, path=next_path))
+            citations.extend(
+                _collect_recursive(node=value, source=source, path=next_path, root_wrappers_only=root_wrappers_only)
+            )
         elif isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
             for index, item in enumerate(value):
-                item_path = next_path if key in _STRUCTURAL_KEYS else [*next_path, f"[{index}]"]
-                citations.extend(_collect_recursive(node=item, source=source, path=item_path))
+                item_path = next_path if structural else [*next_path, f"[{index}]"]
+                citations.extend(
+                    _collect_recursive(node=item, source=source, path=item_path, root_wrappers_only=root_wrappers_only)
+                )
 
     return citations
 
