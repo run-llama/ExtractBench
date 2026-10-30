@@ -94,23 +94,25 @@ Top 10 of 52 systems — full table in [leaderboard.csv](leaderboard.csv).
 
 ### ExtractBench Pro leaderboard
 
+The Max Effort entry was evaluated on the development API on October 30, 2026; production parity was not measured. See its [configuration and aggregate run evidence](docs/agentic-plus-max-effort-results.json).
+
 <!-- PRO_LEADERBOARD:START -->
 Rows are ordered by % Perfect, then Value F1, then lower cost.
 
 | Rank | Provider | Category | % Perfect | Value F1 | Grounding F1 | ¢ / Page |
 |---:|---|---|---:|---:|---:|---:|
-| 1 | Codex GPT-6 Astra | Coding Agents | **58** | **94.53** | **70.97** | 95.20¢ |
-| 2 | Claude Code Opus 5.5 | Coding Agents | <u>51</u> | 74.87 | 45.29 | 41.20¢ |
-| 3 | LlamaExtract Agentic Plus | LlamaExtract | 38 | <u>77.70</u> | 60.39 | 7.50¢ |
-| 4 | Extend Operator | Specialized APIs | 34 | 73.87 | 57.75 | 9.88¢ |
-| 5 | Claude Code Sonnet 5.5 | Coding Agents | 32 | 73.62 | 40.47 | 19.98¢ |
-| 6 | Gemini CLI (Gemini 4 Argon Medium) | Coding Agents | 30 | 42.98 | 33.90 | 36.16¢ |
-| 7 | Codex GPT-6.1 Terra Medium | Coding Agents | 27 | 74.19 | 60.16 | 4.06¢ |
-| 8 | LlamaExtract Agentic | LlamaExtract | 20 | 71.32 | 58.01 | 3.12¢ |
-| 9 | Pulse Effort | Specialized APIs | 18 | 70.53 | 18.74 | 10.50¢ |
-| 10 | Codex GPT-6.1 Sol | Coding Agents | 12 | 74.06 | <u>63.96</u> | 13.86¢ |
+| 1 | LlamaExtract Agentic Plus (Max Effort) | LlamaExtract | **61** | <u>94.32</u> | 57.02 | 12.71¢ |
+| 2 | Codex GPT-6 Astra | Coding Agents | <u>58</u> | **94.53** | **70.97** | 95.20¢ |
+| 3 | Claude Code Opus 5.5 | Coding Agents | 51 | 74.87 | 45.29 | 41.20¢ |
+| 4 | LlamaExtract Agentic Plus | LlamaExtract | 38 | 77.70 | 60.39 | 7.50¢ |
+| 5 | Extend Operator | Specialized APIs | 34 | 73.87 | 57.75 | 9.88¢ |
+| 6 | Claude Code Sonnet 5.5 | Coding Agents | 32 | 73.62 | 40.47 | 19.98¢ |
+| 7 | Gemini CLI (Gemini 4 Argon Medium) | Coding Agents | 30 | 42.98 | 33.90 | 36.16¢ |
+| 8 | Codex GPT-6.1 Terra Medium | Coding Agents | 27 | 74.19 | 60.16 | 4.06¢ |
+| 9 | LlamaExtract Agentic | LlamaExtract | 20 | 71.32 | 58.01 | 3.12¢ |
+| 10 | Pulse Effort | Specialized APIs | 18 | 70.53 | 18.74 | 10.50¢ |
 
-Top 10 of 15 systems — full table in [leaderboard-pro.csv](leaderboard-pro.csv). Scores with no time limit are also available there.
+Top 10 of 16 systems — full table in [leaderboard-pro.csv](leaderboard-pro.csv). Scores with no time limit are also available there.
 <!-- PRO_LEADERBOARD:END -->
 
 ### Submitting results

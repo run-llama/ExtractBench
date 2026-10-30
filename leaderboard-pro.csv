@@ -1,4 +1,11 @@
 Provider,Category,Challenge,Documents,Grounding_Documents,Perfect_Documents,Value_F1,Word_Grounding,Page_Grounding,Cost_Per_Page,Perfect_Documents_No_Time_Limit,Value_F1_No_Time_Limit,Word_Grounding_No_Time_Limit,Page_Grounding_No_Time_Limit
+LlamaExtract Agentic Plus (Max Effort),LlamaExtract,all,100,81,61.00,94.32,57.02,78.45,0.127128,61.00,94.32,57.02,78.45
+LlamaExtract Agentic Plus (Max Effort),LlamaExtract,document_conventions,22,22,27.27,99.83,77.40,96.44,0.119143,27.27,99.83,77.40,96.44
+LlamaExtract Agentic Plus (Max Effort),LlamaExtract,house_vocabulary,14,14,85.71,99.73,44.69,54.27,0.077902,85.71,99.73,44.69,54.27
+LlamaExtract Agentic Plus (Max Effort),LlamaExtract,house_counting_rules,12,9,50.00,68.72,44.87,40.00,0.082733,50.00,68.72,44.87,40.00
+LlamaExtract Agentic Plus (Max Effort),LlamaExtract,drawn_relations,20,19,85.00,98.74,65.42,87.31,0.196083,85.00,98.74,65.42,87.31
+LlamaExtract Agentic Plus (Max Effort),LlamaExtract,charts_inside_documents,25,10,72.00,95.01,64.33,78.89,0.116539,72.00,95.01,64.33,78.89
+LlamaExtract Agentic Plus (Max Effort),LlamaExtract,long_chart_sheets,7,7,28.57,95.02,0.00,95.02,4.188929,28.57,95.02,0.00,95.02
 LlamaExtract Agentic Plus,LlamaExtract,all,100,81,38.00,77.70,60.39,66.01,0.075000,38.00,77.70,60.39,66.01
 LlamaExtract Agentic Plus,LlamaExtract,document_conventions,22,22,22.73,97.45,73.21,83.57,0.075000,22.73,97.45,73.21,83.57
 LlamaExtract Agentic Plus,LlamaExtract,house_vocabulary,14,14,64.29,98.64,61.22,68.61,0.075000,64.29,98.64,61.22,68.61
