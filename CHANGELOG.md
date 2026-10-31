@@ -8,7 +8,14 @@ All notable changes to `llama-extract-bench` are recorded here. The format follo
 
 ### Dataset layout
 
-- ExtractBench Pro uses canonical challenge names in splits, case IDs, paths, and leaderboard rows. Pro downloads and runs automatically repair original local paths and identity metadata before reusing cached predictions; original HF split names and group aliases remain accepted. Pro Harbor task IDs use only the document identifier, independent of challenge names, without legacy aliases. Benchmark content and scoring are unchanged.
+- Rename the six ExtractBench Pro challenges and their split files, case-ID prefixes, PDF paths, tags, and leaderboard keys:
+  - Document conventions (`document_conventions`) → Interpretation rules (`interpretation_rules`).
+  - House vocabulary (`house_vocabulary`) → Custom terminology (`custom_terminology`).
+  - House counting rules (`house_counting_rules`) → Conditional aggregation (`conditional_aggregation`).
+  - Drawn relations (`drawn_relations`) → Relational diagrams (`relational_diagrams`).
+  - Charts inside documents (`charts_inside_documents`) → Charts and maps (`charts_and_maps`).
+  - Long chart sheets (`long_chart_sheets`) → Long single pages (`long_single_pages`).
+- Pro downloads and runs automatically repair original local paths and identity metadata before reusing cached predictions; original HF split names and group aliases remain accepted. Pro Harbor task IDs use only the document identifier, independent of challenge names, without legacy aliases. Benchmark content and scoring are unchanged.
 
 
 ### Packaging

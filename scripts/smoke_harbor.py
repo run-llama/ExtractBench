@@ -166,6 +166,9 @@ def smoke(output: Path, extractbench_revision: str = "main", pro_revision: str =
                 config.repo,
                 repo_type="dataset",
                 revision=revision,
+                # Materialize files: HF cache snapshots link PDFs outside their
+                # snapshot root, which the release stager rejects as unsafe.
+                local_dir=output / "sources" / dataset / revision,
                 allow_patterns=[
                     "README.md",
                     ".gitattributes",
@@ -180,7 +183,7 @@ def smoke(output: Path, extractbench_revision: str = "main", pro_revision: str =
         original_snapshot = snapshot
         source_splits = config.splits
         if dataset == "pro" and (snapshot / "house_vocabulary.jsonl").is_file():
-            source_splits = ("document_conventions", *LEGACY_PRO_SPLITS)
+            source_splits = tuple(LEGACY_PRO_SPLITS)
         validate_source_splits(snapshot, source_splits)
         original_rows = {
             row["id"]: row
