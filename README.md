@@ -58,13 +58,13 @@ In the official benchmark, documents that fail or exceed a 30-minute limit score
 | 3 | Pulse (Effort) | Specialized APIs | 96.07 | 96.83 | 94.70 | 93.24 | 10.50¢ |
 | 4 | LlamaExtract Agentic | LlamaExtract | 95.65 | 96.06 | <u>94.79</u> | **94.73** | 3.12¢ |
 | 5 | Codex (GPT-6.1 Sol Evidence) | Coding Agents | 95.31 | 97.01 | 92.96 | 85.46 | 7.13¢ |
-| 6 | Claude Code (Sonnet 5.5 Evidence) | Coding Agents | 94.68 | 96.22 | 92.97 | 83.69 | 5.69¢ |
-| 7 | Codex (GPT-6 Sol Evidence) | Coding Agents | 94.57 | 95.99 | 92.42 | 87.25 | 9.80¢ |
-| 8 | Pulse (Non-effort) | Specialized APIs | 94.51 | 95.39 | 92.49 | 93.31 | 3.00¢ |
-| 9 | Codex (GPT-6.1 Terra Evidence) | Coding Agents | 94.28 | 96.26 | 91.86 | 81.21 | 4.68¢ |
-| 10 | LlamaExtract Cost-Effective | LlamaExtract | 94.21 | 95.49 | 91.58 | 90.86 | 1.00¢ |
+| 6 | KYNEX (GPT-6.1 Sol) | Coding Agents | 94.72 | 96.04 | 93.14 | 85.83 | 9.35¢ |
+| 7 | Claude Code (Sonnet 5.5 Evidence) | Coding Agents | 94.68 | 96.22 | 92.97 | 83.69 | 5.69¢ |
+| 8 | Codex (GPT-6 Sol Evidence) | Coding Agents | 94.57 | 95.99 | 92.42 | 87.25 | 9.80¢ |
+| 9 | Pulse (Non-effort) | Specialized APIs | 94.51 | 95.39 | 92.49 | 93.31 | 3.00¢ |
+| 10 | Codex (GPT-6.1 Terra Evidence) | Coding Agents | 94.28 | 96.26 | 91.86 | 81.21 | 4.68¢ |
 
-Top 10 of 52 systems — full table in [leaderboard.csv](leaderboard.csv).
+Top 10 of 54 systems — full table in [leaderboard.csv](leaderboard.csv).
 <!-- LEADERBOARD:END -->
 
 <!-- GROUNDING:START -->
@@ -89,7 +89,7 @@ Top 10 of 52 systems — full table in [leaderboard.csv](leaderboard.csv).
   </tbody>
 </table>
 
-Top 10 of 52 systems — full table in [leaderboard.csv](leaderboard.csv).
+Top 10 of 54 systems — full table in [leaderboard.csv](leaderboard.csv).
 <!-- GROUNDING:END -->
 
 ### ExtractBench Pro leaderboard
