@@ -19,7 +19,7 @@ This repository hosts two benchmarks. They share the task, the evaluator, the me
 | Benchmark | What makes it hard | Size | Documents | Dataset | Details |
 |---|---|---|---|---|---|
 | **ExtractBench** | Long lists, needles in long documents, dense forms, scans, and handwriting | 370 documents, 4,869 pages, 67 document types | Real public records, plus synthetic long lists rendered from real layouts | [llamaindex/ExtractBench](https://huggingface.co/datasets/llamaindex/ExtractBench) | [docs/extractbench.md](docs/extractbench.md) · [launch post](https://www.llamaindex.ai/blog/introducing-extractbench) |
-| **ExtractBench Pro** | Values read off charts and drawings, counted under house rules, or decoded with house vocabulary | 100 documents, 2,622 pages, 86 document types | Synthetic, derived from real long-tail documents | [llamaindex/ExtractBenchPro](https://huggingface.co/datasets/llamaindex/ExtractBenchPro) | [docs/extractbench-pro.md](docs/extractbench-pro.md) · [launch post](https://www.llamaindex.ai/blog/introducing-extractbench-pro) |
+| **ExtractBench Pro** | Values read off charts and drawings, counted under house rules, or decoded with custom terminology | 100 documents, 2,622 pages, 86 document types | Synthetic, derived from real long-tail documents | [llamaindex/ExtractBenchPro](https://huggingface.co/datasets/llamaindex/ExtractBenchPro) | [docs/extractbench-pro.md](docs/extractbench-pro.md) · [launch post](https://www.llamaindex.ai/blog/introducing-extractbench-pro) |
 
 <p align="center">
   <img src="docs/extractbench_teaser.png" alt="ExtractBench: JSON Schema and document in; JSON plus evidence out; scored on value F1, grounding F1, challenge tags, and cost" width="100%">
@@ -170,7 +170,7 @@ Both datasets are hosted on Hugging Face and download automatically the first ti
 | `--dataset` | `extractbench` (default) | `pro` |
 | Local data | `data/` | `data-pro/` |
 | Results | `output/` | `output-pro/` |
-| `--group` values | `short`, `medium`, `long` | `document_conventions`, `house_vocabulary`, `house_counting_rules`, `drawn_relations`, `charts_inside_documents`, `long_chart_sheets` |
+| `--group` values | `short`, `medium`, `long` | `interpretation_rules`, `custom_terminology`, `conditional_aggregation`, `relational_diagrams`, `charts_and_maps`, `long_single_pages` |
 | `--test` subset | 6 documents | none |
 | Splits, tags, sources, ground truth | [docs/extractbench.md](docs/extractbench.md) | [docs/extractbench-pro.md](docs/extractbench-pro.md) |
 
@@ -230,7 +230,7 @@ uv run extract-bench run <pipeline_name> --dataset pro
 
 # Evaluate a single split (ExtractBench) or challenge (Pro) only
 uv run extract-bench run <pipeline_name> --group short
-uv run extract-bench run <pipeline_name> --dataset pro --group house_vocabulary
+uv run extract-bench run <pipeline_name> --dataset pro --group custom_terminology
 
 # Skip calling the extraction system — just re-evaluate existing results
 uv run extract-bench run <pipeline_name> --skip_inference

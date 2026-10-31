@@ -57,11 +57,12 @@ def _write_json(path: Path, value: Any) -> None:
     path.write_text(json.dumps(value, ensure_ascii=False, indent=2, allow_nan=False) + "\n", encoding="utf-8")
 
 
-def _task_id(case_id: str) -> str:
+def _task_id(case_id: str, dataset: str) -> str:
     if Path(case_id).is_absolute() or ".." in Path(case_id).parts:
         raise ValueError(f"Unsafe case ID: {case_id!r}")
-    slug = re.sub(r"[^a-z0-9-]", "-", case_id.lower().replace("/", "--"))[:64].strip("-")
-    return f"{slug}-{hashlib.sha256(case_id.encode()).hexdigest()[:10]}"
+    identity = case_id.partition("/")[2] if dataset == "pro" else case_id
+    slug = re.sub(r"[^a-z0-9-]", "-", identity.lower().replace("/", "--"))[:64].strip("-")
+    return f"{slug}-{hashlib.sha256(identity.encode()).hexdigest()[:10]}"
 
 
 def _task_config(row: Mapping[str, Any], repo: str, revision: str, scorer_revision: str, timeout: int) -> str:
@@ -120,7 +121,7 @@ def export_snapshot(snapshot: Path, output: Path, dataset: str, revision: str, s
             if row["category"] != split or not case_id.startswith(split + "/"):
                 raise ValueError(f"Case {case_id!r} does not belong to {split}")
             # A flat task directory supports Harbor's default tasks/ discovery.
-            task_id = _task_id(case_id)
+            task_id = _task_id(case_id, dataset)
             if task_id in task_ids:
                 raise ValueError(f"Colliding case ID: {case_id!r}")
             task_ids.add(task_id)
@@ -194,7 +195,7 @@ The oracle copies the reference output; it checks packaging and grading, not ext
         attributes = attributes.rstrip() + "\n" + pdf_rule + "\n"
     (output / ".gitattributes").write_text(attributes, encoding="utf-8")
     for index, row in enumerate(rows, start=1):
-        task_id = _task_id(row["id"])
+        task_id = _task_id(row["id"], dataset)
         task = tasks / task_id
         env = task / "environment"
         tests = task / "tests"

@@ -43,6 +43,10 @@ are rejected rather than silently retained.
 `harbor-manifest.json` records source/scorer revisions, JSONL SHA-256 hashes,
 the original ID for every task, and every generated task file's hash. Directory
 names are bounded lowercase slugs with a source-ID hash to avoid collisions.
+Pro task names use only the document identifier below the split, including for
+the hash, so moving a document between challenges does not rename its task.
+The source case ID, split, and challenge tags remain in task metadata.
+Duplicate document identifiers across Pro splits are rejected before export.
 
 ## Validate an export
 
@@ -98,3 +102,20 @@ The command verifies task hashes and opens a Hugging Face dataset PR using
 `create_pr=True` and a `parent_commit` guard against the pinned source revision.
 Only `README.md`, `.gitattributes`, `harbor-manifest.json`, and `tasks/**` are
 uploaded; original JSONL/PDF source files are never uploaded or replaced.
+
+## Canonical Pro split-name migration
+
+All six original split names are replaced by `interpretation_rules`, `custom_terminology`, `conditional_aggregation`, `relational_diagrams`, `charts_and_maps`, and `long_single_pages`. `scripts/rename_pro_splits.py` stages the renamed JSONL/PDF paths and records the complete case mapping plus unchanged PDF SHA-256 hashes. It never publishes. Verify source row payloads and PDFs, then review the data commit before regenerating Harbor against that commit. The HF migration must remove the original split files, PDF paths, and superseded task directories; an ordinary overlay upload alone does not perform those deletions.
+
+The new Pro task directories omit the challenge component from both the slug and its hash. All 100 task names change, including the Interpretation rules tasks. No aliases are provided for the original Harbor names. Validate the same PDFs, schemas, prompt, reference answers, verifier, and scorer pin before releasing the new packages.
+
+Prepare an unpublished Hub candidate from the validated export:
+
+```bash
+uv run --with harbor==0.24.0 python scripts/stage_pro_hub.py \
+  --export <validated-canonical-export> \
+  --output <fresh-hub-staging-directory> \
+  --hf-revision <full-reviewed-HF-commit>
+```
+
+The script adds explicit `llamaindex/<canonical-task-id>` package names with schema 1.4, verifies the execution settings, and writes content-pinned task references to `dataset.toml`. Review it before any separate `harbor publish` operation. Publishing the candidate changes the Hub release and requires release approval.
