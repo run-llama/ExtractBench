@@ -111,3 +111,10 @@ def test_default_polling_outlasts_the_one_hour_per_file_deadline() -> None:
     )
 
     assert provider._max_polls * provider._poll_interval >= 3600
+
+
+def test_unresolved_block_id_does_not_claim_page_one() -> None:
+    citations = _build_field_citations({"amount": 10, "amount_citations": ["missing-block"]}, block_lookup={})
+    assert len(citations) == 1
+    assert citations[0].page is None
+    assert citations[0].bbox is None

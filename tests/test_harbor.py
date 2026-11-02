@@ -2,6 +2,7 @@
 
 import json
 import runpy
+import shlex
 import shutil
 import tomllib
 from pathlib import Path
@@ -9,6 +10,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
+from packaging.requirements import Requirement
 
 from extract_bench.data.download import dataset_config
 from extract_bench.evaluation.metrics.extract.unified_evidence_metric import ValueCell, compute_unified_evidence_metrics
@@ -69,6 +71,22 @@ def test_export_keeps_answers_out_of_agent_context_and_preserves_jsonl(tmp_path,
     short_task = next(path for path in (output / "tasks").iterdir() if path.name.startswith("short--"))
     (short_task / "environment/document.pdf").unlink()
     assert export_snapshot(snapshot, output, "extractbench", "a" * 40, "b" * 40) == first
+
+
+def test_verifier_pin_satisfies_package_dependency(tmp_path: Path, snapshot: Path) -> None:
+    """A stale verifier pin must not make the exported container uninstallable."""
+    output = tmp_path / "export"
+    export_snapshot(snapshot, output, "extractbench", "a" * 40, "b" * 40)
+    task = next((output / "tasks").iterdir())
+    dockerfile = (task / "tests/Dockerfile").read_text(encoding="utf-8")
+    install = next(line for line in dockerfile.splitlines() if line.startswith("RUN pip install "))
+    pin = Requirement(next(arg for arg in shlex.split(install) if arg.startswith("parse-bench==")))
+    pinned_version = next(iter(pin.specifier)).version
+    project = tomllib.loads((Path(__file__).parents[1] / "pyproject.toml").read_text(encoding="utf-8"))
+    dependency = next(
+        Requirement(value) for value in project["project"]["dependencies"] if Requirement(value).name == pin.name
+    )
+    assert pinned_version in dependency.specifier
 
 
 def test_verifier_honors_acceptable_values_and_order_insensitive_alignment(tmp_path, snapshot):

@@ -669,7 +669,7 @@ def _citation_from_field(
     page, bbox = _parse_source_bbox(source, page_sizes, selected_region_indexes=selected_region_indexes)
     return FieldCitation(
         field_path=field_path,
-        page=page or 1,
+        page=page,
         bbox=bbox,
         reference_text=reference_text or _reference_text(field),
         confidence=float(field["confidence"]) if isinstance(field.get("confidence"), (int, float)) else None,
