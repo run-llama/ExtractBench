@@ -35,6 +35,19 @@ jobs:
       - name: Ruff lint
         run: uv run ruff check
 
+      - name: Check leaderboard row order
+        run: |
+          uv run python - <<'PY'
+          import csv
+          from pathlib import Path
+
+          for name in ("leaderboard.csv", "leaderboard-pro.csv"):
+              with Path(name).open(encoding="utf-8", newline="") as file:
+                  providers = [row["Provider"] for row in csv.DictReader(file)]
+              if providers != sorted(providers, key=str.casefold):
+                  raise SystemExit(f"{name}: rows must be in alphabetical order by Provider")
+          PY
+
       - name: Check README leaderboards
         run: uv run python scripts/update_readme.py --check
 
