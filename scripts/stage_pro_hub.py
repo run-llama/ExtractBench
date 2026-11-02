@@ -61,6 +61,9 @@ def stage(export: Path, output: Path, revision: str) -> None:
                 readme = "".join(lines[index + 1 :])
                 break
     readme = readme.lstrip("\n")
+    hf_files = f"https://huggingface.co/datasets/{manifest['source_repo']}/resolve/{revision}"
+    for filename in manifest["source_files"]:
+        readme = readme.replace(f"]({filename})", f"]({hf_files}/{filename})")
     readme += (
         "\n## Harbor Hub release\n\n"
         f"This release is based on HF commit `{revision}` and uses task names "
