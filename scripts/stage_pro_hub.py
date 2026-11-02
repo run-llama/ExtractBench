@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import shutil
 from pathlib import Path
 
@@ -52,9 +53,12 @@ def stage(export: Path, output: Path, revision: str) -> None:
         digest, _ = Packager.compute_content_hash(target)
         tasks.append(DatasetTaskRef(name=name, digest=f"sha256:{digest}"))
     readme = (export / "README.md").read_text()
+    # Hub renders the dataset card's YAML header as visible Markdown.
+    # Keep its prose while leaving HF-specific metadata in the HF source.
+    readme = re.sub(r"\A---\n.*?^---[ \t]*(?:\n|\Z)", "", readme, count=1, flags=re.MULTILINE | re.DOTALL).lstrip("\n")
     readme += (
         "\n## Harbor Hub release\n\n"
-        f"This candidate is based on HF commit `{revision}` and uses task names "
+        f"This release is based on HF commit `{revision}` and uses task names "
         "derived from document identifiers, independent of challenge labels. "
         "Original Harbor task names have no aliases in this release.\n\n"
         f"```bash\nharbor run -d llamaindex/extractbench-pro@hf-{revision[:12]} "
