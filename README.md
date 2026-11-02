@@ -19,7 +19,7 @@ This repository hosts two benchmarks. They share the task, the evaluator, the me
 | Benchmark | What makes it hard | Size | Documents | Dataset | Details |
 |---|---|---|---|---|---|
 | **ExtractBench** | Long lists, needles in long documents, dense forms, scans, and handwriting | 370 documents, 4,869 pages, 67 document types | Real public records, plus synthetic long lists rendered from real layouts | [llamaindex/ExtractBench](https://huggingface.co/datasets/llamaindex/ExtractBench) | [docs/extractbench.md](docs/extractbench.md) · [launch post](https://www.llamaindex.ai/blog/introducing-extractbench) |
-| **ExtractBench Pro** | Values read off charts and drawings, counted under house rules, or decoded with house vocabulary | 100 documents, 2,622 pages, 86 document types | Synthetic, derived from real long-tail documents | [llamaindex/ExtractBenchPro](https://huggingface.co/datasets/llamaindex/ExtractBenchPro) | [docs/extractbench-pro.md](docs/extractbench-pro.md) · [launch post](https://www.llamaindex.ai/blog/introducing-extractbench-pro) |
+| **ExtractBench Pro** | Values read off charts and drawings, counted under house rules, or decoded with custom terminology | 100 documents, 2,622 pages, 86 document types | Synthetic, derived from real long-tail documents | [llamaindex/ExtractBenchPro](https://huggingface.co/datasets/llamaindex/ExtractBenchPro) | [docs/extractbench-pro.md](docs/extractbench-pro.md) · [launch post](https://www.llamaindex.ai/blog/introducing-extractbench-pro) |
 
 <p align="center">
   <img src="docs/extractbench_teaser.png" alt="ExtractBench: JSON Schema and document in; JSON plus evidence out; scored on value F1, grounding F1, challenge tags, and cost" width="100%">
@@ -99,7 +99,7 @@ Rows are ordered by % Perfect, then Value F1, then lower cost.
 
 | Rank | Provider | Category | % Perfect | Value F1 | Grounding F1 | ¢ / Page |
 |---:|---|---|---:|---:|---:|---:|
-| 1 | LlamaExtract Agentic Plus (Max Effort) | LlamaExtract | **61** | <u>94.32</u> | 57.02 | 12.71¢ |
+| 1 | LlamaExtract Agentic Plus (Max Effort) | LlamaExtract | **61** | <u>94.32</u> | 57.02 | 42.19¢ |
 | 2 | Codex GPT-6 Astra | Coding Agents | <u>58</u> | **94.53** | **70.97** | 95.20¢ |
 | 3 | Claude Code Opus 5.5 | Coding Agents | 51 | 74.87 | 45.29 | 41.20¢ |
 | 4 | LlamaExtract Agentic Plus | LlamaExtract | 38 | 77.70 | 60.39 | 7.50¢ |
@@ -115,7 +115,7 @@ Top 10 of 16 systems — full table in [leaderboard-pro.csv](leaderboard-pro.csv
 
 ### Submitting results
 
-Open a PR updating [leaderboard.csv](leaderboard.csv) or [leaderboard-pro.csv](leaderboard-pro.csv), with your pipeline configuration and evaluation reports. Scores are percentages; costs are USD per page. Regenerate the tables with `uv run python scripts/update_readme.py`.
+Open a PR updating [leaderboard.csv](leaderboard.csv) or [leaderboard-pro.csv](leaderboard-pro.csv), with your pipeline configuration and evaluation reports. Scores are percentages. Costs are computed by averaging each document's USD per page, with equal weighting given to all documents. Regenerate the tables with `uv run python scripts/update_readme.py`.
 
 The rows each CSV needs are described in [ExtractBench: submitting results](docs/extractbench.md#submitting-results) and [ExtractBench Pro: submitting results](docs/extractbench-pro.md#submitting-results). For Pro, include the overall (`all`) row and all six challenge rows, with scores for both time-limit views.
 
@@ -156,11 +156,9 @@ uv run extract-bench serve output-pro/llamaextract_agentic
 ```
 
 > [!WARNING]
-> A full run calls a metered API. ExtractBench (370 documents / 4,869 pages) costs roughly
-> **$10 to $1,677**, and ExtractBench Pro (100 documents / 2,622 pages) roughly **$26 to $2,496**,
-> depending on which system you evaluate. Start with `--test` on ExtractBench, which runs 6 documents
-> for cents on any hosted system. Pro has no `--test` subset; run one challenge with `--group` instead.
-> Per-system estimates: [ExtractBench](docs/extractbench.md#cost-of-a-full-run), [ExtractBench Pro](docs/extractbench-pro.md#cost-of-a-full-run).
+> A full run calls a metered API. Start with `--test` on ExtractBench, which runs 6 documents.
+> Pro has no `--test` subset; run one challenge with `--group` instead.
+> Cost accounting: [ExtractBench](docs/extractbench.md#cost-of-a-full-run), [ExtractBench Pro](docs/extractbench-pro.md#cost-of-a-full-run).
 
 ## Datasets
 
@@ -172,7 +170,7 @@ Both datasets are hosted on Hugging Face and download automatically the first ti
 | `--dataset` | `extractbench` (default) | `pro` |
 | Local data | `data/` | `data-pro/` |
 | Results | `output/` | `output-pro/` |
-| `--group` values | `short`, `medium`, `long` | `document_conventions`, `house_vocabulary`, `house_counting_rules`, `drawn_relations`, `charts_inside_documents`, `long_chart_sheets` |
+| `--group` values | `short`, `medium`, `long` | `interpretation_rules`, `custom_terminology`, `conditional_aggregation`, `relational_diagrams`, `charts_and_maps`, `long_single_pages` |
 | `--test` subset | 6 documents | none |
 | Splits, tags, sources, ground truth | [docs/extractbench.md](docs/extractbench.md) | [docs/extractbench-pro.md](docs/extractbench-pro.md) |
 
@@ -232,7 +230,7 @@ uv run extract-bench run <pipeline_name> --dataset pro
 
 # Evaluate a single split (ExtractBench) or challenge (Pro) only
 uv run extract-bench run <pipeline_name> --group short
-uv run extract-bench run <pipeline_name> --dataset pro --group house_vocabulary
+uv run extract-bench run <pipeline_name> --dataset pro --group custom_terminology
 
 # Skip calling the extraction system — just re-evaluate existing results
 uv run extract-bench run <pipeline_name> --skip_inference

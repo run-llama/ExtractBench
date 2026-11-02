@@ -10,6 +10,7 @@ from extract_bench.data.download import (
     is_dataset_ready,
     read_manifest,
 )
+from extract_bench.data.pro_names import migrate_pro_layout
 
 
 class DataCLI:
@@ -21,6 +22,7 @@ class DataCLI:
         force: bool = False,
         test: bool = False,
         dataset: str = "extractbench",
+        revision: str | None = None,
     ) -> int:
         """Download the ExtractBench dataset from HuggingFace.
 
@@ -28,6 +30,7 @@ class DataCLI:
         that inference and evaluation consume.
 
         Args:
+            revision: Optional pinned HF commit, tag, branch, or PR reference.
             data_dir: Local directory to store the dataset
                 (default: ./data, or ./data/test when --test is set)
             dataset: "extractbench" (default) or "pro" (./data-pro)
@@ -39,13 +42,24 @@ class DataCLI:
         """
         try:
             data_path = Path(data_dir) if data_dir else default_data_dir(test=test, dataset=dataset)
-            download_dataset(data_dir=data_path, force=force, test=test, dataset=dataset)
+            download_dataset(data_dir=data_path, force=force, test=test, dataset=dataset, revision=revision)
             return 0
         except Exception as e:
             print(f"Error downloading dataset: {e}", file=sys.stderr)
             import traceback
 
             traceback.print_exc()
+            return 1
+
+    def migrate_pro_names(self, path: str | Path, write: bool = False) -> int:
+        """Translate one existing Pro dataset or pipeline directory; dry-run unless --write."""
+        try:
+            for action in migrate_pro_layout(Path(path), write=write):
+                print(action)
+            print("Migration applied." if write else "Dry run; pass --write to apply.")
+            return 0
+        except (ValueError, OSError) as error:
+            print(f"Migration refused: {error}", file=sys.stderr)
             return 1
 
     def status(
