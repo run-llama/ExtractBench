@@ -96,4 +96,4 @@ See "Output Structure" under [Configuration](../README.md#configuration) for the
 
 ## Submitting results
 
-Add one row per system to [leaderboard.csv](../leaderboard.csv). Each row carries value F1 (`Overall`, `Short`, `Medium`, `Long`), precision and recall per split (`P_*`, `R_*`), word- and page-level grounding F1 overall and per split, cost per page overall and per split, and latency per document per split. Then follow the shared steps in [Submitting results](../README.md#submitting-results).
+Add one row per system to [leaderboard.csv](../leaderboard.csv). Each row carries `Pipeline`, `Reasoning`, value F1 (`Overall`, `Short`, `Medium`, `Long`), precision and recall per split (`P_*`, `R_*`), word- and page-level grounding F1 overall and per split, cost per page overall and per split, and latency per document per split. Then follow the shared steps in [Submitting results](../README.md#submitting-results).
