@@ -223,7 +223,7 @@ The oracle copies the reference output; it checks packaging and grading, not ext
             "RUN apt-get update && apt-get install -y --no-install-recommends git "
             "&& rm -rf /var/lib/apt/lists/*\n"
             f'RUN pip install --no-cache-dir "llama-extract-bench @ '
-            f'git+https://github.com/run-llama/ExtractBench.git@{scorer_revision}" "parse-bench==1.0.4"\n'
+            f'git+https://github.com/run-llama/ExtractBench.git@{scorer_revision}" "parse-bench==1.0.7"\n'
             "WORKDIR /app\nCOPY . /tests/\n",
             encoding="utf-8",
         )
