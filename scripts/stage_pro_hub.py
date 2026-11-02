@@ -10,7 +10,6 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import re
 import shutil
 from pathlib import Path
 
@@ -55,7 +54,13 @@ def stage(export: Path, output: Path, revision: str) -> None:
     readme = (export / "README.md").read_text()
     # Hub renders the dataset card's YAML header as visible Markdown.
     # Keep its prose while leaving HF-specific metadata in the HF source.
-    readme = re.sub(r"\A---\n.*?^---[ \t]*(?:\n|\Z)", "", readme, count=1, flags=re.MULTILINE | re.DOTALL).lstrip("\n")
+    if readme.startswith("---\n"):
+        lines = readme.splitlines(keepends=True)
+        for index, line in enumerate(lines[1:], start=1):
+            if line.rstrip() == "---":
+                readme = "".join(lines[index + 1 :])
+                break
+    readme = readme.lstrip("\n")
     readme += (
         "\n## Harbor Hub release\n\n"
         f"This release is based on HF commit `{revision}` and uses task names "
