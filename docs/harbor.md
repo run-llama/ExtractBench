@@ -124,3 +124,7 @@ per document for the agent. Verifier time is separate from agent time.
 
 For regenerating or publishing task exports, see the
 [maintainer guide](harbor-maintenance.md).
+
+## ExtractBench Pro challenge names
+
+The [challenge table](extractbench-pro.md#challenges) pairs the public challenge names with their published split identifiers. Harbor task names derive from the document identifier without the split; the final challenge rename leaves those document-based names unchanged. The renamed release does not provide aliases for old Harbor task/package names. PDFs, schemas, reference answers, prompt, scorer, and reward remain unchanged; validating the export requires no model inference.
