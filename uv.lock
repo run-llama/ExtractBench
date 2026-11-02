@@ -1788,7 +1788,7 @@ requires-dist = [
     { name = "openai", marker = "extra == 'openweights'", specifier = ">=1.0.0" },
     { name = "openai", marker = "extra == 'runners'", specifier = ">=1.0.0" },
     { name = "pandas", specifier = ">=2.0.0" },
-    { name = "parse-bench", git = "https://github.com/run-llama/ParseBench?rev=063372093b80250aec9526c0f2adf0201e89ea57" },
+    { name = "parse-bench", specifier = ">=1.0.7" },
     { name = "pdf2image", marker = "extra == 'anthropic'", specifier = ">=1.16.0" },
     { name = "pdf2image", marker = "extra == 'google'", specifier = ">=1.16.0" },
     { name = "pdf2image", marker = "extra == 'local'", specifier = ">=1.16.0" },
@@ -2725,7 +2725,7 @@ wheels = [
 [[package]]
 name = "parse-bench"
 version = "1.0.7"
-source = { git = "https://github.com/run-llama/ParseBench?rev=063372093b80250aec9526c0f2adf0201e89ea57#063372093b80250aec9526c0f2adf0201e89ea57" }
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anls-star" },
     { name = "apted" },
@@ -2749,6 +2749,10 @@ dependencies = [
     { name = "rich" },
     { name = "scipy" },
     { name = "unidecode" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/93/b2/52faab262ccd92a71a2b3f79f46ca31bf2b7009d4a306a4d131aa99db47d/parse_bench-1.0.7.tar.gz", hash = "sha256:cf4b4080415f244e787ed0ccfc3dd609eb9c6d011610341da07de0c1b05a4b00", size = 1283431, upload-time = "2026-11-02T03:41:51.684Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/71/9f/07f593174edf364c6c2e2375f21e71096f8f4ea5984d453dc7227503b6d0/parse_bench-1.0.7-py3-none-any.whl", hash = "sha256:822ca64fc283a5e6745a732a2780813b59c7da2f6d1b6c822a31d4ba00254555", size = 1163497, upload-time = "2026-11-02T03:41:49.927Z" },
 ]
 
 [[package]]
