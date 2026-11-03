@@ -49,26 +49,26 @@ In the official benchmark, documents that fail or exceed a 30-minute limit score
 ### ExtractBench leaderboard
 
 <!-- LEADERBOARD:START -->
-**Unified value F1** â€” rows are ordered by Overall Value F1, then lower cost.
+**Unified value F1** — rows are ordered by Overall Value F1, then lower cost.
 
-| Rank | Provider | Category | Overall | Short | Medium | Long | Â¢ / Page |
+| Rank | Provider | Category | Overall | Short | Medium | Long | ¢ / Page |
 |---:|---|---|---:|---:|---:|---:|---:|
-| 1 | LlamaExtract Agentic Plus | LlamaExtract | **96.17** | <u>97.02</u> | 94.30 | <u>94.65</u> | 7.50Â¢ |
-| 2 | LlamaExtract Agentic Plus (Max Effort) | LlamaExtract | **96.17** | 96.82 | **95.48** | 91.36 | 19.11Â¢ |
-| 3 | Reducto Deep Extract | Specialized APIs | <u>96.08</u> | 96.84 | <u>94.80</u> | 92.85 | 6.35Â¢ |
-| 4 | Pulse (Effort) | Specialized APIs | 96.07 | 96.83 | 94.70 | 93.24 | 10.50Â¢ |
-| 5 | LlamaExtract Agentic | LlamaExtract | 95.65 | 96.06 | 94.79 | **94.73** | 3.12Â¢ |
-| 6 | Codex (GPT-6.1 Sol Evidence) | Coding Agents | 95.31 | 97.01 | 92.96 | 85.46 | 7.13Â¢ |
-| 7 | Claude Code (Sonnet 5.5 Evidence) | Coding Agents | 94.68 | 96.22 | 92.97 | 83.69 | 5.69Â¢ |
-| 8 | Codex (GPT-6 Sol Evidence) | Coding Agents | 94.57 | 95.99 | 92.42 | 87.25 | 9.80Â¢ |
-| 9 | Pulse (Non-effort) | Specialized APIs | 94.51 | 95.39 | 92.49 | 93.31 | 3.00Â¢ |
-| 10 | Codex (GPT-6.1 Terra Evidence) | Coding Agents | 94.28 | 96.26 | 91.86 | 81.21 | 4.68Â¢ |
+| 1 | LlamaExtract Agentic Plus | LlamaExtract | **96.17** | <u>97.02</u> | 94.30 | <u>94.65</u> | 7.50¢ |
+| 2 | LlamaExtract Agentic Plus (Max Effort) | LlamaExtract | **96.17** | 96.82 | **95.48** | 91.36 | 19.11¢ |
+| 3 | Reducto Deep Extract | Specialized APIs | <u>96.08</u> | 96.84 | <u>94.80</u> | 92.85 | 6.35¢ |
+| 4 | Pulse (Effort) | Specialized APIs | 96.07 | 96.83 | 94.70 | 93.24 | 10.50¢ |
+| 5 | LlamaExtract Agentic | LlamaExtract | 95.65 | 96.06 | 94.79 | **94.73** | 3.12¢ |
+| 6 | Codex (GPT-6.1 Sol Evidence) | Coding Agents | 95.31 | 97.01 | 92.96 | 85.46 | 7.13¢ |
+| 7 | KYNEX (GPT-6.1 Sol) | Coding Agents | 94.72 | 96.04 | 93.14 | 85.83 | 9.35¢ |
+| 8 | Claude Code (Sonnet 5.5 Evidence) | Coding Agents | 94.68 | 96.22 | 92.97 | 83.69 | 5.69¢ |
+| 9 | Codex (GPT-6 Sol Evidence) | Coding Agents | 94.57 | 95.99 | 92.42 | 87.25 | 9.80¢ |
+| 10 | Pulse (Non-effort) | Specialized APIs | 94.51 | 95.39 | 92.49 | 93.31 | 3.00¢ |
 
-Top 10 of 53 systems â€” full table in [leaderboard.csv](leaderboard.csv).
+Top 10 of 55 systems — full table in [leaderboard.csv](leaderboard.csv).
 <!-- LEADERBOARD:END -->
 
 <!-- GROUNDING:START -->
-**Grounding F1** â€” rows are ordered by overall word-level grounding F1.
+**Grounding F1** — rows are ordered by overall word-level grounding F1.
 
 <table>
   <thead>
@@ -89,7 +89,7 @@ Top 10 of 53 systems â€” full table in [leaderboard.csv](leaderboard.csv).
   </tbody>
 </table>
 
-Top 10 of 53 systems â€” full table in [leaderboard.csv](leaderboard.csv).
+Top 10 of 55 systems — full table in [leaderboard.csv](leaderboard.csv).
 <!-- GROUNDING:END -->
 
 ### ExtractBench Pro leaderboard
@@ -97,20 +97,20 @@ Top 10 of 53 systems â€” full table in [leaderboard.csv](leaderboard.csv).
 <!-- PRO_LEADERBOARD:START -->
 Rows are ordered by % Perfect, then Value F1, then lower cost.
 
-| Rank | Provider | Category | % Perfect | Value F1 | Grounding F1 | Â¢ / Page |
+| Rank | Provider | Category | % Perfect | Value F1 | Grounding F1 | ¢ / Page |
 |---:|---|---|---:|---:|---:|---:|
-| 1 | Codex GPT-6 Astra | Coding Agents | **58** | **94.53** | **70.97** | 95.20Â¢ |
-| 2 | LlamaExtract Agentic Plus (Max Effort) | LlamaExtract | <u>56</u> | <u>92.71</u> | <u>66.20</u> | 36.60Â¢ |
-| 3 | Claude Code Opus 5.5 | Coding Agents | 51 | 74.87 | 45.29 | 41.20Â¢ |
-| 4 | LlamaExtract Agentic Plus | LlamaExtract | 38 | 77.70 | 60.39 | 7.50Â¢ |
-| 5 | Extend Operator | Specialized APIs | 34 | 73.87 | 57.75 | 9.88Â¢ |
-| 6 | Claude Code Sonnet 5.5 | Coding Agents | 32 | 73.62 | 40.47 | 19.98Â¢ |
-| 7 | Gemini CLI (Gemini 4 Argon Medium) | Coding Agents | 30 | 42.98 | 33.90 | 36.16Â¢ |
-| 8 | Codex GPT-6.1 Terra Medium | Coding Agents | 27 | 74.19 | 60.16 | 4.06Â¢ |
-| 9 | LlamaExtract Agentic | LlamaExtract | 20 | 71.32 | 58.01 | 3.12Â¢ |
-| 10 | Pulse Effort | Specialized APIs | 18 | 70.53 | 18.74 | 10.50Â¢ |
+| 1 | Codex GPT-6 Astra | Coding Agents | **58** | **94.53** | **70.97** | 95.20¢ |
+| 2 | LlamaExtract Agentic Plus (Max Effort) | LlamaExtract | <u>56</u> | <u>92.71</u> | <u>66.20</u> | 36.60¢ |
+| 3 | Claude Code Opus 5.5 | Coding Agents | 51 | 74.87 | 45.29 | 41.20¢ |
+| 4 | LlamaExtract Agentic Plus | LlamaExtract | 38 | 77.70 | 60.39 | 7.50¢ |
+| 5 | Extend Operator | Specialized APIs | 34 | 73.87 | 57.75 | 9.88¢ |
+| 6 | Claude Code Sonnet 5.5 | Coding Agents | 32 | 73.62 | 40.47 | 19.98¢ |
+| 7 | Gemini CLI (Gemini 4 Argon Medium) | Coding Agents | 30 | 42.98 | 33.90 | 36.16¢ |
+| 8 | Codex GPT-6.1 Terra Medium | Coding Agents | 27 | 74.19 | 60.16 | 4.06¢ |
+| 9 | LlamaExtract Agentic | LlamaExtract | 20 | 71.32 | 58.01 | 3.12¢ |
+| 10 | Pulse Effort | Specialized APIs | 18 | 70.53 | 18.74 | 10.50¢ |
 
-Top 10 of 16 systems â€” full table in [leaderboard-pro.csv](leaderboard-pro.csv). Scores with no time limit are also available there.
+Top 10 of 16 systems — full table in [leaderboard-pro.csv](leaderboard-pro.csv). Scores with no time limit are also available there.
 <!-- PRO_LEADERBOARD:END -->
 
 ### Submitting results
