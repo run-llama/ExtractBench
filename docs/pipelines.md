@@ -18,7 +18,8 @@ uv run extract-bench run <pipeline_name>
 | Pipeline | Provider | Notes |
 |---|---|---|
 | `llamaextract_cost_effective` / `llamaextract_agentic` | LlamaExtract V2 API | Extract v2.6 with citations enabled (`LLAMA_CLOUD_API_KEY`) |
-| `llamaextract_agentic_plus` | LlamaExtract V2 API | Extract v2.6, highest tier, citations enabled |
+| `llamaextract_agentic_plus` | LlamaExtract V2 API | Extract v2.6, citations enabled |
+| `llamaextract_agentic_plus_max_effort` | LlamaExtract V2 API | Agentic Plus with `effort=max`, `latest`, citations and confidence scores enabled |
 | `openai_gpt_5_4_extract_oneshot_structured_output_file` (+ `_nano`) | OpenAI Responses | one-shot structured output over the uploaded file |
 | `openai_gpt_6_astra_reasoning_low_extract_oneshot_structured_output_file` | OpenAI Responses | one-shot structured output over the uploaded file (reasoning: low) |
 | `gemini_3_5_flash_extract_oneshot_structured_output_file` | Gemini | one-shot structured output (thinking: low) |
