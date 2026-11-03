@@ -69,7 +69,8 @@ uv run extract-bench run <pipeline_name>
 | `nuextract3_extract` | Self-hosted vLLM | schema converted to a NuExtract template; requires `NUEXTRACT3_SERVER_URL` |
 
 Max effort uses the production API by default with the usual LlamaCloud API key.
-It allows up to two hours per document. Its cost comes from
+It uses a 50-minute API timeout and a one-hour per-file watchdog, matching the
+other public LlamaExtract pipelines. Its cost comes from
 the API's billed Extract and Parse credits, including the model-cost charge;
 when those credits are unavailable, cost remains unknown. `latest` follows the
 current stable release, so retain the resolved job configuration with results.

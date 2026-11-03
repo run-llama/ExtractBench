@@ -61,11 +61,11 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
                 "effort": "max",
                 "extract_version": "latest",
                 "extraction_target": "per_doc",
-                "timeout": 7200,
+                "timeout": 3000,
                 "confidence_scores": True,
                 "cite_sources": True,
             },
-            per_file_timeout=7200.0,
+            per_file_timeout=3600.0,
         )
     )
 

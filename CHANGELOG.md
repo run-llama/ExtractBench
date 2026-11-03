@@ -39,7 +39,8 @@ harness ahead of the first PyPI release.
 
 ### Added
 - Register `llamaextract_agentic_plus_max_effort` with citations, confidence scores,
-  and a two-hour timeout. Retain billed API usage so Max costs include model charges;
+  and the same 50-minute API / one-hour per-file timeouts as other LlamaExtract
+  pipelines. Retain billed API usage so Max costs include model charges;
   costs remain unknown when billing usage is unavailable.
 - `ExtractEvaluator.compute_metrics()` returns an `ExtractMetricBundle`: the
   headline and diagnostic metrics plus the `ExtractScoringInputs` they scored
