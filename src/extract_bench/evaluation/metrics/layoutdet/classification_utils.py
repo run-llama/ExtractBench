@@ -7,7 +7,7 @@ and computing per-class precision/recall/F1 metrics.
 from collections import defaultdict
 
 import numpy as np
-from sklearn.metrics import average_precision_score
+from parse_bench.evaluation.metrics.layoutdet.classification_utils import average_precision_score
 
 from extract_bench.evaluation.metrics.layoutdet.iou import compute_iou_matrix
 
@@ -155,7 +155,7 @@ def compute_per_class_metrics(
             recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
             f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0.0
 
-            # Compute AP using sklearn
+            # Compute AP across distinct confidence thresholds.
             if len(np.unique(y_true)) > 1:
                 ap = float(average_precision_score(y_true, y_scores))
             else:

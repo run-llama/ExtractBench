@@ -6,6 +6,12 @@ All notable changes to `llama-extract-bench` are recorded here. The format follo
 
 ## [Unreleased]
 
+### Dependencies
+
+- Remove the direct scikit-learn dependency. Layout average precision reuses
+  ParseBench's NumPy implementation, including its handling of tied confidence
+  scores; evaluation numbers are unchanged.
+
 ### Dataset layout
 
 - Rename the six ExtractBench Pro challenges and their split files, case-ID prefixes, PDF paths, tags, and leaderboard keys:
