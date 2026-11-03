@@ -484,9 +484,10 @@ class LlamaExtractV2Provider(Provider):
         # ``usage.num_pages_billed``. It comes back null unless expanded, and
         # without it there is no billable page count, so cost falls back to a
         # schema estimate (or to nothing at all on non-Agentic-Plus tiers).
+        # ``usage`` carries billed credits, including Max model-cost charges.
         poll_params: dict[str, Any] = {
             **params,
-            "expand": ["metadata", "extract_metadata", "latency", "metadata_state_transitions"],
+            "expand": ["metadata", "extract_metadata", "usage", "latency", "metadata_state_transitions"],
         }
 
         poll_history: list[dict[str, Any]] = []
@@ -547,6 +548,7 @@ class LlamaExtractV2Provider(Provider):
                     # above the page count. Pricing prefers it over any local
                     # estimate, so it has to survive into the raw result.
                     "metadata": data.get("metadata"),
+                    "usage": data.get("usage"),
                     "status": status,
                     "latency": data.get("latency"),
                     "metadata_state_transitions": data.get("metadata_state_transitions"),

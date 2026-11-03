@@ -52,6 +52,23 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
             )
         )
 
+    register_fn(
+        _pipeline_spec(
+            pipeline_name="llamaextract_agentic_plus_max_effort",
+            provider_name="llamaextract_v2",
+            config={
+                "tier": "agentic_plus",
+                "effort": "max",
+                "extract_version": "latest",
+                "extraction_target": "per_doc",
+                "timeout": 7200,
+                "confidence_scores": True,
+                "cite_sources": True,
+            },
+            per_file_timeout=7200.0,
+        )
+    )
+
     # =========================================================================
     # One-shot VLM/LLM APIs (schema-guided structured output over the file)
     # =========================================================================

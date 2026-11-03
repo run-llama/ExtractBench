@@ -18,7 +18,8 @@ uv run extract-bench run <pipeline_name>
 | Pipeline | Provider | Notes |
 |---|---|---|
 | `llamaextract_cost_effective` / `llamaextract_agentic` | LlamaExtract V2 API | Extract v2.6 with citations enabled (`LLAMA_CLOUD_API_KEY`) |
-| `llamaextract_agentic_plus` | LlamaExtract V2 API | Extract v2.6, highest tier, citations enabled |
+| `llamaextract_agentic_plus` | LlamaExtract V2 API | Extract v2.6, citations enabled |
+| `llamaextract_agentic_plus_max_effort` | LlamaExtract V2 API | Agentic Plus with `effort=max`, `latest`, citations and confidence scores enabled; requires Max-effort access |
 | `openai_gpt_5_4_extract_oneshot_structured_output_file` (+ `_nano`) | OpenAI Responses | one-shot structured output over the uploaded file |
 | `openai_gpt_6_astra_reasoning_low_extract_oneshot_structured_output_file` | OpenAI Responses | one-shot structured output over the uploaded file (reasoning: low) |
 | `gemini_3_5_flash_extract_oneshot_structured_output_file` | Gemini | one-shot structured output (thinking: low) |
@@ -66,6 +67,12 @@ uv run extract-bench run <pipeline_name>
 | `gemma4_12b_vllm_extract_oneshot_structured_output_file` | Self-hosted vLLM | Gemma-4-12B, json_object mode; requires `GEMMA4_12B_SERVER_URL` |
 | `qwen3_5_4b_vllm_extract_oneshot_structured_output_file` | Self-hosted vLLM | Qwen3.5-4B, json_object mode; requires `QWEN3_5_4B_SERVER_URL` |
 | `nuextract3_extract` | Self-hosted vLLM | schema converted to a NuExtract template; requires `NUEXTRACT3_SERVER_URL` |
+
+Max effort uses the production API by default and requires an organization with
+Max effort enabled. It allows up to two hours per document. Its cost comes from
+the API's billed Extract and Parse credits, including the model-cost charge;
+when those credits are unavailable, cost remains unknown. `latest` follows the
+current stable release, so retain the resolved job configuration with results.
 
 ## Parse Pipelines
 
