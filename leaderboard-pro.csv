@@ -83,13 +83,13 @@ LlamaExtract Agentic Plus,LlamaExtract,conditional_aggregation,12,9,41.67,67.64,
 LlamaExtract Agentic Plus,LlamaExtract,relational_diagrams,20,19,10.00,49.27,71.42,75.52,0.075000,10.00,49.27,71.42,75.52
 LlamaExtract Agentic Plus,LlamaExtract,charts_and_maps,25,10,68.00,94.35,76.75,78.00,0.075000,68.00,94.35,76.75,78.00
 LlamaExtract Agentic Plus,LlamaExtract,long_single_pages,7,7,0.00,12.73,0.00,4.76,0.075000,0.00,12.73,0.00,4.76
-LlamaExtract Agentic Plus (Max Effort),LlamaExtract,all,100,81,61.00,94.32,57.02,78.45,0.421856,61.00,94.32,57.02,78.45
-LlamaExtract Agentic Plus (Max Effort),LlamaExtract,document_conventions,22,22,27.27,99.83,77.40,96.44,0.108137,27.27,99.83,77.40,96.44
-LlamaExtract Agentic Plus (Max Effort),LlamaExtract,house_vocabulary,14,14,85.71,99.73,44.69,54.27,0.084200,85.71,99.73,44.69,54.27
-LlamaExtract Agentic Plus (Max Effort),LlamaExtract,house_counting_rules,12,9,50.00,68.72,44.87,40.00,0.082110,50.00,68.72,44.87,40.00
-LlamaExtract Agentic Plus (Max Effort),LlamaExtract,drawn_relations,20,19,85.00,98.74,65.42,87.31,0.206969,85.00,98.74,65.42,87.31
-LlamaExtract Agentic Plus (Max Effort),LlamaExtract,charts_inside_documents,25,10,72.00,95.01,64.33,78.89,0.167225,72.00,95.01,64.33,78.89
-LlamaExtract Agentic Plus (Max Effort),LlamaExtract,long_chart_sheets,7,7,28.57,95.02,0.00,95.02,4.188929,28.57,95.02,0.00,95.02
+LlamaExtract Agentic Plus (Max Effort),LlamaExtract,all,100,81,56.00,92.71,66.20,72.62,0.366017,56.00,92.71,66.20,72.62
+LlamaExtract Agentic Plus (Max Effort),LlamaExtract,interpretation_rules,22,22,36.36,99.72,83.95,95.64,0.107638,36.36,99.72,83.95,95.64
+LlamaExtract Agentic Plus (Max Effort),LlamaExtract,custom_terminology,14,14,85.71,99.54,60.05,65.34,0.083242,85.71,99.54,60.05,65.34
+LlamaExtract Agentic Plus (Max Effort),LlamaExtract,conditional_aggregation,12,9,33.33,60.14,32.80,32.80,0.079575,33.33,60.14,32.80,32.80
+LlamaExtract Agentic Plus (Max Effort),LlamaExtract,relational_diagrams,20,19,70.00,95.96,80.26,83.95,0.198602,70.00,95.96,80.26,83.95
+LlamaExtract Agentic Plus (Max Effort),LlamaExtract,charts_and_maps,25,10,72.00,95.72,85.41,88.41,0.195253,72.00,95.72,85.41,88.41
+LlamaExtract Agentic Plus (Max Effort),LlamaExtract,long_single_pages,7,7,0.00,92.83,0.00,12.74,3.322857,0.00,92.83,0.00,12.74
 LlamaExtract Cost Effective,LlamaExtract,all,100,81,0.00,47.19,49.40,56.46,0.010000,0.00,47.19,49.40,56.46
 LlamaExtract Cost Effective,LlamaExtract,interpretation_rules,22,22,0.00,74.97,55.63,63.93,0.010000,0.00,74.97,55.63,63.93
 LlamaExtract Cost Effective,LlamaExtract,custom_terminology,14,14,0.00,80.85,46.80,65.92,0.010000,0.00,80.85,46.80,65.92
