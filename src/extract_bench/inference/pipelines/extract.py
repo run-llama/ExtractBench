@@ -52,6 +52,23 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
             )
         )
 
+    register_fn(
+        _pipeline_spec(
+            pipeline_name="llamaextract_agentic_plus_max_effort",
+            provider_name="llamaextract_v2",
+            config={
+                "tier": "agentic_plus",
+                "effort": "max",
+                "extract_version": "latest",
+                "extraction_target": "per_doc",
+                "timeout": 3000,
+                "confidence_scores": True,
+                "cite_sources": True,
+            },
+            per_file_timeout=3600.0,
+        )
+    )
+
     # =========================================================================
     # One-shot VLM/LLM APIs (schema-guided structured output over the file)
     # =========================================================================
@@ -274,6 +291,14 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
     # documents. Run them in a container or VM.
     register_fn(
         _pipeline_spec(
+            pipeline_name="gemini_cli_extract_gemini_4_argon_medium_thinking_vision_evidence",
+            provider_name="gemini_cli_extract",
+            config={"model": "gemini-4-argon", "thinking_level": "medium", "evidence_mode": True, "max_cost_usd": 5.0},
+            per_file_timeout=1800,
+        )
+    )
+    register_fn(
+        _pipeline_spec(
             pipeline_name="claude_code_extract_opus_4_8",
             provider_name="claude_code_extract",
             config={"model": "claude-opus-4-8", "bare": True},
@@ -367,6 +392,7 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
         ("gpt_6_luna", "gpt-6-luna", ("medium", "high", "xhigh")),
         ("gpt_6_sol", "gpt-6-sol", ("low", "medium", "high")),
         ("gpt_6_1_sol", "gpt-6.1-sol", ("low", "medium", "high", "xhigh")),
+        ("gpt_6_1_terra", "gpt-6.1-terra", ("low", "medium")),
     ):
         for _reasoning_effort in _gpt6_efforts:
             register_fn(
@@ -952,5 +978,15 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
                 # Shared open-weight 32k output budget (provider default is 100k).
                 "max_tokens": 32768,
             },
+        )
+    )
+
+    # The provider provisions a pinned KYNEX checkout and isolated dependencies.
+    register_fn(
+        _pipeline_spec(
+            pipeline_name="kynex_gpt_5_4",
+            provider_name="kynex_extract",
+            config={"timeout": 1800},
+            per_file_timeout=1800.0,
         )
     )

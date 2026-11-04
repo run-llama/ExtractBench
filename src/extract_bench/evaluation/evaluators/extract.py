@@ -7,6 +7,7 @@ package's metric selection, adds its own metrics, and builds its own result —
 without either side having to copy the other's metric wiring.
 """
 
+from collections.abc import MutableSequence
 from dataclasses import dataclass, field
 from typing import Any, TypeGuard
 
@@ -23,6 +24,7 @@ from extract_bench.evaluation.metrics.extract.json_subset_match_metric import (
 )
 from extract_bench.evaluation.metrics.extract.list_unwrap import normalize_list_prediction
 from extract_bench.evaluation.metrics.extract.unified_evidence_metric import (
+    ValueCell,
     compute_unified_evidence_metrics,
 )
 from extract_bench.evaluation.metrics.field_grounding.evidence_comparator import (
@@ -226,7 +228,13 @@ class ExtractEvaluator(BaseEvaluator):
             stats=build_operational_stats(inference_result),
         )
 
-    def compute_metrics(self, inference_result: InferenceResult, test_case: TestCase) -> ExtractMetricBundle:
+    def compute_metrics(
+        self,
+        inference_result: InferenceResult,
+        test_case: TestCase,
+        *,
+        value_cells: MutableSequence[ValueCell] | None = None,
+    ) -> ExtractMetricBundle:
         """
         Compute this package's extract metrics, without building a result model.
 
@@ -321,6 +329,7 @@ class ExtractEvaluator(BaseEvaluator):
                     field_rules=test_case.get_extract_field_rules(),
                     field_citations=getattr(inference_result.output, "field_citations", []),
                     data_schema=test_case.data_schema,
+                    value_cells=value_cells,
                 )
             )
 

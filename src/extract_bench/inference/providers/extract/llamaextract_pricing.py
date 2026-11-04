@@ -279,9 +279,26 @@ def apply_pricing_fields(
         raw_output["num_pages"] = page_count
 
     extract_tier = normalize_tier(configuration.get("tier") or "cost_effective")
+    is_max = extract_tier == "agentic_plus" and configuration.get("effort") == "max"
+    if is_max:
+        # Max adds a model-cost charge. Re-normalization must clear any earlier
+        # page-rate estimate when settled billed credits are unavailable.
+        for key in (
+            "extract_credits",
+            "parse_credits",
+            "total_credits",
+            "credits_used",
+            "credits_per_page",
+            "cost_per_page_usd",
+            "cost_usd",
+            "num_pages_billed",
+            "num_pages_billed_source",
+            "schema_field_count",
+        ):
+            raw_output.pop(key, None)
 
     billed_pages: float | None = None
-    billed = billed_page_count_for(raw_output, page_count, data_schema, extract_tier)
+    billed = billed_page_count_for(raw_output, page_count, None if is_max else data_schema, extract_tier)
     if billed is not None:
         billed_pages, billed_source, billed_fields = billed
         raw_output["num_pages_billed"] = billed_pages
@@ -296,14 +313,21 @@ def apply_pricing_fields(
     raw_output["extract_credits_per_page"] = extract_credits_per_page
     raw_output["parse_credits_per_page"] = parse_credits_per_page
 
-    if page_count is None:
-        return
-
-    # Parse bills every page it processed; extract bills the effective billable
-    # pages when known, falling back to parsed pages otherwise.
-    extract_pages = billed_pages if billed_pages is not None else page_count
-    extract_credits = extract_credits_per_page * extract_pages
-    parse_credits = parse_credits_per_page * page_count
+    if is_max:
+        usage = raw_output.get("usage")
+        if not isinstance(usage, dict):
+            return
+        extract_credits = usage.get("extract_credits")
+        parse_credits = usage.get("parse_credits")
+        if not isinstance(extract_credits, (int, float)) or not isinstance(parse_credits, (int, float)):
+            return
+    else:
+        if page_count is None:
+            return
+        # Parse bills real pages; Extract bills effective pages when reported.
+        extract_pages = billed_pages if billed_pages is not None else page_count
+        extract_credits = extract_credits_per_page * extract_pages
+        parse_credits = parse_credits_per_page * page_count
     credits_used = extract_credits + parse_credits
 
     raw_output["extract_credits"] = extract_credits
@@ -312,6 +336,7 @@ def apply_pricing_fields(
     raw_output["credits_used"] = credits_used
     # Effective all-in rate over *parsed* pages -- what $/page reporting
     # consumes. With billable pages in play this is no longer a flat constant.
-    raw_output["credits_per_page"] = credits_used / page_count
-    raw_output["cost_per_page_usd"] = (credits_used / page_count) * USD_PER_CREDIT
+    if page_count is not None:
+        raw_output["credits_per_page"] = credits_used / page_count
+        raw_output["cost_per_page_usd"] = (credits_used / page_count) * USD_PER_CREDIT
     raw_output["cost_usd"] = credits_used * USD_PER_CREDIT

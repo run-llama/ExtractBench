@@ -1,0 +1,55 @@
+name: Harbor smoke
+
+on:
+  pull_request:
+    paths:
+      - src/extract_bench/harbor/**
+      - src/extract_bench/data/**
+      - src/extract_bench/evaluation/**
+      - src/extract_bench/test_cases/**
+      - src/extract_bench/schemas/**
+      - tests/test_harbor.py
+      - scripts/smoke_harbor.py
+      - pyproject.toml
+      - uv.lock
+      - .github/workflows/harbor.yml
+  push:
+    branches: [main]
+    paths:
+      - src/extract_bench/harbor/**
+      - src/extract_bench/data/**
+      - src/extract_bench/evaluation/**
+      - src/extract_bench/test_cases/**
+      - src/extract_bench/schemas/**
+      - scripts/smoke_harbor.py
+      - pyproject.toml
+      - uv.lock
+      - .github/workflows/harbor.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  container-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - run: uv sync --locked
+      - run: uv tool install harbor==0.24.0 --python 3.12
+      - run: uv run --with pymupdf==1.26.6 python scripts/smoke_harbor.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: harbor-smoke
+          path: |
+            output/harbor-smoke/data-validation.json
+            output/harbor-smoke/container-smokes.json
+            output/harbor-smoke/audit/**
+            output/harbor-smoke/wheel/*.whl
+            output/harbor-smoke/jobs/**/result.json
+            output/harbor-smoke/jobs/**/verifier/*

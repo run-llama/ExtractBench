@@ -282,6 +282,7 @@ class InferenceRunner:
     def _run_provider_inference(self, request: InferenceRequest) -> RawInferenceResult:
         """Run inference, rewriting the stored request back to the benchmark source path."""
         with self._provider_request_context(request) as provider_request:
+            provider_request = provider_request.model_copy(update={"artifact_dir": str(self.output_dir / "traces")})
             raw_result = self.provider.run_inference(self.pipeline, provider_request)
         if raw_result.request != request:
             raw_result = raw_result.model_copy(update={"request": request})

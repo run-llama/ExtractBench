@@ -6,6 +6,24 @@ All notable changes to `llama-extract-bench` are recorded here. The format follo
 
 ## [Unreleased]
 
+### Dependencies
+
+- Remove the direct scikit-learn dependency. Layout average precision reuses
+  ParseBench's NumPy implementation, including its handling of tied confidence
+  scores; evaluation numbers are unchanged.
+
+### Dataset layout
+
+- Rename the six ExtractBench Pro challenges and their split files, case-ID prefixes, PDF paths, tags, and leaderboard keys:
+  - Document conventions (`document_conventions`) → Interpretation rules (`interpretation_rules`).
+  - House vocabulary (`house_vocabulary`) → Custom terminology (`custom_terminology`).
+  - House counting rules (`house_counting_rules`) → Conditional aggregation (`conditional_aggregation`).
+  - Drawn relations (`drawn_relations`) → Relational diagrams (`relational_diagrams`).
+  - Charts inside documents (`charts_inside_documents`) → Charts and maps (`charts_and_maps`).
+  - Long chart sheets (`long_chart_sheets`) → Long single pages (`long_single_pages`).
+- Pro downloads and runs automatically repair original local paths and identity metadata before reusing cached predictions; original HF split names and group aliases remain accepted. Pro Harbor task IDs use only the document identifier, independent of challenge names, without legacy aliases. Benchmark content and scoring are unchanged.
+
+
 ### Packaging
 
 - The PyPI distribution is `llama-extract-bench` (the `extract-bench` name is
@@ -26,6 +44,10 @@ Pulls the extract scorer into alignment with the internal LlamaCloud benchmark
 harness ahead of the first PyPI release.
 
 ### Added
+- Register `llamaextract_agentic_plus_max_effort` with citations, confidence scores,
+  and the same 50-minute API / one-hour per-file timeouts as other LlamaExtract
+  pipelines. Retain billed API usage so Max costs include model charges;
+  costs remain unknown when billing usage is unavailable.
 - `ExtractEvaluator.compute_metrics()` returns an `ExtractMetricBundle`: the
   headline and diagnostic metrics plus the `ExtractScoringInputs` they scored
   (post list-unwrap, post EOB layout reconciliation). A harness with its own

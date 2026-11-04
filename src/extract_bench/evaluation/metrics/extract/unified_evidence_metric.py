@@ -91,7 +91,7 @@ from __future__ import annotations
 
 import math
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping, MutableSequence, Sequence
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import Any, SupportsFloat
@@ -183,6 +183,20 @@ type BoxIndex = dict[str, list[PageBBox]]
 # plain single-box IoU target.
 type EvidenceTarget = tuple[int, BBox, tuple[BBox, ...]]
 type TargetIndex = dict[str, Sequence[EvidenceTarget]]
+
+
+@dataclass(frozen=True)
+class ValueCell:
+    """One leaf counted by Value F1, after normalization and row alignment.
+
+    A missing path denotes a one-sided denominator entry. Collecting these
+    records observes the actual scoring pass, including unmatched subtrees;
+    it does not perform a second assignment or require citation evidence.
+    """
+
+    gt_path: str | None
+    pred_path: str | None
+    value_correct: bool
 
 
 @dataclass(frozen=True)
@@ -668,11 +682,13 @@ class Scorer:
         evidence_targets: TargetIndex | None = None,
         bbox_match_mode: str = DEFAULT_BBOX_MATCH_MODE,
         graded_cells: list[GradedCell] | None = None,
+        value_cells: MutableSequence[ValueCell] | None = None,
     ) -> None:
         if bbox_match_mode not in BBOX_MATCH_MODES:
             raise ValueError(f"unknown bbox_match_mode {bbox_match_mode!r}; supported: {sorted(BBOX_MATCH_MODES)}")
         self._alt = alt_values
         self._cells = graded_cells
+        self._value_cells = value_cells
         self._ev_boxes = evidence_boxes
         self._ev_pages = evidence_pages
         self._ev_targets = _flat_targets(evidence_boxes) if evidence_targets is None else evidence_targets
@@ -892,6 +908,8 @@ class Scorer:
         g_correct/p_correct on the same skipped set.
         """
         matched = self._value_match(gt_path, canonical, actual, field)
+        if self._value_cells is not None:
+            self._value_cells.append(ValueCell(gt_path, pred_path, matched))
         paged = False
         boxed = False
         if matched:
@@ -980,6 +998,8 @@ class Scorer:
                     if in_side:
                         self._count_subtree(child, child_val, child_schema, c, expected=expected, ground=ground)
                 return
+        if self._value_cells is not None:
+            self._value_cells.append(ValueCell(path if expected else None, None if expected else path, False))
         if expected:
             c.expected += 1
             if ground:
@@ -1341,9 +1361,8 @@ class Scorer:
     ) -> _Counts:
         c = _Counts()
         # Schema names first: a defaulted field omitted on both sides must still
-        # compare. Instance extras (keys not in the schema) stay in the union so
-        # a hallucinated key is still a scalar cell — shape of that cell is
-        # still schema (empty → opaque), not the Python type of the value.
+        # compare. Only schema keys earn recall; an off-schema root key is one
+        # opaque predicted cell, nested ones are ignored (#94).
         names = (set(schema_props) | set(expected) | set(actual)) - RESERVED_OUTPUT_KEYS
         for name in sorted(names):
             schema = schema_props.get(name, {})
@@ -1512,6 +1531,7 @@ def compute_unified_evidence_metrics(
     bbox_iou_threshold: float = 0.5,
     bbox_match_mode: str = DEFAULT_BBOX_MATCH_MODE,
     graded_cells: list[GradedCell] | None = None,
+    value_cells: MutableSequence[ValueCell] | None = None,
 ) -> list[MetricValue]:
     """Value + grounded precision/recall/F1 under keyless Hungarian alignment.
 
@@ -1525,6 +1545,9 @@ def compute_unified_evidence_metrics(
     Pass a list as ``graded_cells`` to collect the per-cell verdicts the pass
     would otherwise discard (see ``GradedCell``). It is a pure side-channel: the
     metrics and their metadata are identical either way.
+
+    ``value_cells`` collects every Value-F1 leaf, including one-sided misses
+    and cells with no citations. Paths address the normalized scoring inputs.
     """
     if bbox_match_mode not in BBOX_MATCH_MODES:
         raise ValueError(f"unknown bbox_match_mode {bbox_match_mode!r}; supported: {sorted(BBOX_MATCH_MODES)}")
@@ -1556,6 +1579,7 @@ def compute_unified_evidence_metrics(
         fuzzy=fuzzy,
         iou_threshold=bbox_iou_threshold,
         graded_cells=graded_cells,
+        value_cells=value_cells,
         evidence_targets=ev_targets if bbox_match_mode == "envelope" else None,
         bbox_match_mode=bbox_match_mode,
     ).score_root(expected, actual, schema_props)

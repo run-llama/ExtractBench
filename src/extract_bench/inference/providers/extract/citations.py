@@ -4,25 +4,13 @@ from __future__ import annotations
 
 import logging
 import math
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
 from extract_bench.schemas.extract_output import FieldCitation
 
 logger = logging.getLogger(__name__)
-
-_STRUCTURAL_KEYS = {
-    "citation",
-    "citations",
-    "document_metadata",
-    "field_metadata",
-    "fields",
-    "metadata",
-    "page_metadata",
-    "properties",
-    "row_metadata",
-}
 
 
 def extract_extend_field_citations(raw_output: Mapping[str, Any]) -> list[FieldCitation]:
@@ -32,12 +20,39 @@ def extract_extend_field_citations(raw_output: Mapping[str, Any]) -> list[FieldC
     return _dedupe(_collect_field_map(metadata, source="extend"))
 
 
-def extract_reducto_field_citations(raw_output: Mapping[str, Any]) -> list[FieldCitation]:
-    """Extract citations from Reducto Extract result payloads."""
+def extract_reducto_field_citations(raw_output: Mapping[str, Any]) -> Sequence[FieldCitation]:
+    """Extract citations from Reducto's value/citations field wrappers."""
     result = raw_output.get("result")
-    if isinstance(result, list) and result:
+    if isinstance(result, list) and len(result) > 0:
         result = result[0]
-    return _dedupe(_collect_recursive(node=_as_mapping(result), source="reducto", path=[]))
+    return _dedupe(_collect_reducto_citations(result, path=()))
+
+
+def _collect_reducto_citations(node: Any, *, path: Sequence[str]) -> Sequence[FieldCitation]:
+    citations: list[FieldCitation] = []
+    if isinstance(node, Mapping) and "value" in node and "citations" in node:
+        citations.extend(
+            _collect_node_citations(
+                field_path=format_field_path(path),
+                node=node,
+                source="reducto",
+                default_page=None,
+                default_dimensions=None,
+            )
+        )
+        citations.extend(_collect_reducto_citations(node["value"], path=path))
+    else:
+        for token, child in _iter_field_children(node):
+            citations.extend(_collect_reducto_citations(child, path=(*path, token)))
+    return citations
+
+
+def _iter_field_children(node: Any) -> Iterator[tuple[str, Any]]:
+    if isinstance(node, Mapping):
+        yield from node.items()
+    elif isinstance(node, Sequence) and not isinstance(node, (str, bytes, bytearray)):
+        for index, item in enumerate(node):
+            yield f"[{index}]", item
 
 
 def extract_landingai_field_citations(
@@ -78,36 +93,38 @@ def extract_landingai_field_citations(
     return citations
 
 
-def extract_llamaextract_field_citations(metadata: Any, *, source: str) -> list[FieldCitation]:
-    """Extract citations from LlamaExtract metadata in known and fallback shapes."""
+def extract_llamaextract_field_citations(metadata: Any, *, source: str) -> Sequence[FieldCitation]:
+    """Unwrap LlamaExtract's document, page, and row metadata envelopes."""
     metadata_map = _as_mapping(metadata)
-    if not metadata_map:
-        return []
-
+    field_metadata = _as_mapping(metadata_map.get("field_metadata"))
+    sections = ("document_metadata", "page_metadata", "row_metadata")
     citations: list[FieldCitation] = []
+    if any(key in field_metadata for key in sections):
+        envelope = field_metadata
+    else:
+        envelope = metadata_map
+        citations.extend(_collect_field_tree(node=field_metadata, source=source, path=()))
 
-    for key in ("field_metadata", "document_metadata", "fields"):
-        citations.extend(_collect_field_map(_as_mapping(metadata_map.get(key)), source=source))
+    for key in ("document_metadata", "fields"):
+        citations.extend(_collect_field_tree(node=envelope.get(key), source=source, path=()))
 
     for key in ("page_metadata", "row_metadata"):
-        entries = metadata_map.get(key)
-        if not isinstance(entries, Sequence) or isinstance(entries, (str, bytes, bytearray)):
-            continue
-        for entry in entries:
+        for entry in _as_sequence(envelope.get(key)):
             entry_map = _as_mapping(entry)
-            default_page = _extract_page(entry_map)
-            default_dimensions = _extract_dimensions(entry_map)
+            field_tree = entry_map
             for field_key in ("field_metadata", "document_metadata", "fields"):
-                citations.extend(
-                    _collect_field_map(
-                        _as_mapping(entry_map.get(field_key)),
-                        source=source,
-                        default_page=default_page,
-                        default_dimensions=default_dimensions,
-                    )
+                if field_key in entry_map:
+                    field_tree = _as_mapping(entry_map[field_key])
+                    break
+            citations.extend(
+                _collect_field_tree(
+                    node=field_tree,
+                    source=source,
+                    path=(),
+                    default_page=_extract_page(entry_map),
+                    default_dimensions=_extract_dimensions(entry_map),
                 )
-
-    citations.extend(_collect_recursive(node=metadata_map, source=source, path=[]))
+            )
     return _dedupe(citations)
 
 
@@ -146,7 +163,9 @@ def _collect_node_citations(
     if not node_map:
         return []
 
-    page = _extract_page(node_map) or default_page
+    page = _extract_page(node_map)
+    if page is None:
+        page = default_page
     dimensions = _extract_dimensions(node_map) or default_dimensions
     citations: list[FieldCitation] = []
     for citation in _iter_citation_entries(node_map):
@@ -160,19 +179,13 @@ def _collect_node_citations(
                 default_confidence=_extract_confidence(node_map),
             )
         )
-    if not citations:
-        # Confidence-only fallback: when a node has confidence but no bbox/citation
-        # entries, emit a page-only FieldCitation so the metric can still read the
-        # signal. If descendants later emit their own citations they keep distinct
-        # field paths, so both coexist without double-counting — the consumer
-        # picks the leaf via exact-path lookup and falls back to the parent only
-        # when nothing leaf-level matches.
+    if len(citations) == 0:
         confidence = _extract_confidence(node_map)
         if confidence is not None:
             citations.append(
                 FieldCitation(
                     field_path=field_path,
-                    page=page or 1,
+                    page=page,
                     bbox=None,
                     source=source,
                     confidence=confidence,
@@ -191,54 +204,44 @@ def _iter_citation_entries(node: Mapping[str, Any]) -> list[Any]:
     return entries
 
 
-def _collect_recursive(*, node: Any, source: str, path: list[str]) -> list[FieldCitation]:
-    node_map = _as_mapping(node)
-    if not node_map:
-        return []
-
+def _collect_field_tree(
+    *,
+    node: Any,
+    source: str,
+    path: Sequence[str],
+    default_page: int | None = None,
+    default_dimensions: tuple[float, float] | None = None,
+) -> Sequence[FieldCitation]:
     citations: list[FieldCitation] = []
-    explicit_path = _extract_field_path(node_map)
-    field_path = explicit_path or format_field_path(path)
-    if field_path:
-        for citation in _iter_citation_entries(node_map):
+    if isinstance(node, Mapping):
+        page = _extract_page(node)
+        dimensions = _extract_dimensions(node)
+        if page is not None:
+            default_page = page
+        if dimensions is not None:
+            default_dimensions = dimensions
+        if len(path) > 0:
             citations.extend(
-                _normalize_citation(
-                    field_path=field_path,
-                    citation=citation,
+                _collect_node_citations(
+                    field_path=format_field_path(path),
+                    node=node,
                     source=source,
-                    default_page=_extract_page(node_map),
-                    default_dimensions=_extract_dimensions(node_map),
-                    default_confidence=_extract_confidence(node_map),
+                    default_page=default_page,
+                    default_dimensions=default_dimensions,
                 )
             )
-        if not citations:
-            # See _collect_node_citations: parent-level confidence-only citations
-            # coexist with any leaf citations from the descendant walk below.
-            # Distinct field paths keep them from colliding in the consumer maps.
-            confidence = _extract_confidence(node_map)
-            if confidence is not None:
-                citations.append(
-                    FieldCitation(
-                        field_path=field_path,
-                        page=_extract_page(node_map) or 1,
-                        bbox=None,
-                        source=source,
-                        confidence=confidence,
-                        metadata=_compact_metadata(node_map),
-                    )
-                )
-
-    for key, value in node_map.items():
-        if key in ("citations", "citation"):
+    for token, child in _iter_field_children(node):
+        if token in ("citation", "citations"):
             continue
-        next_path = path if key in _STRUCTURAL_KEYS else [*path, key]
-        if isinstance(value, Mapping):
-            citations.extend(_collect_recursive(node=value, source=source, path=next_path))
-        elif isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
-            for index, item in enumerate(value):
-                item_path = next_path if key in _STRUCTURAL_KEYS else [*next_path, f"[{index}]"]
-                citations.extend(_collect_recursive(node=item, source=source, path=item_path))
-
+        citations.extend(
+            _collect_field_tree(
+                node=child,
+                source=source,
+                path=(*path, token),
+                default_page=default_page,
+                default_dimensions=default_dimensions,
+            )
+        )
     return citations
 
 
@@ -317,7 +320,7 @@ def _landingai_reference_to_citation(
         return None
 
     page_index = _coerce_int(grounding_entry.get("page"))
-    page = page_index + 1 if page_index is not None and page_index >= 0 else 1
+    page = page_index + 1 if page_index is not None and page_index >= 0 else None
     confidence = _extract_confidence(grounding_entry)
     metadata = {"reference": reference}
     grounding_type = grounding_entry.get("type")
@@ -335,7 +338,7 @@ def _landingai_reference_to_citation(
     )
 
 
-def format_field_path(path: list[str]) -> str:
+def format_field_path(path: Sequence[str]) -> str:
     """Render path tokens so list-index tokens (`[N]`) attach to the prior key without a dot.
 
     GT field paths use bracket notation (`employees[0].basic_salary`). We collect tokens during
@@ -366,7 +369,11 @@ def _normalize_citation(
     if not citation_map:
         return []
 
-    page = _extract_page(citation_map) or _extract_nested_bbox_page(citation_map) or default_page or 1
+    page = _extract_page(citation_map)
+    if page is None:
+        page = _extract_nested_bbox_page(citation_map)
+    if page is None:
+        page = default_page
     dimensions = _extract_dimensions(citation_map) or default_dimensions
     polygon = _extract_polygon(citation_map)
     reference_text = _extract_reference_text(citation_map)
@@ -459,17 +466,12 @@ def _extract_bbox_list(node: Mapping[str, Any]) -> list[list[float]] | None:
     return bboxes or None
 
 
-def _extract_field_path(node: Mapping[str, Any]) -> str | None:
-    for key in ("field_path", "fieldPath", "path", "field", "name", "key"):
-        value = node.get(key)
-        if isinstance(value, str) and value:
-            return value
-    return None
-
-
 def _extract_page(node: Mapping[str, Any]) -> int | None:
     for key in ("page", "page_number", "pageNumber"):
-        value = _coerce_int(node.get(key))
+        raw_value = node.get(key)
+        if key == "page" and isinstance(raw_value, Mapping):
+            raw_value = raw_value.get("number")
+        value = _coerce_int(raw_value)
         if value is not None and value >= 1:
             return value
     for key in ("page_index", "pageIndex"):
@@ -493,7 +495,16 @@ def _extract_dimensions(node: Mapping[str, Any]) -> tuple[float, float] | None:
     if width is not None and height is not None and width > 0 and height > 0:
         return width, height
 
-    for key in ("page_dimensions", "pageDimensions", "page_size", "pageSize", "dimensions", "image_size", "imageSize"):
+    for key in (
+        "page",
+        "page_dimensions",
+        "pageDimensions",
+        "page_size",
+        "pageSize",
+        "dimensions",
+        "image_size",
+        "imageSize",
+    ):
         size = _as_mapping(node.get(key))
         width = _coerce_float(_first_present(size, ("width", "w")))
         height = _coerce_float(_first_present(size, ("height", "h")))
@@ -714,7 +725,7 @@ def _compact_metadata(node: Mapping[str, Any]) -> dict[str, Any] | None:
     return dict(metadata) if metadata else None
 
 
-def _dedupe(citations: list[FieldCitation]) -> list[FieldCitation]:
+def _dedupe(citations: Sequence[FieldCitation]) -> list[FieldCitation]:
     seen: set[tuple[Any, ...]] = set()
     deduped: list[FieldCitation] = []
     for citation in citations:
@@ -826,7 +837,10 @@ def _refine_chunk_citations_via_text_search(
             if not queries:
                 refined.append(citation)
                 continue
-            page_index = (citation.page or 1) - 1
+            if citation.page is None:
+                refined.append(citation)
+                continue
+            page_index = citation.page - 1
             if page_index < 0 or page_index >= document.page_count:
                 refined.append(citation)
                 continue

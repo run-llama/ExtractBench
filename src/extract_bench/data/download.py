@@ -27,6 +27,8 @@ from collections.abc import Set
 from dataclasses import dataclass
 from pathlib import Path
 
+from extract_bench.data.pro_names import LEGACY_PRO_SPLITS, PRO_SPLITS, canonical_pro_tag, repair_pro_layout
+
 DATASET_REPO = "llamaindex/ExtractBench"
 DATASET_REPO_TYPE = "dataset"
 TEST_DATA_REVISION = "test-data"
@@ -55,14 +57,7 @@ def dataset_config(dataset: str = "extractbench", test: bool = False) -> Dataset
             raise ValueError("ExtractBench Pro has no --test subset. Use --group to run one challenge.")
         return Dataset(
             "llamaindex/ExtractBenchPro",
-            (
-                "document_conventions",
-                "house_vocabulary",
-                "house_counting_rules",
-                "drawn_relations",
-                "charts_inside_documents",
-                "long_chart_sheets",
-            ),
+            PRO_SPLITS,
             Path("./data-pro"),
         )
     raise ValueError(f"Unknown dataset {dataset!r}. Choose 'extractbench' or 'pro'.")
@@ -150,7 +145,7 @@ def _revision_is_stale(data_dir: Path, revision: str | None, dataset: str = "ext
 def _prune_orphans(data_dir: Path, keep: Set[Path], dataset: str = "extractbench") -> list[Path]:
     """Delete reconstructed sidecars (and their PDFs) no longer in the dataset."""
     removed = []
-    for split in dataset_config(dataset).splits:
+    for split in (*dataset_config(dataset).splits, *(LEGACY_PRO_SPLITS if dataset == "pro" else ())):
         split_dir = data_dir / split
         if not split_dir.is_dir():
             continue
@@ -190,7 +185,7 @@ def _write_sidecar(row: dict, split_dir: Path, snapshot_dir: Path, force: bool =
         shutil.copyfile(src_pdf, dest_pdf)
 
     sidecar: dict = {
-        "tags": row.get("tags") or [],
+        "tags": [canonical_pro_tag(tag) for tag in row.get("tags") or []],
         "data_schema": json.loads(row["data_schema"]),
         "expected_output": json.loads(row["expected_output"]),
     }
@@ -216,6 +211,7 @@ def download_dataset(
     force: bool = False,
     test: bool = False,
     dataset: str = "extractbench",
+    revision: str | None = None,
 ) -> Path:
     """Download the ExtractBench dataset and reconstruct the sidecar layout.
 
@@ -243,7 +239,10 @@ def download_dataset(
     # Two branches, same as ParseBench: the full dataset lives on the default
     # branch, the small smoke subset on `test-data`. The resolved commit is
     # recorded in the manifest so `status` can report exactly what is on disk.
-    revision = TEST_DATA_REVISION if test else None
+    if test and revision is not None:
+        raise ValueError("--test selects test-data; do not also pass --revision")
+    if test:
+        revision = TEST_DATA_REVISION
 
     existing_manifest = read_manifest(data_dir)
     if existing_manifest is not None and existing_manifest.get("repo") != config.repo:
@@ -257,6 +256,9 @@ def download_dataset(
             f"{data_dir} already holds the {kind_existing}; refusing to overlay the "
             f"{kind_requested} into the same directory. Use a different --data_dir."
         )
+
+    if dataset == "pro":
+        repair_pro_layout(data_dir)
 
     if not force and is_dataset_ready(data_dir, dataset, test) and not _revision_is_stale(data_dir, revision, dataset):
         print(f"Dataset already downloaded at: {data_dir}")
@@ -273,7 +275,10 @@ def download_dataset(
             repo_id=config.repo,
             repo_type=DATASET_REPO_TYPE,
             revision=revision,
-            allow_patterns=[*[f"{split}.jsonl" for split in config.splits], "docs/**"],
+            allow_patterns=[
+                *[f"{split}.jsonl" for split in (*config.splits, *(LEGACY_PRO_SPLITS if dataset == "pro" else ()))],
+                "docs/**",
+            ],
         )
     )
     # huggingface_hub materializes snapshots under snapshots/<commit-sha>/.
@@ -295,16 +300,20 @@ def download_dataset(
     per_split: dict[str, int] = {}
     written: set[Path] = set()
     for split in config.splits:
-        jsonl_path = snapshot_dir / f"{split}.jsonl"
-        if not jsonl_path.exists():
-            raise RuntimeError(f"Dataset snapshot is missing {split}.jsonl at {snapshot_dir}")
+        source_names = [split] + [old for old, new in LEGACY_PRO_SPLITS.items() if dataset == "pro" and new == split]
+        candidates = [
+            snapshot_dir / f"{name}.jsonl" for name in source_names if (snapshot_dir / f"{name}.jsonl").is_file()
+        ]
+        if len(candidates) != 1:
+            raise RuntimeError(f"Expected exactly one source split for {split} at {snapshot_dir}, found {candidates}")
+        jsonl_path = candidates[0]
         split_dir = data_dir / split
         split_cases = 0
         for line in jsonl_path.read_text(encoding="utf-8").splitlines():
             if not line.strip():
                 continue
             row = json.loads(line)
-            if row["category"] != split:
+            if row["category"] != jsonl_path.stem:
                 raise ValueError(f"Row {row.get('id')} in {split}.jsonl has category {row['category']!r}")
             written.add(_write_sidecar(row, split_dir, snapshot_dir, force=refresh))
             split_cases += 1
