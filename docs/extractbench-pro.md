@@ -97,7 +97,7 @@ The leaderboard reports the unweighted mean of each document's cost divided by i
 
 ## Submitting results
 
-Add seven rows per system to [leaderboard-pro.csv](../leaderboard-pro.csv): the overall row (`Challenge` = `all`) and one row for each of the six challenges. Each row carries `Documents`, `Grounding_Documents`, `Cost_Per_Page`, and both score views:
+Add seven rows per system to [leaderboard-pro.csv](../leaderboard-pro.csv): the overall row (`Challenge` = `all`) and one row for each of the six challenges. Each row carries `Pipeline`, `Reasoning`, `Documents`, `Grounding_Documents`, `Cost_Per_Page`, and both score views:
 
 | Metric | 30-minute limit | No time limit |
 |---|---|---|

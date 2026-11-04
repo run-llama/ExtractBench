@@ -117,6 +117,8 @@ Top 10 of 16 systems — full table in [leaderboard-pro.csv](leaderboard-pro.csv
 
 Open a PR updating [leaderboard.csv](leaderboard.csv) or [leaderboard-pro.csv](leaderboard-pro.csv), with your pipeline configuration and evaluation reports. Scores are percentages. Costs are computed by averaging each document's USD per page, with equal weighting given to all documents. Regenerate the tables with `uv run python scripts/update_readme.py`.
 
+`Pipeline` is the registered pipeline name, empty when none is registered. `Reasoning` is the reasoning or thinking level the run used (`off`, `low`, `medium`, `high`, `xhigh`), including a CLI or API default the pipeline leaves unset. `default` means a model or server default that the run did not record. It is empty for systems without a reasoning setting.
+
 The rows each CSV needs are described in [ExtractBench: submitting results](docs/extractbench.md#submitting-results) and [ExtractBench Pro: submitting results](docs/extractbench-pro.md#submitting-results). For Pro, include the overall (`all`) row and all six challenge rows, with scores for both time-limit views.
 
 <details>
