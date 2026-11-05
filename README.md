@@ -58,13 +58,13 @@ In the official benchmark, documents that fail or exceed a 30-minute limit score
 | 3 | Reducto Deep Extract | Specialized APIs | <u>96.08</u> | 96.84 | <u>94.80</u> | 92.85 | 6.35¢ |
 | 4 | Pulse (Effort) | Specialized APIs | 96.07 | 96.83 | 94.70 | 93.24 | 10.50¢ |
 | 5 | LlamaExtract Agentic | LlamaExtract | 95.65 | 96.06 | 94.79 | **94.73** | 3.12¢ |
-| 6 | Codex (GPT-6.1 Sol Evidence) | Coding Agents | 95.31 | 97.01 | 92.96 | 85.46 | 7.13¢ |
-| 7 | Claude Code (Sonnet 5.5 Evidence) | Coding Agents | 94.68 | 96.22 | 92.97 | 83.69 | 5.69¢ |
-| 8 | Codex (GPT-6 Sol Evidence) | Coding Agents | 94.57 | 95.99 | 92.42 | 87.25 | 9.80¢ |
+| 6 | Codex (GPT-6.1 Sol) | Coding Agents | 95.31 | 97.01 | 92.96 | 85.46 | 7.13¢ |
+| 7 | Claude Code (Sonnet 5.5) | Coding Agents | 94.68 | 96.22 | 92.97 | 83.69 | 5.69¢ |
+| 8 | Codex (GPT-6 Sol) | Coding Agents | 94.57 | 95.99 | 92.42 | 87.25 | 9.80¢ |
 | 9 | Pulse (Non-effort) | Specialized APIs | 94.51 | 95.39 | 92.49 | 93.31 | 3.00¢ |
-| 10 | Codex (GPT-6.1 Terra Evidence) | Coding Agents | 94.28 | 96.26 | 91.86 | 81.21 | 4.68¢ |
+| 10 | Codex (GPT-6.1 Terra) | Coding Agents | 94.28 | 96.26 | 91.86 | 81.21 | 4.68¢ |
 
-Top 10 of 54 systems — full table in [leaderboard.csv](leaderboard.csv).
+Top 10 of 51 ranked systems — all results in [leaderboard.csv](leaderboard.csv).
 <!-- LEADERBOARD:END -->
 
 <!-- GROUNDING:START -->
@@ -76,20 +76,20 @@ Top 10 of 54 systems — full table in [leaderboard.csv](leaderboard.csv).
     <tr><th align="right">Overall</th><th align="right">Short</th><th align="right">Medium</th><th align="right">Long</th><th align="right">Overall</th><th align="right">Short</th><th align="right">Medium</th><th align="right">Long</th></tr>
   </thead>
   <tbody>
-    <tr><td align="right">1</td><td>Codex (GPT-6.1 Sol Evidence)</td><td align="right"><strong>87.61</strong></td><td align="right"><strong>89.03</strong></td><td align="right">84.38</td><td align="right"><strong>85.70</strong></td><td align="right"><u>89.37</u></td><td align="right"><u>89.63</u></td><td align="right">89.25</td><td align="right">86.80</td></tr>
-    <tr><td align="right">2</td><td>Codex (GPT-6.1 Terra Evidence)</td><td align="right"><u>85.69</u></td><td align="right"><u>88.13</u></td><td align="right">81.32</td><td align="right">77.21</td><td align="right">87.42</td><td align="right">88.49</td><td align="right">86.10</td><td align="right">81.15</td></tr>
+    <tr><td align="right">1</td><td>Codex (GPT-6.1 Sol)</td><td align="right"><strong>87.61</strong></td><td align="right"><strong>89.03</strong></td><td align="right">84.38</td><td align="right"><strong>85.70</strong></td><td align="right"><u>89.37</u></td><td align="right"><u>89.63</u></td><td align="right">89.25</td><td align="right">86.80</td></tr>
+    <tr><td align="right">2</td><td>Codex (GPT-6.1 Terra)</td><td align="right"><u>85.69</u></td><td align="right"><u>88.13</u></td><td align="right">81.32</td><td align="right">77.21</td><td align="right">87.42</td><td align="right">88.49</td><td align="right">86.10</td><td align="right">81.15</td></tr>
     <tr><td align="right">3</td><td>LlamaExtract Agentic Plus</td><td align="right">83.25</td><td align="right">83.22</td><td align="right">83.44</td><td align="right"><u>82.84</u></td><td align="right">88.26</td><td align="right">87.97</td><td align="right">88.48</td><td align="right"><u>90.61</u></td></tr>
     <tr><td align="right">4</td><td>LlamaExtract Agentic</td><td align="right">82.33</td><td align="right">81.39</td><td align="right"><u>84.94</u></td><td align="right">81.63</td><td align="right">88.20</td><td align="right">86.95</td><td align="right"><u>90.33</u></td><td align="right"><strong>92.59</strong></td></tr>
     <tr><td align="right">5</td><td>LlamaExtract Agentic Plus (Max Effort)</td><td align="right">81.78</td><td align="right">80.58</td><td align="right"><strong>85.55</strong></td><td align="right">78.74</td><td align="right"><strong>90.02</strong></td><td align="right"><strong>89.92</strong></td><td align="right"><strong>90.67</strong></td><td align="right">88.10</td></tr>
     <tr><td align="right">6</td><td>LlamaExtract Cost-Effective</td><td align="right">79.80</td><td align="right">80.99</td><td align="right">77.52</td><td align="right">76.16</td><td align="right">86.28</td><td align="right">86.97</td><td align="right">84.60</td><td align="right">86.41</td></tr>
-    <tr><td align="right">7</td><td>Codex (GPT-6 Sol Evidence)</td><td align="right">77.11</td><td align="right">77.61</td><td align="right">75.53</td><td align="right">78.31</td><td align="right">86.50</td><td align="right">87.20</td><td align="right">85.12</td><td align="right">84.82</td></tr>
-    <tr><td align="right">8</td><td>Claude Code (Opus 5.5 Evidence)</td><td align="right">71.55</td><td align="right">73.57</td><td align="right">65.54</td><td align="right">74.87</td><td align="right">76.95</td><td align="right">79.27</td><td align="right">71.36</td><td align="right">76.47</td></tr>
-    <tr><td align="right">9</td><td>Codex (GPT-6 Luna Evidence)</td><td align="right">65.70</td><td align="right">62.91</td><td align="right">71.11</td><td align="right">74.36</td><td align="right">83.93</td><td align="right">84.41</td><td align="right">83.47</td><td align="right">80.17</td></tr>
-    <tr><td align="right">10</td><td>Claude Code (Sonnet 5.5 Evidence)</td><td align="right">64.61</td><td align="right">64.59</td><td align="right">63.18</td><td align="right">71.22</td><td align="right">75.99</td><td align="right">77.93</td><td align="right">71.50</td><td align="right">74.98</td></tr>
+    <tr><td align="right">7</td><td>Codex (GPT-6 Sol)</td><td align="right">77.11</td><td align="right">77.61</td><td align="right">75.53</td><td align="right">78.31</td><td align="right">86.50</td><td align="right">87.20</td><td align="right">85.12</td><td align="right">84.82</td></tr>
+    <tr><td align="right">8</td><td>Claude Code (Opus 5.5)</td><td align="right">71.55</td><td align="right">73.57</td><td align="right">65.54</td><td align="right">74.87</td><td align="right">76.95</td><td align="right">79.27</td><td align="right">71.36</td><td align="right">76.47</td></tr>
+    <tr><td align="right">9</td><td>Codex (GPT-6 Luna)</td><td align="right">65.70</td><td align="right">62.91</td><td align="right">71.11</td><td align="right">74.36</td><td align="right">83.93</td><td align="right">84.41</td><td align="right">83.47</td><td align="right">80.17</td></tr>
+    <tr><td align="right">10</td><td>Claude Code (Sonnet 5.5)</td><td align="right">64.61</td><td align="right">64.59</td><td align="right">63.18</td><td align="right">71.22</td><td align="right">75.99</td><td align="right">77.93</td><td align="right">71.50</td><td align="right">74.98</td></tr>
   </tbody>
 </table>
 
-Top 10 of 54 systems — full table in [leaderboard.csv](leaderboard.csv).
+Top 10 of 51 ranked systems — all results in [leaderboard.csv](leaderboard.csv).
 <!-- GROUNDING:END -->
 
 ### ExtractBench Pro leaderboard
@@ -110,12 +110,12 @@ Rows are ordered by % Perfect, then Value F1, then lower cost.
 | 9 | LlamaExtract Agentic | LlamaExtract | 20 | 71.32 | 58.01 | 3.12¢ |
 | 10 | Pulse Effort | Specialized APIs | 18 | 70.53 | 18.74 | 10.50¢ |
 
-Top 10 of 16 systems — full table in [leaderboard-pro.csv](leaderboard-pro.csv). Scores with no time limit are also available there.
+Top 10 of 16 ranked systems — all results in [leaderboard-pro.csv](leaderboard-pro.csv). Scores with no time limit are also available there.
 <!-- PRO_LEADERBOARD:END -->
 
 ### Submitting results
 
-Open a PR updating [leaderboard.csv](leaderboard.csv) or [leaderboard-pro.csv](leaderboard-pro.csv), with your pipeline configuration and evaluation reports. Scores are percentages. Costs are computed by averaging each document's USD per page, with equal weighting given to all documents. Regenerate the tables with `uv run python scripts/update_readme.py`.
+Open a PR updating [leaderboard.csv](leaderboard.csv) or [leaderboard-pro.csv](leaderboard-pro.csv), with your pipeline configuration and evaluation reports. Set `include_in_rankings` to `true` or `false` on every row; `false` retains the result in the CSV and excludes it from public rankings. Coding agents use their evidence configurations in rankings; direct VLMs use their non-evidence configurations. Keep the flag consistent across a system's Pro challenge rows. Scores are percentages. Costs are computed by averaging each document's USD per page, with equal weighting given to all documents. Regenerate the tables with `uv run python scripts/update_readme.py`.
 
 `Pipeline` is the registered pipeline name, empty when none is registered. `Reasoning` is the reasoning or thinking level the run used (`off`, `low`, `medium`, `high`, `xhigh`), including a CLI or API default the pipeline leaves unset. `default` means a model or server default that the run did not record. It is empty for systems without a reasoning setting.
 
