@@ -44,6 +44,7 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
                     "extract_version": "2.6",
                     "timeout": 3000,
                     "cite_sources": True,
+                    "confidence_scores": True,
                 },
                 # The provider polls the hosted job for up to `timeout` seconds; give
                 # the runner-level watchdog headroom past that so long documents are
