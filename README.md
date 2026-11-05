@@ -115,7 +115,7 @@ Top 10 of 16 ranked systems — all results in [leaderboard-pro.csv](leaderboard
 
 ### Submitting results
 
-Open a PR updating [leaderboard.csv](leaderboard.csv) or [leaderboard-pro.csv](leaderboard-pro.csv), with your pipeline configuration and evaluation reports. Set `include_in_rankings` to `true` or `false` on every row; `false` retains the result in the CSV and excludes it from public rankings. Coding agents use their evidence configurations in rankings; direct VLMs use their non-evidence configurations. Keep the flag consistent across a system's Pro challenge rows. Scores are percentages. Costs are computed by averaging each document's USD per page, with equal weighting given to all documents. Regenerate the tables with `uv run python scripts/update_readme.py`.
+Open a PR updating [leaderboard.csv](leaderboard.csv) or [leaderboard-pro.csv](leaderboard-pro.csv), with your pipeline configuration and evaluation reports. Set `include_in_rankings` to `true` or `false` on every row; `false` retains the result in the CSV and excludes it from public rankings. Scores are percentages. Costs are computed by averaging each document's USD per page, with equal weighting given to all documents. Regenerate the tables with `uv run python scripts/update_readme.py`.
 
 `Pipeline` is the registered pipeline name, empty when none is registered. `Reasoning` is the reasoning or thinking level the run used (`off`, `low`, `medium`, `high`, `xhigh`), including a CLI or API default the pipeline leaves unset. `default` means a model or server default that the run did not record. It is empty for systems without a reasoning setting.
 
