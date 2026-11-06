@@ -1,4 +1,4 @@
-"""Extract providers imported for registry side effects.
+"""Extract providers loaded by the registry on first use.
 
 Imports are best-effort so a core ExtractBench install does not require
 optional provider SDKs such as ``extend-ai``; failures that originate inside
@@ -41,14 +41,17 @@ _PROVIDER_MODULES = [
     "vllm_extract",
 ]
 
-for _mod in _PROVIDER_MODULES:
-    try:
-        importlib.import_module(f"extract_bench.inference.providers.extract.{_mod}")
-    except ImportError as exc:
-        # A missing third-party SDK is expected on a core-only install; a
-        # failure originating inside this package is a packaging bug and must
-        # be loud, not silently skipped.
-        if (exc.name or "").startswith("extract_bench"):
-            logger.warning("Extract provider %s failed to import: %s", _mod, exc)
-        else:
-            logger.debug("Skipping extract provider %s (missing dependency)", _mod)
+
+def load_providers() -> None:
+    """Register this family's providers, skipping optional SDKs that are unavailable."""
+    for module in _PROVIDER_MODULES:
+        try:
+            importlib.import_module(f"extract_bench.inference.providers.extract.{module}")
+        except ImportError as exc:
+            # A missing third-party SDK is expected on a core-only install; a
+            # failure originating inside this package is a packaging bug and must
+            # be loud, not silently skipped.
+            if exc.name is not None and exc.name.startswith("extract_bench"):
+                logger.warning("Extract provider %s failed to import: %s", module, exc)
+            else:
+                logger.debug("Skipping extract provider %s (missing dependency)", module)
