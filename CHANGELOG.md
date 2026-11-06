@@ -6,6 +6,13 @@ All notable changes to `llama-extract-bench` are recorded here. The format follo
 
 ## [Unreleased]
 
+### Imports
+
+- Load built-in providers on the first `create_provider` call, so extension and
+  helper imports do not load every provider SDK. Direct provider-module imports
+  still register that provider. Code reading the private provider registry must
+  call `load_builtin_providers()` first.
+
 ### Dependencies
 
 - Remove the direct scikit-learn dependency. Layout average precision reuses

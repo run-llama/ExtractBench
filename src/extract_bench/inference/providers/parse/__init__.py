@@ -1,4 +1,4 @@
-"""Parse providers — imported lazily to avoid requiring all SDKs."""
+"""Parse providers loaded by the registry on first use."""
 
 import importlib
 import logging
@@ -53,8 +53,11 @@ _PROVIDER_MODULES = [
     "oi_parser",
 ]
 
-for _mod in _PROVIDER_MODULES:
-    try:
-        importlib.import_module(f"extract_bench.inference.providers.parse.{_mod}")
-    except ImportError:
-        logger.debug("Skipping parse provider %s (missing dependency)", _mod)
+
+def load_providers() -> None:
+    """Register this family's providers, skipping optional SDKs that are unavailable."""
+    for module in _PROVIDER_MODULES:
+        try:
+            importlib.import_module(f"extract_bench.inference.providers.parse.{module}")
+        except ImportError:
+            logger.debug("Skipping parse provider %s (missing dependency)", module)

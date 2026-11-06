@@ -1,11 +1,9 @@
-"""Provider implementations for document parsing."""
+"""Provider implementations loaded on the first ``create_provider`` call.
 
-# Import providers to register them
-from extract_bench.inference.providers import (
-    extract,  # noqa: F401
-    layoutdet,  # noqa: F401
-    parse,  # noqa: F401
-)
+Importing provider helpers or registration hooks leaves optional SDKs unloaded.
+Direct imports of individual provider modules still register those providers.
+"""
+
 from extract_bench.inference.providers.base import (
     Provider,
     ProviderConfigError,

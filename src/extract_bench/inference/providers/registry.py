@@ -1,9 +1,24 @@
+import functools
+import importlib
 from collections.abc import Callable
 
 from extract_bench.inference.providers.base import Provider, ProviderConfigError
 from extract_bench.schemas.pipeline import PipelineSpec
 
 _PROVIDER_REGISTRY: dict[str, type[Provider]] = {}
+
+_BUILTIN_PROVIDER_PACKAGES = ("extract", "layoutdet", "parse")
+
+
+@functools.cache
+def load_builtin_providers() -> None:
+    """Register built-in providers on first use, keeping helper imports free of SDKs.
+
+    Successful loading is cached so unavailable optional SDKs are not retried on
+    every factory call. Individual provider modules retain import-time registration.
+    """
+    for package in _BUILTIN_PROVIDER_PACKAGES:
+        importlib.import_module(f"extract_bench.inference.providers.{package}").load_providers()
 
 
 def register_provider(provider_name: str) -> Callable[[type[Provider]], type[Provider]]:
@@ -38,6 +53,7 @@ def create_provider(pipeline: PipelineSpec) -> Provider:
     :return: Concrete Provider instance
     :raises ProviderConfigError: If provider is not registered
     """
+    load_builtin_providers()
     provider_name = pipeline.provider_name
     provider_cls = _PROVIDER_REGISTRY.get(provider_name)
     if provider_cls is None:
