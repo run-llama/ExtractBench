@@ -501,7 +501,7 @@ class ExtendProvider(Provider):
             # The SDK permits missing fields, so hasattr(id) alone accepts None.
             payload = self._run_response_to_dict(upload_response)
             file_data = payload.get("file", payload)
-            file_id = file_data.get("id") or file_data.get("fileId")
+            file_id = file_data.get("id")
             if isinstance(file_id, str) and len(file_id) > 0:
                 return file_id
             raise ProviderPermanentError("No file ID in upload response", debug_payload={"upload_response": payload})
