@@ -81,6 +81,7 @@ UNSUPPORTED_SCHEMA_PROPERTIES = {
     "contentMediaType",
     "contentEncoding",
     "default",
+    "examples",
     "definitions",
     "title",
 }
@@ -496,22 +497,20 @@ class ExtendProvider(Provider):
             with open(file_path, "rb") as f:
                 upload_response = self._client.files.upload(file=f)
 
-            # Extract file ID from response
-            if hasattr(upload_response, "id"):
-                return str(upload_response.id)
-            elif hasattr(upload_response, "file") and hasattr(upload_response.file, "id"):
-                return str(upload_response.file.id)
-            elif isinstance(upload_response, dict):
-                file_data = upload_response.get("file", upload_response)
-                file_id = file_data.get("id") or file_data.get("fileId")
-                if file_id:
-                    return str(file_id)
-
-            raise ProviderPermanentError(f"No file ID in upload response: {upload_response}")
+            # API 2025-04-21 wraps the file; API 2026-02-09 returns it directly.
+            # The SDK permits missing fields, so hasattr(id) alone accepts None.
+            payload = self._run_response_to_dict(upload_response)
+            file_data = payload.get("file", payload)
+            file_id = file_data.get("id") or file_data.get("fileId")
+            if isinstance(file_id, str) and len(file_id) > 0:
+                return file_id
+            raise ProviderPermanentError("No file ID in upload response", debug_payload={"upload_response": payload})
 
         except ApiError as e:
             self._handle_api_error(e, "file upload")
             raise  # Should not reach here, but satisfies type checker
+        except ProviderError:
+            raise
         except Exception as e:
             error_str = str(e).lower()
             if any(kw in error_str for kw in ["timeout", "timed out", "connection", "network", "readtimeout"]):

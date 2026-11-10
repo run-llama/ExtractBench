@@ -197,3 +197,26 @@ def test_extend_schema_adapter_wraps_empty_object_array_items() -> None:
     }
     # The ground truth is always [] -> round-trips unchanged.
     assert _adapt_result_from_extend({"currency_code": []}, primitive_array_paths) == {"currency_code": []}
+
+
+def test_extend_schema_adapter_strips_rejected_examples_without_removing_named_fields() -> None:
+    field = {"type": "string", "description": "Shareholder name.", "examples": ["Jane Doe"]}
+    schema = {
+        "type": "object",
+        "properties": {
+            "form_7203": {
+                "type": "object",
+                "properties": {"name_of_shareholder": field, "examples": {"type": "string"}},
+            },
+            "rows": {"type": "array", "items": {"type": "object", "properties": {"name": field}}},
+        },
+    }
+
+    adapted, _, _ = _adapt_schema_for_extend(schema)
+
+    form_properties = adapted["properties"]["form_7203"]["properties"]
+    expected_field = {"type": "string", "description": "Shareholder name."}
+    assert form_properties["name_of_shareholder"] == expected_field
+    assert adapted["properties"]["rows"]["items"]["properties"]["name"] == expected_field
+    assert form_properties["examples"] == {"type": "string"}
+    assert field["examples"] == ["Jane Doe"]

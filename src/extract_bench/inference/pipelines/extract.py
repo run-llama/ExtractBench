@@ -496,9 +496,12 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
             provider_name="extend",
             config={
                 "baseProcessor": "extraction_performance",
-                "baseVersion": "4.1.1",
+                "api_version": "2026-02-09",
+                "async_run": True,
                 "advancedOptions": {
                     "citationsEnabled": True,
+                    "citationMode": "line",
+                    "arrayCitationStrategy": "property",
                     "advancedFigureParsingEnabled": True,
                 },
             },
