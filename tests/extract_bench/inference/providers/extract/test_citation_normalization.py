@@ -244,3 +244,59 @@ def test_extend_invalid_nested_page_does_not_hide_explicit_page(
     )
     assert len(citations) == 1
     assert citations[0].page == expected_page
+
+
+@pytest.mark.parametrize("pipeline_name", ["extend_extract", "extend_extract_max"])
+def test_extend_review_scores_survive_provider_normalization_without_changing_values(
+    pipeline_name: str,
+) -> None:
+    """Review scores must replace OCR confidence and survive missing citations."""
+    from datetime import UTC, datetime
+
+    pytest.importorskip("extend_ai", reason="Extend SDK is an optional provider dependency")
+
+    from extract_bench.inference.pipelines import get_pipeline
+    from extract_bench.inference.providers.extract.extend import ExtendProvider
+    from extract_bench.schemas.pipeline_io import RawInferenceResult
+
+    pipeline = get_pipeline(pipeline_name)
+    provider = ExtendProvider("extend", {"api_key": "test"})
+    values = {"items": [{"amount": 10, "name": "A", "note": "uncertain"}]}
+    metadata = {
+        "items[0].amount": {
+            "reviewAgentScore": 1,
+            "confidence": 0.99,
+            "insights": [{"type": "issue", "content": "Check total"}],
+            "citations": [{"page": 2, "bbox": [0.1, 0.2, 0.3, 0.1]}],
+        },
+        "items[0].name": {"reviewAgentScore": 5, "citations": None},
+        "items[0].note": {
+            "reviewAgentScore": None,
+            "confidence": 0.99,
+            "citations": [{"page": 2, "bbox": [0.1, 0.4, 0.3, 0.1]}],
+        },
+    }
+    now = datetime.now(UTC)
+    raw = RawInferenceResult.model_validate(
+        {
+            "request": {"example_id": "review", "source_file_path": "/document.pdf", "product_type": "extract"},
+            "pipeline": pipeline,
+            "pipeline_name": pipeline_name,
+            "product_type": "extract",
+            "raw_output": {"processor_run": {"output": {"value": values, "metadata": metadata}}},
+            "started_at": now,
+            "completed_at": now,
+            "latency_in_ms": 0,
+        }
+    )
+    result = provider.normalize(raw)
+    assert result.output.extracted_data == values
+    citations = {citation.field_path: citation for citation in result.output.field_citations}
+    assert citations["items[0].amount"].confidence == 0.0
+    assert citations["items[0].amount"].page == 2
+    assert citations["items[0].amount"].bbox == [0.1, 0.2, 0.3, 0.1]
+    assert citations["items[0].amount"].metadata["review_agent_insights"] == metadata["items[0].amount"]["insights"]
+    assert citations["items[0].name"].confidence == 1.0
+    assert citations["items[0].name"].page is None
+    assert citations["items[0].name"].bbox is None
+    assert citations["items[0].note"].confidence is None

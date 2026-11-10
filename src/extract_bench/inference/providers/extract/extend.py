@@ -9,7 +9,8 @@ import json
 import os
 import threading
 import time
-from datetime import datetime
+from datetime import UTC, datetime
+from importlib.metadata import version
 from pathlib import Path
 from typing import Any, cast
 
@@ -43,13 +44,10 @@ from extract_bench.schemas.product import ProductType
 # Source: https://docs.extend.ai/general/how-credits-work
 DEFAULT_PARSE_CREDITS_PER_PAGE = 2.0
 
-# USD per Extend credit at Pay-As-You-Go list pricing. Extend doesn't publish a
-# direct per-credit rate, so this is derived from their published parse pricing:
-# $0.025/page at 2 credits/page = $0.0125/credit. Hardcoded (like llamaextract's
-# _USD_PER_CREDIT) so cost_usd / cost_per_page_usd always populate and the
-# dashboard cost columns render. Update here if Extend's list pricing changes.
-# Source: https://www.extend.ai/pricing
+# Conversion rate for saved configurations without an explicit usd_per_credit.
 USD_PER_CREDIT = 0.0125
+
+EXTEND_METADATA_KEY = "_extend_metadata"
 
 # JSON Schema properties not supported by Extend AI
 UNSUPPORTED_SCHEMA_PROPERTIES = {
@@ -373,7 +371,9 @@ def _attach_cost_stats(raw_output: dict[str, Any], pipeline_config: dict[str, An
     raw_output["total_credits"] = total_credits
 
     # USD conversion at PAYG list pricing so the dashboard cost columns populate.
-    cost_usd = total_credits * USD_PER_CREDIT
+    rate = float(pipeline_config.get("usd_per_credit", USD_PER_CREDIT))
+    raw_output["usd_per_credit"] = rate
+    cost_usd = total_credits * rate
     raw_output["cost_usd"] = cost_usd
     if num_pages:
         raw_output["credits_per_page"] = total_credits / num_pages
@@ -778,7 +778,7 @@ class ExtendProvider(Provider):
         try:
             create_response = self._client.processor_run.create(
                 processor_id=processor_id,
-                file={"fileId": file_id},  # type: ignore[arg-type]
+                file={"file_id": file_id},
                 sync=False,  # Asynchronous — poll for completion below
             )
         except ApiError as e:
@@ -799,6 +799,8 @@ class ExtendProvider(Provider):
         # against a persistently unreachable polling channel, never against a
         # legitimately long extraction.
         consecutive_poll_errors = 0
+        create_payload = self._run_response_to_dict(create_response)
+        poll_history: list[dict[str, Any]] = []
         while True:
             time.sleep(self._async_poll_interval)
             try:
@@ -828,14 +830,25 @@ class ExtendProvider(Provider):
 
             run = getattr(get_response, "processor_run", None)
             status = str(getattr(run, "status", "") or "")
+            poll_history.append({"at": datetime.now(UTC).isoformat(), "status": status})
+            # Keep the create receipt and status timeline alongside the full terminal
+            # response so remote execution can be reconstructed without another run.
+            if status in ("PROCESSED", "FAILED", "CANCELLED"):
+                terminal_payload = self._run_response_to_dict(get_response)
+                terminal_payload["_extend_execution"] = {
+                    "create_response": create_payload,
+                    "poll_history": poll_history,
+                }
             if status == "PROCESSED":
-                return self._run_response_to_dict(get_response)
+                return terminal_payload
             if status in ("FAILED", "CANCELLED"):
                 reason = getattr(run, "failure_reason", None)
                 message = getattr(run, "failure_message", None)
                 detail = " ".join(part for part in (reason, message) if part).strip()
                 raise ProviderPermanentError(
-                    f"Extend processor run {run_id} ended with status {status}" + (f": {detail}" if detail else "")
+                    f"Extend processor run {run_id} ended with status {status}" + (f": {detail}" if detail else ""),
+                    job_id=run_id,
+                    debug_payload=terminal_payload,
                 )
             # PENDING / PROCESSING / unrecognized → keep polling.
 
@@ -866,20 +879,26 @@ class ExtendProvider(Provider):
         # Step 3: Get or create processor for this config
         processor_id = self._get_or_create_processor(processor_config)
 
-        # Step 4: Run processor (async poll-to-completion, or sync per config)
-        if self._async_run:
-            result = self._run_processor_async(processor_id, file_id)
-        else:
-            result = self._run_processor(processor_id, file_id)
-
-        # Add metadata (including schema adaptation info for normalization)
-        result["_extend_metadata"] = {
+        # Keep the adapted request on both success and failure artifacts.
+        metadata = {
             "file_id": file_id,
             "processor_id": processor_id,
+            "requested_processor_config": processor_config,
+            "sdk_version": version("extend-ai"),
             "primitive_array_paths": primitive_array_paths,
             "renamed_props": renamed_props,
         }
-
+        try:
+            if self._async_run:
+                result = self._run_processor_async(processor_id, file_id)
+            else:
+                result = self._run_processor(processor_id, file_id)
+        except ProviderError as error:
+            if error.debug_payload is None:
+                error.debug_payload = {}
+            error.debug_payload[EXTEND_METADATA_KEY] = metadata
+            raise
+        result[EXTEND_METADATA_KEY] = metadata
         return result
 
     def run_inference(self, pipeline: PipelineSpec, request: InferenceRequest) -> RawInferenceResult:
@@ -966,18 +985,21 @@ class ExtendProvider(Provider):
 
         # Adapt the result back to match the original schema
         # (unwrap primitive arrays that were wrapped for Extend AI)
-        extend_metadata = raw_result.raw_output.get("_extend_metadata") or {}
+        extend_metadata = raw_result.raw_output.get(EXTEND_METADATA_KEY) or {}
         primitive_array_paths = extend_metadata.get("primitive_array_paths") or {}
         renamed_props = extend_metadata.get("renamed_props") or {}
         if primitive_array_paths or renamed_props:
             extracted_data = _adapt_result_from_extend(extracted_data, primitive_array_paths, renamed_props)
+
+        advanced_options = raw_result.pipeline.config.get("advancedOptions", {})
+        review_agent_enabled = advanced_options.get("reviewAgent", {}).get("enabled") is True
 
         output = ExtractOutput(
             task_type="extract",
             example_id=raw_result.request.example_id,
             pipeline_name=raw_result.pipeline_name,
             extracted_data=extracted_data,
-            field_citations=extract_extend_field_citations(raw_result.raw_output),
+            field_citations=extract_extend_field_citations(raw_result.raw_output, review_agent=review_agent_enabled),
         )
 
         return InferenceResult(

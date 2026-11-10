@@ -93,7 +93,7 @@ Costs use each provider's official listed price. The totals below sum recorded d
 | Specialized APIs | $157 – $285 | Reducto Deep ~$157, Extend Operator ~$259, Pulse Effort ~$265, Datalab Accurate ~$285 |
 | Coding agents | $9 – $471 | Codex GPT-6 Luna ~$9, Codex GPT-6.1 Sol ~$60, Claude Code Sonnet 5.5 ~$114, Claude Code Opus 5.5 ~$247, Codex GPT-6 Astra ~$471 |
 
-The leaderboard reports the unweighted mean of each document's cost divided by its page count, pooling documents across challenges for the overall mean. Per-system rates are in [leaderboard-pro.csv](../leaderboard-pro.csv) (`Cost_Per_Page`, in dollars per page).
+The leaderboard reports the unweighted mean of each document's cost divided by its page count, pooling documents across challenges for the overall mean. Per-system rates are in [leaderboard-pro.csv](../leaderboard-pro.csv) (`Cost_Per_Page`, in dollars per page). The optional `Grounding_Added_Cost_Per_Page` and `Confidence_Added_Cost_Per_Page` columns use the [same cost conventions as ExtractBench](extractbench.md#optional-feature-costs).
 
 ## Submitting results
 

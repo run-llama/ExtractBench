@@ -42,8 +42,8 @@ uv run extract-bench run <pipeline_name>
 | `codex_code_extract_gpt_6_astra_xhigh_evidence` / `codex_code_extract_gpt_6_1_sol_{low,medium,high,xhigh}_evidence` / `codex_code_extract_gpt_6_1_terra_{low,medium}_evidence` | Codex CLI | GPT-6 Astra, GPT-6.1 Sol and GPT-6.1 Terra extraction with page and box citations at the effort in the name; unrestricted shell, no cost cap |
 | `codex_code_extract_gpt_6_luna_{low,medium,high,xhigh}_evidence_prompt_opt` | Codex CLI | GPT-6 Luna evidence extraction plus a short prompt addendum: always write the output files, the documents are authorized for extraction, no field needs web access |
 | `reducto_extract` / `reducto_extract_v4` / `reducto_deep_extract` | Reducto | `_v4` uses Reducto's v4 extract model |
-| `extend_extract` | Extend Performance | latest stable model; asynchronous runs with line/property citations on API 2026-02-09 |
-| `extend_extract_max` | Extend Performance (Max Context) | citations enabled; max-context array strategy variant |
+| `extend_extract` | Extend Performance + Review Agent | latest stable model, Review Agent scores, line/property citations; async API 2026-02-09 |
+| `extend_extract_max` | Extend Max Context + Review Agent | same settings as Performance, with `large_array_max_context` |
 | `extend_extract_operator` | Extend | Operator extraction on the 2026-02-09 API with word-level citations; cost from the run's reported usage (`EXTEND_API_KEY`) |
 | `landingai_extract` | LandingAI ADE | |
 | `parseur_extract_v3_vision` | Parseur | AI Vision engine v3; no citations (`PARSEUR_API_KEY`) |
@@ -69,6 +69,19 @@ uv run extract-bench run <pipeline_name>
 | `gemma4_12b_vllm_extract_oneshot_structured_output_file` | Self-hosted vLLM | Gemma-4-12B, json_object mode; requires `GEMMA4_12B_SERVER_URL` |
 | `qwen3_5_4b_vllm_extract_oneshot_structured_output_file` | Self-hosted vLLM | Qwen3.5-4B, json_object mode; requires `QWEN3_5_4B_SERVER_URL` |
 | `nuextract3_extract` | Self-hosted vLLM | schema converted to a NuExtract template; requires `NUEXTRACT3_SERVER_URL` |
+
+Both Extend Performance configurations omit `baseVersion` and use the latest stable model.
+Their leaderboard rows are excluded from rankings until reviewed runs supply new scores,
+costs, and latency. Review Agent costs an additional $0.01/page at
+[PAYG pricing](https://docs.extend.ai/general/how-credits-work); citations are included.
+The run artifacts retain total cost including review, the requested processor configuration,
+SDK version, create receipt, polling history, and full terminal response.
+
+Review Agent scores are ordinal: 1–5 maps to 0, 0.25, 0.5, 0.75, 1 in normalized
+`FieldCitation.confidence`. This preserves ordering and ties; it is not a probability.
+The original score and insights are retained in citation metadata. Missing review scores
+remain unknown, including when the API supplies a different OCR or logprob confidence.
+Scores without citations retain an unknown page and box.
 
 ## Parse Pipelines
 
