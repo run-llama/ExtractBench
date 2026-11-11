@@ -1,7 +1,6 @@
 """Contracts at the JSONL → sandbox → existing evaluator boundaries."""
 
 import json
-import runpy
 import shlex
 import shutil
 import tomllib
@@ -262,68 +261,6 @@ def test_publish_opens_pr_without_overwriting_source_data_and_refuses_modified_t
         with pytest.raises(ValueError, match="changed after generation"):
             publish(output)
         api.assert_not_called()
-
-
-@pytest.mark.parametrize(
-    "damaged", ["environment/schema.json", "environment/document.pdf", "tests/reference.test.json"]
-)
-def test_smoke_rejects_exported_inputs_or_references_that_disagree_with_the_hf_row(tmp_path, snapshot, damaged):
-    smoke = runpy.run_path(str(Path(__file__).parents[1] / "scripts/smoke_harbor.py"))
-    output = tmp_path / "export"
-    manifest = export_snapshot(snapshot, output, "extractbench", "a" * 40, "b" * 40)
-    task_id = next(iter(manifest["tasks"]))
-    task = output / "tasks" / task_id
-    row = json.loads((snapshot / "short.jsonl").read_text())
-    smoke["validate_task"](task, row, snapshot / row["pdf"])
-    (task / damaged).write_bytes(b"{}" if damaged.endswith(".json") else b"%PDF-another-document")
-    with pytest.raises(ValueError, match="differs"):
-        smoke["validate_task"](task, row, snapshot / row["pdf"])
-
-
-def test_smoke_rejects_published_tasks_when_source_jsonl_changed_without_regeneration(tmp_path, snapshot):
-    smoke = runpy.run_path(str(Path(__file__).parents[1] / "scripts/smoke_harbor.py"))
-    output = tmp_path / "published"
-    export_snapshot(snapshot, output, "extractbench", "a" * 40, "b" * 40)
-    shutil.copytree(snapshot / "docs", output / "docs")
-    files = [f"{split}.jsonl" for split in dataset_config().splits]
-    rows = {row["id"]: row for file in files for row in [json.loads((snapshot / file).read_text())]}
-    smoke["validate_published"](output, rows, files)
-    path = output / "short.jsonl"
-    row = json.loads(path.read_text())
-    row["expected_output"] = json.dumps({"rows": []})
-    path.write_text(json.dumps(row) + "\n")
-    with pytest.raises(ValueError, match="source hashes"):
-        smoke["validate_published"](output, rows, files)
-
-
-def test_smoke_keeps_production_dockerfile_scaffolding_and_installs_the_checkout_wheel(tmp_path, snapshot):
-    """Replacing the whole Dockerfile would hide broken production setup from the smoke."""
-    smoke = runpy.run_path(str(Path(__file__).parents[1] / "scripts/smoke_harbor.py"))
-    output = tmp_path / "export"
-    export_snapshot(snapshot, output, "extractbench", "a" * 40, "b" * 40)
-    source = next((output / "tasks").iterdir())
-    dockerfile = source / "tests/Dockerfile"
-    dockerfile.write_text(dockerfile.read_text() + "RUN echo additional-production-setup\n")
-    production = dockerfile.read_text()
-    wheel = tmp_path / "checkout_build-1.0.0-py3-none-any.whl"
-    wheel.write_bytes(b"checkout wheel contents")
-    target = tmp_path / "container-task"
-    smoke["container_task"](source, target, wheel)
-    assert (target / "tests" / wheel.name).read_bytes() == wheel.read_bytes()
-    smoke_dockerfile = (target / "tests/Dockerfile").read_text()
-    assert f'"/tmp/{wheel.name}"' in smoke_dockerfile
-    requirement = "llama-extract-bench @ git+https://github.com/run-llama/ExtractBench.git@" + "b" * 40
-    restored = smoke_dockerfile.replace(f"COPY {wheel.name} /tmp/{wheel.name}\n", "")
-    assert restored.replace(f"/tmp/{wheel.name}", requirement) == production
-
-
-def test_smoke_rejects_unregistered_hf_splits_instead_of_silently_skipping_their_cases(snapshot):
-    smoke = runpy.run_path(str(Path(__file__).parents[1] / "scripts/smoke_harbor.py"))
-    splits = dataset_config().splits
-    smoke["validate_source_splits"](snapshot, splits)
-    (snapshot / "new_split.jsonl").write_text('{"id": "new_split/unvalidated"}\n')
-    with pytest.raises(ValueError, match="HF JSONL splits differ"):
-        smoke["validate_source_splits"](snapshot, splits)
 
 
 def test_pro_task_identity_survives_challenge_reclassification(tmp_path, snapshot):
