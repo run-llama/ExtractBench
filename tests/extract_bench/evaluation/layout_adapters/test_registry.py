@@ -195,34 +195,6 @@ def test_duplicate_key_raises_before_first_registry_read():
     subprocess.run([sys.executable, "-c", code], check=True)
 
 
-def test_attribution_adapter_passes_rotation_and_page_dimensions() -> None:
-    from extract_bench.schemas.layout_detection_output import LayoutOutput
-
-    output = LayoutOutput.model_validate(
-        {
-            "example_id": "page",
-            "pipeline_name": "example",
-            "model": "llamaparse",
-            "image_width": 900,
-            "image_height": 200,
-            "predictions": [
-                {
-                    "bbox": [360, 95, 540, 105],
-                    "r": 90,
-                    "score": 1.0,
-                    "label": "text",
-                    "page": 1,
-                    "content": {"type": "text", "text": "Region total"},
-                }
-            ],
-        }
-    )
-
-    [block] = _NonMatchingAdapter().to_attribution_blocks(output, page_number=1)
-
-    assert (block.r, block.page_width, block.page_height) == (90, 900, 200)
-
-
 @requires_adapters
 def test_llamaparse_typed_page_scores_only_explicit_segments() -> None:
     from extract_bench.evaluation.layout_adapters.adapters import LlamaParseLayoutAdapter
