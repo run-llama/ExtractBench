@@ -92,3 +92,42 @@ def test_no_warning_when_expected_output_absent(tmp_path: Path, caplog) -> None:
     assert isinstance(result, ExtractTestCase)
     drift_records = [r for r in caplog.records if r.levelno == logging.WARNING and "disagree" in r.getMessage()]
     assert not drift_records
+
+
+def test_v02_structural_and_computed_rules_load_without_legacy_values(tmp_path: Path, caplog) -> None:
+    pdf_path = _write_doc(tmp_path)
+    rules = {
+        "grants": {"structural": "match_by:recipient_ein", "expected_min": 2},
+        "grants[0].recipient_ein": {"evidence": [{"value": "123", "page": 1}]},
+        "grants[1].address_line2": {"source_policy": "computed", "evidence_required": False},
+    }
+    payload = {
+        "data_schema": {"type": "object"},
+        "expected_output": {"grants": [{"recipient_ein": "123"}, {"address_line2": None}]},
+        "_field_rules": rules,
+    }
+    pdf_path.with_suffix(".test.json").write_text(json.dumps(payload))
+
+    with caplog.at_level(logging.WARNING, logger="extract_bench.test_cases.loader"):
+        result = load_test_case(pdf_path)
+
+    assert isinstance(result, ExtractTestCase)
+    assert result.expected_output == payload["expected_output"]
+    assert [rule.field_path for rule in result.get_extract_field_rules()] == list(rules)
+    assert len([r for r in caplog.records if "disagree" in r.getMessage()]) == 0
+
+
+def test_explicit_legacy_null_still_checked_for_drift(tmp_path: Path, caplog) -> None:
+    pdf_path = _write_doc(tmp_path)
+    payload = {
+        "data_schema": {"type": "object"},
+        "expected_output": {"name": "Acme"},
+        "test_rules": [{"type": "extract_field", "field_path": "name", "expected_value": None}],
+    }
+    pdf_path.with_suffix(".test.json").write_text(json.dumps(payload))
+
+    with caplog.at_level(logging.WARNING, logger="extract_bench.test_cases.loader"):
+        result = load_test_case(pdf_path)
+
+    assert isinstance(result, ExtractTestCase)
+    assert len([r for r in caplog.records if "disagree" in r.getMessage()]) == 1
