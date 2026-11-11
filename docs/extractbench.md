@@ -103,3 +103,7 @@ See "Output Structure" under [Configuration](../README.md#configuration) for the
 `Confidence_AUGRC` stores raw AUGRC (lower is better), not a percentage or its reciprocal; blank means unreported. The website displays `1 / Confidence_AUGRC`.
 
 Add one row per system to [leaderboard.csv](../leaderboard.csv). Each row carries `Pipeline`, `Reasoning`, `include_in_rankings` (`true` or `false`), value F1 (`Overall`, `Short`, `Medium`, `Long`), precision and recall per split (`P_*`, `R_*`), word- and page-level grounding F1 overall and per split, cost per page overall and per split, and latency per document per split. Then follow the shared steps in [Submitting results](../README.md#submitting-results).
+
+The [confidence curves CSV](../confidence-curves.csv) has one `Allowed_Error_Percent` column and one column per provider; each provider cell is the percentage of expected fields accepted correctly. These are the September 2026 chart's historical samples: 1–7% error in 0.05-point steps, pooled over 370 documents with correct accepted fields divided by 841,895 expected fields. The range is a plotting choice; no sub-1% values are supplied. The older Extend Review Agent curve does not represent the current Performance or Max Context runs. Aggregate AUGRC stays in `leaderboard.csv`.
+
+Future confidence exports should preserve every distinct confidence threshold with accepted, correct, and incorrect field counts, plus expected-field counts and run provenance. Keep the full curve; display range and downsampling belong in the viewer.
