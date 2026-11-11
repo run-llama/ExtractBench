@@ -1,0 +1,606 @@
+Provider,Allowed_Error_Percent,Correct_Accepted_Percent
+LlamaExtract Agentic Plus,1.0,34.502877
+LlamaExtract Agentic Plus,1.05,36.453477
+LlamaExtract Agentic Plus,1.1,38.747825
+LlamaExtract Agentic Plus,1.15,40.771474
+LlamaExtract Agentic Plus,1.2,42.46931
+LlamaExtract Agentic Plus,1.25,43.663046
+LlamaExtract Agentic Plus,1.3,44.868778
+LlamaExtract Agentic Plus,1.35,46.057644
+LlamaExtract Agentic Plus,1.4,47.10338
+LlamaExtract Agentic Plus,1.45,48.518283
+LlamaExtract Agentic Plus,1.5,49.624122
+LlamaExtract Agentic Plus,1.55,50.551078
+LlamaExtract Agentic Plus,1.6,51.366025
+LlamaExtract Agentic Plus,1.65,52.202353
+LlamaExtract Agentic Plus,1.7,52.907667
+LlamaExtract Agentic Plus,1.75,53.659304
+LlamaExtract Agentic Plus,1.8,54.437905
+LlamaExtract Agentic Plus,1.85,55.115543
+LlamaExtract Agentic Plus,1.9,55.733791
+LlamaExtract Agentic Plus,1.95,56.424851
+LlamaExtract Agentic Plus,2.0,56.994281
+LlamaExtract Agentic Plus,2.05,57.540192
+LlamaExtract Agentic Plus,2.1,58.017568
+LlamaExtract Agentic Plus,2.15,58.467624
+LlamaExtract Agentic Plus,2.2,58.864942
+LlamaExtract Agentic Plus,2.25,59.302407
+LlamaExtract Agentic Plus,2.3,59.741654
+LlamaExtract Agentic Plus,2.35,60.344342
+LlamaExtract Agentic Plus,2.4,60.738928
+LlamaExtract Agentic Plus,2.45,61.32475
+LlamaExtract Agentic Plus,2.5,61.863059
+LlamaExtract Agentic Plus,2.55,62.28829
+LlamaExtract Agentic Plus,2.6,62.742385
+LlamaExtract Agentic Plus,2.65,63.242091
+LlamaExtract Agentic Plus,2.7,63.783251
+LlamaExtract Agentic Plus,2.75,64.247085
+LlamaExtract Agentic Plus,2.8,64.760332
+LlamaExtract Agentic Plus,2.85,65.300067
+LlamaExtract Agentic Plus,2.9,65.731
+LlamaExtract Agentic Plus,2.95,66.150173
+LlamaExtract Agentic Plus,3.0,66.478718
+LlamaExtract Agentic Plus,3.05,66.857506
+LlamaExtract Agentic Plus,3.1,67.324785
+LlamaExtract Agentic Plus,3.15,67.818552
+LlamaExtract Agentic Plus,3.2,68.20328
+LlamaExtract Agentic Plus,3.25,68.70643
+LlamaExtract Agentic Plus,3.3,69.158981
+LlamaExtract Agentic Plus,3.35,69.662725
+LlamaExtract Agentic Plus,3.4,70.05838
+LlamaExtract Agentic Plus,3.45,70.406405
+LlamaExtract Agentic Plus,3.5,70.746827
+LlamaExtract Agentic Plus,3.55,71.115044
+LlamaExtract Agentic Plus,3.6,71.385505
+LlamaExtract Agentic Plus,3.65,71.653472
+LlamaExtract Agentic Plus,3.7,71.972871
+LlamaExtract Agentic Plus,3.75,72.259011
+LlamaExtract Agentic Plus,3.8,72.533867
+LlamaExtract Agentic Plus,3.85,72.783304
+LlamaExtract Agentic Plus,3.9,73.006966
+LlamaExtract Agentic Plus,3.95,73.22849
+LlamaExtract Agentic Plus,4.0,73.424833
+LlamaExtract Agentic Plus,4.05,73.59742
+LlamaExtract Agentic Plus,4.1,73.789249
+LlamaExtract Agentic Plus,4.15,73.974546
+LlamaExtract Agentic Plus,4.2,74.1697
+LlamaExtract Agentic Plus,4.25,74.412961
+LlamaExtract Agentic Plus,4.3,74.632228
+LlamaExtract Agentic Plus,4.35,74.823345
+LlamaExtract Agentic Plus,4.4,75.040118
+LlamaExtract Agentic Plus,4.45,75.278865
+LlamaExtract Agentic Plus,4.5,75.500508
+LlamaExtract Agentic Plus,4.55,75.766693
+LlamaExtract Agentic Plus,4.6,76.055565
+LlamaExtract Agentic Plus,4.65,76.301201
+LlamaExtract Agentic Plus,4.7,76.579502
+LlamaExtract Agentic Plus,4.75,76.839748
+LlamaExtract Agentic Plus,4.8,77.127076
+LlamaExtract Agentic Plus,4.85,77.361072
+LlamaExtract Agentic Plus,4.9,77.580696
+LlamaExtract Agentic Plus,4.95,77.819918
+LlamaExtract Agentic Plus,5.0,78.025645
+LlamaExtract Agentic Plus,5.05,78.2246
+LlamaExtract Agentic Plus,5.1,78.456102
+LlamaExtract Agentic Plus,5.15,78.780727
+LlamaExtract Agentic Plus,5.2,79.117586
+LlamaExtract Agentic Plus,5.25,80.118067
+LlamaExtract Agentic Plus,5.3,80.739166
+LlamaExtract Agentic Plus,5.35,88.643239
+LlamaExtract Agentic Plus,5.4,88.643239
+LlamaExtract Agentic Plus,5.45,88.643239
+LlamaExtract Agentic Plus,5.5,88.643239
+LlamaExtract Agentic Plus,5.55,88.643239
+LlamaExtract Agentic Plus,5.6,88.643239
+LlamaExtract Agentic Plus,5.65,88.643239
+LlamaExtract Agentic Plus,5.7,88.643239
+LlamaExtract Agentic Plus,5.75,88.643239
+LlamaExtract Agentic Plus,5.8,88.643239
+LlamaExtract Agentic Plus,5.85,88.643239
+LlamaExtract Agentic Plus,5.9,88.643239
+LlamaExtract Agentic Plus,5.95,88.643239
+LlamaExtract Agentic Plus,6.0,88.643239
+LlamaExtract Agentic Plus,6.05,88.643239
+LlamaExtract Agentic Plus,6.1,88.643239
+LlamaExtract Agentic Plus,6.15,88.643239
+LlamaExtract Agentic Plus,6.2,88.643239
+LlamaExtract Agentic Plus,6.25,88.643239
+LlamaExtract Agentic Plus,6.3,88.643239
+LlamaExtract Agentic Plus,6.35,88.643239
+LlamaExtract Agentic Plus,6.4,88.643239
+LlamaExtract Agentic Plus,6.45,88.643239
+LlamaExtract Agentic Plus,6.5,88.643239
+LlamaExtract Agentic Plus,6.55,88.643239
+LlamaExtract Agentic Plus,6.6,88.643239
+LlamaExtract Agentic Plus,6.65,88.643239
+LlamaExtract Agentic Plus,6.7,88.643239
+LlamaExtract Agentic Plus,6.75,88.643239
+LlamaExtract Agentic Plus,6.8,88.643239
+LlamaExtract Agentic Plus,6.85,88.643239
+LlamaExtract Agentic Plus,6.9,88.643239
+LlamaExtract Agentic Plus,6.95,88.643239
+LlamaExtract Agentic Plus,7.0,88.643239
+LlamaExtract Agentic,1.0,20.382708
+LlamaExtract Agentic,1.05,22.56861
+LlamaExtract Agentic,1.1,24.997417
+LlamaExtract Agentic,1.15,27.536688
+LlamaExtract Agentic,1.2,29.908718
+LlamaExtract Agentic,1.25,32.086662
+LlamaExtract Agentic,1.3,34.471876
+LlamaExtract Agentic,1.35,36.819675
+LlamaExtract Agentic,1.4,38.81743
+LlamaExtract Agentic,1.45,41.384614
+LlamaExtract Agentic,1.5,43.828862
+LlamaExtract Agentic,1.55,45.62683
+LlamaExtract Agentic,1.6,47.315995
+LlamaExtract Agentic,1.65,48.670202
+LlamaExtract Agentic,1.7,49.802054
+LlamaExtract Agentic,1.75,51.076678
+LlamaExtract Agentic,1.8,52.009336
+LlamaExtract Agentic,1.85,52.955654
+LlamaExtract Agentic,1.9,53.928934
+LlamaExtract Agentic,1.95,54.941768
+LlamaExtract Agentic,2.0,55.992493
+LlamaExtract Agentic,2.05,57.276976
+LlamaExtract Agentic,2.1,58.365829
+LlamaExtract Agentic,2.15,59.390898
+LlamaExtract Agentic,2.2,60.210121
+LlamaExtract Agentic,2.25,60.847493
+LlamaExtract Agentic,2.3,61.361215
+LlamaExtract Agentic,2.35,61.870423
+LlamaExtract Agentic,2.4,62.337821
+LlamaExtract Agentic,2.45,62.813296
+LlamaExtract Agentic,2.5,63.301481
+LlamaExtract Agentic,2.55,63.801187
+LlamaExtract Agentic,2.6,64.19993
+LlamaExtract Agentic,2.65,64.584063
+LlamaExtract Agentic,2.7,64.903462
+LlamaExtract Agentic,2.75,65.281537
+LlamaExtract Agentic,2.8,65.705106
+LlamaExtract Agentic,2.85,66.058475
+LlamaExtract Agentic,2.9,66.290689
+LlamaExtract Agentic,2.95,66.586451
+LlamaExtract Agentic,3.0,66.838739
+LlamaExtract Agentic,3.05,67.062282
+LlamaExtract Agentic,3.1,67.269077
+LlamaExtract Agentic,3.15,67.504974
+LlamaExtract Agentic,3.2,67.722578
+LlamaExtract Agentic,3.25,67.915714
+LlamaExtract Agentic,3.3,68.067752
+LlamaExtract Agentic,3.35,68.239151
+LlamaExtract Agentic,3.4,68.437632
+LlamaExtract Agentic,3.45,68.609031
+LlamaExtract Agentic,3.5,68.797772
+LlamaExtract Agentic,3.55,68.968102
+LlamaExtract Agentic,3.6,69.136769
+LlamaExtract Agentic,3.65,69.316601
+LlamaExtract Agentic,3.7,69.471846
+LlamaExtract Agentic,3.75,69.634812
+LlamaExtract Agentic,3.8,69.786969
+LlamaExtract Agentic,3.85,69.951003
+LlamaExtract Agentic,3.9,70.098765
+LlamaExtract Agentic,3.95,70.255554
+LlamaExtract Agentic,4.0,70.394052
+LlamaExtract Agentic,4.05,70.581723
+LlamaExtract Agentic,4.1,70.739344
+LlamaExtract Agentic,4.15,70.877247
+LlamaExtract Agentic,4.2,71.016932
+LlamaExtract Agentic,4.25,71.148065
+LlamaExtract Agentic,4.3,71.294045
+LlamaExtract Agentic,4.35,71.450715
+LlamaExtract Agentic,4.4,71.577334
+LlamaExtract Agentic,4.45,71.747308
+LlamaExtract Agentic,4.5,71.89994
+LlamaExtract Agentic,4.55,72.051978
+LlamaExtract Agentic,4.6,72.210074
+LlamaExtract Agentic,4.65,72.354629
+LlamaExtract Agentic,4.7,72.529235
+LlamaExtract Agentic,4.75,72.69612
+LlamaExtract Agentic,4.8,72.848514
+LlamaExtract Agentic,4.85,72.993901
+LlamaExtract Agentic,4.9,73.180028
+LlamaExtract Agentic,4.95,73.345607
+LlamaExtract Agentic,5.0,73.535773
+LlamaExtract Agentic,5.05,73.729978
+LlamaExtract Agentic,5.1,73.926915
+LlamaExtract Agentic,5.15,74.0938
+LlamaExtract Agentic,5.2,74.312355
+LlamaExtract Agentic,5.25,74.505966
+LlamaExtract Agentic,5.3,74.684254
+LlamaExtract Agentic,5.35,74.872163
+LlamaExtract Agentic,5.4,75.112692
+LlamaExtract Agentic,5.45,75.362129
+LlamaExtract Agentic,5.5,75.671075
+LlamaExtract Agentic,5.55,88.234994
+LlamaExtract Agentic,5.6,88.234994
+LlamaExtract Agentic,5.65,88.234994
+LlamaExtract Agentic,5.7,88.234994
+LlamaExtract Agentic,5.75,88.234994
+LlamaExtract Agentic,5.8,88.234994
+LlamaExtract Agentic,5.85,88.234994
+LlamaExtract Agentic,5.9,88.234994
+LlamaExtract Agentic,5.95,88.234994
+LlamaExtract Agentic,6.0,88.234994
+LlamaExtract Agentic,6.05,88.234994
+LlamaExtract Agentic,6.1,88.234994
+LlamaExtract Agentic,6.15,88.234994
+LlamaExtract Agentic,6.2,88.234994
+LlamaExtract Agentic,6.25,88.234994
+LlamaExtract Agentic,6.3,88.234994
+LlamaExtract Agentic,6.35,88.234994
+LlamaExtract Agentic,6.4,88.234994
+LlamaExtract Agentic,6.45,88.234994
+LlamaExtract Agentic,6.5,88.234994
+LlamaExtract Agentic,6.55,88.234994
+LlamaExtract Agentic,6.6,88.234994
+LlamaExtract Agentic,6.65,88.234994
+LlamaExtract Agentic,6.7,88.234994
+LlamaExtract Agentic,6.75,88.234994
+LlamaExtract Agentic,6.8,88.234994
+LlamaExtract Agentic,6.85,88.234994
+LlamaExtract Agentic,6.9,88.234994
+LlamaExtract Agentic,6.95,88.234994
+LlamaExtract Agentic,7.0,88.234994
+LlamaExtract Cost-Effective,1.0,6.188064
+LlamaExtract Cost-Effective,1.05,7.345572
+LlamaExtract Cost-Effective,1.1,8.440958
+LlamaExtract Cost-Effective,1.15,9.054455
+LlamaExtract Cost-Effective,1.2,9.776754
+LlamaExtract Cost-Effective,1.25,10.879148
+LlamaExtract Cost-Effective,1.3,11.728303
+LlamaExtract Cost-Effective,1.35,13.057804
+LlamaExtract Cost-Effective,1.4,13.838543
+LlamaExtract Cost-Effective,1.45,15.500745
+LlamaExtract Cost-Effective,1.5,16.773351
+LlamaExtract Cost-Effective,1.55,18.384003
+LlamaExtract Cost-Effective,1.6,19.542461
+LlamaExtract Cost-Effective,1.65,20.477732
+LlamaExtract Cost-Effective,1.7,21.389366
+LlamaExtract Cost-Effective,1.75,22.211558
+LlamaExtract Cost-Effective,1.8,22.850949
+LlamaExtract Cost-Effective,1.85,23.41349
+LlamaExtract Cost-Effective,1.9,24.023423
+LlamaExtract Cost-Effective,1.95,24.338546
+LlamaExtract Cost-Effective,2.0,24.75962
+LlamaExtract Cost-Effective,2.05,25.187108
+LlamaExtract Cost-Effective,2.1,25.611151
+LlamaExtract Cost-Effective,2.15,25.946941
+LlamaExtract Cost-Effective,2.2,26.217521
+LlamaExtract Cost-Effective,2.25,26.584194
+LlamaExtract Cost-Effective,2.3,26.930912
+LlamaExtract Cost-Effective,2.35,27.216814
+LlamaExtract Cost-Effective,2.4,27.571372
+LlamaExtract Cost-Effective,2.45,27.911913
+LlamaExtract Cost-Effective,2.5,28.244734
+LlamaExtract Cost-Effective,2.55,28.550591
+LlamaExtract Cost-Effective,2.6,28.903129
+LlamaExtract Cost-Effective,2.65,29.191764
+LlamaExtract Cost-Effective,2.7,29.505461
+LlamaExtract Cost-Effective,2.75,29.838994
+LlamaExtract Cost-Effective,2.8,30.125847
+LlamaExtract Cost-Effective,2.85,30.404267
+LlamaExtract Cost-Effective,2.9,30.735662
+LlamaExtract Cost-Effective,2.95,31.066226
+LlamaExtract Cost-Effective,3.0,31.498821
+LlamaExtract Cost-Effective,3.05,31.925715
+LlamaExtract Cost-Effective,3.1,32.414493
+LlamaExtract Cost-Effective,3.15,32.9648
+LlamaExtract Cost-Effective,3.2,33.685673
+LlamaExtract Cost-Effective,3.25,34.303328
+LlamaExtract Cost-Effective,3.3,34.936423
+LlamaExtract Cost-Effective,3.35,35.832972
+LlamaExtract Cost-Effective,3.4,36.64008
+LlamaExtract Cost-Effective,3.45,38.67525
+LlamaExtract Cost-Effective,3.5,40.920542
+LlamaExtract Cost-Effective,3.55,55.359516
+LlamaExtract Cost-Effective,3.6,57.900807
+LlamaExtract Cost-Effective,3.65,59.079576
+LlamaExtract Cost-Effective,3.7,59.912935
+LlamaExtract Cost-Effective,3.75,60.868398
+LlamaExtract Cost-Effective,3.8,61.389009
+LlamaExtract Cost-Effective,3.85,61.912115
+LlamaExtract Cost-Effective,3.9,62.320955
+LlamaExtract Cost-Effective,3.95,62.779206
+LlamaExtract Cost-Effective,4.0,63.177475
+LlamaExtract Cost-Effective,4.05,63.521936
+LlamaExtract Cost-Effective,4.1,63.816034
+LlamaExtract Cost-Effective,4.15,64.054662
+LlamaExtract Cost-Effective,4.2,64.311464
+LlamaExtract Cost-Effective,4.25,64.582163
+LlamaExtract Cost-Effective,4.3,64.801074
+LlamaExtract Cost-Effective,4.35,65.027705
+LlamaExtract Cost-Effective,4.4,65.228918
+LlamaExtract Cost-Effective,4.45,65.413027
+LlamaExtract Cost-Effective,4.5,65.604024
+LlamaExtract Cost-Effective,4.55,65.786826
+LlamaExtract Cost-Effective,4.6,66.017496
+LlamaExtract Cost-Effective,4.65,66.22346
+LlamaExtract Cost-Effective,4.7,66.429662
+LlamaExtract Cost-Effective,4.75,66.656887
+LlamaExtract Cost-Effective,4.8,66.885182
+LlamaExtract Cost-Effective,4.85,67.113951
+LlamaExtract Cost-Effective,4.9,67.321222
+LlamaExtract Cost-Effective,4.95,67.50533
+LlamaExtract Cost-Effective,5.0,67.694903
+LlamaExtract Cost-Effective,5.05,67.925691
+LlamaExtract Cost-Effective,5.1,68.116214
+LlamaExtract Cost-Effective,5.15,68.328948
+LlamaExtract Cost-Effective,5.2,68.493577
+LlamaExtract Cost-Effective,5.25,68.66747
+LlamaExtract Cost-Effective,5.3,68.817489
+LlamaExtract Cost-Effective,5.35,68.97024
+LlamaExtract Cost-Effective,5.4,69.121803
+LlamaExtract Cost-Effective,5.45,69.253529
+LlamaExtract Cost-Effective,5.5,69.407943
+LlamaExtract Cost-Effective,5.55,69.529098
+LlamaExtract Cost-Effective,5.6,69.681849
+LlamaExtract Cost-Effective,5.65,69.826166
+LlamaExtract Cost-Effective,5.7,69.96205
+LlamaExtract Cost-Effective,5.75,70.130123
+LlamaExtract Cost-Effective,5.8,70.323853
+LlamaExtract Cost-Effective,5.85,70.536943
+LlamaExtract Cost-Effective,5.9,70.715469
+LlamaExtract Cost-Effective,5.95,70.92559
+LlamaExtract Cost-Effective,6.0,71.173246
+LlamaExtract Cost-Effective,6.05,71.427316
+LlamaExtract Cost-Effective,6.1,71.724265
+LlamaExtract Cost-Effective,6.15,72.060174
+LlamaExtract Cost-Effective,6.2,72.378147
+LlamaExtract Cost-Effective,6.25,72.634117
+LlamaExtract Cost-Effective,6.3,72.857066
+LlamaExtract Cost-Effective,6.35,73.142732
+LlamaExtract Cost-Effective,6.4,73.429347
+LlamaExtract Cost-Effective,6.45,73.743163
+LlamaExtract Cost-Effective,6.5,74.150458
+LlamaExtract Cost-Effective,6.55,74.479834
+LlamaExtract Cost-Effective,6.6,74.811229
+LlamaExtract Cost-Effective,6.65,87.041733
+LlamaExtract Cost-Effective,6.7,87.041733
+LlamaExtract Cost-Effective,6.75,87.041733
+LlamaExtract Cost-Effective,6.8,87.041733
+LlamaExtract Cost-Effective,6.85,87.041733
+LlamaExtract Cost-Effective,6.9,87.041733
+LlamaExtract Cost-Effective,6.95,87.041733
+LlamaExtract Cost-Effective,7.0,87.041733
+Reducto Deep Extract,1.0,30.950653
+Reducto Deep Extract,1.05,31.141651
+Reducto Deep Extract,1.1,31.322908
+Reducto Deep Extract,1.15,31.47756
+Reducto Deep Extract,1.2,31.622827
+Reducto Deep Extract,1.25,31.754791
+Reducto Deep Extract,1.3,31.863
+Reducto Deep Extract,1.35,31.952916
+Reducto Deep Extract,1.4,32.039031
+Reducto Deep Extract,1.45,32.122771
+Reducto Deep Extract,1.5,32.201997
+Reducto Deep Extract,1.55,32.257467
+Reducto Deep Extract,1.6,32.325528
+Reducto Deep Extract,1.65,32.38658
+Reducto Deep Extract,1.7,32.447633
+Reducto Deep Extract,1.75,32.513675
+Reducto Deep Extract,1.8,32.577934
+Reducto Deep Extract,1.85,32.636968
+Reducto Deep Extract,1.9,32.70099
+Reducto Deep Extract,1.95,32.756104
+Reducto Deep Extract,2.0,32.836993
+Reducto Deep Extract,2.05,32.931898
+Reducto Deep Extract,2.1,33.045332
+Reducto Deep Extract,2.15,33.202953
+Reducto Deep Extract,2.2,33.228134
+Reducto Deep Extract,2.25,33.228134
+Reducto Deep Extract,2.3,33.228134
+Reducto Deep Extract,2.35,33.228134
+Reducto Deep Extract,2.4,33.228134
+Reducto Deep Extract,2.45,33.228134
+Reducto Deep Extract,2.5,33.228134
+Reducto Deep Extract,2.55,33.228134
+Reducto Deep Extract,2.6,33.228134
+Reducto Deep Extract,2.65,33.228134
+Reducto Deep Extract,2.7,33.228134
+Reducto Deep Extract,2.75,33.228134
+Reducto Deep Extract,2.8,33.228134
+Reducto Deep Extract,2.85,33.228134
+Reducto Deep Extract,2.9,33.228134
+Reducto Deep Extract,2.95,33.228134
+Reducto Deep Extract,3.0,33.228134
+Reducto Deep Extract,3.05,33.228134
+Reducto Deep Extract,3.1,33.228134
+Reducto Deep Extract,3.15,33.228134
+Reducto Deep Extract,3.2,33.228134
+Reducto Deep Extract,3.25,33.228134
+Reducto Deep Extract,3.3,33.228134
+Reducto Deep Extract,3.35,33.228134
+Reducto Deep Extract,3.4,33.228134
+Reducto Deep Extract,3.45,33.228134
+Reducto Deep Extract,3.5,33.228134
+Reducto Deep Extract,3.55,33.228134
+Reducto Deep Extract,3.6,33.228134
+Reducto Deep Extract,3.65,33.228134
+Reducto Deep Extract,3.7,33.228134
+Reducto Deep Extract,3.75,33.228134
+Reducto Deep Extract,3.8,33.228134
+Reducto Deep Extract,3.85,33.228134
+Reducto Deep Extract,3.9,33.228134
+Reducto Deep Extract,3.95,33.228134
+Reducto Deep Extract,4.0,33.228134
+Reducto Deep Extract,4.05,33.228134
+Reducto Deep Extract,4.1,33.228134
+Reducto Deep Extract,4.15,33.228134
+Reducto Deep Extract,4.2,33.228134
+Reducto Deep Extract,4.25,33.228134
+Reducto Deep Extract,4.3,33.228134
+Reducto Deep Extract,4.35,33.228134
+Reducto Deep Extract,4.4,33.228134
+Reducto Deep Extract,4.45,33.228134
+Reducto Deep Extract,4.5,33.228134
+Reducto Deep Extract,4.55,33.228134
+Reducto Deep Extract,4.6,33.228134
+Reducto Deep Extract,4.65,33.228134
+Reducto Deep Extract,4.7,33.228134
+Reducto Deep Extract,4.75,33.228134
+Reducto Deep Extract,4.8,33.228134
+Reducto Deep Extract,4.85,33.228134
+Reducto Deep Extract,4.9,33.228134
+Reducto Deep Extract,4.95,33.228134
+Reducto Deep Extract,5.0,33.228134
+Reducto Deep Extract,5.05,33.228134
+Reducto Deep Extract,5.1,33.228134
+Reducto Deep Extract,5.15,33.228134
+Reducto Deep Extract,5.2,33.228134
+Reducto Deep Extract,5.25,33.228134
+Reducto Deep Extract,5.3,33.228134
+Reducto Deep Extract,5.35,33.228134
+Reducto Deep Extract,5.4,33.228134
+Reducto Deep Extract,5.45,33.228134
+Reducto Deep Extract,5.5,33.228134
+Reducto Deep Extract,5.55,33.228134
+Reducto Deep Extract,5.6,33.228134
+Reducto Deep Extract,5.65,33.228134
+Reducto Deep Extract,5.7,33.228134
+Reducto Deep Extract,5.75,33.228134
+Reducto Deep Extract,5.8,33.228134
+Reducto Deep Extract,5.85,33.228134
+Reducto Deep Extract,5.9,33.228134
+Reducto Deep Extract,5.95,33.228134
+Reducto Deep Extract,6.0,33.228134
+Reducto Deep Extract,6.05,33.228134
+Reducto Deep Extract,6.1,33.228134
+Reducto Deep Extract,6.15,33.228134
+Reducto Deep Extract,6.2,33.228134
+Reducto Deep Extract,6.25,33.228134
+Reducto Deep Extract,6.3,33.228134
+Reducto Deep Extract,6.35,33.228134
+Reducto Deep Extract,6.4,33.228134
+Reducto Deep Extract,6.45,33.228134
+Reducto Deep Extract,6.5,33.228134
+Reducto Deep Extract,6.55,33.228134
+Reducto Deep Extract,6.6,33.228134
+Reducto Deep Extract,6.65,33.228134
+Reducto Deep Extract,6.7,33.228134
+Reducto Deep Extract,6.75,33.228134
+Reducto Deep Extract,6.8,33.228134
+Reducto Deep Extract,6.85,33.228134
+Reducto Deep Extract,6.9,33.228134
+Reducto Deep Extract,6.95,33.228134
+Reducto Deep Extract,7.0,33.228134
+Extend Review Agent,1.0,0.0
+Extend Review Agent,1.05,0.0
+Extend Review Agent,1.1,0.0
+Extend Review Agent,1.15,0.0
+Extend Review Agent,1.2,0.0
+Extend Review Agent,1.25,0.0
+Extend Review Agent,1.3,0.0
+Extend Review Agent,1.35,0.0
+Extend Review Agent,1.4,0.0
+Extend Review Agent,1.45,0.0
+Extend Review Agent,1.5,0.0
+Extend Review Agent,1.55,0.0
+Extend Review Agent,1.6,0.0
+Extend Review Agent,1.65,0.0
+Extend Review Agent,1.7,0.0
+Extend Review Agent,1.75,0.0
+Extend Review Agent,1.8,0.0
+Extend Review Agent,1.85,0.0
+Extend Review Agent,1.9,0.0
+Extend Review Agent,1.95,0.0
+Extend Review Agent,2.0,0.0
+Extend Review Agent,2.05,0.0
+Extend Review Agent,2.1,0.0
+Extend Review Agent,2.15,0.0
+Extend Review Agent,2.2,0.0
+Extend Review Agent,2.25,0.0
+Extend Review Agent,2.3,0.0
+Extend Review Agent,2.35,0.0
+Extend Review Agent,2.4,0.0
+Extend Review Agent,2.45,0.0
+Extend Review Agent,2.5,0.0
+Extend Review Agent,2.55,0.0
+Extend Review Agent,2.6,0.0
+Extend Review Agent,2.65,0.0
+Extend Review Agent,2.7,0.0
+Extend Review Agent,2.75,0.0
+Extend Review Agent,2.8,0.0
+Extend Review Agent,2.85,0.0
+Extend Review Agent,2.9,0.0
+Extend Review Agent,2.95,0.0
+Extend Review Agent,3.0,0.0
+Extend Review Agent,3.05,0.0
+Extend Review Agent,3.1,0.0
+Extend Review Agent,3.15,0.0
+Extend Review Agent,3.2,0.0
+Extend Review Agent,3.25,0.0
+Extend Review Agent,3.3,0.0
+Extend Review Agent,3.35,0.0
+Extend Review Agent,3.4,0.0
+Extend Review Agent,3.45,0.0
+Extend Review Agent,3.5,0.0
+Extend Review Agent,3.55,0.0
+Extend Review Agent,3.6,0.0
+Extend Review Agent,3.65,0.0
+Extend Review Agent,3.7,0.0
+Extend Review Agent,3.75,0.0
+Extend Review Agent,3.8,0.0
+Extend Review Agent,3.85,0.0
+Extend Review Agent,3.9,0.0
+Extend Review Agent,3.95,0.0
+Extend Review Agent,4.0,0.0
+Extend Review Agent,4.05,0.0
+Extend Review Agent,4.1,0.0
+Extend Review Agent,4.15,0.0
+Extend Review Agent,4.2,0.0
+Extend Review Agent,4.25,0.0
+Extend Review Agent,4.3,0.0
+Extend Review Agent,4.35,0.0
+Extend Review Agent,4.4,0.0
+Extend Review Agent,4.45,0.0
+Extend Review Agent,4.5,0.0
+Extend Review Agent,4.55,0.0
+Extend Review Agent,4.6,0.0
+Extend Review Agent,4.65,0.0
+Extend Review Agent,4.7,0.0
+Extend Review Agent,4.75,0.0
+Extend Review Agent,4.8,0.0
+Extend Review Agent,4.85,0.0
+Extend Review Agent,4.9,0.0
+Extend Review Agent,4.95,0.0
+Extend Review Agent,5.0,0.0
+Extend Review Agent,5.05,0.0
+Extend Review Agent,5.1,0.0
+Extend Review Agent,5.15,0.0
+Extend Review Agent,5.2,0.0
+Extend Review Agent,5.25,0.0
+Extend Review Agent,5.3,0.0
+Extend Review Agent,5.35,0.0
+Extend Review Agent,5.4,0.0
+Extend Review Agent,5.45,0.0
+Extend Review Agent,5.5,0.0
+Extend Review Agent,5.55,69.678998
+Extend Review Agent,5.6,69.678998
+Extend Review Agent,5.65,69.678998
+Extend Review Agent,5.7,69.678998
+Extend Review Agent,5.75,69.678998
+Extend Review Agent,5.8,69.678998
+Extend Review Agent,5.85,78.287554
+Extend Review Agent,5.9,79.305614
+Extend Review Agent,5.95,79.305614
+Extend Review Agent,6.0,79.305614
+Extend Review Agent,6.05,79.305614
+Extend Review Agent,6.1,79.305614
+Extend Review Agent,6.15,79.305614
+Extend Review Agent,6.2,79.305614
+Extend Review Agent,6.25,79.305614
+Extend Review Agent,6.3,79.305614
+Extend Review Agent,6.35,79.899156
+Extend Review Agent,6.4,79.899156
+Extend Review Agent,6.45,79.899156
+Extend Review Agent,6.5,79.899156
+Extend Review Agent,6.55,79.899156
+Extend Review Agent,6.6,79.899156
+Extend Review Agent,6.65,79.899156
+Extend Review Agent,6.7,79.899156
+Extend Review Agent,6.75,79.899156
+Extend Review Agent,6.8,79.899156
+Extend Review Agent,6.85,79.899156
+Extend Review Agent,6.9,79.899156
+Extend Review Agent,6.95,79.899156
+Extend Review Agent,7.0,79.899156
