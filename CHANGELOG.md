@@ -4,39 +4,39 @@ Notable changes to `llama-extract-bench`. This project follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [Unreleased](https://github.com/run-llama/ExtractBench/compare/v1.0.0...main)
 
 ### Evaluation
 
-- Layout diagnostics use ParseBench's attribution scorer, including rotated box overlap and zero for missing reading-order indices. Import helpers from `parse_bench.evaluation.metrics.attribution`. [#130]
-- Field confidence grading excludes object and array citations and pairs identical rows one-to-one. Rescore cached runs with container confidence before comparing. [#128]
-- Array-record metrics accept `_identity_hints` for large row-matching problems. [#77]
-- Fixed citation field paths for LlamaExtract and Reducto. [#105]
-- Preserve unknown citation pages as `null` and read page numbers and dimensions from nested citation metadata. [#107]
+- Layout diagnostics use ParseBench's attribution scorer, including rotated box overlap and zero for missing reading-order indices. Import helpers from `parse_bench.evaluation.metrics.attribution`. [#130](https://github.com/run-llama/ExtractBench/pull/130)
+- Field confidence grading excludes object and array citations and pairs identical rows one-to-one. Rescore cached runs with container confidence before comparing. [#128](https://github.com/run-llama/ExtractBench/pull/128)
+- Array-record metrics accept `_identity_hints` for large row-matching problems. [#77](https://github.com/run-llama/ExtractBench/pull/77)
+- Fixed citation field paths for LlamaExtract and Reducto. [#105](https://github.com/run-llama/ExtractBench/pull/105)
+- Preserve unknown citation pages as `null` and read page numbers and dimensions from nested citation metadata. [#107](https://github.com/run-llama/ExtractBench/pull/107)
 
 ### Running benchmarks
 
-- Use `--shuffle_seed` for reproducible submission order and `--max_concurrent_pages` to cap concurrent PDF pages. [#74] [#75]
-- Built-in providers load on the first `create_provider` call. [#122]
-- Download and run ExtractBench Pro through the CLI. [#81]
-- Run ExtractBench and Pro as [Harbor tasks](docs/harbor.md) with the paper's coding-agent prompt. [#89]
-- Pro renamed six challenge splits. Cached runs with the original split names can be reused. Harbor task IDs now use document IDs. [#101]
+- Use `--shuffle_seed` for reproducible submission order and `--max_concurrent_pages` to cap concurrent PDF pages. [#74](https://github.com/run-llama/ExtractBench/pull/74) [#75](https://github.com/run-llama/ExtractBench/pull/75)
+- Built-in providers load on the first `create_provider` call. [#122](https://github.com/run-llama/ExtractBench/pull/122)
+- Download and run ExtractBench Pro through the CLI. [#81](https://github.com/run-llama/ExtractBench/pull/81)
+- Run ExtractBench and Pro as [Harbor tasks](docs/harbor.md) with the paper's coding-agent prompt. [#89](https://github.com/run-llama/ExtractBench/pull/89)
+- Pro renamed six challenge splits. Cached runs with the original split names can be reused. Harbor task IDs now use document IDs. [#101](https://github.com/run-llama/ExtractBench/pull/101)
 
 ### Pipelines and dependencies
 
-- LlamaExtract leaderboard pipelines use Extract 2.6. The Cost Effective and Agentic `_standard_bbox` variants were removed. [#86] [#87]
-- LlamaExtract results retain API latency and state transitions. Agentic Plus Max Effort uses reported billing when available. [#76] [#114]
-- Added Parseur AI Vision, Extend Operator, Gemini 4 Argon, and more Codex pipelines. The Extend Performance and Max Context pipelines now use Review Agent. [#85] [#90] [#98] [#104] [#124]
-- Require ParseBench 1.0.7 or later for nullable citation pages. Layout average precision uses ParseBench, removing the direct scikit-learn dependency. [#107] [#116]
+- LlamaExtract leaderboard pipelines use Extract 2.6. The Cost Effective and Agentic `_standard_bbox` variants were removed. [#86](https://github.com/run-llama/ExtractBench/pull/86) [#87](https://github.com/run-llama/ExtractBench/pull/87)
+- LlamaExtract results retain API latency and state transitions. Agentic Plus Max Effort uses reported billing when available. [#76](https://github.com/run-llama/ExtractBench/pull/76) [#114](https://github.com/run-llama/ExtractBench/pull/114)
+- Added Parseur AI Vision, Extend Operator, Gemini 4 Argon, and more Codex pipelines. The Extend Performance and Max Context pipelines now use Review Agent. [#85](https://github.com/run-llama/ExtractBench/pull/85) [#90](https://github.com/run-llama/ExtractBench/pull/90) [#98](https://github.com/run-llama/ExtractBench/pull/98) [#104](https://github.com/run-llama/ExtractBench/pull/104) [#124](https://github.com/run-llama/ExtractBench/pull/124)
+- Require ParseBench 1.0.7 or later for nullable citation pages. Layout average precision uses ParseBench, removing the direct scikit-learn dependency. [#107](https://github.com/run-llama/ExtractBench/pull/107) [#116](https://github.com/run-llama/ExtractBench/pull/116)
 
 ### Leaderboards
 
-- Costs are computed by averaging each document's USD per page, with equal weighting given to all documents. Use recorded totals for full-run budgets. [#108]
-- Pro reports scores with and without the 30-minute scoring cutoff. [#91]
-- Leaderboard CSVs include pipeline and reasoning settings. Submissions set `include_in_rankings` explicitly. [#113] [#120]
-- Published confidence AUGRC, acceptance curves, and threshold counts where available. [#126] [#127] [#128]
+- Costs are computed by averaging each document's USD per page, with equal weighting given to all documents. Use recorded totals for full-run budgets. [#108](https://github.com/run-llama/ExtractBench/pull/108)
+- Pro reports scores with and without the 30-minute scoring cutoff. [#91](https://github.com/run-llama/ExtractBench/pull/91)
+- Leaderboard CSVs include pipeline and reasoning settings. Submissions set `include_in_rankings` explicitly. [#113](https://github.com/run-llama/ExtractBench/pull/113) [#120](https://github.com/run-llama/ExtractBench/pull/120)
+- Published confidence AUGRC, acceptance curves, and threshold counts where available. [#126](https://github.com/run-llama/ExtractBench/pull/126) [#127](https://github.com/run-llama/ExtractBench/pull/127) [#128](https://github.com/run-llama/ExtractBench/pull/128)
 
-## [1.0.0] - 2026-10-01
+## [1.0.0](https://github.com/run-llama/ExtractBench/tree/v1.0.0) - 2026-10-01
 
 ### Packaging and APIs
 
@@ -68,33 +68,3 @@ Notable changes to `llama-extract-bench`. This project follows
 - Codex can retry all-null output and accept pipeline-specific prompt instructions. Claude Code supports `non_zdr: true`.
 - Fixed Extend schema submission for properties named `id` and arrays of empty objects.
 - Removed the `tqdm` dependency.
-
-[Unreleased]: https://github.com/run-llama/ExtractBench/compare/v1.0.0...main
-[1.0.0]: https://github.com/run-llama/ExtractBench/tree/v1.0.0
-[#74]: https://github.com/run-llama/ExtractBench/pull/74
-[#75]: https://github.com/run-llama/ExtractBench/pull/75
-[#76]: https://github.com/run-llama/ExtractBench/pull/76
-[#77]: https://github.com/run-llama/ExtractBench/pull/77
-[#81]: https://github.com/run-llama/ExtractBench/pull/81
-[#85]: https://github.com/run-llama/ExtractBench/pull/85
-[#86]: https://github.com/run-llama/ExtractBench/pull/86
-[#87]: https://github.com/run-llama/ExtractBench/pull/87
-[#89]: https://github.com/run-llama/ExtractBench/pull/89
-[#90]: https://github.com/run-llama/ExtractBench/pull/90
-[#91]: https://github.com/run-llama/ExtractBench/pull/91
-[#98]: https://github.com/run-llama/ExtractBench/pull/98
-[#101]: https://github.com/run-llama/ExtractBench/pull/101
-[#104]: https://github.com/run-llama/ExtractBench/pull/104
-[#105]: https://github.com/run-llama/ExtractBench/pull/105
-[#107]: https://github.com/run-llama/ExtractBench/pull/107
-[#108]: https://github.com/run-llama/ExtractBench/pull/108
-[#113]: https://github.com/run-llama/ExtractBench/pull/113
-[#114]: https://github.com/run-llama/ExtractBench/pull/114
-[#116]: https://github.com/run-llama/ExtractBench/pull/116
-[#120]: https://github.com/run-llama/ExtractBench/pull/120
-[#122]: https://github.com/run-llama/ExtractBench/pull/122
-[#124]: https://github.com/run-llama/ExtractBench/pull/124
-[#126]: https://github.com/run-llama/ExtractBench/pull/126
-[#127]: https://github.com/run-llama/ExtractBench/pull/127
-[#128]: https://github.com/run-llama/ExtractBench/pull/128
-[#130]: https://github.com/run-llama/ExtractBench/pull/130
