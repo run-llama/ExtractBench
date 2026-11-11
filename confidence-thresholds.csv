@@ -1,0 +1,6 @@
+Confidence_Threshold,Expected_Fields,Extend Performance + Review Agent_Accepted,Extend Performance + Review Agent_Correct,Extend Performance + Review Agent_Unscored,Extend Performance + Review Agent_Unscored_Correct,Extend Max Context + Review Agent_Accepted,Extend Max Context + Review Agent_Correct,Extend Max Context + Review Agent_Unscored,Extend Max Context + Review Agent_Unscored_Correct
+1.0,844134,419981,413525,53792,40764,488808,480379,53913,40569
+0.75,844134,465046,455663,53792,40764,533089,522410,53913,40569
+0.5,844134,471235,458345,53792,40764,535419,524473,53913,40569
+0.25,844134,476066,461428,53792,40764,539867,527816,53913,40569
+0.0,844134,476751,461817,53792,40764,540249,528037,53913,40569

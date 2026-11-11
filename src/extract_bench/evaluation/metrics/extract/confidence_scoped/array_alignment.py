@@ -10,12 +10,14 @@ the same assignment problem over the candidates.
 
 from __future__ import annotations
 
+import json
 import logging
 import math
 import re
 import statistics
 import time
-from collections import Counter, defaultdict
+from collections import Counter, defaultdict, deque
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -1000,6 +1002,34 @@ def assign_sparse_candidate_pairs(
     return scored_count, len(scored_pairs), largest_component_pairs
 
 
+def add_exact_row_alignment(
+    out: ArrayAlignment,
+    used_pred: set[int],
+    used_gt: set[int],
+    predicted_list: Sequence[Any],
+    gt_list: Sequence[Any],
+) -> None:
+    """Pair identical JSON objects once each, including frequent redacted rows.
+
+    Sparse feature lookup discards common values to bound candidate growth.
+    A queue per complete row preserves duplicate multiplicity in linear space.
+    """
+    gt_by_row: dict[str, deque[int]] = defaultdict(deque)
+    for index, row in enumerate(gt_list):
+        if index not in used_gt and isinstance(row, dict) and len(row) > 0:
+            gt_by_row[json.dumps(row, sort_keys=True)].append(index)
+    for index, row in enumerate(predicted_list):
+        if index in used_pred or not isinstance(row, dict) or len(row) == 0:
+            continue
+        matches = gt_by_row.get(json.dumps(row, sort_keys=True))
+        if matches is None or len(matches) == 0:
+            continue
+        gt_index = matches.popleft()
+        out[index] = (gt_index, 1.0, "exact_array_row")
+        used_pred.add(index)
+        used_gt.add(gt_index)
+
+
 def build_sparse_array_alignment(
     predicted_list: list[Any],
     gt_list: list[Any],
@@ -1030,6 +1060,7 @@ def build_sparse_array_alignment(
         )
 
     if not include_all_pairs:
+        add_exact_row_alignment(out, used_pred, used_gt, predicted_list, gt_list)
         add_inferred_identity_alignment(out, used_pred, used_gt, predicted_list, gt_list)
         add_distinctive_value_alignment(out, used_pred, used_gt, predicted_list, gt_list)
         add_composite_feature_alignment(out, used_pred, used_gt, predicted_list, gt_list)
