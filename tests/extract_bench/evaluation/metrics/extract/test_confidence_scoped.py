@@ -57,3 +57,26 @@ def test_parent_only_confidence_does_not_score_uncited_children() -> None:
     assert carrier.metadata["total_fields"] == 0
     assert carrier.metadata["field_rows_sample"] == []
     assert coverage.value == 0
+
+
+def test_sparse_alignment_matches_repeated_identical_rows_once_each() -> None:
+    # Frequent redacted rows have no rare feature for sparse candidate lookup.
+    # Two distinct anchors make the partial alignment nonempty, exposing misses.
+    repeated = {"name": "NAME ON FILE", "address": "ADDRESS ON FILE"}
+    anchors = [{"name": "ALPHA", "address": "1 A STREET"}, {"name": "BETA", "address": "2 B STREET"}]
+    expected = {"rows": [repeated] * 201 + anchors}
+    extracted = {"rows": anchors[::-1] + [{"address": "ADDRESS ON FILE", "name": "NAME ON FILE"}] * 202}
+    metrics = compute_confidence_scoped_metrics(
+        extracted_data=extracted,
+        expected_output=expected,
+        field_rules=[],
+        field_citations=[
+            {"field_path": f"rows[{index}].{key}", "confidence": 1.0}
+            for index in range(len(extracted["rows"]))
+            for key in ("name", "address")
+        ],
+    )
+    carrier = next(metric for metric in metrics if metric.metric_name == "confidence_scoped_auc")
+    assert carrier.metadata["total_fields"] == 408
+    assert carrier.metadata["correct_fields"] == 406
+    assert carrier.metadata["full_gt"]["unique_leaf_covered"] == 406
