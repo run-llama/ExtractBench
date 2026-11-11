@@ -60,29 +60,6 @@ harbor run -p output/harbor/ExtractBenchPro/tasks -a oracle -l 1 -n 1
 The oracle copies the public reference output, checking packaging and grading.
 Use `-a nop` to check that a missing output scores zero.
 
-`uv run --with pymupdf==1.26.6 python scripts/smoke_harbor.py` resolves the current
-HF `main` revisions on every run. It exports and validates every case: source
-JSONL preservation, PDF readability, schema/reference agreement, perfect
-reference rewards, and cell-credit accounting. It builds a wheel from the
-current checkout and substitutes only that package source in the production
-verifier Dockerfile.
-When the HF revision contains published Harbor tasks, their hashes, coverage,
-inputs, and references are also checked against the current HF rows, so a data
-update without matching task regeneration fails.
-One case per dataset also runs oracle/nop through Harbor, including checks for
-per-trial errors (a job can exit successfully despite a failed trial). The oracle
-also checks that its allowed model API host is reachable without credentials,
-while Hugging Face, GitHub, and a direct public IP are blocked during execution.
-
-The `Harbor smoke` workflow runs on relevant PRs/main changes and on
-manual dispatch. Its artifacts record resolved HF revisions, the tested wheel
-hash, per-case results, and container results. Exact wheel/reference hashes
-permit interrupted local audits to resume. Use `--extractbench-revision` and
-`--pro-revision` to reproduce a reported revision; defaults track `main`.
-These checks establish data/export/scorer consistency, not an independent
-annotation review against the PDFs. Smoke container tasks install a local wheel
-and must not be published as dataset tasks.
-
 ## Publish an export
 
 Before publishing, validate all task configurations, compare representative
