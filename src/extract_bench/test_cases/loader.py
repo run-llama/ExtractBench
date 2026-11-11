@@ -409,9 +409,14 @@ def load_test_case(
             identity_hints=test_config.get("_identity_hints"),
         )
 
-        # Drift check applies only to legacy rules (no v0.2 evidence list):
-        # v0.2 evidence values legitimately differ from expected_output leaves.
-        extract_field_rules = [rule for rule in extract_case.get_extract_field_rules() if rule.evidence is None]
+        # Only explicitly supplied legacy values can be checked for drift. Structural
+        # and computed v0.2 rules may omit both evidence and expected_value; treating
+        # their default None as a label can overwrite a parent array during inflation.
+        extract_field_rules = [
+            rule
+            for rule in extract_case.get_extract_field_rules()
+            if rule.evidence is None and "expected_value" in rule.model_fields_set
+        ]
         if extract_field_rules and expected_output is not None:
             drifts = validate_rules_match_expected_output(extract_field_rules, expected_output)
             if drifts:
