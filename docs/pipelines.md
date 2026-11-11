@@ -42,7 +42,8 @@ uv run extract-bench run <pipeline_name>
 | `codex_code_extract_gpt_6_astra_xhigh_evidence` / `codex_code_extract_gpt_6_1_sol_{low,medium,high,xhigh}_evidence` / `codex_code_extract_gpt_6_1_terra_{low,medium}_evidence` | Codex CLI | GPT-6 Astra, GPT-6.1 Sol and GPT-6.1 Terra extraction with page and box citations at the effort in the name; unrestricted shell, no cost cap |
 | `codex_code_extract_gpt_6_luna_{low,medium,high,xhigh}_evidence_prompt_opt` | Codex CLI | GPT-6 Luna evidence extraction plus a short prompt addendum: always write the output files, the documents are authorized for extraction, no field needs web access |
 | `reducto_extract` / `reducto_extract_v4` / `reducto_deep_extract` | Reducto | `_v4` uses Reducto's v4 extract model |
-| `extend_extract` / `extend_extract_max` | Extend | citations enabled; max-context array strategy variant |
+| `extend_extract` | Extend Performance + Review Agent | latest stable model, Review Agent scores, line/property citations; async API 2026-02-09 |
+| `extend_extract_max` | Extend Max Context + Review Agent | same settings as Performance, with `large_array_max_context` |
 | `extend_extract_operator` | Extend | Operator extraction on the 2026-02-09 API with word-level citations; cost from the run's reported usage (`EXTEND_API_KEY`) |
 | `landingai_extract` | LandingAI ADE | |
 | `parseur_extract_v3_vision` | Parseur | AI Vision engine v3; no citations (`PARSEUR_API_KEY`) |

@@ -83,6 +83,10 @@ Costs use each provider's official listed price. A run's total cost is the sum o
 
 The leaderboard reports the unweighted mean of each document's cost divided by its page count, overall and within each split. The overall mean pools documents across splits. Use the evaluation reports' recorded totals when budgeting a full run. Per-system rates are in [leaderboard.csv](../leaderboard.csv) (`Cost_Per_Page`, `Cost_Short`, `Cost_Medium`, `Cost_Long`, in dollars per page).
 
+### Optional feature costs
+
+Both leaderboard CSVs separate base `Cost_Per_Page` from `Grounding_Added_Cost_Per_Page` and `Confidence_Added_Cost_Per_Page`, all in USD/page. Zero means included; blank means unavailable or unpriced; a positive value is the additional charge. For example, Extend includes grounding and adds $0.01/page for Review Agent confidence.
+
 ## Results layout
 
 ```

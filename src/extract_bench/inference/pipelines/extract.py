@@ -496,10 +496,15 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
             provider_name="extend",
             config={
                 "baseProcessor": "extraction_performance",
-                "baseVersion": "4.1.1",
+                "usd_per_credit": 0.01,
+                "api_version": "2026-02-09",
+                "async_run": True,
                 "advancedOptions": {
                     "citationsEnabled": True,
+                    "citationMode": "line",
+                    "arrayCitationStrategy": "property",
                     "advancedFigureParsingEnabled": True,
+                    "reviewAgent": {"enabled": True},
                 },
             },
         )
@@ -517,10 +522,15 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
             provider_name="extend",
             config={
                 "baseProcessor": "extraction_performance",
+                "usd_per_credit": 0.01,
+                "api_version": "2026-02-09",
                 "async_run": True,
                 "advancedOptions": {
                     "citationsEnabled": True,
+                    "citationMode": "line",
+                    "arrayCitationStrategy": "property",
                     "advancedFigureParsingEnabled": True,
+                    "reviewAgent": {"enabled": True},
                     "arrayStrategy": {"type": "large_array_max_context"},
                 },
             },

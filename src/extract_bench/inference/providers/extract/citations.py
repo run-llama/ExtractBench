@@ -13,11 +13,95 @@ from extract_bench.schemas.extract_output import FieldCitation
 logger = logging.getLogger(__name__)
 
 
-def extract_extend_field_citations(raw_output: Mapping[str, Any]) -> list[FieldCitation]:
-    """Extract citations from Extend AI processor-run metadata."""
+def extract_extend_field_citations(
+    raw_output: Mapping[str, Any],
+    *,
+    review_agent: bool = False,
+) -> list[FieldCitation]:
+    """Extract citations and optional Review Agent scores from Extend metadata."""
     output = _as_mapping(_as_mapping(raw_output.get("processor_run")).get("output"))
     metadata = _as_mapping(output.get("metadata"))
-    return _dedupe(_collect_field_map(metadata, source="extend"))
+    citations = _dedupe(_collect_field_map(metadata, source="extend"))
+    if not review_agent:
+        return citations
+
+    signals = _collect_extend_review_agent_signals(metadata)
+    normalized: list[FieldCitation] = []
+    cited_paths: set[str] = set()
+    for citation in citations:
+        signal = signals.get(citation.field_path)
+        cited_paths.add(citation.field_path)
+        normalized.append(
+            citation.model_copy(
+                update={
+                    # Review Agent is the sole trust signal for this arm. Do
+                    # not silently fall back to citation/OCR/logprob values.
+                    "confidence": signal[0] if signal is not None else None,
+                    "metadata": {
+                        **(citation.metadata if citation.metadata is not None else {}),
+                        **(signal[1] if signal is not None else {}),
+                    },
+                }
+            )
+        )
+    for field_path, (confidence, signal_metadata) in signals.items():
+        if field_path in cited_paths:
+            continue
+        normalized.append(
+            FieldCitation(
+                field_path=field_path,
+                page=None,
+                bbox=None,
+                source="extend",
+                confidence=confidence,
+                metadata=signal_metadata,
+            )
+        )
+    return _dedupe(normalized)
+
+
+def _collect_extend_review_agent_signals(
+    metadata: Mapping[str, Any],
+) -> dict[str, tuple[float, dict[str, Any]]]:
+    signals: dict[str, tuple[float, dict[str, Any]]] = {}
+
+    def walk(node: Any, path: Sequence[str]) -> None:
+        node_map = _as_mapping(node)
+        if len(node_map) > 0:
+            score_value = _first_present(node_map, ("reviewAgentScore", "review_agent_score"))
+            raw_score = _coerce_float(score_value)
+            field_path = format_field_path(path)
+            if len(field_path) > 0 and raw_score is not None and math.isfinite(raw_score):
+                normalized = max(0.0, min(1.0, (raw_score - 1.0) / 4.0))
+                signal_metadata: dict[str, Any] = {
+                    "review_agent_score": raw_score,
+                    "confidence_semantics": "ordinal_1_5",
+                }
+                insights = _first_present(node_map, ("insights", "reviewAgentInsights", "review_agent_insights"))
+                if insights is not None:
+                    signal_metadata["review_agent_insights"] = insights
+                signals[field_path] = (normalized, signal_metadata)
+
+            for key, value in node_map.items():
+                if key in {
+                    "citations",
+                    "citation",
+                    "reviewAgentScore",
+                    "review_agent_score",
+                    "insights",
+                    "reviewAgentInsights",
+                    "review_agent_insights",
+                }:
+                    continue
+                next_path = (*path, key)
+                walk(value, next_path)
+            return
+        if isinstance(node, Sequence) and not isinstance(node, (str, bytes, bytearray)):
+            for index, item in enumerate(node):
+                walk(item, [*path, f"[{index}]"])
+
+    walk(metadata, ())
+    return signals
 
 
 def extract_reducto_field_citations(raw_output: Mapping[str, Any]) -> Sequence[FieldCitation]:
