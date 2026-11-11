@@ -89,6 +89,9 @@ class LayoutAdapter(ABC):
                     normalized_text=normalized_text,
                     tokens=tokens,
                     order_index=order_index,
+                    r=prediction.r,
+                    page_width=layout_output.image_width,
+                    page_height=layout_output.image_height,
                 )
             )
 

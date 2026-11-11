@@ -1,12 +1,15 @@
-"""Constants for layout attribution pass/fail evaluation."""
+"""Re-export ParseBench layout attribution constants."""
 
-# Localization pass thresholds (bidirectional IoA):
-# IoA(gt, pred) >= 0.50 and IoA(pred, gt) >= 0.20
-LOCALIZATION_IOA_THRESHOLD = 0.50
-LOCALIZATION_IOA_PRED_THRESHOLD = 0.20
+from parse_bench.evaluation.metrics.attribution.constants import (
+    ATTRIBUTION_OVERLAP_IOA_THRESHOLD,
+    ATTRIBUTION_TOKEN_F1_THRESHOLD,
+    LOCALIZATION_IOA_PRED_THRESHOLD,
+    LOCALIZATION_IOA_THRESHOLD,
+)
 
-# Attribution overlap threshold for collecting predicted blocks
-ATTRIBUTION_OVERLAP_IOA_THRESHOLD = 0.30
-
-# Token F1 threshold for attribution pass
-ATTRIBUTION_TOKEN_F1_THRESHOLD = 0.80
+__all__ = [
+    "ATTRIBUTION_OVERLAP_IOA_THRESHOLD",
+    "ATTRIBUTION_TOKEN_F1_THRESHOLD",
+    "LOCALIZATION_IOA_PRED_THRESHOLD",
+    "LOCALIZATION_IOA_THRESHOLD",
+]

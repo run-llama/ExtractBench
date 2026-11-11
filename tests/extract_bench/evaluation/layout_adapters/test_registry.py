@@ -193,3 +193,81 @@ def test_duplicate_key_raises_before_first_registry_read():
         "    raise SystemExit('duplicate registration did not raise')\n"
     )
     subprocess.run([sys.executable, "-c", code], check=True)
+
+
+@requires_adapters
+def test_layout_attribution_preserves_rotation_in_rectangular_page() -> None:
+    """A rotated pixel box must reach the scorer in its original page frame."""
+    from extract_bench.evaluation.layout_adapters.adapters import NormalizedLayoutOutputAdapter
+    from extract_bench.evaluation.metrics.attribution.core import compute_attribution_metrics, parse_gt_elements
+    from extract_bench.schemas.layout_detection_output import LayoutOutput
+
+    output = LayoutOutput.model_validate(
+        {
+            "example_id": "page",
+            "pipeline_name": "example",
+            "model": "llamaparse",
+            "image_width": 900,
+            "image_height": 200,
+            "predictions": [
+                {
+                    "bbox": [360, 95, 540, 105],
+                    "r": 90,
+                    "score": 1.0,
+                    "label": "text",
+                    "page": 1,
+                    "content": {"type": "text", "text": "Region total"},
+                }
+            ],
+        }
+    )
+    expected = parse_gt_elements(
+        [
+            {
+                "type": "layout",
+                "bbox": [445 / 900, 10 / 200, 10 / 900, 180 / 200],
+                "canonical_class": "Text",
+                "ro_index": 0,
+                "content": {"type": "text", "text": "Region total"},
+            }
+        ]
+    )
+    blocks = NormalizedLayoutOutputAdapter().to_attribution_blocks(output, page_number=1)
+
+    assert compute_attribution_metrics(expected, blocks).af1 == 1.0
+
+
+@requires_adapters
+def test_llamaparse_typed_page_scores_only_explicit_segments() -> None:
+    from extract_bench.evaluation.layout_adapters.adapters import LlamaParseLayoutAdapter
+
+    box = {"x": 360, "y": 95, "w": 180, "h": 10, "label": "text", "confidence": 1.0}
+    result = _make_result()
+    assert isinstance(result.output, ParseOutput)
+    result.output.layout_pages = [
+        ParseLayoutPageIR.model_validate(
+            {
+                "page_number": 1,
+                "width": 900,
+                "height": 200,
+                "items": [
+                    {
+                        "value": "Region total",
+                        "bbox": box,
+                        "layout_segments": [{**box, "r": 90}],
+                    },
+                    {
+                        "value": "Item without segment attribution",
+                        "bbox": box,
+                    },
+                ],
+            }
+        )
+    ]
+    adapter = LlamaParseLayoutAdapter()
+    output = adapter.to_layout_output(result)
+
+    blocks = adapter.to_attribution_blocks(output, page_number=1)
+
+    assert [(block.text, block.r) for block in blocks] == [("Region total", 90)]
+    assert blocks[0].bbox_xyxy == pytest.approx([0.4, 0.475, 0.6, 0.525])

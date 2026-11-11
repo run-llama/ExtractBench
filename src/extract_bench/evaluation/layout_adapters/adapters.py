@@ -1101,6 +1101,9 @@ class DoclingParseLayoutAdapter(LayoutAdapter):
                         normalized_text=normalized_text,
                         tokens=tokenize(normalized_text),
                         order_index=item_index,
+                        r=seg.r,
+                        page_width=page.width if page.width is not None else layout_output.image_width,
+                        page_height=page.height if page.height is not None else layout_output.image_height,
                     )
                 )
 
