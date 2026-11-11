@@ -108,6 +108,8 @@ def test_public_runner_keeps_evidence_and_paid_usage_when_cli_output_is_missing(
     monkeypatch.delenv("GOOGLE_GEMINI_API_KEY", raising=False)
     monkeypatch.setenv("GOOGLE_GEMINI_BASE_URL", "https://gateway.test/genai")
     monkeypatch.setenv("GEMINI_CLI_CUSTOM_HEADERS", "x-model-provider: gemini, authorization: gateway-secret")
+    pipeline = get_pipeline("gemini_cli_extract_gemini_4_argon_medium_thinking_vision_evidence")
+    provider = create_provider(pipeline)
     original_client = httpx.Client
     forwarded = []
 
@@ -120,8 +122,6 @@ def test_public_runner_keeps_evidence_and_paid_usage_when_cli_output_is_missing(
         "Client",
         lambda **kwargs: original_client(transport=httpx.MockTransport(upstream), trust_env=False),
     )
-    pipeline = get_pipeline("gemini_cli_extract_gemini_4_argon_medium_thinking_vision_evidence")
-    provider = create_provider(pipeline)
     source = tmp_path / "doc.pdf"
     writer = PdfWriter()
     writer.add_blank_page(width=100, height=100)

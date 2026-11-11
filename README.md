@@ -18,8 +18,8 @@ This repository hosts two benchmarks. They share the task, the evaluator, the me
 
 | Benchmark | What makes it hard | Size | Documents | Dataset | Details |
 |---|---|---|---|---|---|
-| **ExtractBench** | Long lists, needles in long documents, dense forms, scans, and handwriting | 370 documents, 4,869 pages, 67 document types | Real public records, plus synthetic long lists rendered from real layouts | [llamaindex/ExtractBench](https://huggingface.co/datasets/llamaindex/ExtractBench) | [docs/extractbench.md](docs/extractbench.md) Â· [launch post](https://www.llamaindex.ai/blog/introducing-extractbench) |
-| **ExtractBench Pro** | Values read off charts and drawings, counted under house rules, or decoded with custom terminology | 100 documents, 2,622 pages, 86 document types | Synthetic, derived from real long-tail documents | [llamaindex/ExtractBenchPro](https://huggingface.co/datasets/llamaindex/ExtractBenchPro) | [docs/extractbench-pro.md](docs/extractbench-pro.md) Â· [launch post](https://www.llamaindex.ai/blog/introducing-extractbench-pro) |
+| **ExtractBench** | Long lists, needles in long documents, dense forms, scans, and handwriting | 370 documents, 4,869 pages, 67 document types | Real public records, plus synthetic long lists rendered from real layouts | [llamaindex/ExtractBench](https://huggingface.co/datasets/llamaindex/ExtractBench) | [docs/extractbench.md](docs/extractbench.md) · [launch post](https://www.llamaindex.ai/blog/introducing-extractbench) |
+| **ExtractBench Pro** | Values read off charts and drawings, counted under house rules, or decoded with custom terminology | 100 documents, 2,622 pages, 86 document types | Synthetic, derived from real long-tail documents | [llamaindex/ExtractBenchPro](https://huggingface.co/datasets/llamaindex/ExtractBenchPro) | [docs/extractbench-pro.md](docs/extractbench-pro.md) · [launch post](https://www.llamaindex.ai/blog/introducing-extractbench-pro) |
 
 <p align="center">
   <img src="docs/extractbench_teaser.png" alt="ExtractBench: JSON Schema and document in; JSON plus evidence out; scored on value F1, grounding F1, challenge tags, and cost" width="100%">
@@ -27,7 +27,7 @@ This repository hosts two benchmarks. They share the task, the evaluator, the me
 
 ## Leaderboards
 
-[ExtractBench](#extractbench-leaderboard) Â· [ExtractBench Pro](#extractbench-pro-leaderboard) Â· [Submit results](#submitting-results)
+[ExtractBench](#extractbench-leaderboard) · [ExtractBench Pro](#extractbench-pro-leaderboard) · [Submit results](#submitting-results)
 
 Models and prices reflect each provider's official documentation; each system uses its recommended configuration.
 
@@ -58,13 +58,13 @@ In the official benchmark, documents that fail or exceed a 30-minute limit score
 | 3 | Reducto Deep Extract | Specialized APIs | <u>96.08</u> | 96.84 | <u>94.80</u> | 92.85 | 6.35¢ |
 | 4 | Pulse (Effort) | Specialized APIs | 96.07 | 96.83 | 94.70 | 93.24 | 10.50¢ |
 | 5 | LlamaExtract Agentic | LlamaExtract | 95.65 | 96.06 | 94.79 | **94.73** | 3.12¢ |
-| 6 | Codex (GPT-6.1 Sol Evidence) | Coding Agents | 95.31 | 97.01 | 92.96 | 85.46 | 7.13¢ |
-| 7 | KYNEX (GPT-6.1 Sol) | Coding Agents | 94.72 | 96.04 | 93.14 | 85.83 | 9.35¢ |
-| 8 | Claude Code (Sonnet 5.5 Evidence) | Coding Agents | 94.68 | 96.22 | 92.97 | 83.69 | 5.69¢ |
-| 9 | Codex (GPT-6 Sol Evidence) | Coding Agents | 94.57 | 95.99 | 92.42 | 87.25 | 9.80¢ |
+| 6 | Codex (GPT-6.1 Sol) | Coding Agents | 95.31 | 97.01 | 92.96 | 85.46 | 7.13¢ |
+| 7 | Claude Code (Sonnet 5.5) | Coding Agents | 94.68 | 96.22 | 92.97 | 83.69 | 5.69¢ |
+| 8 | KYNEX (GPT-6.1 Sol) | Coding Agents | 94.63 | 96.04 | 93.14 | 84.18 | 9.35¢ |
+| 9 | Codex (GPT-6 Sol) | Coding Agents | 94.57 | 95.99 | 92.42 | 87.25 | 9.80¢ |
 | 10 | Pulse (Non-effort) | Specialized APIs | 94.51 | 95.39 | 92.49 | 93.31 | 3.00¢ |
 
-Top 10 of 56 systems — full table in [leaderboard.csv](leaderboard.csv).
+Top 10 of 54 ranked systems — all results in [leaderboard.csv](leaderboard.csv).
 <!-- LEADERBOARD:END -->
 
 <!-- GROUNDING:START -->
@@ -76,20 +76,20 @@ Top 10 of 56 systems — full table in [leaderboard.csv](leaderboard.csv).
     <tr><th align="right">Overall</th><th align="right">Short</th><th align="right">Medium</th><th align="right">Long</th><th align="right">Overall</th><th align="right">Short</th><th align="right">Medium</th><th align="right">Long</th></tr>
   </thead>
   <tbody>
-    <tr><td align="right">1</td><td>Codex (GPT-6.1 Sol Evidence)</td><td align="right"><strong>87.61</strong></td><td align="right"><strong>89.03</strong></td><td align="right">84.38</td><td align="right"><strong>85.70</strong></td><td align="right"><u>89.37</u></td><td align="right"><u>89.63</u></td><td align="right">89.25</td><td align="right">86.80</td></tr>
-    <tr><td align="right">2</td><td>Codex (GPT-6.1 Terra Evidence)</td><td align="right"><u>85.69</u></td><td align="right"><u>88.13</u></td><td align="right">81.32</td><td align="right">77.21</td><td align="right">87.42</td><td align="right">88.49</td><td align="right">86.10</td><td align="right">81.15</td></tr>
+    <tr><td align="right">1</td><td>Codex (GPT-6.1 Sol)</td><td align="right"><strong>87.61</strong></td><td align="right"><strong>89.03</strong></td><td align="right">84.38</td><td align="right"><strong>85.70</strong></td><td align="right"><u>89.37</u></td><td align="right"><u>89.63</u></td><td align="right">89.25</td><td align="right">86.80</td></tr>
+    <tr><td align="right">2</td><td>Codex (GPT-6.1 Terra)</td><td align="right"><u>85.69</u></td><td align="right"><u>88.13</u></td><td align="right">81.32</td><td align="right">77.21</td><td align="right">87.42</td><td align="right">88.49</td><td align="right">86.10</td><td align="right">81.15</td></tr>
     <tr><td align="right">3</td><td>LlamaExtract Agentic Plus</td><td align="right">83.25</td><td align="right">83.22</td><td align="right">83.44</td><td align="right"><u>82.84</u></td><td align="right">88.26</td><td align="right">87.97</td><td align="right">88.48</td><td align="right"><u>90.61</u></td></tr>
     <tr><td align="right">4</td><td>LlamaExtract Agentic</td><td align="right">82.33</td><td align="right">81.39</td><td align="right"><u>84.94</u></td><td align="right">81.63</td><td align="right">88.20</td><td align="right">86.95</td><td align="right"><u>90.33</u></td><td align="right"><strong>92.59</strong></td></tr>
     <tr><td align="right">5</td><td>LlamaExtract Agentic Plus (Max Effort)</td><td align="right">81.78</td><td align="right">80.58</td><td align="right"><strong>85.55</strong></td><td align="right">78.74</td><td align="right"><strong>90.02</strong></td><td align="right"><strong>89.92</strong></td><td align="right"><strong>90.67</strong></td><td align="right">88.10</td></tr>
     <tr><td align="right">6</td><td>LlamaExtract Cost-Effective</td><td align="right">79.80</td><td align="right">80.99</td><td align="right">77.52</td><td align="right">76.16</td><td align="right">86.28</td><td align="right">86.97</td><td align="right">84.60</td><td align="right">86.41</td></tr>
-    <tr><td align="right">7</td><td>Codex (GPT-6 Sol Evidence)</td><td align="right">77.11</td><td align="right">77.61</td><td align="right">75.53</td><td align="right">78.31</td><td align="right">86.50</td><td align="right">87.20</td><td align="right">85.12</td><td align="right">84.82</td></tr>
-    <tr><td align="right">8</td><td>Claude Code (Opus 5.5 Evidence)</td><td align="right">71.55</td><td align="right">73.57</td><td align="right">65.54</td><td align="right">74.87</td><td align="right">76.95</td><td align="right">79.27</td><td align="right">71.36</td><td align="right">76.47</td></tr>
-    <tr><td align="right">9</td><td>Codex (GPT-6 Luna Evidence)</td><td align="right">65.70</td><td align="right">62.91</td><td align="right">71.11</td><td align="right">74.36</td><td align="right">83.93</td><td align="right">84.41</td><td align="right">83.47</td><td align="right">80.17</td></tr>
-    <tr><td align="right">10</td><td>Claude Code (Sonnet 5.5 Evidence)</td><td align="right">64.61</td><td align="right">64.59</td><td align="right">63.18</td><td align="right">71.22</td><td align="right">75.99</td><td align="right">77.93</td><td align="right">71.50</td><td align="right">74.98</td></tr>
+    <tr><td align="right">7</td><td>Codex (GPT-6 Sol)</td><td align="right">77.11</td><td align="right">77.61</td><td align="right">75.53</td><td align="right">78.31</td><td align="right">86.50</td><td align="right">87.20</td><td align="right">85.12</td><td align="right">84.82</td></tr>
+    <tr><td align="right">8</td><td>Claude Code (Opus 5.5)</td><td align="right">71.55</td><td align="right">73.57</td><td align="right">65.54</td><td align="right">74.87</td><td align="right">76.95</td><td align="right">79.27</td><td align="right">71.36</td><td align="right">76.47</td></tr>
+    <tr><td align="right">9</td><td>Codex (GPT-6 Luna)</td><td align="right">65.70</td><td align="right">62.91</td><td align="right">71.11</td><td align="right">74.36</td><td align="right">83.93</td><td align="right">84.41</td><td align="right">83.47</td><td align="right">80.17</td></tr>
+    <tr><td align="right">10</td><td>Claude Code (Sonnet 5.5)</td><td align="right">64.61</td><td align="right">64.59</td><td align="right">63.18</td><td align="right">71.22</td><td align="right">75.99</td><td align="right">77.93</td><td align="right">71.50</td><td align="right">74.98</td></tr>
   </tbody>
 </table>
 
-Top 10 of 56 systems — full table in [leaderboard.csv](leaderboard.csv).
+Top 10 of 54 ranked systems — all results in [leaderboard.csv](leaderboard.csv).
 <!-- GROUNDING:END -->
 
 ### ExtractBench Pro leaderboard
@@ -110,12 +110,12 @@ Rows are ordered by % Perfect, then Value F1, then lower cost.
 | 9 | LlamaExtract Agentic | LlamaExtract | 20 | 71.32 | 58.01 | 3.12¢ |
 | 10 | Pulse Effort | Specialized APIs | 18 | 70.53 | 18.74 | 10.50¢ |
 
-Top 10 of 16 systems — full table in [leaderboard-pro.csv](leaderboard-pro.csv). Scores with no time limit are also available there.
+Top 10 of 16 ranked systems — all results in [leaderboard-pro.csv](leaderboard-pro.csv). Scores with no time limit are also available there.
 <!-- PRO_LEADERBOARD:END -->
 
 ### Submitting results
 
-Open a PR updating [leaderboard.csv](leaderboard.csv) or [leaderboard-pro.csv](leaderboard-pro.csv), with your pipeline configuration and evaluation reports. Scores are percentages. Costs are computed by averaging each document's USD per page, with equal weighting given to all documents. Regenerate the tables with `uv run python scripts/update_readme.py`.
+Open a PR updating [leaderboard.csv](leaderboard.csv) or [leaderboard-pro.csv](leaderboard-pro.csv), with your pipeline configuration and evaluation reports. Set `include_in_rankings` to `true` or `false` on every row; `false` retains the result in the CSV and excludes it from public rankings. Scores are percentages. Costs are computed by averaging each document's USD per page, with equal weighting given to all documents. Regenerate the tables with `uv run python scripts/update_readme.py`.
 
 `Pipeline` is the registered pipeline name, empty when none is registered. `Reasoning` is the reasoning or thinking level the run used (`off`, `low`, `medium`, `high`, `xhigh`), including a CLI or API default the pipeline leaves unset. `default` means a model or server default that the run did not record. It is empty for systems without a reasoning setting.
 
@@ -142,7 +142,7 @@ pip install "llama-extract-bench[llamaextract]" # or just one, e.g. llamaextract
 # Or, from a checkout of this repo
 uv sync --extra runners
 
-# Quick test run on ExtractBench (6 documents â€” good for trying things out)
+# Quick test run on ExtractBench (6 documents — good for trying things out)
 # (drop the `uv run` prefix if you installed from PyPI)
 uv run extract-bench run llamaextract_agentic --test
 
@@ -204,9 +204,9 @@ The parse and layout-detection rosters inherited from [ParseBench](https://githu
 
 Both benchmarks use the same deterministic evaluator: one metric for value accuracy and two for grounding. We score the grounding metrics only on fields that carry verified box ground truth.
 
-- **Unified value F1** â€” whether the extracted *values* match the expected output, under one definition for scalar fields and arrays of records. Each output is flattened into cells, one per scalar field and per aligned record subfield, and a cell is correct when it matches its expected counterpart after normalization. Precision, recall, and F1 are computed over these cells per document; slices report unweighted document means.
-- **Word-level grounding F1** â€” a field is grounded-correct only when its value is accepted *and* its predicted box overlaps any accepted box on its evidence list, at IoU 0.5.
-- **Page-level grounding F1** â€” the same rule against the cited source page instead of the box: a field counts only when its value is accepted and the page it cites is correct.
+- **Unified value F1** — whether the extracted *values* match the expected output, under one definition for scalar fields and arrays of records. Each output is flattened into cells, one per scalar field and per aligned record subfield, and a cell is correct when it matches its expected counterpart after normalization. Precision, recall, and F1 are computed over these cells per document; slices report unweighted document means.
+- **Word-level grounding F1** — a field is grounded-correct only when its value is accepted *and* its predicted box overlaps any accepted box on its evidence list, at IoU 0.5.
+- **Page-level grounding F1** — the same rule against the cited source page instead of the box: a field counts only when its value is accepted and the page it cites is correct.
 
 <details>
 <summary><strong>How the unified value F1 is computed</strong></summary>
@@ -234,7 +234,7 @@ uv run extract-bench run <pipeline_name> --dataset pro
 uv run extract-bench run <pipeline_name> --group short
 uv run extract-bench run <pipeline_name> --dataset pro --group custom_terminology
 
-# Skip calling the extraction system â€” just re-evaluate existing results
+# Skip calling the extraction system — just re-evaluate existing results
 uv run extract-bench run <pipeline_name> --skip_inference
 
 # Control how many documents are processed in parallel
@@ -363,18 +363,18 @@ ExtractBench results go to `output/`, with one directory per split. Pro results 
 
 ```
 output/                                      # output-pro/ for ExtractBench Pro
-â”œâ”€â”€ _leaderboard.html                        # Cross-pipeline leaderboard
-â””â”€â”€ <pipeline_name>/
-    â”œâ”€â”€ short/                               # one directory per split or challenge
-    â”‚   â”œâ”€â”€ *.result.json                    # Inference results
-    â”‚   â”œâ”€â”€ _evaluation_report.json          # Evaluation summary
-    â”‚   â”œâ”€â”€ _evaluation_report_detailed.html # Interactive detailed report
-    â”‚   â”œâ”€â”€ _evaluation_results.csv          # Per-example CSV
-    â”‚   â””â”€â”€ _evaluation_report.md            # Markdown summary
-    â”œâ”€â”€ medium/  (same structure)
-    â”œâ”€â”€ long/    (same structure)
-    â”œâ”€â”€ _errors.json                         # Per-document inference failures
-    â””â”€â”€ _metadata.json                       # Run metadata
+├── _leaderboard.html                        # Cross-pipeline leaderboard
+└── <pipeline_name>/
+    ├── short/                               # one directory per split or challenge
+    │   ├── *.result.json                    # Inference results
+    │   ├── _evaluation_report.json          # Evaluation summary
+    │   ├── _evaluation_report_detailed.html # Interactive detailed report
+    │   ├── _evaluation_results.csv          # Per-example CSV
+    │   └── _evaluation_report.md            # Markdown summary
+    ├── medium/  (same structure)
+    ├── long/    (same structure)
+    ├── _errors.json                         # Per-document inference failures
+    └── _metadata.json                       # Run metadata
 ```
 
 </details>
@@ -384,30 +384,30 @@ output/                                      # output-pro/ for ExtractBench Pro
 
 ```
 src/extract_bench/
-â”œâ”€â”€ cli.py                           # Fire CLI entry point
-â”œâ”€â”€ pipeline/cli.py                  # End-to-end pipeline orchestration
-â”œâ”€â”€ data/
-â”‚   â”œâ”€â”€ download.py                  # HuggingFace dataset download
-â”‚   â””â”€â”€ cli.py                       # Data management CLI
-â”œâ”€â”€ inference/
-â”‚   â”œâ”€â”€ runner.py                    # Batch inference with concurrency
-â”‚   â”œâ”€â”€ pipelines/                   # Pipeline registry (extract, parse, layout)
-â”‚   â””â”€â”€ providers/                   # Provider implementations per product type
-â”œâ”€â”€ evaluation/
-â”‚   â”œâ”€â”€ runner.py                    # Parallel evaluation + failure penalties
-â”‚   â”œâ”€â”€ evaluators/                  # Product-specific evaluators
-â”‚   â”œâ”€â”€ metrics/extract/             # Unified value F1, grounding, record matching
-â”‚   â””â”€â”€ reports/                     # CSV, HTML, markdown export
-â”œâ”€â”€ analysis/
-â”‚   â”œâ”€â”€ detailed_report.py           # Interactive per-split HTML report
-â”‚   â””â”€â”€ comparison.py                # Pipeline comparison
-â”œâ”€â”€ test_cases/
-â”‚   â”œâ”€â”€ loader.py                    # Load test cases (JSONL or sidecar .test.json)
-â”‚   â””â”€â”€ schema.py                    # TestCase types (Extract, Parse, LayoutDetection)
-â””â”€â”€ schemas/
-    â”œâ”€â”€ pipeline_io.py               # InferenceRequest, InferenceResult
-    â”œâ”€â”€ evaluation.py                # EvaluationResult, EvaluationSummary
-    â””â”€â”€ product.py                   # ProductType enum
+├── cli.py                           # Fire CLI entry point
+├── pipeline/cli.py                  # End-to-end pipeline orchestration
+├── data/
+│   ├── download.py                  # HuggingFace dataset download
+│   └── cli.py                       # Data management CLI
+├── inference/
+│   ├── runner.py                    # Batch inference with concurrency
+│   ├── pipelines/                   # Pipeline registry (extract, parse, layout)
+│   └── providers/                   # Provider implementations per product type
+├── evaluation/
+│   ├── runner.py                    # Parallel evaluation + failure penalties
+│   ├── evaluators/                  # Product-specific evaluators
+│   ├── metrics/extract/             # Unified value F1, grounding, record matching
+│   └── reports/                     # CSV, HTML, markdown export
+├── analysis/
+│   ├── detailed_report.py           # Interactive per-split HTML report
+│   └── comparison.py                # Pipeline comparison
+├── test_cases/
+│   ├── loader.py                    # Load test cases (JSONL or sidecar .test.json)
+│   └── schema.py                    # TestCase types (Extract, Parse, LayoutDetection)
+└── schemas/
+    ├── pipeline_io.py               # InferenceRequest, InferenceResult
+    ├── evaluation.py                # EvaluationResult, EvaluationSummary
+    └── product.py                   # ProductType enum
 ```
 
 </details>
@@ -428,10 +428,10 @@ src/extract_bench/
 
 ## Links
 
-- **ExtractBench dataset**: [llamaindex/ExtractBench](https://huggingface.co/datasets/llamaindex/ExtractBench) Â· [details](docs/extractbench.md) Â· [launch post](https://www.llamaindex.ai/blog/introducing-extractbench)
-- **ExtractBench Pro dataset**: [llamaindex/ExtractBenchPro](https://huggingface.co/datasets/llamaindex/ExtractBenchPro) Â· [details](docs/extractbench-pro.md) Â· [launch post](https://www.llamaindex.ai/blog/introducing-extractbench-pro) Â· [website](https://www.extractbench.ai/pro/)
+- **ExtractBench dataset**: [llamaindex/ExtractBench](https://huggingface.co/datasets/llamaindex/ExtractBench) · [details](docs/extractbench.md) · [launch post](https://www.llamaindex.ai/blog/introducing-extractbench)
+- **ExtractBench Pro dataset**: [llamaindex/ExtractBenchPro](https://huggingface.co/datasets/llamaindex/ExtractBenchPro) · [details](docs/extractbench-pro.md) · [launch post](https://www.llamaindex.ai/blog/introducing-extractbench-pro) · [website](https://www.extractbench.ai/pro/)
 - **Code**: [run-llama/ExtractBench](https://github.com/run-llama/ExtractBench)
-- **ParseBench**: [run-llama/ParseBench](https://github.com/run-llama/ParseBench) â€” A Document Parsing Benchmark for AI Agents
+- **ParseBench**: [run-llama/ParseBench](https://github.com/run-llama/ParseBench) — A Document Parsing Benchmark for AI Agents
 
 ## License
 

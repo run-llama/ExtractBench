@@ -19,6 +19,22 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 CSV_PATH = REPO_ROOT / "leaderboard.csv"
 PRO_CSV_PATH = REPO_ROOT / "leaderboard-pro.csv"
 README_PATH = REPO_ROOT / "README.md"
+INCLUDE_IN_RANKINGS = "include_in_rankings"
+
+
+def read_ranked_rows(path: Path) -> list[dict[str, str]]:
+    with path.open(encoding="utf-8", newline="") as file:
+        reader = csv.DictReader(file)
+        if reader.fieldnames is None or INCLUDE_IN_RANKINGS not in reader.fieldnames:
+            raise ValueError(f"{path.name}: missing {INCLUDE_IN_RANKINGS} column")
+        rows = []
+        for row in reader:
+            included = row[INCLUDE_IN_RANKINGS]
+            if included not in ("true", "false"):
+                raise ValueError(f"{path.name}: {INCLUDE_IN_RANKINGS} must be true or false for {row['Provider']}")
+            if included == "true":
+                rows.append(row)
+        return rows
 
 
 def fmt(v: str) -> str:
@@ -81,7 +97,10 @@ def value_table(rows: list[dict]) -> str:
             for i, r in enumerate(ranked, 1)
         ],
     )
-    return f"{body}\n\nTop {TOP_N} of {len(rows)} systems — full table in [leaderboard.csv](leaderboard.csv)."
+    return (
+        f"{body}\n\nTop {len(ranked)} of {len(rows)} ranked systems — "
+        "all results in [leaderboard.csv](leaderboard.csv)."
+    )
 
 
 GROUNDING_PREFIXES = ("Word_Grounding", "Page_Grounding")
@@ -130,7 +149,7 @@ def grounding_table(rows: list[dict]) -> str:
             "  </tbody>",
             "</table>",
             "",
-            f"Top {len(ranked)} of {len(rows)} systems — full table in [leaderboard.csv](leaderboard.csv).",
+            f"Top {len(ranked)} of {len(rows)} ranked systems — all results in [leaderboard.csv](leaderboard.csv).",
         ]
     )
 
@@ -172,8 +191,8 @@ def pro_table(rows: list[dict[str, str]]) -> str:
         ],
     )
     return (
-        f"{body}\n\nTop {len(ranked)} of {len(overall)} systems — "
-        "full table in [leaderboard-pro.csv](leaderboard-pro.csv). Scores with no time limit are also available there."
+        f"{body}\n\nTop {len(ranked)} of {len(overall)} ranked systems — "
+        "all results in [leaderboard-pro.csv](leaderboard-pro.csv). Scores with no time limit are also available there."
     )
 
 
@@ -190,13 +209,10 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check", action="store_true", help="Fail if README tables are stale; do not write files")
     args = parser.parse_args()
-    with CSV_PATH.open() as f:
-        rows = [r for r in csv.DictReader(f) if r.get("Provider")]
+    rows = read_ranked_rows(CSV_PATH)
+    pro_rows = read_ranked_rows(PRO_CSV_PATH)
 
-    with PRO_CSV_PATH.open() as f:
-        pro_rows = [row for row in csv.DictReader(f) if row.get("Provider")]
-
-    original = README_PATH.read_text()
+    original = README_PATH.read_text(encoding="utf-8")
     readme = original
     readme = replace_block(
         readme,
@@ -218,7 +234,7 @@ def main() -> None:
             raise SystemExit("README leaderboard tables are stale. Run: uv run python scripts/update_readme.py")
         print("README leaderboard tables are up to date")
     else:
-        README_PATH.write_text(readme)
+        README_PATH.write_text(readme, encoding="utf-8")
         print(f"Updated README.md from {CSV_PATH.name} and {PRO_CSV_PATH.name}")
 
 
