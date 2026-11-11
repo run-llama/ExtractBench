@@ -5,17 +5,13 @@ from dataclasses import dataclass, field
 from typing import Any, Literal
 
 import numpy as np
-
-from extract_bench.evaluation.evaluators.base import BaseEvaluator
-from extract_bench.evaluation.layout_adapters import create_layout_adapter_for_result
-from extract_bench.evaluation.layout_label_mappers import project_layout_predictions
-from extract_bench.evaluation.metrics.attribution.constants import (
+from parse_bench.evaluation.metrics.attribution.constants import (
     ATTRIBUTION_OVERLAP_IOA_THRESHOLD,
     ATTRIBUTION_TOKEN_F1_THRESHOLD,
     LOCALIZATION_IOA_PRED_THRESHOLD,
     LOCALIZATION_IOA_THRESHOLD,
 )
-from extract_bench.evaluation.metrics.attribution.core import (
+from parse_bench.evaluation.metrics.attribution.core import (
     GTElement,
     PredBlock,
     compute_attribution_metrics,
@@ -26,7 +22,11 @@ from extract_bench.evaluation.metrics.attribution.core import (
     normalize_layout_attributes,
     parse_gt_elements,
 )
-from extract_bench.evaluation.metrics.attribution.geometry import compute_ioa_matrix
+from parse_bench.evaluation.metrics.attribution.geometry import compute_ioa_matrix
+
+from extract_bench.evaluation.evaluators.base import BaseEvaluator
+from extract_bench.evaluation.layout_adapters import create_layout_adapter_for_result
+from extract_bench.evaluation.layout_label_mappers import project_layout_predictions
 from extract_bench.evaluation.metrics.layoutdet.classification_utils import (
     compute_map_at_thresholds,
     compute_per_class_metrics,

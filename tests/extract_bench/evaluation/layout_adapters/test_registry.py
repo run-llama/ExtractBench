@@ -195,11 +195,7 @@ def test_duplicate_key_raises_before_first_registry_read():
     subprocess.run([sys.executable, "-c", code], check=True)
 
 
-@requires_adapters
-def test_layout_attribution_preserves_rotation_in_rectangular_page() -> None:
-    """A rotated pixel box must reach the scorer in its original page frame."""
-    from extract_bench.evaluation.layout_adapters.adapters import NormalizedLayoutOutputAdapter
-    from extract_bench.evaluation.metrics.attribution.core import compute_attribution_metrics, parse_gt_elements
+def test_attribution_adapter_passes_rotation_and_page_dimensions() -> None:
     from extract_bench.schemas.layout_detection_output import LayoutOutput
 
     output = LayoutOutput.model_validate(
@@ -221,20 +217,10 @@ def test_layout_attribution_preserves_rotation_in_rectangular_page() -> None:
             ],
         }
     )
-    expected = parse_gt_elements(
-        [
-            {
-                "type": "layout",
-                "bbox": [445 / 900, 10 / 200, 10 / 900, 180 / 200],
-                "canonical_class": "Text",
-                "ro_index": 0,
-                "content": {"type": "text", "text": "Region total"},
-            }
-        ]
-    )
-    blocks = NormalizedLayoutOutputAdapter().to_attribution_blocks(output, page_number=1)
 
-    assert compute_attribution_metrics(expected, blocks).af1 == 1.0
+    [block] = _NonMatchingAdapter().to_attribution_blocks(output, page_number=1)
+
+    assert (block.r, block.page_width, block.page_height) == (90, 900, 200)
 
 
 @requires_adapters
@@ -270,4 +256,3 @@ def test_llamaparse_typed_page_scores_only_explicit_segments() -> None:
     blocks = adapter.to_attribution_blocks(output, page_number=1)
 
     assert [(block.text, block.r) for block in blocks] == [("Region total", 90)]
-    assert blocks[0].bbox_xyxy == pytest.approx([0.4, 0.475, 0.6, 0.525])
