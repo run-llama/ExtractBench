@@ -106,4 +106,4 @@ Add seven rows per system to [leaderboard-pro.csv](../leaderboard-pro.csv): the 
 | Grounding F1 | `Word_Grounding` | `Word_Grounding_No_Time_Limit` |
 | Page-level grounding F1 | `Page_Grounding` | `Page_Grounding_No_Time_Limit` |
 
-Scores are percentages. Use an empty cell for an unreported metric; zero means a measured zero. Then follow the shared steps in [Submitting results](../README.md#submitting-results).
+Score columns above are percentages. `Confidence_AUGRC` stores raw AUGRC (lower is better), with the website displaying its reciprocal. Use an empty cell for an unreported metric; zero means a measured zero. Then follow the shared steps in [Submitting results](../README.md#submitting-results).
