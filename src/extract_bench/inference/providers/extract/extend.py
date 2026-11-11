@@ -444,7 +444,8 @@ class ExtendProvider(Provider):
         # errors while polling re-poll the SAME run instead of creating another.
         # Enabled per-pipeline via config {"async_run": true}.
         self._async_run = bool(self.base_config.get("async_run", False))
-        self._async_poll_interval = float(self.base_config.get("async_poll_interval", 5.0))
+        # Match the LlamaExtract adapter polling cadence for latency comparisons.
+        self._async_poll_interval = float(self.base_config.get("async_poll_interval", 3.0))
         self._async_max_poll_errors = int(self.base_config.get("async_max_poll_errors", 15))
 
         # Initialize the Extend client
