@@ -70,19 +70,6 @@ uv run extract-bench run <pipeline_name>
 | `qwen3_5_4b_vllm_extract_oneshot_structured_output_file` | Self-hosted vLLM | Qwen3.5-4B, json_object mode; requires `QWEN3_5_4B_SERVER_URL` |
 | `nuextract3_extract` | Self-hosted vLLM | schema converted to a NuExtract template; requires `NUEXTRACT3_SERVER_URL` |
 
-Both Extend Performance configurations omit `baseVersion` and use the latest stable model.
-Their leaderboard rows are excluded from rankings until reviewed runs supply new scores,
-costs, and latency. Review Agent costs an additional $0.01/page at
-[PAYG pricing](https://docs.extend.ai/general/how-credits-work); citations are included.
-The run artifacts retain total cost including review, the requested processor configuration,
-SDK version, create receipt, polling history, and full terminal response.
-
-Review Agent scores are ordinal: 1–5 maps to 0, 0.25, 0.5, 0.75, 1 in normalized
-`FieldCitation.confidence`. This preserves ordering and ties; it is not a probability.
-The original score and insights are retained in citation metadata. Missing review scores
-remain unknown, including when the API supplies a different OCR or logprob confidence.
-Scores without citations retain an unknown page and box.
-
 ## Parse Pipelines
 
 Parse pipelines (inherited from ParseBench, used here by the two-stage extract

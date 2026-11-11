@@ -85,19 +85,7 @@ The leaderboard reports the unweighted mean of each document's cost divided by i
 
 ### Optional feature costs
 
-Both leaderboard CSVs separate the base `Cost_Per_Page` from
-`Grounding_Added_Cost_Per_Page` and `Confidence_Added_Cost_Per_Page`, all in USD/page.
-A zero means the feature is included in the base cost. An empty CSV cell represents
-`null`: the feature cannot be added or its cost cannot be estimated. A positive value
-is the additional per-page charge for that feature. These columns describe price,
-not whether a feature has already been evaluated.
-
-For Extend Performance and Max Context, subtract the Review Agent charge from the
-measured total when publishing `Cost_Per_Page` and the split cost columns, and put
-that charge in `Confidence_Added_Cost_Per_Page`. Raw run costs remain the full billed
-total. Value and confidence metrics must describe the same extracted predictions.
-The two reviewed Extend rows have blank results and `include_in_rankings=false`
-until those runs are available; previous results remain in Git history.
+Both leaderboard CSVs separate base `Cost_Per_Page` from `Grounding_Added_Cost_Per_Page` and `Confidence_Added_Cost_Per_Page`, all in USD/page. Zero means included; blank means unavailable or unpriced; a positive value is the additional charge. For example, Extend includes grounding and adds $0.01/page for Review Agent confidence.
 
 ## Results layout
 
