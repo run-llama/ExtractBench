@@ -103,3 +103,5 @@ See "Output Structure" under [Configuration](../README.md#configuration) for the
 `Confidence_AUGRC` stores raw AUGRC (lower is better), not a percentage or its reciprocal; blank means unreported. The website displays `1 / Confidence_AUGRC`.
 
 Add one row per system to [leaderboard.csv](../leaderboard.csv). Each row carries `Pipeline`, `Reasoning`, `include_in_rankings` (`true` or `false`), value F1 (`Overall`, `Short`, `Medium`, `Long`), precision and recall per split (`P_*`, `R_*`), word- and page-level grounding F1 overall and per split, cost per page overall and per split, and latency per document per split. Then follow the shared steps in [Submitting results](../README.md#submitting-results).
+
+The [confidence-curve sidecar](../confidence-curves.json) supplies the published confidence chart independently of the aggregate `Confidence_AUGRC` column. Its shared `allowed_error_percent` axis and each provider's `correct_accepted_percent` array use percentages; the latter divides correct accepted fields by `expected_field_count`. The snapshot is historical, including the older Extend Review Agent configuration, and must not be relabeled as a current run.
