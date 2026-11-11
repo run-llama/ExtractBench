@@ -1,7 +1,7 @@
 """Confidence-scoped summary metrics.
 
 All ``confidence_scoped_*`` metrics here are computed over the
-emitted-fields-with-confidence row set (``scoring_scope`` in the metric
+emitted-scalar-fields-with-confidence row set (``scoring_scope`` in the metric
 metadata). GT-denominator signals live in the ``confidence_full_gt_*`` metrics
 instead.
 """
@@ -515,7 +515,7 @@ def compute_confidence_scoped_metrics(
     base_metadata = {
         # Bumped when scoring semantics change enough that series are not
         # comparable across the boundary.
-        "scorer_version": "2026-07-09",
+        "scorer_version": "2026-11-10",
         "total_fields": len(rows),
         "correct_fields": summary["correct_fields"],
         "scoped_accuracy": summary["confidence_scoped_accuracy"],

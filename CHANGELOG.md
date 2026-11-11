@@ -6,6 +6,12 @@ All notable changes to `llama-extract-bench` are recorded here. The format follo
 
 ## [Unreleased]
 
+### Evaluation
+
+- Exclude object and array confidence citations from field confidence metrics.
+  Scorer version `2026-11-10` retains scalar-array elements and explicit nulls;
+  cached runs with container confidence need rescoring before comparison.
+
 ### Imports
 
 - Load built-in providers on the first `create_provider` call, so extension and

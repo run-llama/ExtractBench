@@ -713,7 +713,9 @@ def _collect_emitted_fields_from_citations(extracted_data: Any, field_citations:
         if not isinstance(field_path, str) or not field_path or confidence is None:
             continue
         found, value = value_at(extracted_data, path_tokens(field_path))
-        if not found:
+        # Container confidence is not an additional field observation. Scalar
+        # array elements and explicit nulls remain eligible at their own paths.
+        if not found or isinstance(value, (dict, list)):
             continue
         cited_text = _citation_reference_text(data)
         current = by_path.get(field_path)
@@ -799,7 +801,7 @@ def build_confidence_field_rows(
     skip_field_paths: set[str] | None = None,
     expected_output: Any | None = None,
 ) -> list[ConfidenceFieldRow]:
-    """Score confidence-bearing emitted fields against GT.
+    """Score confidence-bearing emitted scalar fields against GT.
 
     The row set is scoped to fields the extractor emitted WITH confidence
     metadata (not to GT rules), then each emitted value is matched against the
