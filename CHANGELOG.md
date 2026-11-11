@@ -1,226 +1,100 @@
 # Changelog
 
-All notable changes to `llama-extract-bench` are recorded here. The format follows
-[Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
+Notable changes to `llama-extract-bench`. This project follows
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
 ### Evaluation
 
-- Layout diagnostics now import the attribution scorer from
-  `parse_bench.evaluation.metrics.attribution`, which is also the new import
-  path for attribution helpers. Diagnostics inherit ParseBench's HTML table
-  handling, rotated box overlap, and treatment of a missing reading-order
-  index as zero. Saved LlamaParse layout pages can be scored from typed segments.
-- Exclude object and array confidence citations from field confidence metrics.
-  Scorer version `2026-11-10` retains scalar-array elements and explicit nulls;
-  cached runs with container confidence need rescoring before comparison.
-- Match repeated identical rows one-to-one before sparse confidence alignment,
-  so common redacted rows receive credit while surplus predictions remain errors.
+- Layout diagnostics use ParseBench's attribution scorer, including rotated box overlap and zero for missing reading-order indices. Import helpers from `parse_bench.evaluation.metrics.attribution`. [#130]
+- Field confidence grading excludes object and array citations and pairs identical rows one-to-one. Rescore cached runs with container confidence before comparing. [#128]
+- Array-record metrics accept `_identity_hints` for large row-matching problems. [#77]
+- Fixed citation field paths for LlamaExtract and Reducto. [#105]
+- Preserve unknown citation pages as `null` and read page numbers and dimensions from nested citation metadata. [#107]
 
-### Imports
+### Running benchmarks
 
-- Load built-in providers on the first `create_provider` call, so extension and
-  helper imports do not load every provider SDK. Direct provider-module imports
-  still register that provider. Code reading the private provider registry must
-  call `load_builtin_providers()` first.
+- Use `--shuffle_seed` for reproducible submission order and `--max_concurrent_pages` to cap concurrent PDF pages. [#74] [#75]
+- Built-in providers load on the first `create_provider` call. [#122]
+- Download and run ExtractBench Pro through the CLI. [#81]
+- Run ExtractBench and Pro as [Harbor tasks](docs/harbor.md) with the paper's coding-agent prompt. [#89]
+- Pro renamed six challenge splits. Cached runs with the original split names can be reused. Harbor task IDs now use document IDs. [#101]
 
-### Dependencies
+### Pipelines and dependencies
 
-- Remove the direct scikit-learn dependency. Layout average precision reuses
-  ParseBench's NumPy implementation, including its handling of tied confidence
-  scores; evaluation numbers are unchanged.
+- LlamaExtract leaderboard pipelines use Extract 2.6. The Cost Effective and Agentic `_standard_bbox` variants were removed. [#86] [#87]
+- LlamaExtract results retain API latency and state transitions. Agentic Plus Max Effort uses reported billing when available. [#76] [#114]
+- Added Parseur AI Vision, Extend Operator, Gemini 4 Argon, and more Codex pipelines. The Extend Performance and Max Context pipelines now use Review Agent. [#85] [#90] [#98] [#104] [#124]
+- Require ParseBench 1.0.7 or later for nullable citation pages. Layout average precision uses ParseBench, removing the direct scikit-learn dependency. [#107] [#116]
 
-### Dataset layout
+### Leaderboards
 
-- Rename the six ExtractBench Pro challenges and their split files, case-ID prefixes, PDF paths, tags, and leaderboard keys:
-  - Document conventions (`document_conventions`) → Interpretation rules (`interpretation_rules`).
-  - House vocabulary (`house_vocabulary`) → Custom terminology (`custom_terminology`).
-  - House counting rules (`house_counting_rules`) → Conditional aggregation (`conditional_aggregation`).
-  - Drawn relations (`drawn_relations`) → Relational diagrams (`relational_diagrams`).
-  - Charts inside documents (`charts_inside_documents`) → Charts and maps (`charts_and_maps`).
-  - Long chart sheets (`long_chart_sheets`) → Long single pages (`long_single_pages`).
-- Pro downloads and runs automatically repair original local paths and identity metadata before reusing cached predictions; original HF split names and group aliases remain accepted. Pro Harbor task IDs use only the document identifier, independent of challenge names, without legacy aliases. Benchmark content and scoring are unchanged.
+- Costs are computed by averaging each document's USD per page, with equal weighting given to all documents. Use recorded totals for full-run budgets. [#108]
+- Pro reports scores with and without the 30-minute scoring cutoff. [#91]
+- Leaderboard CSVs include pipeline and reasoning settings. Submissions set `include_in_rankings` explicitly. [#113] [#120]
+- Published confidence AUGRC, acceptance curves, and threshold counts where available. [#126] [#127] [#128]
 
+## [1.0.0] - 2026-10-01
 
-### Packaging
+### Packaging and APIs
 
-- The PyPI distribution is `llama-extract-bench` (the `extract-bench` name is
-  taken by an unrelated project). The `extract-bench` CLI command and the
-  `extract_bench` import package are unchanged.
-- `parse-bench>=1.0.2` is now a dependency, and the shared core it already
-  owns is re-exported from it rather than duplicated here: `MetricValue`,
-  `RunStat`, `ConfusionMatrixMetrics`, `ExtractOutput`, `FieldCitation`,
-  `PipelineSpec`, `ProductType` (with its extension registry), the layout
-  ontology, `geometry.rotated_bbox`, `evaluation.metrics.base.Metric` and
-  `test_cases.extract_field_paths`. Import paths and class names are
-  unchanged, and no score changes: the modules were byte-identical apart from
-  docstrings. A harness that pins both packages now sees one class per
-  concept, so metrics from both can be collected into one list — with two
-  structurally identical classes, Pydantic rejected the crossing.
+- Install from PyPI as `llama-extract-bench`. Use the `extract-bench` CLI and `extract_bench` Python package.
+- Added per-provider extras and `extract-bench version`. The `runners` extra installs all provider SDKs.
+- Shared schemas and helpers with `parse-bench>=1.0.2` while keeping their ExtractBench import paths.
+- `extract_bench.extensions` exposes registration hooks for providers, pipelines, products, output models, and layout adapters.
+- `ExtractEvaluator.compute_metrics()` exposes metrics and normalized scoring inputs. Compatible extraction test cases can use their own model classes.
+- `compute_unified_evidence_metrics(..., graded_cells=...)` exposes per-cell grounding verdicts.
+- Added `ProviderTerminalCheckpointError`, `CloseOnceClient`, `format_field_path`, `field_citations_from_raw`, and `ToolResultWithImages` for provider integrations.
 
-Pulls the extract scorer into alignment with the internal LlamaCloud benchmark
-harness ahead of the first PyPI release.
+### Evaluation
 
-### Added
-- Register `llamaextract_agentic_plus_max_effort` with citations, confidence scores,
-  and the same 50-minute API / one-hour per-file timeouts as other LlamaExtract
-  pipelines. Retain billed API usage so Max costs include model charges;
-  costs remain unknown when billing usage is unavailable.
-- `ExtractEvaluator.compute_metrics()` returns an `ExtractMetricBundle`: the
-  headline and diagnostic metrics plus the `ExtractScoringInputs` they scored
-  (post list-unwrap, post EOB layout reconciliation). A harness with its own
-  result model uses it to reuse this package's metric selection and add its
-  own metrics, instead of copying the metric wiring. `evaluate()` is now a
-  thin wrapper over it and reports the same metrics.
-- `ExtractEvaluator.can_evaluate()` compares the product type by value, and
-  accepts any test case carrying extract ground truth (`is_extract_test_case`,
-  also exported from `extensions`) rather than requiring this package's
-  `ExtractTestCase`. A harness's own `InferenceResult` and test-case classes
-  extend its own bases, so the previous `isinstance` guards made the extract
-  metrics unreachable from the harness. A parse or layout case still fails the
-  check, so evaluator routing is unchanged.
+- Unified Value F1 applies declared schema defaults to omitted fields, scores nested primitive arrays as single cells, and uses nested fields when matching rows.
+- Grounding requires citations to cover the full coarse evidence envelope. Invalid predicted boxes count as misses.
+- JSON subset scoring preserves ground truth across runs. In unweighted mode, a nonempty prediction against an empty expected list scores zero.
+- Removed legacy extract metrics. Use unified Value F1 and grounded F1 for the published task.
+- Evaluator crashes and timeouts count as one zero per pipeline and document. Stalled workers restart for datasets with sidecars up to 1 MiB.
+- Added `confidence_signal_coverage` to report the share of emitted scalar fields with finite confidence scores.
+- Added `FieldEvidence.layer` for evidence geometry and support for `layout_line` and `layout_word` rules.
 
-### Scoring (changes evaluation numbers)
-- Unified extract F1: a key omitted from a prediction resolves to the JSON
-  Schema `default` when the property declares one; without a default it is a
-  one-sided miss rather than an implicit `null` prediction. Omitted, explicit
-  `null` and `0` are three distinct cells (`0 != null`; an omitted key equals
-  `0` only under `"default": 0`). Defaulted fields omitted on both sides count
-  as matches.
-- Unified extract F1: nested primitive arrays (`tags: ["a", "b"]`) score as one
-  opaque cell instead of being dropped from the cell count.
-- Unified extract F1: Hungarian row pairing for object arrays counts nested
-  object children and nested object arrays in the assignment cost, and reads
-  nested leaves through the same schema-default lookup as scoring, so rows are
-  aligned on the full leaf set F1 actually grades.
-- Unified grounding: envelope match mode (`bbox_match_mode="envelope"`, the
-  default). A `coarse` evidence entry is graded as an AND over the precise
-  boxes it encloses on its page; a citation must cover the whole envelope, not
-  one of its lines. Identical to the previous behaviour on ground truth with no
-  coarse entries.
-- Unified grounding: non-finite or non-positive predicted boxes score as
-  misses instead of propagating `NaN` through IoU.
-- JSON subset match: ground truth is no longer mutated during scoring (a second
-  pass over the same objects saw a stripped nested `check_number`). Unweighted
-  mode scores an empty expected list against a non-empty actual list as 0.
-- Removed the extract-side metrics that cannot fire on the published ground
-  truth (every sidecar is v0.2 `_field_rules`): the legacy element-pass-rate /
-  loc / attr / `extract_avg_iou*` family, bare `precision` / `recall` / `f1` /
-  `iou` / `bbox_recall`, `record_*`, `null_hallucination_rate`,
-  `extract_field_value_pass_rate`, `schema_field_accuracy_*`, extract-side
-  `rule_pass_rate` / `rule_array_*`, and `association_f1`. `extract_unified_*`,
-  `extract_evidence_*`, `accuracy`, `array_record_*` and
-  `confidence_scoped_*` are unchanged.
-- Evaluation failures count. A document whose evaluator worker crashes or
-  times out becomes one zero-scored row for that pipeline, with
-  `evaluation_worker_error` or `evaluation_timeout` in the metric metadata,
-  instead of being dropped from the denominator. Failure rows are keyed by
-  `(pipeline, test_id)`, so a retried inference that logged one `_errors.json`
-  entry per attempt is penalized once, not once per attempt.
-- The per-worker evaluation timeout now fires. It was written against
-  `as_completed`, which only yields finished futures, so it could never elapse
-  and one hung document held a run open indefinitely. The pool is drained with
-  a progress-based stall window (8 minutes with nothing completing), stalled
-  workers are terminated, and queued work is re-submitted to a fresh pool. The
-  guard is enabled only when every selected ground-truth sidecar is at most
-  1 MiB, so citation-heavy long documents are never cut off.
+### CLI and providers
 
-### Added
-- Extension points matching the ones `parse-bench` already exposes, so a
-  downstream harness can keep its private providers, products and adapters in
-  its own package instead of forking this one:
-  `register_product_type` (a registered name validates anywhere a product type
-  is declared and behaves like a `ProductType` member), `register_output_model`
-  (a normalized output model for that product, dispatched on `task_type` so
-  saved results round-trip through JSON), and `register_pipeline_resolver` (the
-  harness's own pipeline registry resolves a result's `pipeline_name` to a
-  provider key before the package registry is consulted). All re-exported from
-  `extract_bench.extensions`; `ProductType` is now a `StrEnum`.
-- `GradedCell` and the `graded_cells=` side-channel on
-  `compute_unified_evidence_metrics`: collects the per-cell page/bbox verdicts
-  the Hungarian pass already computes and would otherwise discard, so a caller
-  explaining a wrong citation does not re-score the document once per citation.
-  Scores and metric metadata are identical whether or not cells are collected.
-- `ProviderTerminalCheckpointError` (a permanent error naming a remote
-  checkpoint that cannot be resumed), `CloseOnceClient` (exact-once `close()`
-  over a shared client), `format_field_path` (public, was `_format_field_path`),
-  `field_citations_from_raw`, and `ToolResultWithImages` — shared with the
-  providers a downstream harness co-owns.
-- `FieldEvidence.layer` names the bbox geometry when the same location is
-  annotated more than once (`word`, `structural`, `checkbox`, ...), so ground
-  truth written for the internal harness loads unchanged. Unknown names are
-  rejected at load time. The headline grounded F1 ORs every box regardless of
-  layer; per-layer metrics are not emitted.
-- `deepseek_v4_1_flash_extract_oneshot_structured_output_file` pipeline:
-  DeepSeek-V4.1-Flash over page images with thinking disabled
-  (`DEEPSEEK_API_KEY`).
-- `test_rules` entries typed `layout_line` / `layout_word` load as layout rules
-  with the matching granularity.
-- `extract-bench dataset lint <dir>`: fail-closed gate over every extract
-  `.test.json` in a tree. Ground truth must conform to its `data_schema`, field
-  rules must live in one `_field_rules` container with resolvable paths, and row
-  identity must sit beside the schema as `_eval_row_identity`. Exit 1 on any
-  finding, exit 2 when the tree holds no extract sidecar.
-- `extract-bench evaluation score_case <test.json> <prediction.json>`: score a
-  single prediction against one test case and print the value-F1 metrics as
-  JSON, for interactive harnesses that do not produce a results directory.
-- `confidence_signal_coverage` metric: the share of emitted scalar leaves that
-  carry a finite confidence score, with per-document and aggregate counts in the
-  grounded-confidence payloads.
-- Non-LlamaCloud providers receive the document under a random basename
-  (`report-3f9a….pdf`) staged from the same bytes, so a dataset filename cannot
-  leak what a document is to a hosted model or an agent's prompt. The saved
-  request keeps the benchmark path. Recorded in `_metadata.json` as
-  `randomize_external_filenames`; a pipeline opts out with
-  `randomize_external_filename: false`.
-- `Provider.recompute_cost(raw_output)`: a provider-agnostic re-pricing seam
-  called by `inference renormalize`, so a corrected rate table re-prices saved
-  runs without new inference. Implemented for the OpenAI Responses and Codex
-  providers.
-- Pricing rows for `gpt-5.5`, `gpt-5.6-sol` / `-terra` / `-luna`,
-  `gemini-3.5-flash-lite` and `gemini-3.1-pro`. The Codex `gpt-5.6-sol` row is
-  corrected from 5.00/0.50/30.00 to 4.00/0.40/20.00 per million tokens.
-- Codex provider: `retry_empty_output` treats an all-null `output.json` as a
-  transient failure and retries; `extra_instructions` appends pipeline-specific
-  lines to the task prompt.
-- Claude Code provider: `non_zdr: true` authenticates with
-  `ANTHROPIC_NON_ZDR_API_KEY` for models unavailable under zero-data-retention.
-- `glm_deepinfra_extract` provider and the
-  `glm_5_3_flash_deepinfra_extract_oneshot_structured_output_file` pipeline:
-  GLM-5.3-Flash served by DeepInfra over page images (`DEEPINFRA_API_KEY`). The
-  z.ai pipeline is unchanged and remains the leaderboard row.
-- Packaging for PyPI: the version is read from `extract_bench.__version__` at
-  build time, the sdist carries only the package, tests, README, LICENSE and
-  this changelog, and the package ships a `py.typed` marker. Per-provider
-  extras (`llamaextract`, `openai`, `anthropic`, `google`, `openweights`,
-  `reducto`, `extend`, `datalab`, `landingai`, `azure`, `aws`, `local`) install
-  one system's SDK; `runners` remains their union. Releases are published by
-  `.github/workflows/publish.yml` on a `v*` tag (see `docs/releasing.md`).
-- `extract-bench version` prints the installed version.
-- `extract_bench.extensions` collects the public registration hooks
-  (`register_provider`, `register_pipeline`, `register_layout_adapter`,
-  `register_layout_label_mapper`) for harnesses built on the package.
+- Added `dataset lint` to validate extraction test cases and `evaluation score_case` to score a single prediction.
+- Dataset discovery deduplicates same-stem inputs, skips artifact directories, and recognizes versioned dataset paths. `evaluation run` accepts a pipeline output root directly.
+- External providers receive randomized filenames by default. Set `randomize_external_filename: false` to opt out.
+- `inference renormalize` can reprice saved OpenAI Responses and Codex results.
+- Added DeepSeek V4.1 Flash and DeepInfra GLM-5.3 Flash pipelines and updated OpenAI and Gemini pricing.
+- Codex can retry all-null output and accept pipeline-specific prompt instructions. Claude Code supports `non_zdr: true`.
+- Fixed Extend schema submission for properties named `id` and arrays of empty objects.
+- Removed the `tqdm` dependency.
 
-### Removed
-- The unused `tqdm` dependency.
-
-### Fixed
-- Extend: a schema property named `id` (reserved by Extend) is aliased in the
-  submitted schema and restored in the result, and an array whose items are an
-  empty object is wrapped like a primitive array. Both shapes previously failed
-  at processor creation.
-
-### Fixed
-- Dataset discovery keeps one input per stem and directory. A sibling `.png`
-  saved beside `<stem>.pdf` used to collide on `test_id` and on the shared
-  `.test.json`, so which twin was scored depended on iteration order.
-- Per-document artifact directories (`<stem>.parse/`, `<stem>.pdf.images/`,
-  `<stem>.v2.screenshots/`) no longer flip a flat dataset into grouped mode.
-- Dataset names split into base and version at the last version-like segment,
-  so `extract/short/v0.2` files under `extract/short` instead of `extract`.
-- `evaluation run` pointed directly at a pipeline output root (one holding
-  `_metadata.json`) treats it as that pipeline rather than scanning its document
-  groups as if they were pipelines. `*.result.json` files inside
-  `<document>.images/` artifact bundles are no longer scored as documents.
+[Unreleased]: https://github.com/run-llama/ExtractBench/compare/v1.0.0...main
+[1.0.0]: https://github.com/run-llama/ExtractBench/tree/v1.0.0
+[#74]: https://github.com/run-llama/ExtractBench/pull/74
+[#75]: https://github.com/run-llama/ExtractBench/pull/75
+[#76]: https://github.com/run-llama/ExtractBench/pull/76
+[#77]: https://github.com/run-llama/ExtractBench/pull/77
+[#81]: https://github.com/run-llama/ExtractBench/pull/81
+[#85]: https://github.com/run-llama/ExtractBench/pull/85
+[#86]: https://github.com/run-llama/ExtractBench/pull/86
+[#87]: https://github.com/run-llama/ExtractBench/pull/87
+[#89]: https://github.com/run-llama/ExtractBench/pull/89
+[#90]: https://github.com/run-llama/ExtractBench/pull/90
+[#91]: https://github.com/run-llama/ExtractBench/pull/91
+[#98]: https://github.com/run-llama/ExtractBench/pull/98
+[#101]: https://github.com/run-llama/ExtractBench/pull/101
+[#104]: https://github.com/run-llama/ExtractBench/pull/104
+[#105]: https://github.com/run-llama/ExtractBench/pull/105
+[#107]: https://github.com/run-llama/ExtractBench/pull/107
+[#108]: https://github.com/run-llama/ExtractBench/pull/108
+[#113]: https://github.com/run-llama/ExtractBench/pull/113
+[#114]: https://github.com/run-llama/ExtractBench/pull/114
+[#116]: https://github.com/run-llama/ExtractBench/pull/116
+[#120]: https://github.com/run-llama/ExtractBench/pull/120
+[#122]: https://github.com/run-llama/ExtractBench/pull/122
+[#124]: https://github.com/run-llama/ExtractBench/pull/124
+[#126]: https://github.com/run-llama/ExtractBench/pull/126
+[#127]: https://github.com/run-llama/ExtractBench/pull/127
+[#128]: https://github.com/run-llama/ExtractBench/pull/128
+[#130]: https://github.com/run-llama/ExtractBench/pull/130
