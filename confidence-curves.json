@@ -762,5 +762,6 @@
     79.899156
    ]
   }
- ]
+ ],
+ "sampling": "Samples at 0.05 percentage-point intervals from 1% through 7% allowed error, matching the published chart. This is a display range, not the full curve or a scoring limit; values outside it are not provided."
 }
