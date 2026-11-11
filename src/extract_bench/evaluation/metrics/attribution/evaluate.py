@@ -16,12 +16,13 @@ import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from extract_bench.evaluation.layout_adapters import create_layout_adapter_for_result
-from extract_bench.evaluation.metrics.attribution.core import (
+from parse_bench.evaluation.metrics.attribution.core import (
     AttributionResult,
     compute_attribution_metrics,
     parse_gt_elements,
 )
+
+from extract_bench.evaluation.layout_adapters import create_layout_adapter_for_result
 from extract_bench.schemas.layout_detection_output import LayoutPrediction
 from extract_bench.schemas.pipeline_io import InferenceResult
 

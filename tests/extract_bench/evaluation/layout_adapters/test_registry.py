@@ -193,3 +193,38 @@ def test_duplicate_key_raises_before_first_registry_read():
         "    raise SystemExit('duplicate registration did not raise')\n"
     )
     subprocess.run([sys.executable, "-c", code], check=True)
+
+
+@requires_adapters
+def test_llamaparse_typed_page_scores_only_explicit_segments() -> None:
+    from extract_bench.evaluation.layout_adapters.adapters import LlamaParseLayoutAdapter
+
+    box = {"x": 360, "y": 95, "w": 180, "h": 10, "label": "text", "confidence": 1.0}
+    result = _make_result()
+    assert isinstance(result.output, ParseOutput)
+    result.output.layout_pages = [
+        ParseLayoutPageIR.model_validate(
+            {
+                "page_number": 1,
+                "width": 900,
+                "height": 200,
+                "items": [
+                    {
+                        "value": "Region total",
+                        "bbox": box,
+                        "layout_segments": [{**box, "r": 90}],
+                    },
+                    {
+                        "value": "Item without segment attribution",
+                        "bbox": box,
+                    },
+                ],
+            }
+        )
+    ]
+    adapter = LlamaParseLayoutAdapter()
+    output = adapter.to_layout_output(result)
+
+    blocks = adapter.to_attribution_blocks(output, page_number=1)
+
+    assert [(block.text, block.r) for block in blocks] == [("Region total", 90)]

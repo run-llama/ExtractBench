@@ -6,17 +6,18 @@ import re
 from dataclasses import dataclass
 from typing import Any, cast
 
-from extract_bench.evaluation.layout_adapters.base import LayoutAdapter
-from extract_bench.evaluation.layout_adapters.registry import register_layout_adapter
-from extract_bench.evaluation.metrics.attribution.core import (
+from parse_bench.evaluation.metrics.attribution.core import (
     PredBlock,
     parse_pred_blocks,
 )
-from extract_bench.evaluation.metrics.attribution.text_utils import (
+from parse_bench.evaluation.metrics.attribution.text_utils import (
     extract_text_from_html,
     normalize_attribution_text,
     tokenize,
 )
+
+from extract_bench.evaluation.layout_adapters.base import LayoutAdapter
+from extract_bench.evaluation.layout_adapters.registry import register_layout_adapter
 from extract_bench.inference.layout_extraction import (
     extract_all_layouts_from_llamaparse_output,
 )
@@ -1101,6 +1102,9 @@ class DoclingParseLayoutAdapter(LayoutAdapter):
                         normalized_text=normalized_text,
                         tokens=tokenize(normalized_text),
                         order_index=item_index,
+                        r=seg.r,
+                        page_width=page.width if page.width is not None else layout_output.image_width,
+                        page_height=page.height if page.height is not None else layout_output.image_height,
                     )
                 )
 

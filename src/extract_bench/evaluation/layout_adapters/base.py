@@ -4,12 +4,13 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-from extract_bench.evaluation.metrics.attribution.core import PredBlock
-from extract_bench.evaluation.metrics.attribution.text_utils import (
+from parse_bench.evaluation.metrics.attribution.core import PredBlock
+from parse_bench.evaluation.metrics.attribution.text_utils import (
     extract_text_from_html,
     normalize_attribution_text,
     tokenize,
 )
+
 from extract_bench.schemas.layout_detection_output import LayoutOutput
 from extract_bench.schemas.pipeline_io import InferenceResult
 from extract_bench.test_cases.schema import TestCase
@@ -89,6 +90,9 @@ class LayoutAdapter(ABC):
                     normalized_text=normalized_text,
                     tokens=tokens,
                     order_index=order_index,
+                    r=prediction.r,
+                    page_width=layout_output.image_width,
+                    page_height=layout_output.image_height,
                 )
             )
 

@@ -8,6 +8,11 @@ All notable changes to `llama-extract-bench` are recorded here. The format follo
 
 ### Evaluation
 
+- Layout diagnostics now import the attribution scorer from
+  `parse_bench.evaluation.metrics.attribution`, which is also the new import
+  path for attribution helpers. Diagnostics inherit ParseBench's HTML table
+  handling, rotated box overlap, and treatment of a missing reading-order
+  index as zero. Saved LlamaParse layout pages can be scored from typed segments.
 - Exclude object and array confidence citations from field confidence metrics.
   Scorer version `2026-11-10` retains scalar-array elements and explicit nulls;
   cached runs with container confidence need rescoring before comparison.

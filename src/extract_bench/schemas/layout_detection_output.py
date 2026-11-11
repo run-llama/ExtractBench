@@ -466,6 +466,7 @@ class LayoutPrediction(BaseModel):
     """Provider-agnostic layout prediction."""
 
     bbox: list[float] = Field(description="[x1, y1, x2, y2] in pixel coordinates")
+    r: float | None = Field(default=None, description="Clockwise rotation in degrees around the literal box center")
     score: float = Field(ge=0.0, le=1.0, description="Confidence score")
     label: str = Field(description="Raw provider label")
     page: int | None = Field(default=None, description="1-indexed page number")

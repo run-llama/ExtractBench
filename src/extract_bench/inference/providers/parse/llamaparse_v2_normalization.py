@@ -521,6 +521,8 @@ def build_layout_pages_from_pages_payload(pages_payload: Any) -> list[ParseLayou
 
 def layout_pages_to_legacy_pages_payload(
     layout_pages: Sequence[ParseLayoutPageIR],
+    *,
+    include_bbox_segment_fallback: bool = True,
 ) -> list[dict[str, Any]]:
     """Convert typed layout pages into legacy pages payload consumed by layout extractors."""
     legacy_pages: list[dict[str, Any]] = []
@@ -561,7 +563,7 @@ def layout_pages_to_legacy_pages_payload(
                 item_data["layoutAwareBbox"] = [
                     _segment_to_legacy_bbox(segment, include_span=True) for segment in item.layout_segments
                 ]
-            elif item.bbox is not None:
+            elif include_bbox_segment_fallback and item.bbox is not None:
                 # Preserve legacy fallback behavior where a single bBox can act as segment.
                 item_data["layoutAwareBbox"] = [_segment_to_legacy_bbox(item.bbox, include_span=True)]
             items.append(item_data)
@@ -640,6 +642,8 @@ def _segment_to_legacy_bbox(
         "confidence": segment.confidence,
         "label": segment.label,
     }
+    if segment.r is not None:
+        payload["r"] = segment.r
     if include_span:
         payload["startIndex"] = segment.start_index
         payload["endIndex"] = segment.end_index
