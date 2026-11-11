@@ -60,11 +60,11 @@ In the official benchmark, documents that fail or exceed a 30-minute limit score
 | 5 | LlamaExtract Agentic | LlamaExtract | 95.65 | 96.06 | 94.79 | **94.73** | 3.12¢ |
 | 6 | Codex (GPT-6.1 Sol) | Coding Agents | 95.31 | 97.01 | 92.96 | 85.46 | 7.13¢ |
 | 7 | Claude Code (Sonnet 5.5) | Coding Agents | 94.68 | 96.22 | 92.97 | 83.69 | 5.69¢ |
-| 8 | Codex (GPT-6 Sol) | Coding Agents | 94.57 | 95.99 | 92.42 | 87.25 | 9.80¢ |
-| 9 | Pulse (Non-effort) | Specialized APIs | 94.51 | 95.39 | 92.49 | 93.31 | 3.00¢ |
-| 10 | Codex (GPT-6.1 Terra) | Coding Agents | 94.28 | 96.26 | 91.86 | 81.21 | 4.68¢ |
+| 8 | KYNEX (GPT-6.1 Sol) | Coding Agents | 94.63 | 96.04 | 93.14 | 84.18 | 9.35¢ |
+| 9 | Codex (GPT-6 Sol) | Coding Agents | 94.57 | 95.99 | 92.42 | 87.25 | 9.80¢ |
+| 10 | Pulse (Non-effort) | Specialized APIs | 94.51 | 95.39 | 92.49 | 93.31 | 3.00¢ |
 
-Top 10 of 50 ranked systems — all results in [leaderboard.csv](leaderboard.csv).
+Top 10 of 51 ranked systems — all results in [leaderboard.csv](leaderboard.csv).
 <!-- LEADERBOARD:END -->
 
 <!-- GROUNDING:START -->
@@ -89,7 +89,7 @@ Top 10 of 50 ranked systems — all results in [leaderboard.csv](leaderboard.csv
   </tbody>
 </table>
 
-Top 10 of 50 ranked systems — all results in [leaderboard.csv](leaderboard.csv).
+Top 10 of 51 ranked systems — all results in [leaderboard.csv](leaderboard.csv).
 <!-- GROUNDING:END -->
 
 ### ExtractBench Pro leaderboard
