@@ -64,7 +64,7 @@ In the official benchmark, documents that fail or exceed a 30-minute limit score
 | 9 | Codex (GPT-6 Sol) | Coding Agents | 94.57 | 95.99 | 92.42 | 87.25 | 9.80¢ |
 | 10 | Pulse (Non-effort) | Specialized APIs | 94.51 | 95.39 | 92.49 | 93.31 | 3.00¢ |
 
-Top 10 of 54 ranked systems — all results in [leaderboard.csv](leaderboard.csv).
+Top 10 of 53 ranked systems — all results in [leaderboard.csv](leaderboard.csv).
 <!-- LEADERBOARD:END -->
 
 <!-- GROUNDING:START -->
@@ -89,7 +89,7 @@ Top 10 of 54 ranked systems — all results in [leaderboard.csv](leaderboard.csv
   </tbody>
 </table>
 
-Top 10 of 54 ranked systems — all results in [leaderboard.csv](leaderboard.csv).
+Top 10 of 53 ranked systems — all results in [leaderboard.csv](leaderboard.csv).
 <!-- GROUNDING:END -->
 
 ### ExtractBench Pro leaderboard
