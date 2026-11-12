@@ -169,3 +169,30 @@ def test_non_polling_parse_ignores_poll_config(tmp_path: Path, interval: str | N
     request = InferenceRequest(example_id="blank", source_file_path=str(pdf), product_type=ProductType.PARSE)
     result = provider.run_inference(pipeline, request)
     assert result.raw_output["pages"] == [{"page_index": 0, "text": ""}]
+
+
+def test_closed_async_loop_does_not_skip_provider_cancellation(tmp_path: Path) -> None:
+    import asyncio
+
+    from extract_bench.inference.limits import ExecutionBudget
+
+    provider = Mock()
+    pipeline = PipelineSpec(pipeline_name="test", provider_name="test", product_type=ProductType.EXTRACT)
+    runner = InferenceRunner(provider=provider, pipeline=pipeline, output_dir=tmp_path, use_rich=False)
+    budget = ExecutionBudget()
+    loop = asyncio.new_event_loop()
+
+    async def finished() -> None:
+        return None
+
+    task = loop.create_task(finished())
+    loop.run_until_complete(task)
+    loop.close()
+    budget._tasks[task] = loop
+    runner._execution_budgets["doc"] = budget
+    try:
+        runner._signal_cancel_and_cancel_future("doc", Future())
+        provider.cancel.assert_called_once_with("doc")
+        assert budget.cancelled.is_set()
+    finally:
+        runner.shutdown()

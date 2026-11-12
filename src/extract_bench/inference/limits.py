@@ -37,7 +37,13 @@ class ExecutionBudget:
         self.cancelled.set()
         with self._lock:
             for task, loop in self._tasks.items():
-                loop.call_soon_threadsafe(task.cancel)
+                try:
+                    loop.call_soon_threadsafe(task.cancel)
+                except RuntimeError:
+                    # A loop can close while its task is being unregistered.
+                    # Other loops and provider cancellation still need signaling.
+                    if not loop.is_closed():
+                        raise
 
     def wait(self, seconds: float) -> None:
         self.cancelled.wait(min(seconds, self.remaining()))

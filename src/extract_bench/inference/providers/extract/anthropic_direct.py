@@ -283,11 +283,12 @@ class AnthropicDirectExtractProvider(Provider):
             content, use_pdf_beta = self._message_content(source_path)
         else:
             raise ProviderPermanentError("_call_api requires source_path or document_text")
+        remaining = execution_budget().remaining()
         kwargs = {
             "model": self._model,
             "max_tokens": self._max_tokens,
             "system": self._system_prompt,
-            "timeout": httpx.Timeout(execution_budget().remaining(), connect=5.0),
+            "timeout": httpx.Timeout(remaining, connect=min(5.0, remaining)),
             "messages": [{"role": "user", "content": content}],
             "output_config": self._output_config(schema),
             **self._extra_kwargs(),
