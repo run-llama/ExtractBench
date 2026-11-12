@@ -28,7 +28,6 @@ def _pipeline_spec(
         provider_name=provider_name,
         product_type=ProductType.EXTRACT,
         config=config,
-        per_file_timeout=EXTRACT_HARD_TIMEOUT_S,
     )
 
 

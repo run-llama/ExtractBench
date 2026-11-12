@@ -51,7 +51,11 @@ def test_registered_extract_pipelines_do_not_shorten_the_shared_deadline() -> No
 
     pipelines: list[PipelineSpec] = []
     register_extract_pipelines(pipelines.append)
-    offenders = {p.pipeline_name: p.per_file_timeout for p in pipelines if p.per_file_timeout != EXTRACT_HARD_TIMEOUT_S}
+    offenders = {
+        p.pipeline_name: p.per_file_timeout
+        for p in pipelines
+        if p.per_file_timeout not in (None, EXTRACT_HARD_TIMEOUT_S)
+    }
     assert offenders == {}
 
 
