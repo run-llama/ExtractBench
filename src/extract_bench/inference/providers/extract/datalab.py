@@ -12,6 +12,7 @@ normalized ``FieldCitation`` entries with COCO ``[x, y, w, h]`` bboxes in
 import asyncio
 import dataclasses
 import json
+import math
 import os
 from collections.abc import Mapping, Sequence
 from datetime import datetime
@@ -22,7 +23,7 @@ from datalab_sdk import AsyncDatalabClient
 from datalab_sdk.models import ExtractOptions
 from pypdf import PdfReader
 
-from extract_bench.inference.limits import DEFAULT_POLL_INTERVAL_S, EXTRACT_HARD_TIMEOUT_S, execution_budget
+from extract_bench.inference.limits import execution_budget
 from extract_bench.inference.providers.base import (
     Provider,
     ProviderConfigError,
@@ -49,8 +50,6 @@ DATALAB_EXTRACT_COST_PER_PAGE_USD = {
     "balanced": 0.015,
     "accurate": 0.02,
 }
-#: The runner owns the document deadline across extraction and scoring stages.
-DEFAULT_MAX_POLLS = int(EXTRACT_HARD_TIMEOUT_S / DEFAULT_POLL_INTERVAL_S)
 
 
 @register_provider("datalab_extract")
@@ -87,11 +86,6 @@ class DatalabExtractProvider(Provider):
               block ``id`` + ``bbox``) is available for citation resolution.
             - ``save_checkpoint``: Save a checkpoint after processing.
             - ``skip_cache``: Bypass server-side cache (default: False).
-            - ``max_polls``: Polling budget passed to the SDK
-              (SDK default is 300 = 5 minutes at 1s/poll). The runner's
-              per-file timeout is the deadline every pipeline shares, so the
-              bench provider defaults to ``DEFAULT_MAX_POLLS``. The shared
-              elapsed-time budget also covers HTTP calls and confidence polling.
             - ``poll_interval``: Seconds between polls (default: 3).
         """
         super().__init__(provider_name, base_config)
@@ -121,7 +115,8 @@ class DatalabExtractProvider(Provider):
         self._output_format = self.base_config.get("output_format", "json")
         self._save_checkpoint = self.base_config.get("save_checkpoint", False)
         self._skip_cache = self.base_config.get("skip_cache", False)
-        self._max_polls = int(self.base_config.get("max_polls", DEFAULT_MAX_POLLS))
+        if not math.isfinite(self._poll_interval) or self._poll_interval <= 0:
+            raise ProviderConfigError("poll_interval must be positive and finite")
 
     async def _extract_pdf_async(self, pdf_path: str, schema: dict[str, Any]) -> dict[str, Any]:
         """Call Datalab Extract and return the full response as a plain dict."""
@@ -144,11 +139,13 @@ class DatalabExtractProvider(Provider):
                 options.page_range = self._page_range
 
             async with AsyncDatalabClient(api_key=self._api_key) as client:
+                # The SDK accepts a poll count, not a deadline. Size its sleep
+                # allowance from the remaining budget; run_async owns the cutoff.
                 result = await client.extract(
                     pdf_path,
                     options=options,
-                    max_polls=self._max_polls,
-                    poll_interval=int(self._poll_interval),
+                    max_polls=math.ceil(execution_budget().remaining() / self._poll_interval),
+                    poll_interval=self._poll_interval,  # type: ignore[arg-type]
                 )
 
             raw_response: dict[str, Any] = dataclasses.asdict(result)

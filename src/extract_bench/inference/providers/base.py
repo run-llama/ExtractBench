@@ -2,6 +2,7 @@ import asyncio
 import concurrent.futures
 from abc import ABC, abstractmethod
 from collections.abc import Coroutine
+from functools import cached_property
 from typing import Any
 
 from extract_bench.inference.limits import DEFAULT_POLL_INTERVAL_S
@@ -108,9 +109,17 @@ class Provider(ABC):
         """
         self._provider_name = provider_name
         self._base_config = base_config or {}
-        self._poll_interval = float(
-            self._base_config.get(self._poll_interval_config_key, self._default_poll_interval_s)
-        )
+
+    @cached_property
+    def _poll_interval(self) -> float:
+        """Resolve polling config only for providers that actually use it."""
+        value = self._base_config.get(self._poll_interval_config_key)
+        if value is None:
+            return self._default_poll_interval_s
+        try:
+            return float(value)
+        except (TypeError, ValueError) as exc:
+            raise ProviderConfigError(f"{self._poll_interval_config_key} must be a number or None") from exc
 
     @property
     def provider_name(self) -> str:

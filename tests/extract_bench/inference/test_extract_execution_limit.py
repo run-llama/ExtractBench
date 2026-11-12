@@ -152,3 +152,20 @@ def test_pipeline_factory_rejects_provider_budget_that_conflicts_with_runner(key
 
     with pytest.raises(ValueError, match=f"{key} must equal"):
         _pipeline_spec(pipeline_name="test", provider_name="test", config={key: seconds})
+
+
+@pytest.mark.parametrize("interval", [None, "unused"])
+def test_non_polling_parse_ignores_poll_config(tmp_path: Path, interval: str | None) -> None:
+    from pypdf import PdfWriter
+
+    from extract_bench.inference.providers.parse.pypdf import PyPDFProvider
+
+    pdf = tmp_path / "blank.pdf"
+    writer = PdfWriter()
+    writer.add_blank_page(width=100, height=100)
+    writer.write(pdf)
+    provider = PyPDFProvider("pypdf", {"poll_interval": interval})
+    pipeline = PipelineSpec(pipeline_name="pypdf", provider_name="pypdf", product_type=ProductType.PARSE)
+    request = InferenceRequest(example_id="blank", source_file_path=str(pdf), product_type=ProductType.PARSE)
+    result = provider.run_inference(pipeline, request)
+    assert result.raw_output["pages"] == [{"page_index": 0, "text": ""}]
