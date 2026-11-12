@@ -25,6 +25,7 @@ from typing import Any
 
 from openai import OpenAI
 
+from extract_bench.inference.limits import EXTRACT_HARD_TIMEOUT_S, execution_budget
 from extract_bench.inference.providers.base import (
     Provider,
     ProviderConfigError,
@@ -207,7 +208,7 @@ class VLLMExtractProvider(Provider):
         - additional_properties_false (bool, default True): close every object.
         - schema_name (str, default "extraction"): json_schema name field.
         - strict (bool, default False): json_schema strict flag.
-        - timeout_s (float, default 900): request timeout.
+        - timeout_s (float, default 10800): request timeout.
         - input_price_per_1m / output_price_per_1m (float, default 0.0):
           self-hosted, so cost defaults to 0; override to attribute compute.
         - max_cost_usd (float | None): optional per-doc budget flag.
@@ -249,7 +250,9 @@ class VLLMExtractProvider(Provider):
         self._strict: bool = bool(self.base_config.get("strict", False))
         self._system_prompt: str = self.base_config.get("system_prompt", DEFAULT_SYSTEM_PROMPT)
         self._user_instruction: str = self.base_config.get("user_instruction", DEFAULT_USER_INSTRUCTION)
-        self._timeout_s: float = float(self.base_config.get("timeout_s", self.base_config.get("timeout", 900.0)))
+        self._timeout_s: float = float(
+            self.base_config.get("timeout_s", self.base_config.get("timeout", EXTRACT_HARD_TIMEOUT_S))
+        )
         self._max_cost_usd: float | None = self.base_config.get("max_cost_usd")
 
         self._input_price_per_1m: float = float(self.base_config.get("input_price_per_1m", 0.0))
@@ -424,7 +427,10 @@ class VLLMExtractProvider(Provider):
             ],
             "response_format": self._response_format(schema),
         }
-        response = self._client.chat.completions.create(**kwargs)
+        response = self._client.chat.completions.create(
+            **kwargs,
+            timeout=min(self._timeout_s, execution_budget().remaining()),
+        )
 
         choice = response.choices[0]
         finish_reason = getattr(choice, "finish_reason", None)
@@ -582,9 +588,12 @@ class VLLMExtractProvider(Provider):
         cur_schema = schema
         compact = False
         out_budget = self._max_tokens
+        budget = execution_budget()
         while True:
+            budget.remaining()
             try:
-                out = self._call_api(cur_schema, pages, max_tokens=out_budget, compact_schema=compact)
+                with budget.activate():
+                    out = self._call_api(cur_schema, pages, max_tokens=out_budget, compact_schema=compact)
                 if dropped:
                     out["pages_truncated"] = dropped
                     out["pages_sent"] = len(pages)

@@ -17,6 +17,7 @@ from typing import Any
 
 import httpx
 
+from extract_bench.inference.limits import EXTRACT_HARD_TIMEOUT_S
 from extract_bench.inference.providers.base import (
     Provider,
     ProviderConfigError,
@@ -43,8 +44,7 @@ logger = logging.getLogger(__name__)
 
 _PRODUCTION_BASE_URL = "https://api.cloud.llamaindex.ai"
 
-_DEFAULT_TIMEOUT = 600
-_POLL_INTERVAL = 3
+_DEFAULT_TIMEOUT = EXTRACT_HARD_TIMEOUT_S
 _TERMINAL_STATUSES = {"COMPLETED", "FAILED", "CANCELLED"}
 
 # Pipeline config keys handled by this provider (not forwarded to extract config)
@@ -559,7 +559,7 @@ class LlamaExtractV2Provider(Provider):
                     "spawned_parse_job_id": spawned_parse_job_id,
                 }
 
-            time.sleep(_POLL_INTERVAL)
+            time.sleep(self._poll_interval)
 
 
 def _guess_mime(path: Path) -> str:

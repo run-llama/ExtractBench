@@ -25,6 +25,7 @@ from typing import Any
 
 from filelock import FileLock, Timeout
 
+from extract_bench.inference.limits import EXTRACT_HARD_TIMEOUT_S
 from extract_bench.inference.providers.base import (
     Provider,
     ProviderConfigError,
@@ -178,11 +179,11 @@ async def _extract_async(
 
 @register_provider("kynex_extract")
 class KynexExtractProvider(Provider):
-    """KYNEX extraction with a per-document timeout (default: 1800 seconds)."""
+    """KYNEX extraction with a per-document timeout (default: 10800 seconds)."""
 
     def __init__(self, provider_name: str, base_config: dict[str, Any] | None = None):
         super().__init__(provider_name, base_config)
-        self._timeout = int(self.base_config.get("timeout", 1800))
+        self._timeout = int(self.base_config.get("timeout", EXTRACT_HARD_TIMEOUT_S))
 
     def run_inference(self, pipeline: Any, request: InferenceRequest) -> RawInferenceResult:
         if request.product_type != ProductType.EXTRACT:

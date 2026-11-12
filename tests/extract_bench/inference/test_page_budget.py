@@ -222,9 +222,8 @@ def test_cli_forwards_budget_and_single_worker_uses_gate(tmp_path):
 
 
 @pytest.mark.parametrize("max_documents", [1, 2])
-@pytest.mark.parametrize("timeout_retries", [0, 1])
 @pytest.mark.parametrize("mode", ["test_cases", "files"])
-def test_healthy_documents_execute_after_stuck_attempt(tmp_path, max_documents, timeout_retries, mode):
+def test_healthy_documents_execute_after_stuck_attempt(tmp_path, max_documents, mode):
     cases = pdf_cases(tmp_path, [1, 1, 1])
     spec = PipelineSpec(pipeline_name="mock", provider_name="fake", product_type=ProductType.EXTRACT, config={})
     release = threading.Event()
@@ -259,7 +258,7 @@ def test_healthy_documents_execute_after_stuck_attempt(tmp_path, max_documents, 
         use_rich=False,
         force=True,
         per_file_timeout=0.1,
-        timeout_retries=timeout_retries,
+        timeout_retries=0,
     )
     try:
         if mode == "test_cases":
@@ -268,10 +267,10 @@ def test_healthy_documents_execute_after_stuck_attempt(tmp_path, max_documents, 
             summary = asyncio.run(runner.run_files([case.file_path for case in cases], ProductType.EXTRACT))
         assert not stopped.is_set()
         assert set(started) == {"doc-0", "doc-1", "doc-2"}
-        assert started.count("doc-0") == 1 + timeout_retries
-        assert summary.successful == 2 + timeout_retries
-        assert summary.failed == 1 - timeout_retries
-        assert len(summary.errors) == 1 - timeout_retries
+        assert started.count("doc-0") == 1
+        assert summary.successful == 2
+        assert summary.failed == 1
+        assert len(summary.errors) == 1
         assert [e["example_id"] for e in events(tmp_path) if e["event"] == "admitted"] == ["doc-0", "doc-1", "doc-2"]
     finally:
         release.set()

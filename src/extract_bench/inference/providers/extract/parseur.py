@@ -26,6 +26,7 @@ from typing import Any
 import requests
 from requests.adapters import HTTPAdapter
 
+from extract_bench.inference.limits import EXTRACT_HARD_TIMEOUT_S
 from extract_bench.inference.providers.base import (
     Provider,
     ProviderConfigError,
@@ -413,6 +414,8 @@ class ParseurProvider(Provider):
       the API allows about 5).
     """
 
+    _poll_interval_config_key = "poll_interval_s"
+
     def __init__(self, provider_name: str, base_config: dict[str, Any] | None = None):
         super().__init__(provider_name, base_config)
         api_key = os.getenv("PARSEUR_API_KEY")
@@ -421,10 +424,9 @@ class ParseurProvider(Provider):
 
         self._ai_engine = str(self.base_config.get("ai_engine", DEFAULT_AI_ENGINE))
         self._price_per_page = float(self.base_config.get("price_per_page_usd", 0.0))
-        self._poll_interval = float(self.base_config.get("poll_interval_s", 5.0))
         # The slowest document of a full benchmark run took 1015 s. Past the runner's per-file
-        # timeout (1800 s by default), its retry resumes polling the same document until this budget.
-        self._timeout_s = float(self.base_config.get("timeout_s", 3600.0))
+        # deadline. A transient retry resumes polling the same document within this budget.
+        self._timeout_s = float(self.base_config.get("timeout_s", EXTRACT_HARD_TIMEOUT_S))
         rate = float(self.base_config.get("max_requests_per_second", 4.0))
         self._min_interval = 1.0 / rate if rate > 0 else 0.0
         self._rate_lock = threading.Lock()

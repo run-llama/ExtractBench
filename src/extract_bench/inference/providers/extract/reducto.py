@@ -1,6 +1,7 @@
 """Provider for Reducto EXTRACT."""
 
 import asyncio
+import logging
 import os
 import threading
 from datetime import datetime
@@ -9,6 +10,7 @@ from typing import Any, cast
 
 from reducto import Reducto
 
+from extract_bench.inference.limits import execution_budget
 from extract_bench.inference.providers.base import (
     Provider,
     ProviderConfigError,
@@ -219,25 +221,17 @@ class ReductoExtractProvider(Provider):
         :return: Raw API response as dictionary
         :raises ProviderError: For any API errors
         """
+        budget = execution_budget()
+        client = Reducto(api_key=self._api_key, timeout=budget.remaining(), max_retries=0)
         try:
-            # Initialize Reducto client
-            client = Reducto(api_key=self._api_key)
-
-            # Upload the file
-            upload = await asyncio.to_thread(client.upload, file=Path(pdf_path))
-
-            # Build instructions. Adapt the schema first so any
-            # `repeated_structure` arrays show up in the standard
-            # `properties` dict that Reducto extracts against.
-            instructions: dict[str, Any] = {
-                "schema": _adapt_schema_for_reducto(schema),
-            }
+            if cancel_event is not None and cancel_event.is_set():
+                budget.cancel()
+            upload = await budget.run_async(
+                asyncio.to_thread(client.upload, file=Path(pdf_path), timeout=budget.remaining()),
+            )
+            instructions: dict[str, Any] = {"schema": _adapt_schema_for_reducto(schema)}
             if system_prompt:
                 instructions["system_prompt"] = system_prompt
-
-            # Build settings
-            # Always include settings dict with explicit values (matching test script that works)
-            # This ensures the SDK receives a consistent structure
             settings: dict[str, Any] = {
                 "citations": {"enabled": citations, "numerical_confidence": citations},
                 "array_extract": array_extract,
@@ -247,54 +241,53 @@ class ReductoExtractProvider(Provider):
             }
             if extract_model:
                 settings["alpha"] = {"extract_model": extract_model}
-
-            # Extract the document (run in executor since SDK is synchronous)
-            # Note: Using asyncio.to_thread to run synchronous SDK in thread pool
+            if cancel_event is not None and cancel_event.is_set():
+                budget.cancel()
             if deep_extract:
-                # Deep-extract jobs run for many minutes; the synchronous
-                # `extract.run` endpoint intermittently dies with
-                # 401 AUTH_ERROR ("Invalid access token") when the presigned
-                # upload/job token expires mid-flight. Submit async and poll
-                # the jobs API instead. The harness per-file timeout bounds
-                # the polling loop.
-                # The SDK accepts the upload response model and plain dicts at
-                # runtime; its stubs want the *_params TypedDicts, hence casts.
-                submitted = await asyncio.to_thread(
-                    client.extract.run_job,
-                    input=cast(Any, upload),
-                    instructions=cast(Any, instructions),
-                    settings=cast(Any, settings),
+                # Async jobs avoid expiring presigned tokens on long extracts.
+                # Each stage shares the document deadline, including upload time.
+                submitted = await budget.run_async(
+                    asyncio.to_thread(
+                        client.extract.run_job,
+                        input=cast(Any, upload),
+                        instructions=cast(Any, instructions),
+                        settings=cast(Any, settings),
+                        timeout=budget.remaining(),
+                    ),
                 )
                 job_id = submitted.job_id
-                while True:
-                    if cancel_event is not None and cancel_event.is_set():
-                        # Best-effort server-side cancel so the abandoned job
-                        # stops billing; the SDK may not expose it on all
-                        # versions, hence the guard.
-                        job_cancel = getattr(client.job, "cancel", None)
-                        if callable(job_cancel):
-                            try:
-                                await asyncio.to_thread(job_cancel, job_id)
-                            except Exception:  # noqa: BLE001 - cancel is best-effort
-                                pass
-                        raise ProviderTransientError(f"Reducto deep-extract job {job_id} cancelled by runner timeout")
-                    job = await asyncio.to_thread(client.job.get, job_id)
-                    status = getattr(job, "status", None)
-                    if status == "Completed":
-                        result = job.result
-                        break
-                    if status in ("Failed", "Cancelled"):
-                        reason = getattr(job, "reason", None) or "unknown"
-                        raise ProviderTransientError(f"Reducto deep-extract job {job_id} {status}: {reason}")
-                    await asyncio.sleep(10)
+                try:
+                    while True:
+                        if cancel_event is not None and cancel_event.is_set():
+                            budget.cancel()
+                        job = await budget.run_async(
+                            asyncio.to_thread(client.job.get, job_id, timeout=budget.remaining()),
+                        )
+                        status = getattr(job, "status", None)
+                        if status == "Completed":
+                            result = job.result
+                            break
+                        if status in ("Failed", "Cancelled"):
+                            reason = getattr(job, "reason", None) or "unknown"
+                            raise ProviderTransientError(f"Reducto deep-extract job {job_id} {status}: {reason}")
+                        await budget.run_async(asyncio.sleep(self._poll_interval))
+                except (TimeoutError, asyncio.CancelledError):
+                    # Cancellation is cleanup: give it a bounded request after
+                    # extraction time is exhausted, without submitting new work.
+                    try:
+                        await asyncio.to_thread(client.job.cancel, job_id, timeout=10)
+                    except Exception:
+                        logging.getLogger(__name__).warning("Reducto job cancellation failed", exc_info=True)
+                    raise
             else:
-                # extract.run is overloaded; passing it as a value to
-                # to_thread defeats overload resolution, so cast the callable.
-                result = await asyncio.to_thread(
-                    cast(Any, client.extract.run),
-                    input=upload,
-                    instructions=instructions,
-                    settings=settings,
+                result = await budget.run_async(
+                    asyncio.to_thread(
+                        cast(Any, client.extract.run),
+                        input=upload,
+                        instructions=instructions,
+                        settings=settings,
+                        timeout=budget.remaining(),
+                    ),
                 )
 
             # Capture the original Reducto API response as-is. The result is a
@@ -338,6 +331,8 @@ class ReductoExtractProvider(Provider):
 
             return raw_response
 
+        except TimeoutError:
+            raise
         except Exception as e:
             # Check if it's a transient error (network, timeout, etc.)
             if isinstance(e, ProviderTransientError):
@@ -361,6 +356,8 @@ class ReductoExtractProvider(Provider):
                 raise ProviderTransientError(f"Transient error during extraction: {e}") from e
             else:
                 raise ProviderPermanentError(f"Error during extraction: {e}") from e
+        finally:
+            client.close()
 
     def run_inference(self, pipeline: PipelineSpec, request: InferenceRequest) -> RawInferenceResult:
         """
@@ -463,12 +460,7 @@ class ReductoExtractProvider(Provider):
             raise ProviderPermanentError(f"Unexpected error during inference: {e}") from e
 
     def cancel(self, example_id: str) -> bool:
-        """Signal the in-flight deep-extract poll loop for ``example_id`` to stop.
-
-        The loop observes the flag on its next iteration (≤10s), attempts a
-        best-effort server-side job cancel, and exits — instead of polling as a
-        zombie while the runner's retry submits a duplicate billed job.
-        """
+        """Signal cancellation before another upload, extraction, or job poll."""
         with self._cancel_lock:
             event = self._cancel_events.get(example_id)
         if event is None:

@@ -184,8 +184,8 @@ class InferenceCLI:
             tags: Tags for this run - comma-separated string or list (e.g., 'nightly,production')
             per_file_timeout: Explicit run-level max seconds per file. Overrides any
                 per-pipeline value. None (default) → use the pipeline's per_file_timeout,
-                falling back to 600s.
-            timeout_retries: Number of retries on per-file timeout (default: 0)
+                falling back to 10800s for Extract (maximum); other products retain their defaults.
+            timeout_retries: Number of retries on per-file timeout; Extract requires 0
             shuffle_seed: Reproducible shuffle of sorted test IDs; None preserves input order.
             force_exit_on_completion: Force process exit after inference completes to
                 avoid waiting on zombie provider threads (default: True)

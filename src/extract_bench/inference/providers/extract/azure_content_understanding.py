@@ -6,7 +6,6 @@ import json
 import mimetypes
 import os
 import re
-import time
 from collections.abc import Mapping
 from datetime import datetime
 from pathlib import Path
@@ -15,6 +14,7 @@ from urllib.parse import urlencode, urlparse, urlunparse
 
 import requests
 
+from extract_bench.inference.limits import EXTRACT_HARD_TIMEOUT_S, execution_budget
 from extract_bench.inference.providers.base import (
     Provider,
     ProviderConfigError,
@@ -71,8 +71,7 @@ class AzureContentUnderstandingProvider(Provider):
         self._api_key = str(api_key)
         self._api_version = str(self.base_config.get("api_version", _DEFAULT_API_VERSION))
         self._timeout = float(self.base_config.get("timeout", 300))
-        self._poll_interval = float(self.base_config.get("poll_interval", 2))
-        self._max_polls = int(self.base_config.get("max_polls", 300))
+        self._max_polls = int(self.base_config.get("max_polls", int(EXTRACT_HARD_TIMEOUT_S / self._poll_interval)))
         self._session = requests.Session()
 
     def run_inference(self, pipeline: PipelineSpec, request: InferenceRequest) -> RawInferenceResult:
@@ -202,6 +201,7 @@ class AzureContentUnderstandingProvider(Provider):
 
     def _poll_analyzer_ready(self, analyzer_id: str) -> None:
         url = self._url(f"/contentunderstanding/analyzers/{analyzer_id}")
+        budget = execution_budget()
         for _ in range(self._max_polls):
             response = self._request("GET", url, context=f"get analyzer {analyzer_id}")
             body = _response_json(response)
@@ -210,10 +210,11 @@ class AzureContentUnderstandingProvider(Provider):
                 return
             if status == "failed":
                 raise ProviderPermanentError(f"Azure Content Understanding analyzer {analyzer_id} failed: {body}")
-            time.sleep(self._poll_interval)
+            budget.wait(self._poll_interval)
         raise ProviderTransientError(f"Timed out waiting for Azure Content Understanding analyzer {analyzer_id}")
 
     def _poll_operation(self, operation_url: str, *, context: str) -> dict[str, Any]:
+        budget = execution_budget()
         for _ in range(self._max_polls):
             response = self._request("GET", operation_url, context=context)
             body = _response_json(response)
@@ -222,7 +223,7 @@ class AzureContentUnderstandingProvider(Provider):
                 if status == "succeeded":
                     return body
                 raise ProviderPermanentError(f"Azure Content Understanding {context} failed: {body}")
-            time.sleep(self._poll_interval)
+            budget.wait(self._poll_interval)
         raise ProviderTransientError(f"Timed out waiting for Azure Content Understanding {context}")
 
     def _url(self, path: str, extra_params: Mapping[str, str] | None = None) -> str:
@@ -235,7 +236,13 @@ class AzureContentUnderstandingProvider(Provider):
         headers = dict(kwargs.pop("headers", {}) or {})
         headers["Ocp-Apim-Subscription-Key"] = self._api_key
         try:
-            response = self._session.request(method, url, headers=headers, timeout=self._timeout, **kwargs)
+            response = self._session.request(
+                method,
+                url,
+                headers=headers,
+                timeout=min(self._timeout, execution_budget().remaining()),
+                **kwargs,
+            )
         except requests.RequestException as exc:
             raise ProviderTransientError(f"Azure Content Understanding {context} request failed: {exc}") from exc
 

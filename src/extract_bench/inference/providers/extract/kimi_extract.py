@@ -30,6 +30,7 @@ from typing import Any
 
 from openai import OpenAI
 
+from extract_bench.inference.limits import EXTRACT_HARD_TIMEOUT_S, execution_budget
 from extract_bench.inference.providers.base import (
     Provider,
     ProviderConfigError,
@@ -96,7 +97,9 @@ class KimiExtractProvider(Provider):
         self._additional_properties_false: bool = bool(self.base_config.get("additional_properties_false", True))
         self._system_prompt: str = self.base_config.get("system_prompt", DEFAULT_SYSTEM_PROMPT)
         self._user_instruction: str = self.base_config.get("user_instruction", DEFAULT_USER_INSTRUCTION)
-        self._timeout_s: float = float(self.base_config.get("timeout_s", self.base_config.get("api_timeout_s", 900.0)))
+        self._timeout_s: float = float(
+            self.base_config.get("timeout_s", self.base_config.get("api_timeout_s", EXTRACT_HARD_TIMEOUT_S))
+        )
         self._max_cost_usd: float | None = self.base_config.get("max_cost_usd")
 
         default_input, default_cached_input, default_output = self._pricing_for_model(self._model)
@@ -106,7 +109,7 @@ class KimiExtractProvider(Provider):
         )
         self._output_price_per_1m: float = float(self.base_config.get("output_price_per_1m", default_output))
 
-        self._client = OpenAI(api_key=self._api_key, base_url=self._base_url, timeout=self._timeout_s)
+        self._client = OpenAI(api_key=self._api_key, base_url=self._base_url, timeout=self._timeout_s, max_retries=0)
 
     @staticmethod
     def _pricing_for_model(model: str) -> tuple[float, float, float]:
@@ -181,6 +184,7 @@ class KimiExtractProvider(Provider):
         }
         if self._reasoning_effort:
             kwargs["reasoning_effort"] = self._reasoning_effort
+        kwargs["timeout"] = min(self._timeout_s, execution_budget().remaining())
         response = self._client.chat.completions.create(**kwargs)
 
         choice = response.choices[0]

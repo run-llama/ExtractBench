@@ -163,7 +163,7 @@ class ExtendOperatorProvider(ExtendProvider):
         run_id = run["id"]
         consecutive_poll_errors = 0
         while run.get("status") in ("PENDING", "PROCESSING"):
-            if cancelled.wait(self._async_poll_interval):
+            if cancelled.wait(self._poll_interval):
                 check_cancelled()
             try:
                 response = self._client.extract_runs.retrieve(run_id, request_options={"max_retries": 0})

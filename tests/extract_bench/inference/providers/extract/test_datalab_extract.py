@@ -101,20 +101,51 @@ def test_api_cost_takes_precedence_over_base_rate() -> None:
     assert raw_output["cost_per_page_usd"] == pytest.approx(0.48 / 7)
 
 
-def test_default_polling_outlasts_the_one_hour_per_file_deadline() -> None:
-    """Datalab polled 900 s by default, so slow accurate jobs failed with "Polling timed out after 900
-    seconds" while every other pipeline had the run's one-hour per-file timeout. The runner's deadline, not
-    the provider's polling budget, must end a slow job."""
-    provider = DatalabExtractProvider(
-        "datalab_extract",
-        {"api_key": "test", "parse_mode": "accurate", "extraction_mode": "accurate"},
-    )
-
-    assert provider._max_polls * provider._poll_interval >= 3600
-
-
 def test_unresolved_block_id_does_not_claim_page_one() -> None:
     citations = _build_field_citations({"amount": 10, "amount_citations": ["missing-block"]}, block_lookup={})
     assert len(citations) == 1
     assert citations[0].page is None
     assert citations[0].bbox is None
+
+
+@pytest.mark.parametrize(("interval", "expired"), [(None, False), (0.5, False), (2.0, False), (2.0, True)])
+def test_sdk_poll_allowance_uses_remaining_time_and_keeps_fractional_interval(
+    monkeypatch: pytest.MonkeyPatch,
+    interval: float | None,
+    expired: bool,
+) -> None:
+    import asyncio
+    from dataclasses import dataclass
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+
+    from extract_bench.inference import limits
+    from extract_bench.inference.providers.base import ProviderPermanentError
+    from extract_bench.inference.providers.extract import datalab
+
+    @dataclass
+    class Result:
+        extraction_schema_json: str = "{}"
+        page_count: int = 1
+
+    now = 0.0
+    monkeypatch.setattr(limits, "time", SimpleNamespace(monotonic=lambda: now))
+    budget = limits.ExecutionBudget(10.0)
+    client = AsyncMock()
+    client.__aenter__.return_value = client
+    client.extract.return_value = Result()
+    monkeypatch.setattr(datalab, "AsyncDatalabClient", lambda **kwargs: client)
+    provider = datalab.DatalabExtractProvider("datalab_extract", {"api_key": "test", "poll_interval": interval})
+    with budget.activate():
+        now = 11.0 if expired else 6.75
+        if expired:
+            with pytest.raises(ProviderPermanentError, match="deadline exceeded"):
+                asyncio.run(provider._extract_pdf_async("unused.pdf", {"type": "object"}))
+            client.extract.assert_not_awaited()
+            return
+        result = asyncio.run(provider._extract_pdf_async("unused.pdf", {"type": "object"}))
+    cadence = limits.DEFAULT_POLL_INTERVAL_S if interval is None else interval
+    kwargs = client.extract.await_args.kwargs
+    assert kwargs["poll_interval"] == cadence
+    assert 3.25 <= kwargs["max_polls"] * cadence < 3.25 + cadence
+    assert result["extraction_schema_json"] == "{}"

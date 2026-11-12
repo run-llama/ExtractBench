@@ -398,6 +398,7 @@ class ExtendProvider(Provider):
     - Unsupported properties (pattern, not, allOf, etc.) are stripped
     """
 
+    _poll_interval_config_key = "async_poll_interval"
     _attach_cost_stats = staticmethod(_attach_cost_stats)
 
     def __init__(
@@ -444,8 +445,6 @@ class ExtendProvider(Provider):
         # errors while polling re-poll the SAME run instead of creating another.
         # Enabled per-pipeline via config {"async_run": true}.
         self._async_run = bool(self.base_config.get("async_run", False))
-        # Match the LlamaExtract adapter polling cadence for latency comparisons.
-        self._async_poll_interval = float(self.base_config.get("async_poll_interval", 3.0))
         self._async_max_poll_errors = int(self.base_config.get("async_max_poll_errors", 15))
 
         # Initialize the Extend client
@@ -803,7 +802,7 @@ class ExtendProvider(Provider):
         create_payload = self._run_response_to_dict(create_response)
         poll_history: list[dict[str, Any]] = []
         while True:
-            time.sleep(self._async_poll_interval)
+            time.sleep(self._poll_interval)
             try:
                 get_response = self._client.processor_run.get(id=run_id)
                 consecutive_poll_errors = 0
@@ -815,7 +814,7 @@ class ExtendProvider(Provider):
                     consecutive_poll_errors += 1
                     if consecutive_poll_errors > self._async_max_poll_errors:
                         self._handle_api_error(e, "processor run poll")
-                    time.sleep(self._async_poll_interval * 2)
+                    time.sleep(self._poll_interval * 2)
                     continue
                 self._handle_api_error(e, "processor run poll")
                 raise  # Should not reach here, but satisfies type checker
@@ -825,7 +824,7 @@ class ExtendProvider(Provider):
                     consecutive_poll_errors += 1
                     if consecutive_poll_errors > self._async_max_poll_errors:
                         raise ProviderTransientError(f"Transient error while polling processor run: {e}") from e
-                    time.sleep(self._async_poll_interval * 2)
+                    time.sleep(self._poll_interval * 2)
                     continue
                 raise ProviderPermanentError(f"Unexpected error while polling processor run: {e}") from e
 

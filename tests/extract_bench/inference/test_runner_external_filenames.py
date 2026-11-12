@@ -45,6 +45,9 @@ class _RecordingProvider(Provider):
 
 def _runner(provider_name: str, config: dict | None = None) -> tuple[InferenceRunner, _RecordingProvider]:
     runner = InferenceRunner.__new__(InferenceRunner)
+    runner._cancelled_examples = set()
+    runner._execution_budgets = {}
+    runner.per_file_timeout = 10800
     provider = _RecordingProvider()
     runner.provider = provider
     runner.pipeline = PipelineSpec(

@@ -2,8 +2,10 @@ import asyncio
 import concurrent.futures
 from abc import ABC, abstractmethod
 from collections.abc import Coroutine
+from functools import cached_property
 from typing import Any
 
+from extract_bench.inference.limits import DEFAULT_POLL_INTERVAL_S
 from extract_bench.schemas.pipeline import PipelineSpec
 from extract_bench.schemas.pipeline_io import (
     InferenceRequest,
@@ -88,6 +90,11 @@ class Provider(ABC):
     #: timeout limits how long it takes.
     retries_transient_errors: bool = True
 
+    # Polling providers inherit one cadence; subclasses can retain their API's
+    # config key or an explicit latency-experiment default.
+    _poll_interval_config_key: str = "poll_interval"
+    _default_poll_interval_s: float = DEFAULT_POLL_INTERVAL_S
+
     def __init__(
         self,
         provider_name: str,
@@ -102,6 +109,17 @@ class Provider(ABC):
         """
         self._provider_name = provider_name
         self._base_config = base_config or {}
+
+    @cached_property
+    def _poll_interval(self) -> float:
+        """Resolve polling config only for providers that actually use it."""
+        value = self._base_config.get(self._poll_interval_config_key)
+        if value is None:
+            return self._default_poll_interval_s
+        try:
+            return float(value)
+        except (TypeError, ValueError) as exc:
+            raise ProviderConfigError(f"{self._poll_interval_config_key} must be a number or None") from exc
 
     @property
     def provider_name(self) -> str:
