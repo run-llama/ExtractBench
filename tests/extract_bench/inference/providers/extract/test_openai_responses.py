@@ -79,7 +79,7 @@ class _FakeFiles:
         self.created.append(kwargs)
         return SimpleNamespace(id="file-123")
 
-    def delete(self, file_id: str) -> None:
+    def delete(self, file_id: str, **kwargs: Any) -> None:
         pass
 
 

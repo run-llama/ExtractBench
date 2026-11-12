@@ -28,7 +28,7 @@ from typing import Any
 
 import aiohttp
 
-from extract_bench.inference.limits import EXTRACT_HARD_TIMEOUT_S
+from extract_bench.inference.limits import EXTRACT_HARD_TIMEOUT_S, execution_budget
 from extract_bench.inference.providers.base import (
     Provider,
     ProviderConfigError,
@@ -622,7 +622,7 @@ class NuExtract3ExtractProvider(Provider):
                 api_url,
                 json=payload,
                 headers=headers,
-                timeout=aiohttp.ClientTimeout(total=self._timeout),
+                timeout=aiohttp.ClientTimeout(total=min(self._timeout, execution_budget().remaining())),
             ) as resp:
                 if resp.status != 200:
                     error_text = await resp.text()
@@ -659,9 +659,12 @@ class NuExtract3ExtractProvider(Provider):
         """Drop trailing pages on image-cap / context 400s instead of failing."""
         pages = images_b64
         dropped = 0
+        budget = execution_budget()
         while True:
+            budget.remaining()
             try:
-                out = asyncio.run(self._extract_async(pages, template, instructions))
+                with budget.activate():
+                    out = asyncio.run(budget.run_async(self._extract_async(pages, template, instructions)))
                 if dropped:
                     out["pages_truncated"] = dropped
                     out["pages_sent"] = len(pages)

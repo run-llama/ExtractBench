@@ -25,7 +25,7 @@ from typing import Any
 
 from openai import OpenAI
 
-from extract_bench.inference.limits import EXTRACT_HARD_TIMEOUT_S
+from extract_bench.inference.limits import EXTRACT_HARD_TIMEOUT_S, execution_budget
 from extract_bench.inference.providers.base import (
     Provider,
     ProviderConfigError,
@@ -427,7 +427,10 @@ class VLLMExtractProvider(Provider):
             ],
             "response_format": self._response_format(schema),
         }
-        response = self._client.chat.completions.create(**kwargs)
+        response = self._client.chat.completions.create(
+            **kwargs,
+            timeout=min(self._timeout_s, execution_budget().remaining()),
+        )
 
         choice = response.choices[0]
         finish_reason = getattr(choice, "finish_reason", None)
@@ -585,9 +588,12 @@ class VLLMExtractProvider(Provider):
         cur_schema = schema
         compact = False
         out_budget = self._max_tokens
+        budget = execution_budget()
         while True:
+            budget.remaining()
             try:
-                out = self._call_api(cur_schema, pages, max_tokens=out_budget, compact_schema=compact)
+                with budget.activate():
+                    out = self._call_api(cur_schema, pages, max_tokens=out_budget, compact_schema=compact)
                 if dropped:
                     out["pages_truncated"] = dropped
                     out["pages_sent"] = len(pages)

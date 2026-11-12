@@ -42,7 +42,7 @@ from typing import Any
 from openai import OpenAI
 from pypdf import PdfReader
 
-from extract_bench.inference.limits import EXTRACT_HARD_TIMEOUT_S
+from extract_bench.inference.limits import EXTRACT_HARD_TIMEOUT_S, ExecutionBudget, execution_budget
 from extract_bench.inference.providers.base import (
     Provider,
     ProviderConfigError,
@@ -225,7 +225,11 @@ class OpenAIResponsesExtractProvider(Provider):
         except Exception:
             return 0
 
-    def _build_user_content(self, source_path: Path) -> tuple[list[dict[str, Any]], str | None]:
+    def _build_user_content(
+        self,
+        source_path: Path,
+        budget: ExecutionBudget,
+    ) -> tuple[list[dict[str, Any]], str | None]:
         """Build the user-message content array for the source file.
 
         Returns ``(content, uploaded_file_id)``. ``uploaded_file_id`` is set only
@@ -249,7 +253,8 @@ class OpenAIResponsesExtractProvider(Provider):
             ]
             return content, None
 
-        uploaded = self._client.files.create(file=open(source_path, "rb"), purpose="user_data")
+        with source_path.open("rb") as file:
+            uploaded = self._client.files.create(file=file, purpose="user_data", timeout=budget.remaining())
         content = [
             {"type": "input_file", "file_id": uploaded.id},
             {"type": "input_text", "text": self._user_instruction},
@@ -263,6 +268,7 @@ class OpenAIResponsesExtractProvider(Provider):
         source_path: Path | None = None,
         document_text: str | None = None,
     ) -> dict[str, Any]:
+        budget = execution_budget()
         if document_text is not None:
             user_content: list[dict[str, Any]] = [
                 {"type": "input_text", "text": document_text},
@@ -270,7 +276,7 @@ class OpenAIResponsesExtractProvider(Provider):
             ]
             uploaded_file_id: str | None = None
         elif source_path is not None:
-            user_content, uploaded_file_id = self._build_user_content(source_path)
+            user_content, uploaded_file_id = self._build_user_content(source_path, budget)
         else:
             raise ProviderPermanentError("_call_api requires source_path or document_text")
         # The Responses SDK types ``input`` against a wide TypedDict union;
@@ -295,11 +301,11 @@ class OpenAIResponsesExtractProvider(Provider):
         if self._reasoning_effort is not None:
             create_kwargs["reasoning"] = {"effort": self._reasoning_effort}
         try:
-            resp = self._client.responses.create(**create_kwargs)
+            resp = self._client.responses.create(**create_kwargs, timeout=budget.remaining())
         finally:
             if uploaded_file_id is not None:
                 try:
-                    self._client.files.delete(uploaded_file_id)
+                    self._client.files.delete(uploaded_file_id, timeout=10)
                 except Exception:
                     # Best-effort cleanup — don't fail the call on it.
                     pass

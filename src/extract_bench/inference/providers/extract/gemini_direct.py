@@ -8,7 +8,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from extract_bench.inference.limits import EXTRACT_HARD_TIMEOUT_S
+from extract_bench.inference.limits import EXTRACT_HARD_TIMEOUT_S, execution_budget
 from extract_bench.inference.providers.base import (
     Provider,
     ProviderConfigError,
@@ -185,6 +185,10 @@ class GeminiDirectExtractProvider(Provider):
             "system_instruction": self._system_prompt,
             "response_mime_type": "application/json",
             "response_json_schema": schema,
+            "http_options": types.HttpOptions(
+                timeout=max(1, int(execution_budget().remaining() * 1000)),
+                retry_options=types.HttpRetryOptions(attempts=1),
+            ),
         }
         if self._max_tokens is not None:
             config_kwargs["max_output_tokens"] = self._max_tokens
