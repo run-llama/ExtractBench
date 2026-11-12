@@ -7,6 +7,10 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 
+pytest.importorskip("pypdf", reason="dev and runners extras required")
+pytest.importorskip("google.genai", reason="dev and runners extras required")
+pytest.importorskip("openai", reason="dev and runners extras required")
+
 from extract_bench.inference.limits import ExecutionBudget
 from extract_bench.inference.providers.base import ProviderPermanentError
 from extract_bench.inference.providers.extract import gemini_direct, nuextract3_extract, openai_responses, vllm_extract

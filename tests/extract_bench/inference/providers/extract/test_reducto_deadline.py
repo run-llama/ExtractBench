@@ -6,6 +6,9 @@ from unittest.mock import Mock
 
 import pytest
 
+pytest.importorskip("reducto", reason="dev and runners extras required")
+pytest.importorskip("pypdf", reason="dev and runners extras required")
+
 from extract_bench.inference.limits import ExecutionBudget
 from extract_bench.inference.providers.extract import reducto
 

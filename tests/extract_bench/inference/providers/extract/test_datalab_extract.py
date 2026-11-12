@@ -108,13 +108,13 @@ def test_unresolved_block_id_does_not_claim_page_one() -> None:
     assert citations[0].bbox is None
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize(("interval", "expired"), [(None, False), (0.5, False), (2.0, False), (2.0, True)])
-async def test_sdk_poll_allowance_uses_remaining_time_and_keeps_fractional_interval(
+def test_sdk_poll_allowance_uses_remaining_time_and_keeps_fractional_interval(
     monkeypatch: pytest.MonkeyPatch,
     interval: float | None,
     expired: bool,
 ) -> None:
+    import asyncio
     from dataclasses import dataclass
     from types import SimpleNamespace
     from unittest.mock import AsyncMock
@@ -140,10 +140,10 @@ async def test_sdk_poll_allowance_uses_remaining_time_and_keeps_fractional_inter
         now = 11.0 if expired else 6.75
         if expired:
             with pytest.raises(ProviderPermanentError, match="deadline exceeded"):
-                await provider._extract_pdf_async("unused.pdf", {"type": "object"})
+                asyncio.run(provider._extract_pdf_async("unused.pdf", {"type": "object"}))
             client.extract.assert_not_awaited()
             return
-        result = await provider._extract_pdf_async("unused.pdf", {"type": "object"})
+        result = asyncio.run(provider._extract_pdf_async("unused.pdf", {"type": "object"}))
     cadence = limits.DEFAULT_POLL_INTERVAL_S if interval is None else interval
     kwargs = client.extract.await_args.kwargs
     assert kwargs["poll_interval"] == cadence

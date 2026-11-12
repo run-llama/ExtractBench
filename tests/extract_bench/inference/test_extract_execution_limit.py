@@ -97,29 +97,31 @@ def test_extract_limit_does_not_change_parse_timeout_policy(tmp_path: Path) -> N
         extract_runner.shutdown()
 
 
-@pytest.mark.asyncio
-async def test_cancellation_stops_async_vendor_polling_and_releases_client() -> None:
+def test_cancellation_stops_async_vendor_polling_and_releases_client() -> None:
     import asyncio
 
     from extract_bench.inference.limits import ExecutionBudget
 
-    budget = ExecutionBudget()
-    started = asyncio.Event()
-    released = asyncio.Event()
+    async def exercise_cancellation() -> None:
+        budget = ExecutionBudget()
+        started = asyncio.Event()
+        released = asyncio.Event()
 
-    async def poll() -> None:
-        try:
-            started.set()
-            await asyncio.Event().wait()
-        finally:
-            released.set()
+        async def poll() -> None:
+            try:
+                started.set()
+                await asyncio.Event().wait()
+            finally:
+                released.set()
 
-    task = asyncio.create_task(budget.run_async(poll()))
-    await started.wait()
-    budget.cancel()
-    with pytest.raises(TimeoutError, match="deadline exceeded"):
-        await task
-    assert released.is_set()
+        task = asyncio.create_task(budget.run_async(poll()))
+        await started.wait()
+        budget.cancel()
+        with pytest.raises(TimeoutError, match="deadline exceeded"):
+            await task
+        assert released.is_set()
+
+    asyncio.run(exercise_cancellation())
 
 
 def test_provider_stages_and_retries_share_remaining_budget(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -156,7 +158,7 @@ def test_pipeline_factory_rejects_provider_budget_that_conflicts_with_runner(key
 
 @pytest.mark.parametrize("interval", [None, "unused"])
 def test_non_polling_parse_ignores_poll_config(tmp_path: Path, interval: str | None) -> None:
-    from pypdf import PdfWriter
+    PdfWriter = pytest.importorskip("pypdf", reason="local provider extra required").PdfWriter
 
     from extract_bench.inference.providers.parse.pypdf import PyPDFProvider
 
