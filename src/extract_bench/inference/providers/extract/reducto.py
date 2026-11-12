@@ -9,7 +9,7 @@ from typing import Any, cast
 
 from reducto import Reducto
 
-from extract_bench.inference.limits import DEFAULT_POLL_INTERVAL_S, EXTRACT_HARD_TIMEOUT_S
+from extract_bench.inference.limits import EXTRACT_HARD_TIMEOUT_S
 from extract_bench.inference.providers.base import (
     Provider,
     ProviderConfigError,
@@ -287,7 +287,7 @@ class ReductoExtractProvider(Provider):
                     if status in ("Failed", "Cancelled"):
                         reason = getattr(job, "reason", None) or "unknown"
                         raise ProviderTransientError(f"Reducto deep-extract job {job_id} {status}: {reason}")
-                    await asyncio.sleep(DEFAULT_POLL_INTERVAL_S)
+                    await asyncio.sleep(self._poll_interval)
             else:
                 # extract.run is overloaded; passing it as a value to
                 # to_thread defeats overload resolution, so cast the callable.

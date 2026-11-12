@@ -22,7 +22,7 @@ from urllib.parse import urljoin, urlparse
 
 import requests
 
-from extract_bench.inference.limits import DEFAULT_POLL_INTERVAL_S, EXTRACT_HARD_TIMEOUT_S
+from extract_bench.inference.limits import EXTRACT_HARD_TIMEOUT_S
 from extract_bench.inference.providers.base import (
     Provider,
     ProviderConfigError,
@@ -114,9 +114,9 @@ class PulseExtractProvider(Provider):
                 os.getenv("PULSE_JOB_TIMEOUT", _DEFAULT_JOB_TIMEOUT_SECONDS),
             )
         )
-        self._poll_interval = float(
-            self.base_config.get("poll_interval", os.getenv("PULSE_POLL_INTERVAL", DEFAULT_POLL_INTERVAL_S))
-        )
+        poll_interval_env = os.getenv("PULSE_POLL_INTERVAL")
+        if "poll_interval" not in self.base_config and poll_interval_env is not None:
+            self._poll_interval = float(poll_interval_env)
         self._poll_max_interval = float(self.base_config.get("poll_max_interval", 30.0))
         self._max_poll_errors = int(self.base_config.get("max_poll_errors", 12))
         self._run_timeout = float(self.base_config.get("run_timeout", _DEFAULT_RUN_TIMEOUT_SECONDS))

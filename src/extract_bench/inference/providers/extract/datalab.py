@@ -122,7 +122,6 @@ class DatalabExtractProvider(Provider):
         self._save_checkpoint = self.base_config.get("save_checkpoint", False)
         self._skip_cache = self.base_config.get("skip_cache", False)
         self._max_polls = int(self.base_config.get("max_polls", DEFAULT_MAX_POLLS))
-        self._poll_interval = int(self.base_config.get("poll_interval", DEFAULT_POLL_INTERVAL_S))
 
     async def _extract_pdf_async(self, pdf_path: str, schema: dict[str, Any]) -> dict[str, Any]:
         """Call Datalab Extract and return the full response as a plain dict."""
@@ -149,7 +148,7 @@ class DatalabExtractProvider(Provider):
                     pdf_path,
                     options=options,
                     max_polls=self._max_polls,
-                    poll_interval=self._poll_interval,
+                    poll_interval=int(self._poll_interval),
                 )
 
             raw_response: dict[str, Any] = dataclasses.asdict(result)

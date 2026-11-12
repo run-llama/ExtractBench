@@ -14,7 +14,7 @@ from urllib.parse import urlencode, urlparse, urlunparse
 
 import requests
 
-from extract_bench.inference.limits import DEFAULT_POLL_INTERVAL_S, EXTRACT_HARD_TIMEOUT_S, execution_budget
+from extract_bench.inference.limits import EXTRACT_HARD_TIMEOUT_S, execution_budget
 from extract_bench.inference.providers.base import (
     Provider,
     ProviderConfigError,
@@ -71,7 +71,6 @@ class AzureContentUnderstandingProvider(Provider):
         self._api_key = str(api_key)
         self._api_version = str(self.base_config.get("api_version", _DEFAULT_API_VERSION))
         self._timeout = float(self.base_config.get("timeout", 300))
-        self._poll_interval = float(self.base_config.get("poll_interval", DEFAULT_POLL_INTERVAL_S))
         self._max_polls = int(self.base_config.get("max_polls", int(EXTRACT_HARD_TIMEOUT_S / self._poll_interval)))
         self._session = requests.Session()
 
