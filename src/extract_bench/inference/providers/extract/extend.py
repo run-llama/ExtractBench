@@ -8,7 +8,6 @@ import hashlib
 import json
 import os
 import threading
-import time
 from datetime import UTC, datetime
 from importlib.metadata import version
 from pathlib import Path
@@ -16,7 +15,9 @@ from typing import Any, cast
 
 from extend_ai import Extend
 from extend_ai.core.api_error import ApiError
+from extend_ai.core.request_options import RequestOptions
 
+from extract_bench.inference.limits import DEFAULT_POLL_INTERVAL_S, ExecutionBudget, execution_budget
 from extract_bench.inference.providers.base import (
     Provider,
     ProviderConfigError,
@@ -465,6 +466,21 @@ class ExtendProvider(Provider):
         # Cache for processor IDs by schema hash (thread-safe)
         self._processor_cache: dict[str, str] = {}
         self._processor_cache_lock = threading.Lock()
+        self._active_budgets: dict[str, ExecutionBudget] = {}
+        self._active_budgets_lock = threading.Lock()
+
+    def cancel(self, example_id: str) -> bool:
+        with self._active_budgets_lock:
+            budget = self._active_budgets.get(example_id)
+        if budget is None:
+            return False
+        budget.cancel()
+        return True
+
+    @staticmethod
+    def _request_options() -> RequestOptions:
+        # Fern types seconds as int; its HTTP transport also accepts fractional seconds.
+        return cast(RequestOptions, {"timeout_in_seconds": execution_budget().remaining(), "max_retries": 0})
 
     def _get_config_hash(self, config: dict[str, Any]) -> str:
         """Get a deterministic hash of a config for caching processors."""
@@ -495,7 +511,7 @@ class ExtendProvider(Provider):
         """
         try:
             with open(file_path, "rb") as f:
-                upload_response = self._client.files.upload(file=f)
+                upload_response = self._client.files.upload(file=f, request_options=self._request_options())
 
             # API 2025-04-21 wraps the file; API 2026-02-09 returns it directly.
             # The SDK permits missing fields, so hasattr(id) alone accepts None.
@@ -559,9 +575,11 @@ class ExtendProvider(Provider):
             while True:
                 # List processors with pagination
                 if next_page_token:
-                    list_response = self._client.processor.list(next_page_token=next_page_token)
+                    list_response = self._client.processor.list(
+                        next_page_token=next_page_token, request_options=self._request_options()
+                    )
                 else:
-                    list_response = self._client.processor.list()
+                    list_response = self._client.processor.list(request_options=self._request_options())
 
                 # Extract processors from response
                 processors: list[Any] = []
@@ -587,6 +605,8 @@ class ExtendProvider(Provider):
 
             return None
 
+        except TimeoutError:
+            raise
         except Exception:
             # If listing fails, return None and let creation handle it
             return None
@@ -607,6 +627,7 @@ class ExtendProvider(Provider):
                 name=processor_name,
                 type="EXTRACT",  # type: ignore[arg-type]
                 config=processor_config,  # type: ignore[arg-type]
+                request_options=self._request_options(),
             )
 
             # Extract processor ID from response
@@ -734,6 +755,7 @@ class ExtendProvider(Provider):
                 processor_id=processor_id,
                 file={"fileId": file_id},  # type: ignore[arg-type]
                 sync=True,  # Synchronous processing - waits for completion
+                request_options=self._request_options(),
             )
             return self._run_response_to_dict(run_response)
 
@@ -760,97 +782,97 @@ class ExtendProvider(Provider):
         return None
 
     def _run_processor_async(self, processor_id: str, file_id: str) -> dict[str, Any]:
-        """
-        Run a processor asynchronously: create the run, then poll to completion.
-
-        Unlike the sync path this imposes no client-side wall clock on the
-        extraction — it polls the get endpoint until the run reaches a terminal
-        status. Transient errors while polling re-poll the SAME run rather than
-        creating a new (billed) one, and a terminal FAILED/CANCELLED is a
-        permanent error so the harness does not retry into a fresh billed run.
-
-        :param processor_id: ID of the processor to run
-        :param file_id: ID of the uploaded file
-        :return: Raw get-response for the completed run
-        :raises ProviderError: For any run errors
-        """
-        # Step 1: create the run (async — returns immediately with PROCESSING)
+        """Poll one billed run within the document budget and retain its diagnostics."""
+        budget = execution_budget()
         try:
             create_response = self._client.processor_run.create(
                 processor_id=processor_id,
                 file={"file_id": file_id},
-                sync=False,  # Asynchronous — poll for completion below
+                sync=False,
+                request_options=self._request_options(),
             )
-        except ApiError as e:
-            self._handle_api_error(e, "processor run create")
-            raise  # Should not reach here, but satisfies type checker
-        except Exception as e:
-            error_str = str(e).lower()
-            if any(kw in error_str for kw in ["timeout", "timed out", "connection", "network", "readtimeout"]):
-                raise ProviderTransientError(f"Transient error during processor run create: {e}") from e
-            raise ProviderPermanentError(f"Unexpected error during processor run create: {e}") from e
+        except ApiError as error:
+            self._handle_api_error(error, "processor run create")
+            raise
+        except Exception as error:
+            # An ambiguous POST failure may have created a billed run. Retrying
+            # the document would create another one without an id to reconcile.
+            raise ProviderPermanentError(f"Processor run creation failed: {error}") from error
 
         run_id = self._extract_run_id(create_response)
         if not run_id:
             raise ProviderPermanentError(f"No processor run id in async create response: {create_response}")
 
-        # Step 2: poll until terminal. No overall deadline by design — a slow
-        # run is allowed to finish. `consecutive_poll_errors` only guards
-        # against a persistently unreachable polling channel, never against a
-        # legitimately long extraction.
-        consecutive_poll_errors = 0
-        create_payload = self._run_response_to_dict(create_response)
         poll_history: list[dict[str, Any]] = []
-        while True:
-            time.sleep(self._poll_interval)
-            try:
-                get_response = self._client.processor_run.get(id=run_id)
-                consecutive_poll_errors = 0
-            except ApiError as e:
-                status_code = getattr(e, "status_code", None)
-                # A hiccup polling an already-created run must NOT spawn a new
-                # billed run — swallow retriable statuses and keep polling.
-                if status_code == 429 or status_code in (500, 502, 503, 504):
+        execution: dict[str, Any] = {
+            "create_response": self._run_response_to_dict(create_response),
+            "poll_history": poll_history,
+        }
+        consecutive_poll_errors = 0
+        try:
+            while True:
+                budget.wait(self._poll_interval)
+                try:
+                    get_response = self._client.processor_run.get(id=run_id, request_options=self._request_options())
+                    consecutive_poll_errors = 0
+                except TimeoutError:
+                    raise
+                except Exception as error:
+                    budget.remaining()
+                    retryable = (
+                        error.status_code in (429, 500, 502, 503, 504)
+                        if isinstance(error, ApiError)
+                        else any(
+                            word in str(error).lower() for word in ("timeout", "timed out", "connection", "network")
+                        )
+                    )
                     consecutive_poll_errors += 1
-                    if consecutive_poll_errors > self._async_max_poll_errors:
-                        self._handle_api_error(e, "processor run poll")
-                    time.sleep(self._poll_interval * 2)
+                    if not retryable or consecutive_poll_errors > self._async_max_poll_errors:
+                        raise ProviderPermanentError(
+                            f"Cannot poll Extend processor run {run_id}: {error}",
+                            job_id=run_id,
+                            debug_payload={"_extend_execution": execution},
+                        ) from error
+                    budget.wait(self._poll_interval * 2)
                     continue
-                self._handle_api_error(e, "processor run poll")
-                raise  # Should not reach here, but satisfies type checker
-            except Exception as e:
-                error_str = str(e).lower()
-                if any(kw in error_str for kw in ["timeout", "timed out", "connection", "network", "readtimeout"]):
-                    consecutive_poll_errors += 1
-                    if consecutive_poll_errors > self._async_max_poll_errors:
-                        raise ProviderTransientError(f"Transient error while polling processor run: {e}") from e
-                    time.sleep(self._poll_interval * 2)
-                    continue
-                raise ProviderPermanentError(f"Unexpected error while polling processor run: {e}") from e
 
-            run = getattr(get_response, "processor_run", None)
-            status = str(getattr(run, "status", "") or "")
-            poll_history.append({"at": datetime.now(UTC).isoformat(), "status": status})
-            # Keep the create receipt and status timeline alongside the full terminal
-            # response so remote execution can be reconstructed without another run.
-            if status in ("PROCESSED", "FAILED", "CANCELLED"):
-                terminal_payload = self._run_response_to_dict(get_response)
-                terminal_payload["_extend_execution"] = {
-                    "create_response": create_payload,
-                    "poll_history": poll_history,
-                }
-            if status == "PROCESSED":
-                return terminal_payload
-            if status in ("FAILED", "CANCELLED"):
-                reason = getattr(run, "failure_reason", None)
-                message = getattr(run, "failure_message", None)
-                detail = " ".join(part for part in (reason, message) if part).strip()
-                raise ProviderPermanentError(
-                    f"Extend processor run {run_id} ended with status {status}" + (f": {detail}" if detail else ""),
-                    job_id=run_id,
-                    debug_payload=terminal_payload,
+                # A response arriving after cancellation must not become a late success.
+                budget.remaining()
+                run = getattr(get_response, "processor_run", None)
+                status = str(getattr(run, "status", "") or "")
+                poll_history.append({"at": datetime.now(UTC).isoformat(), "status": status})
+                if status in ("PROCESSED", "FAILED", "CANCELLED"):
+                    terminal_payload = self._run_response_to_dict(get_response)
+                    terminal_payload["_extend_execution"] = execution
+                    if status == "PROCESSED":
+                        return terminal_payload
+                    reason = getattr(run, "failure_reason", None)
+                    message = getattr(run, "failure_message", None)
+                    detail = " ".join(part for part in (reason, message) if part).strip()
+                    raise ProviderPermanentError(
+                        f"Extend processor run {run_id} ended with status {status}" + (f": {detail}" if detail else ""),
+                        job_id=run_id,
+                        debug_payload=terminal_payload,
+                    )
+        except TimeoutError as error:
+            # Cleanup gets one polling interval beyond the exhausted document
+            # budget, without SDK retries; retain failures for remote recovery.
+            try:
+                response = self._client.processor_run.cancel(
+                    id=run_id,
+                    request_options=cast(
+                        RequestOptions,
+                        {"timeout_in_seconds": DEFAULT_POLL_INTERVAL_S, "max_retries": 0},
+                    ),
                 )
-            # PENDING / PROCESSING / unrecognized → keep polling.
+                execution["cancel_response"] = self._run_response_to_dict(response)
+            except Exception as cancel_error:
+                execution["cancel_error"] = str(cancel_error)
+            raise ProviderPermanentError(
+                f"Extend processor run {run_id} cancelled or exceeded its deadline",
+                job_id=run_id,
+                debug_payload={"_extend_execution": execution},
+            ) from error
 
     def _extract_document(
         self,
@@ -929,29 +951,34 @@ class ExtendProvider(Provider):
         if not file_path.exists():
             raise ProviderPermanentError(f"File not found: {file_path}")
 
+        budget = execution_budget()
+        with self._active_budgets_lock:
+            self._active_budgets[request.example_id] = budget
         try:
-            # Run extraction with pipeline config options
-            raw_output = self._extract_document(
-                file_path=str(file_path),
-                schema=request.schema_override,
-                pipeline_config=pipeline.config,
-            )
+            with budget.activate():
+                # Run extraction with pipeline config options
+                raw_output = self._extract_document(
+                    file_path=str(file_path),
+                    schema=request.schema_override,
+                    pipeline_config=pipeline.config,
+                )
 
-            completed_at = datetime.now()
-            latency_ms = int((completed_at - started_at).total_seconds() * 1000)
+                budget.remaining()
+                completed_at = datetime.now()
+                latency_ms = int((completed_at - started_at).total_seconds() * 1000)
 
-            self._attach_cost_stats(raw_output, pipeline.config)
+                self._attach_cost_stats(raw_output, pipeline.config)
 
-            return RawInferenceResult(
-                request=request,
-                pipeline=pipeline,
-                pipeline_name=pipeline.pipeline_name,
-                product_type=request.product_type,
-                raw_output=raw_output,
-                started_at=started_at,
-                completed_at=completed_at,
-                latency_in_ms=latency_ms,
-            )
+                return RawInferenceResult(
+                    request=request,
+                    pipeline=pipeline,
+                    pipeline_name=pipeline.pipeline_name,
+                    product_type=request.product_type,
+                    raw_output=raw_output,
+                    started_at=started_at,
+                    completed_at=completed_at,
+                    latency_in_ms=latency_ms,
+                )
 
         except ProviderError:
             # Preserve transient/rate-limit classification so the harness
@@ -960,6 +987,10 @@ class ExtendProvider(Provider):
             raise
         except Exception as e:
             raise ProviderPermanentError(f"Unexpected error during inference: {e}") from e
+        finally:
+            with self._active_budgets_lock:
+                if self._active_budgets.get(request.example_id) is budget:
+                    self._active_budgets.pop(request.example_id)
 
     def normalize(self, raw_result: RawInferenceResult) -> InferenceResult:
         """
