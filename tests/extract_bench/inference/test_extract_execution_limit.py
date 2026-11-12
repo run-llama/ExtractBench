@@ -51,7 +51,7 @@ def test_registered_extract_pipelines_do_not_shorten_the_shared_deadline() -> No
 
     pipelines: list[PipelineSpec] = []
     register_extract_pipelines(pipelines.append)
-    offenders = {p.pipeline_name: p.per_file_timeout for p in pipelines if p.per_file_timeout is not None}
+    offenders = {p.pipeline_name: p.per_file_timeout for p in pipelines if p.per_file_timeout != EXTRACT_HARD_TIMEOUT_S}
     assert offenders == {}
 
 
@@ -139,3 +139,12 @@ def test_provider_stages_and_retries_share_remaining_budget(tmp_path: Path, monk
             second.remaining()
     finally:
         runner.shutdown()
+
+
+@pytest.mark.parametrize("key", ["timeout", "timeout_s"])
+@pytest.mark.parametrize("seconds", [3600, 14400])
+def test_pipeline_factory_rejects_provider_budget_that_conflicts_with_runner(key: str, seconds: int) -> None:
+    from extract_bench.inference.pipelines.extract import _pipeline_spec
+
+    with pytest.raises(ValueError, match=f"{key} must equal"):
+        _pipeline_spec(pipeline_name="test", provider_name="test", config={key: seconds})
