@@ -10,6 +10,7 @@ from typing import Any
 
 from openai import OpenAI
 
+from extract_bench.inference.limits import EXTRACT_HARD_TIMEOUT_S, execution_budget
 from extract_bench.inference.providers.base import (
     Provider,
     ProviderConfigError,
@@ -63,7 +64,7 @@ class GLMExtractProvider(Provider):
         self._max_cost_usd: float | None = self.base_config.get("max_cost_usd")
         self._reasoning_effort: str | None = self.base_config.get("reasoning_effort")
         self._api_timeout_s: float = float(
-            self.base_config.get("api_timeout_s", self.base_config.get("timeout_s", 900.0))
+            self.base_config.get("api_timeout_s", self.base_config.get("timeout_s", EXTRACT_HARD_TIMEOUT_S))
         )
         max_tokens_cfg = self.base_config.get("max_tokens", self.DEFAULT_MAX_TOKENS)
         self._max_tokens: int | None = int(max_tokens_cfg) if max_tokens_cfg is not None else None
@@ -80,7 +81,9 @@ class GLMExtractProvider(Provider):
         )
         self._output_price_per_1m: float = float(self.base_config.get("output_price_per_1m", default_output))
 
-        self._client = OpenAI(api_key=self._api_key, base_url=self._base_url, timeout=self._api_timeout_s)
+        self._client = OpenAI(
+            api_key=self._api_key, base_url=self._base_url, timeout=self._api_timeout_s, max_retries=0
+        )
 
     @staticmethod
     def _pricing_for_model(model: str) -> tuple[float, float, float]:
@@ -119,6 +122,7 @@ class GLMExtractProvider(Provider):
         if self._reasoning_effort:
             kwargs["reasoning_effort"] = self._reasoning_effort
 
+        kwargs["timeout"] = min(self._api_timeout_s, execution_budget().remaining())
         response = self._client.chat.completions.create(**kwargs)
         choice = response.choices[0]
         finish_reason = getattr(choice, "finish_reason", None)

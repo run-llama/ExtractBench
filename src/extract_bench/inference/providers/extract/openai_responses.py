@@ -42,6 +42,7 @@ from typing import Any
 from openai import OpenAI
 from pypdf import PdfReader
 
+from extract_bench.inference.limits import EXTRACT_HARD_TIMEOUT_S
 from extract_bench.inference.providers.base import (
     Provider,
     ProviderConfigError,
@@ -201,7 +202,7 @@ class OpenAIResponsesExtractProvider(Provider):
             self.base_config.get("output_price_per_1m", default_output_price_per_1m)
         )
 
-        self._client = OpenAI(api_key=self._api_key)
+        self._client = OpenAI(api_key=self._api_key, timeout=EXTRACT_HARD_TIMEOUT_S, max_retries=0)
 
     # -- internals ----------------------------------------------------------
 

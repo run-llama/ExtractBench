@@ -7,7 +7,7 @@ import secrets
 import shutil
 import tempfile
 import time
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Generator, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -30,10 +30,12 @@ from rich.progress import (
 )
 from rich.table import Table
 
+from extract_bench.inference.limits import EXTRACT_HARD_TIMEOUT_S, ExecutionBudget
 from extract_bench.inference.page_budget import PageBudget
 from extract_bench.inference.providers.base import (
     Provider,
     ProviderError,
+    ProviderPermanentError,
     ProviderRateLimitError,
     ProviderTransientError,
 )
@@ -52,7 +54,7 @@ INITIAL_BACKOFF_S = 2.0  # seconds
 BACKOFF_MULTIPLIER = 2.0  # exponential backoff factor
 
 # Per-file timeout and retry configuration
-DEFAULT_PER_FILE_TIMEOUT_S = 1800.0  # 30 minutes per file
+DEFAULT_PER_FILE_TIMEOUT_S = 1800.0  # Other products retain their execution default.
 DEFAULT_TIMEOUT_RETRIES = 0  # do not retry timed-out files by default
 
 LOCAL_ARTIFACT_PROVIDER_NAMES: set[str] = set()
@@ -193,8 +195,8 @@ class InferenceRunner:
         :param use_rich: Whether to use Rich for terminal UI (default: True)
         :param tags: Optional list of tags for this run (e.g., ['nightly', 'production'])
         :param per_file_timeout: Explicit run-level max seconds per file. None (default)
-            falls back to the pipeline's per_file_timeout, then DEFAULT_PER_FILE_TIMEOUT_S.
-        :param timeout_retries: Number of retries on per-file timeout (default: 0)
+            uses the pipeline override, then three hours for Extract or the other product default.
+        :param timeout_retries: Number of retries on per-file timeout; Extract requires 0
         """
         self.provider = provider
         self.pipeline = pipeline
@@ -215,7 +217,16 @@ class InferenceRunner:
         elif pipeline.per_file_timeout is not None:
             self.per_file_timeout = pipeline.per_file_timeout
         else:
-            self.per_file_timeout = DEFAULT_PER_FILE_TIMEOUT_S
+            self.per_file_timeout = (
+                EXTRACT_HARD_TIMEOUT_S if pipeline.product_type == ProductType.EXTRACT else DEFAULT_PER_FILE_TIMEOUT_S
+            )
+        if pipeline.product_type == ProductType.EXTRACT:
+            if not 0 < self.per_file_timeout <= EXTRACT_HARD_TIMEOUT_S:
+                raise ValueError("Extract per_file_timeout must be positive and at most three hours")
+            if timeout_retries != 0:
+                raise ValueError("Extract timeouts are terminal; timeout_retries must be 0")
+        self._cancelled_examples: set[str] = set()
+        self._execution_budgets: dict[str, ExecutionBudget] = {}
         self.timeout_retries = timeout_retries
         self.console = Console() if use_rich else None
 
@@ -279,9 +290,22 @@ class InferenceRunner:
             if staged_dir is not None:
                 shutil.rmtree(staged_dir, ignore_errors=True)
 
+    @contextmanager
+    def _execution_budget_context(self, request: InferenceRequest) -> Generator[None]:
+        if request.product_type != ProductType.EXTRACT:
+            yield
+            return
+        budget = self._execution_budgets.setdefault(request.example_id, ExecutionBudget(self.per_file_timeout))
+        if request.example_id in self._cancelled_examples:
+            budget.cancel()
+        with budget.activate():
+            yield
+
     def _run_provider_inference(self, request: InferenceRequest) -> RawInferenceResult:
         """Run inference, rewriting the stored request back to the benchmark source path."""
-        with self._provider_request_context(request) as provider_request:
+        if request.example_id in self._cancelled_examples:
+            raise ProviderPermanentError("Document execution deadline exceeded")
+        with self._execution_budget_context(request), self._provider_request_context(request) as provider_request:
             provider_request = provider_request.model_copy(update={"artifact_dir": str(self.output_dir / "traces")})
             raw_result = self.provider.run_inference(self.pipeline, provider_request)
         if raw_result.request != request:
@@ -346,6 +370,11 @@ class InferenceRunner:
         future: concurrent.futures.Future[Any],
     ) -> None:
         """Signal provider cancellation and mark the Python future cancelled."""
+        if self.pipeline.product_type == ProductType.EXTRACT:
+            self._cancelled_examples.add(example_id)
+            budget = self._execution_budgets.get(example_id)
+            if budget is not None:
+                budget.cancel()
         cancel_fn = getattr(self.provider, "cancel", None)
         if callable(cancel_fn):
             try:

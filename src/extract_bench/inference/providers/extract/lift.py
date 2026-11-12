@@ -22,6 +22,7 @@ from typing import Any
 
 import aiohttp
 
+from extract_bench.inference.limits import EXTRACT_HARD_TIMEOUT_S
 from extract_bench.inference.providers.base import (
     Provider,
     ProviderConfigError,
@@ -47,7 +48,7 @@ class LiftExtractProvider(Provider):
     Configuration options:
         - ``server_url`` (str, required): the lift SDK ``/extract`` endpoint URL
           (e.g. ``https://<your-lift-deployment>.modal.run``).
-        - ``timeout`` (int, default 900): per-request timeout in seconds. lift
+        - ``timeout`` (int, default 10800): per-request timeout in seconds. lift
           sends every page in one request and retries internally, so multi-page
           docs (plus a possible backend cold start) can take a while.
     """
@@ -63,7 +64,7 @@ class LiftExtractProvider(Provider):
                 "/extract endpoint). Example: https://<your-lift-deployment>.modal.run"
             )
         self._server_url: str = str(server_url)
-        self._timeout = int(self.base_config.get("timeout", 900))
+        self._timeout = int(self.base_config.get("timeout", EXTRACT_HARD_TIMEOUT_S))
 
     async def _extract_async(self, file_bytes: bytes, filename: str, schema: dict[str, Any]) -> dict[str, Any]:
         file_b64 = base64.b64encode(file_bytes).decode()

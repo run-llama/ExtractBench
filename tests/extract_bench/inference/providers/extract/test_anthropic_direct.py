@@ -84,7 +84,7 @@ def _patch_client(
 
     import anthropic
 
-    monkeypatch.setattr(anthropic, "Anthropic", lambda api_key: fake_client)
+    monkeypatch.setattr(anthropic, "Anthropic", lambda api_key, **kwargs: fake_client)
 
 
 def test_anthropic_direct_init_raises_without_api_key(monkeypatch: pytest.MonkeyPatch) -> None:

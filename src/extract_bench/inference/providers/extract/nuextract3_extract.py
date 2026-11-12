@@ -28,6 +28,7 @@ from typing import Any
 
 import aiohttp
 
+from extract_bench.inference.limits import EXTRACT_HARD_TIMEOUT_S
 from extract_bench.inference.providers.base import (
     Provider,
     ProviderConfigError,
@@ -507,7 +508,7 @@ class NuExtract3ExtractProvider(Provider):
         - server_url (str, required): self-hosted vLLM server URL (the same endpoint
           the nuextract3 parse pipeline uses).
         - model (str, default="nuextract3"): served model name.
-        - timeout (int, default=1800): per-request timeout in seconds (large
+        - timeout (int, default=10800): per-request timeout in seconds (large
           extractions generate a lot of tokens and can run for many minutes).
         - dpi (int, default=150): DPI for PDF-to-image rendering.
         - max_pages (int | None, default=None): optional page cap; uncapped by
@@ -538,7 +539,7 @@ class NuExtract3ExtractProvider(Provider):
         self._server_url: str = str(server_url)
 
         self._model = self.base_config.get("model", DEFAULT_SERVED_MODEL_NAME)
-        self._timeout = int(self.base_config.get("timeout", 1800))
+        self._timeout = int(self.base_config.get("timeout", EXTRACT_HARD_TIMEOUT_S))
         self._dpi = int(self.base_config.get("dpi", 150))
         max_pages_cfg = self.base_config.get("max_pages")
         self._max_pages: int | None = int(max_pages_cfg) if max_pages_cfg is not None else None

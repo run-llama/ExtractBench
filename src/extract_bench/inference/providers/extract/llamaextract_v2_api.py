@@ -17,6 +17,7 @@ from typing import Any
 
 import httpx
 
+from extract_bench.inference.limits import DEFAULT_POLL_INTERVAL_S, EXTRACT_HARD_TIMEOUT_S
 from extract_bench.inference.providers.base import (
     Provider,
     ProviderConfigError,
@@ -43,8 +44,8 @@ logger = logging.getLogger(__name__)
 
 _PRODUCTION_BASE_URL = "https://api.cloud.llamaindex.ai"
 
-_DEFAULT_TIMEOUT = 600
-_POLL_INTERVAL = 3
+_DEFAULT_TIMEOUT = EXTRACT_HARD_TIMEOUT_S
+_POLL_INTERVAL = DEFAULT_POLL_INTERVAL_S
 _TERMINAL_STATUSES = {"COMPLETED", "FAILED", "CANCELLED"}
 
 # Pipeline config keys handled by this provider (not forwarded to extract config)

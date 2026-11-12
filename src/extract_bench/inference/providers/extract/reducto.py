@@ -9,6 +9,7 @@ from typing import Any, cast
 
 from reducto import Reducto
 
+from extract_bench.inference.limits import DEFAULT_POLL_INTERVAL_S, EXTRACT_HARD_TIMEOUT_S
 from extract_bench.inference.providers.base import (
     Provider,
     ProviderConfigError,
@@ -221,7 +222,7 @@ class ReductoExtractProvider(Provider):
         """
         try:
             # Initialize Reducto client
-            client = Reducto(api_key=self._api_key)
+            client = Reducto(api_key=self._api_key, timeout=EXTRACT_HARD_TIMEOUT_S, max_retries=0)
 
             # Upload the file
             upload = await asyncio.to_thread(client.upload, file=Path(pdf_path))
@@ -286,7 +287,7 @@ class ReductoExtractProvider(Provider):
                     if status in ("Failed", "Cancelled"):
                         reason = getattr(job, "reason", None) or "unknown"
                         raise ProviderTransientError(f"Reducto deep-extract job {job_id} {status}: {reason}")
-                    await asyncio.sleep(10)
+                    await asyncio.sleep(DEFAULT_POLL_INTERVAL_S)
             else:
                 # extract.run is overloaded; passing it as a value to
                 # to_thread defeats overload resolution, so cast the callable.

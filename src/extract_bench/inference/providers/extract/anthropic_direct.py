@@ -12,6 +12,7 @@ from typing import Any
 
 import httpx
 
+from extract_bench.inference.limits import execution_budget
 from extract_bench.inference.providers.base import (
     Provider,
     ProviderConfigError,
@@ -172,7 +173,7 @@ class AnthropicDirectExtractProvider(Provider):
         except ImportError as e:
             raise ProviderConfigError("anthropic package not installed. Run: pip install anthropic") from e
 
-        self._client = anthropic.Anthropic(api_key=self._api_key)
+        self._client = anthropic.Anthropic(api_key=self._api_key, max_retries=0)
 
     @staticmethod
     def _pricing_for_model(model: str) -> tuple[float, float]:
@@ -286,7 +287,7 @@ class AnthropicDirectExtractProvider(Provider):
             "model": self._model,
             "max_tokens": self._max_tokens,
             "system": self._system_prompt,
-            "timeout": httpx.Timeout(3600.0, connect=5.0),
+            "timeout": httpx.Timeout(execution_budget().remaining(), connect=5.0),
             "messages": [{"role": "user", "content": content}],
             "output_config": self._output_config(schema),
             **self._extra_kwargs(),

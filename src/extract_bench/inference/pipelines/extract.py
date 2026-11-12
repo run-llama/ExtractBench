@@ -7,6 +7,7 @@ and open-weight pipelines.
 
 from typing import Any
 
+from extract_bench.inference.limits import EXTRACT_HARD_TIMEOUT_S
 from extract_bench.schemas.pipeline import PipelineSpec
 from extract_bench.schemas.product import ProductType
 
@@ -42,13 +43,9 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
                 config={
                     "tier": _tier,
                     "extract_version": "2.6",
-                    "timeout": 3000,
+                    "timeout": EXTRACT_HARD_TIMEOUT_S,
                     "cite_sources": True,
                 },
-                # The provider polls the hosted job for up to `timeout` seconds; give
-                # the runner-level watchdog headroom past that so long documents are
-                # not killed (and re-submitted) at the 600s run default.
-                per_file_timeout=3600.0,
             )
         )
 
@@ -61,11 +58,10 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
                 "effort": "max",
                 "extract_version": "latest",
                 "extraction_target": "per_doc",
-                "timeout": 3000,
+                "timeout": EXTRACT_HARD_TIMEOUT_S,
                 "confidence_scores": True,
                 "cite_sources": True,
             },
-            per_file_timeout=3600.0,
         )
     )
 
@@ -294,7 +290,6 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
             pipeline_name="gemini_cli_extract_gemini_4_argon_medium_thinking_vision_evidence",
             provider_name="gemini_cli_extract",
             config={"model": "gemini-4-argon", "thinking_level": "medium", "evidence_mode": True, "max_cost_usd": 5.0},
-            per_file_timeout=1800,
         )
     )
     register_fn(
@@ -619,7 +614,7 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
                 "additional_properties_false": True,
                 # Shared open-weight one-shot config: 32k budget, json_object.
                 "max_tokens": 32768,
-                "timeout_s": 3600,
+                "timeout_s": EXTRACT_HARD_TIMEOUT_S,
                 "structured_output": False,
             },
         )
@@ -641,9 +636,7 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
                 "dpi": 100,
                 # Shared open-weight 32k output budget (was 65536).
                 "max_tokens": 32768,
-                # Long documents need more than the provider's 15-minute
-                # default, and SDK retries are disabled to avoid duplicate work.
-                "timeout_s": 3600,
+                "timeout_s": EXTRACT_HARD_TIMEOUT_S,
                 # json_object (not full-schema guided decoding): the extract schemas
                 # are large enough that xgrammar's per-step mask compute starves the
                 # GPU (~1.5 tok/s at concurrency). json_object keeps syntactic-JSON
@@ -668,7 +661,7 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
                 # Large multi-page docs produce large JSON.
                 "max_tokens": 32768,
                 # Long documents decode for a while on small self-hosted GPUs.
-                "timeout_s": 3600,
+                "timeout_s": EXTRACT_HARD_TIMEOUT_S,
                 # json_object (not full-schema guided decoding): compiling a
                 # full-schema grammar for the large extract schemas starves the
                 # GPU. Same reasoning as the gemma4 pipeline above.
@@ -688,7 +681,7 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
                 "additional_properties_false": True,
                 "dpi": 100,
                 "max_tokens": 32768,
-                "timeout_s": 3600,
+                "timeout_s": EXTRACT_HARD_TIMEOUT_S,
                 "structured_output": False,
             },
         )
@@ -705,7 +698,7 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
                 "additional_properties_false": True,
                 "dpi": 100,
                 "max_tokens": 32768,
-                "timeout_s": 3600,
+                "timeout_s": EXTRACT_HARD_TIMEOUT_S,
                 "structured_output": False,
             },
         )
@@ -722,7 +715,7 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
                 "additional_properties_false": True,
                 "dpi": 100,
                 "max_tokens": 32768,
-                "timeout_s": 3600,
+                "timeout_s": EXTRACT_HARD_TIMEOUT_S,
                 "structured_output": False,
             },
         )
@@ -741,7 +734,7 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
                 # Large multi-page docs produce large JSON.
                 "max_tokens": 32768,
                 # Long documents decode for a while on small self-hosted GPUs.
-                "timeout_s": 3600,
+                "timeout_s": EXTRACT_HARD_TIMEOUT_S,
                 # json_object (not full-schema guided decoding): compiling a
                 # full-schema grammar for the large extract schemas starves the
                 # GPU. Same reasoning as the gemma4 pipeline above.
@@ -762,7 +755,7 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
                 # Large multi-page docs produce large JSON.
                 "max_tokens": 32768,
                 # Long documents decode for a while on small self-hosted GPUs.
-                "timeout_s": 3600,
+                "timeout_s": EXTRACT_HARD_TIMEOUT_S,
                 "structured_output": False,
             },
         )
@@ -781,7 +774,7 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
                 # Large multi-page docs produce large JSON.
                 "max_tokens": 32768,
                 # Long documents decode for a while on small self-hosted GPUs.
-                "timeout_s": 3600,
+                "timeout_s": EXTRACT_HARD_TIMEOUT_S,
                 "structured_output": False,
             },
         )
@@ -800,7 +793,7 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
                 # Large multi-page docs produce large JSON.
                 "max_tokens": 32768,
                 # Long documents decode for a while on small self-hosted GPUs.
-                "timeout_s": 3600,
+                "timeout_s": EXTRACT_HARD_TIMEOUT_S,
                 "structured_output": False,
             },
         )
@@ -819,7 +812,7 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
                 # Large multi-page docs produce large JSON.
                 "max_tokens": 32768,
                 # Long documents decode for a while on small self-hosted GPUs.
-                "timeout_s": 3600,
+                "timeout_s": EXTRACT_HARD_TIMEOUT_S,
                 "structured_output": False,
             },
         )
@@ -840,7 +833,7 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
                 # Thinking model: 32k answer + 32k reasoning allowance, one shot.
                 "max_tokens": 65536,
                 # Long documents decode for a while on small self-hosted GPUs.
-                "timeout_s": 3600,
+                "timeout_s": EXTRACT_HARD_TIMEOUT_S,
                 "structured_output": False,
             },
         )
@@ -859,7 +852,7 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
                 # Large multi-page docs produce large JSON.
                 "max_tokens": 32768,
                 # Long documents decode for a while on small self-hosted GPUs.
-                "timeout_s": 3600,
+                "timeout_s": EXTRACT_HARD_TIMEOUT_S,
                 "structured_output": False,
             },
         )
@@ -877,7 +870,7 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
                 # Large multi-page docs produce large JSON.
                 "max_tokens": 32768,
                 # Long documents decode for a while on self-hosted GPUs.
-                "timeout_s": 3600,
+                "timeout_s": EXTRACT_HARD_TIMEOUT_S,
                 # json_object (not xgrammar): compiling a grammar for the large
                 # extract schemas hangs the endpoint (the server drops the request).
                 "structured_output": False,
@@ -897,7 +890,7 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
                 # Large multi-page docs produce large JSON.
                 "max_tokens": 32768,
                 # Long documents decode for a while on small self-hosted GPUs.
-                "timeout_s": 3600,
+                "timeout_s": EXTRACT_HARD_TIMEOUT_S,
                 "structured_output": False,
             },
         )
@@ -915,7 +908,7 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
                 # Large multi-page docs produce large JSON.
                 "max_tokens": 32768,
                 # Long documents decode for a while on small self-hosted GPUs.
-                "timeout_s": 3600,
+                "timeout_s": EXTRACT_HARD_TIMEOUT_S,
                 "structured_output": False,
             },
         )
@@ -934,7 +927,7 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
                 # Large multi-page docs produce large JSON.
                 "max_tokens": 32768,
                 # Long documents decode for a while on small self-hosted GPUs.
-                "timeout_s": 3600,
+                "timeout_s": EXTRACT_HARD_TIMEOUT_S,
                 "structured_output": False,
             },
         )
@@ -952,7 +945,7 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
                 # Large multi-page docs produce large JSON.
                 "max_tokens": 32768,
                 # Long documents decode for a while on small self-hosted GPUs.
-                "timeout_s": 3600,
+                "timeout_s": EXTRACT_HARD_TIMEOUT_S,
                 "structured_output": False,
             },
         )
@@ -996,7 +989,6 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
         _pipeline_spec(
             pipeline_name="kynex_gpt_5_4",
             provider_name="kynex_extract",
-            config={"timeout": 1800},
-            per_file_timeout=1800.0,
+            config={"timeout": EXTRACT_HARD_TIMEOUT_S},
         )
     )

@@ -22,6 +22,7 @@ from datalab_sdk import AsyncDatalabClient
 from datalab_sdk.models import ExtractOptions
 from pypdf import PdfReader
 
+from extract_bench.inference.limits import DEFAULT_POLL_INTERVAL_S, EXTRACT_HARD_TIMEOUT_S, execution_budget
 from extract_bench.inference.providers.base import (
     Provider,
     ProviderConfigError,
@@ -48,8 +49,8 @@ DATALAB_EXTRACT_COST_PER_PAGE_USD = {
     "balanced": 0.015,
     "accurate": 0.02,
 }
-#: polls at the default 1 s interval: 2 hours, so the runner's per-file timeout, not this budget, ends a slow job
-DEFAULT_MAX_POLLS = 7200
+#: The runner owns the document deadline across extraction and scoring stages.
+DEFAULT_MAX_POLLS = int(EXTRACT_HARD_TIMEOUT_S / DEFAULT_POLL_INTERVAL_S)
 
 
 @register_provider("datalab_extract")
@@ -89,9 +90,9 @@ class DatalabExtractProvider(Provider):
             - ``max_polls``: Polling budget passed to the SDK
               (SDK default is 300 = 5 minutes at 1s/poll). The runner's
               per-file timeout is the deadline every pipeline shares, so the
-              bench provider defaults to ``DEFAULT_MAX_POLLS`` (2 hours), longer
-              than any per-file timeout a benchmark run sets.
-            - ``poll_interval``: Seconds between polls (default: 1, SDK default).
+              bench provider defaults to ``DEFAULT_MAX_POLLS``. The shared
+              elapsed-time budget also covers HTTP calls and confidence polling.
+            - ``poll_interval``: Seconds between polls (default: 3).
         """
         super().__init__(provider_name, base_config)
 
@@ -121,7 +122,7 @@ class DatalabExtractProvider(Provider):
         self._save_checkpoint = self.base_config.get("save_checkpoint", False)
         self._skip_cache = self.base_config.get("skip_cache", False)
         self._max_polls = int(self.base_config.get("max_polls", DEFAULT_MAX_POLLS))
-        self._poll_interval = int(self.base_config.get("poll_interval", 1))
+        self._poll_interval = int(self.base_config.get("poll_interval", DEFAULT_POLL_INTERVAL_S))
 
     async def _extract_pdf_async(self, pdf_path: str, schema: dict[str, Any]) -> dict[str, Any]:
         """Call Datalab Extract and return the full response as a plain dict."""
@@ -208,7 +209,11 @@ class DatalabExtractProvider(Provider):
             raise ProviderPermanentError(f"File not found: {file_path}")
 
         try:
-            raw_output = asyncio.run(self._extract_pdf_async(pdf_path=str(file_path), schema=request.schema_override))
+            raw_output = asyncio.run(
+                execution_budget().run_async(
+                    self._extract_pdf_async(pdf_path=str(file_path), schema=request.schema_override)
+                )
+            )
 
             completed_at = datetime.now()
             latency_ms = int((completed_at - started_at).total_seconds() * 1000)

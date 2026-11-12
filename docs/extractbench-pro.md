@@ -107,3 +107,5 @@ Add seven rows per system to [leaderboard-pro.csv](../leaderboard-pro.csv): the 
 | Page-level grounding F1 | `Page_Grounding` | `Page_Grounding_No_Time_Limit` |
 
 Score columns above are percentages. `Confidence_AUGRC` stores raw AUGRC (lower is better), with the website displaying its reciprocal. Use an empty cell for an unreported metric; zero means a measured zero. Then follow the shared steps in [Submitting results](../README.md#submitting-results).
+
+New inference runs use a three-hour execution limit per document, shared by ExtractBench and Pro. Timeout retries are disabled; transient retries stay inside that budget. Job-status polling defaults to three seconds, with backoff for rate limits and transient errors. This is a code change ahead of reruns: published results have not been rerun under this limit, and the primary 30-minute scoring cutoff is unchanged.

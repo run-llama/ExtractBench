@@ -106,7 +106,7 @@ def test_openai_responses_parsed_text_mode_sends_text_and_totals_parse_cost(
     monkeypatch.setattr(
         openai_responses,
         "OpenAI",
-        lambda api_key: SimpleNamespace(responses=fake_responses, files=fake_files),
+        lambda **kwargs: SimpleNamespace(responses=fake_responses, files=fake_files),
     )
     fake_parse = _FakeParseSource(
         ParsedDocumentText(
@@ -163,7 +163,7 @@ def test_recompute_cost_reprices_a_saved_run_from_its_recorded_usage(monkeypatch
     correcting the table and re-running `extract-bench inference renormalize --force`
     re-prices those runs; evaluation reads the cost off the normalized result.
     """
-    monkeypatch.setattr(openai_responses, "OpenAI", lambda api_key: SimpleNamespace())
+    monkeypatch.setattr(openai_responses, "OpenAI", lambda **kwargs: SimpleNamespace())
     provider = openai_responses.OpenAIResponsesExtractProvider(
         "openai_extract", {"api_key": "test-key", "model": "gpt-5.6-terra"}
     )
@@ -215,7 +215,7 @@ def test_recompute_cost_reprices_a_saved_run_from_its_recorded_usage(monkeypatch
 
 def test_recompute_cost_leaves_cost_alone_when_a_raw_artifact_has_no_usage(monkeypatch: pytest.MonkeyPatch) -> None:
     """Re-pricing an artifact that predates token accounting would zero a real number."""
-    monkeypatch.setattr(openai_responses, "OpenAI", lambda api_key: SimpleNamespace())
+    monkeypatch.setattr(openai_responses, "OpenAI", lambda **kwargs: SimpleNamespace())
     provider = openai_responses.OpenAIResponsesExtractProvider(
         "openai_extract", {"api_key": "test-key", "model": "gpt-5.6-terra"}
     )

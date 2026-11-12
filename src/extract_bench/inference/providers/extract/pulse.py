@@ -22,6 +22,7 @@ from urllib.parse import urljoin, urlparse
 
 import requests
 
+from extract_bench.inference.limits import DEFAULT_POLL_INTERVAL_S, EXTRACT_HARD_TIMEOUT_S
 from extract_bench.inference.providers.base import (
     Provider,
     ProviderConfigError,
@@ -40,9 +41,9 @@ from extract_bench.schemas.pipeline_io import (
 from extract_bench.schemas.product import ProductType
 
 _API_BASE_URL = "https://api.runpulse.com"
-_DEFAULT_REQUEST_TIMEOUT_SECONDS = 900.0
-_DEFAULT_JOB_TIMEOUT_SECONDS = 1800.0
-_DEFAULT_RUN_TIMEOUT_SECONDS = 1800.0
+_DEFAULT_REQUEST_TIMEOUT_SECONDS = EXTRACT_HARD_TIMEOUT_S
+_DEFAULT_JOB_TIMEOUT_SECONDS = EXTRACT_HARD_TIMEOUT_S
+_DEFAULT_RUN_TIMEOUT_SECONDS = EXTRACT_HARD_TIMEOUT_S
 _POLL_RETRYABLE_STATUS_CODES = {404, 429, 500, 502, 503, 504}
 _JOB_SUCCESS_STATUSES = {"completed", "complete", "done"}
 _JOB_FAILURE_STATUSES = {"failed", "error", "canceled", "cancelled", "expired"}
@@ -113,7 +114,9 @@ class PulseExtractProvider(Provider):
                 os.getenv("PULSE_JOB_TIMEOUT", _DEFAULT_JOB_TIMEOUT_SECONDS),
             )
         )
-        self._poll_interval = float(self.base_config.get("poll_interval", os.getenv("PULSE_POLL_INTERVAL", 5.0)))
+        self._poll_interval = float(
+            self.base_config.get("poll_interval", os.getenv("PULSE_POLL_INTERVAL", DEFAULT_POLL_INTERVAL_S))
+        )
         self._poll_max_interval = float(self.base_config.get("poll_max_interval", 30.0))
         self._max_poll_errors = int(self.base_config.get("max_poll_errors", 12))
         self._run_timeout = float(self.base_config.get("run_timeout", _DEFAULT_RUN_TIMEOUT_SECONDS))
@@ -636,7 +639,7 @@ class PulseExtractProvider(Provider):
                         },
                     )
 
-                wait = min(wait * 1.3, self._poll_max_interval)
+                wait = self._poll_interval
         finally:
             self._clear_job(example_id, control, job_id)
 

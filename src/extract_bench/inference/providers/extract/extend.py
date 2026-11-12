@@ -17,6 +17,7 @@ from typing import Any, cast
 from extend_ai import Extend
 from extend_ai.core.api_error import ApiError
 
+from extract_bench.inference.limits import DEFAULT_POLL_INTERVAL_S
 from extract_bench.inference.providers.base import (
     Provider,
     ProviderConfigError,
@@ -445,7 +446,7 @@ class ExtendProvider(Provider):
         # Enabled per-pipeline via config {"async_run": true}.
         self._async_run = bool(self.base_config.get("async_run", False))
         # Match the LlamaExtract adapter polling cadence for latency comparisons.
-        self._async_poll_interval = float(self.base_config.get("async_poll_interval", 3.0))
+        self._async_poll_interval = float(self.base_config.get("async_poll_interval", DEFAULT_POLL_INTERVAL_S))
         self._async_max_poll_errors = int(self.base_config.get("async_max_poll_errors", 15))
 
         # Initialize the Extend client
