@@ -82,7 +82,10 @@ class GLMExtractProvider(Provider):
         self._output_price_per_1m: float = float(self.base_config.get("output_price_per_1m", default_output))
 
         self._client = OpenAI(
-            api_key=self._api_key, base_url=self._base_url, timeout=self._api_timeout_s, max_retries=0
+            api_key=self._api_key,
+            base_url=self._base_url,
+            timeout=self._api_timeout_s,
+            max_retries=0,
         )
 
     @staticmethod

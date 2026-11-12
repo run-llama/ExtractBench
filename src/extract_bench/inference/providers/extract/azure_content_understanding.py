@@ -237,7 +237,11 @@ class AzureContentUnderstandingProvider(Provider):
         headers["Ocp-Apim-Subscription-Key"] = self._api_key
         try:
             response = self._session.request(
-                method, url, headers=headers, timeout=min(self._timeout, execution_budget().remaining()), **kwargs
+                method,
+                url,
+                headers=headers,
+                timeout=min(self._timeout, execution_budget().remaining()),
+                **kwargs,
             )
         except requests.RequestException as exc:
             raise ProviderTransientError(f"Azure Content Understanding {context} request failed: {exc}") from exc

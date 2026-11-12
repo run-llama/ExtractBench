@@ -5,6 +5,7 @@ The registered set covers LlamaExtract tiers, one-shot VLM/LLM APIs, two-stage
 and open-weight pipelines.
 """
 
+from collections.abc import Mapping
 from typing import Any
 
 from extract_bench.inference.limits import EXTRACT_HARD_TIMEOUT_S
@@ -16,18 +17,19 @@ def _pipeline_spec(
     *,
     pipeline_name: str,
     provider_name: str,
-    config: dict[str, Any],
+    config: Mapping[str, Any] | None = None,
 ) -> PipelineSpec:
+    provider_config = {} if config is None else dict(config)
     # Providers use different names for the document budget. Keep registration
     # overrides consistent with the runner's fixed deadline.
     for key in ("timeout", "timeout_s", "api_timeout_s", "run_timeout", "job_timeout", "poll_timeout"):
-        if key in config and config[key] != EXTRACT_HARD_TIMEOUT_S:
+        if key in provider_config and provider_config[key] != EXTRACT_HARD_TIMEOUT_S:
             raise ValueError(f"{pipeline_name}: {key} must equal {EXTRACT_HARD_TIMEOUT_S}s")
     return PipelineSpec(
         pipeline_name=pipeline_name,
         provider_name=provider_name,
         product_type=ProductType.EXTRACT,
-        config=config,
+        config=provider_config,
     )
 
 
@@ -537,7 +539,6 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
         _pipeline_spec(
             pipeline_name="landingai_extract",
             provider_name="landingai_extract",
-            config={},
         )
     )
 
@@ -599,7 +600,6 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
         _pipeline_spec(
             pipeline_name="lift_extract",
             provider_name="lift_extract",
-            config={},
         )
     )
 
@@ -972,6 +972,5 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
         _pipeline_spec(
             pipeline_name="kynex_gpt_5_4",
             provider_name="kynex_extract",
-            config={},
         )
     )
