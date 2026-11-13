@@ -218,7 +218,8 @@ def test_cancel_stops_only_the_requested_operator_worker(monkeypatch, tmp_path: 
             with pytest.raises(ProviderPermanentError, match="exr_first") as error:
                 futures["first"].result(timeout=5)
             assert error.value.job_id == "exr_first"
-            assert error.value.debug_payload == {"operator_run_id": "exr_first"}
+            assert error.value.debug_payload["operator_run_id"] == "exr_first"
+            assert error.value.debug_payload["processor_run"]["status"] == "PROCESSING"
             assert not futures["second"].done()
             assert not provider.cancel("first")
         finally:
@@ -226,3 +227,29 @@ def test_cancel_stops_only_the_requested_operator_worker(monkeypatch, tmp_path: 
             for name in started:
                 provider.cancel(name)
     assert not provider.cancel("second")
+
+
+@pytest.mark.parametrize("credits", [None, 12])
+def test_failed_operator_retains_returned_billing(monkeypatch: pytest.MonkeyPatch, credits: int | None) -> None:
+    from types import SimpleNamespace
+    from unittest.mock import Mock
+
+    from extract_bench.inference.events import bind_provider_event_sink
+
+    provider = ExtendOperatorProvider("extend_operator", {"api_key": "test"})
+    monkeypatch.setattr(provider, "_upload_file", lambda path: "file_test")
+    provider._cancel_event.set(threading.Event())
+    run = {"id": "exr_failed", "status": "FAILED", "usage": {"totalCredits": credits}}
+    provider._client = Mock()
+    provider._client.extract_runs.create.return_value = SimpleNamespace(model_dump=lambda **kwargs: run)
+    events = []
+    with bind_provider_event_sink(lambda event, payload: events.append((event, payload))):
+        with pytest.raises(ProviderPermanentError) as caught:
+            provider._extract_document("unused.pdf", {"type": "object"}, {"usd_per_credit": 0.02})
+    assert caught.value.job_id == "exr_failed"
+    assert caught.value.debug_payload["processor_run"] == run
+    accounting = caught.value.debug_payload["cost_accounting"]
+    assert accounting["known_cost_usd"] == (None if credits is None else 0.24)
+    assert accounting["complete"] is (credits is not None)
+    charges = [payload for event, payload in events if event == "cost.component"]
+    assert len(charges) == (0 if credits is None else 1)

@@ -61,7 +61,7 @@ def test_cancelled_polling_cannot_return_late_success_or_start_another_run(
     def response(status: str) -> SimpleNamespace:
         return SimpleNamespace(
             processor_run=SimpleNamespace(id="dpr_test", status=status),
-            model_dump=lambda: {"processor_run": {"id": "dpr_test", "status": status}},
+            model_dump=lambda: {"processor_run": {"id": "dpr_test", "status": status, "usage": {"totalCredits": 16}}},
         )
 
     def create(**kwargs: object) -> SimpleNamespace:
@@ -110,6 +110,9 @@ def test_cancelled_polling_cannot_return_late_success_or_start_another_run(
     assert caught.value.debug_payload is not None
     execution = caught.value.debug_payload["_extend_execution"]
     assert execution["create_response"]["processor_run"]["id"] == "dpr_test"
+    assert caught.value.debug_payload["cost_accounting"]["known_cost_usd"] == pytest.approx(0.16)
+    charges = [payload for event, payload in events if event == "cost.component"]
+    assert {charge["component_id"] for charge in charges} == {"extend/dpr_test"}
     assert (
         "cancel_error" in execution
         if stop_at in ("cancel_error", "trace_failed")

@@ -138,6 +138,7 @@ class DatalabExtractProvider(Provider):
 
     async def _extract_pdf_async(self, pdf_path: str, schema: dict[str, Any]) -> dict[str, Any]:
         """Call Datalab Extract and return the full response as a plain dict."""
+        raw_response: dict[str, Any] = {}
         try:
             extraction_started = time.perf_counter()
             pdf_page_count = _read_pdf_page_count(pdf_path)
@@ -166,7 +167,18 @@ class DatalabExtractProvider(Provider):
                 )
 
             extraction_latency_ms = (time.perf_counter() - extraction_started) * 1000
-            raw_response: dict[str, Any] = dataclasses.asdict(result)
+            raw_response = dataclasses.asdict(result)
+            page_count = _coerce_positive_page_count(raw_response.get("page_count")) or pdf_page_count
+            if page_count is not None:
+                raw_response["page_count"] = page_count
+            if self._extraction_mode is not None:
+                _attach_datalab_extract_pricing(
+                    raw_response,
+                    page_count=page_count,
+                    parse_mode=self._parse_mode,
+                    extraction_mode=self._extraction_mode,
+                )
+            self._record_cost(raw_response)
             emit_provider_event(
                 "stage.completed",
                 provider="datalab",
@@ -190,28 +202,42 @@ class DatalabExtractProvider(Provider):
                 "skip_cache": self._skip_cache,
             }
 
-            page_count = _coerce_positive_page_count(raw_response.get("page_count")) or pdf_page_count
-            if page_count is not None:
-                raw_response["page_count"] = page_count
-            if self._extraction_mode is not None:
-                _attach_datalab_extract_pricing(
-                    raw_response,
-                    page_count=page_count,
-                    parse_mode=self._parse_mode,
-                    extraction_mode=self._extraction_mode,
-                )
-            _promote_api_cost_breakdown(raw_response)
-
             return raw_response
 
         except (ProviderTransientError, ProviderPermanentError):
             raise
         except Exception as e:
+            debug_payload = {
+                "raw_response": raw_response,
+                "cost_accounting": {
+                    "known_cost_usd": raw_response.get("cost_usd"),
+                    "complete": raw_response.get("_cost_complete", False),
+                },
+            }
             error_str = str(e).lower()
             transient_keywords = ["timeout", "network", "connection", "503", "502", "504", "429", "rate limit"]
             if any(keyword in error_str for keyword in transient_keywords):
-                raise ProviderTransientError(f"Transient error during extraction: {e}") from e
-            raise ProviderPermanentError(f"Error during extraction: {e}") from e
+                raise ProviderTransientError(
+                    f"Transient error during extraction: {e}",
+                    debug_payload=debug_payload,
+                ) from e
+            raise ProviderPermanentError(
+                f"Error during extraction: {e}",
+                debug_payload=debug_payload,
+            ) from e
+
+    def _record_cost(self, raw_response: dict[str, Any]) -> None:
+        _promote_api_cost_breakdown(raw_response)
+        cost = raw_response.get("cost_usd")
+        raw_response["_cost_complete"] = cost is not None
+        if cost is not None:
+            emit_provider_event(
+                "cost.component",
+                component_id=f"datalab/{raw_response.get('request_id', 'extract')}",
+                cost_usd=cost,
+                usage=raw_response.get("cost_breakdown"),
+            )
+        emit_provider_event("cost.attempt", known_cost_usd=cost, complete=cost is not None)
 
     async def _wait_for_confidence(self, completed: dict[str, Any], *, base_url: str) -> dict[str, Any]:
         """Refresh the completed job through the documented REST result endpoint.
@@ -278,6 +304,7 @@ class DatalabExtractProvider(Provider):
                             **completed,
                             **{key: value for key, value in refreshed.items() if value is not None},
                         }
+                        self._record_cost(completed)
                         if completed.get("extraction_score_average") is not None:
                             status = ConfidencePollingStatusValues.SCORES_READY
                             break

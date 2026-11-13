@@ -133,3 +133,41 @@ def test_cancelled_awaiter_still_records_late_submission(monkeypatch: pytest.Mon
     assert events[0][0] == "vendor.job_created"
     assert events[0][1]["job_id"] == "late-paid-job"
     client.job.get.assert_not_called()
+
+
+@pytest.mark.parametrize("status", ["Completed", "Failed"])
+@pytest.mark.parametrize("credits", [0, 4])
+def test_terminal_job_usage_is_journaled_even_after_cancellation(
+    monkeypatch: pytest.MonkeyPatch,
+    status: str,
+    credits: int,
+) -> None:
+    from extract_bench.inference.providers.base import ProviderTransientError
+
+    budget = ExecutionBudget(100)
+    client = Mock()
+    client.extract.run_job.return_value = SimpleNamespace(job_id="job")
+    payload = {"usage": {"credits": credits, "num_pages": 2, "num_fields": 0}}
+
+    def poll(*args: object, **kwargs: object) -> SimpleNamespace:
+        if status == "Completed":
+            budget.cancel()
+        return SimpleNamespace(
+            status=status,
+            reason="failed",
+            result=SimpleNamespace(model_dump=lambda: payload),
+            model_dump=lambda: {"status": status, "result": payload},
+        )
+
+    client.job.get.side_effect = poll
+    client.job.cancel.return_value = {"success": True}
+    monkeypatch.setattr(reducto, "Reducto", lambda **kwargs: client)
+    provider = reducto.ReductoExtractProvider("reducto_extract", {"api_key": "test"})
+    events = []
+    with budget.activate(), bind_provider_event_sink(lambda event, payload: events.append((event, payload))):
+        with pytest.raises(TimeoutError if status == "Completed" else ProviderTransientError):
+            asyncio.run(provider._extract_pdf_async("unused.pdf", {}, deep_extract=True))
+    charges = [payload for event, payload in events if event == "cost.component"]
+    assert len(charges) == 1
+    # The successful public Deep rate has a minimum; failure uses only returned billing.
+    assert charges[0]["cost_usd"] == pytest.approx(0.48 if status == "Completed" else credits * 0.015)

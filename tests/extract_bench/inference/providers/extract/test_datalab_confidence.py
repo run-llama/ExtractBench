@@ -140,8 +140,9 @@ def test_extraction_survives_optional_scoring_with_separate_timing(
         )
         try:
             if outcome in ("invalid", "invalid_url"):
-                with budget.activate(), pytest.raises(datalab.ProviderPermanentError):
+                with budget.activate(), pytest.raises(datalab.ProviderPermanentError) as caught:
                     await budget.run_async(provider._extract_pdf_async(str(source), {"type": "object"}))
+                assert caught.value.debug_payload["cost_accounting"] == {"known_cost_usd": 0.017, "complete": True}
                 return
             with budget.activate():
                 result = await budget.run_async(provider._extract_pdf_async(str(source), {"type": "object"}))

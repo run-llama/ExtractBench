@@ -1,6 +1,7 @@
 """Provider for Landing AI EXTRACT."""
 
 import json
+import math
 import os
 from collections.abc import Mapping
 from datetime import datetime
@@ -43,13 +44,13 @@ def _to_plain_data(value: Any) -> Any:
     return value
 
 
-def _coerce_positive(value: Any) -> float | None:
-    """Return ``value`` as a positive float, or ``None`` if non-positive/invalid."""
+def _coerce_nonnegative(value: Any) -> float | None:
+    """Return finite nonnegative billing quantities; missing usage remains unknown."""
     try:
         number = float(value)
     except (TypeError, ValueError):
         return None
-    return number if number > 0 else None
+    return number if math.isfinite(number) and number >= 0 else None
 
 
 @register_provider("landingai_extract")
@@ -114,6 +115,7 @@ class LandingAIExtractProvider(Provider):
         :raises ProviderError: For any API errors
         """
         budget = execution_budget()
+        accounting: dict[str, Any] = {}
         try:
             # First, parse the document
             parse_model = self.base_config.get("parse_model", "dpt-2-latest")
@@ -129,6 +131,7 @@ class LandingAIExtractProvider(Provider):
                 stage="parse",
                 raw_output=_to_plain_data(parse_response),
             )
+            self._record_stage_cost(accounting, "parse", parse_response)
             # Get markdown from parse response
             markdown = parse_response.markdown if hasattr(parse_response, "markdown") else ""
 
@@ -157,6 +160,7 @@ class LandingAIExtractProvider(Provider):
                 stage="extract",
                 raw_output=_to_plain_data(response),
             )
+            self._record_stage_cost(accounting, "extract", response)
             # Convert response to dictionary format
             result: dict[str, Any] = {
                 "data": {},
@@ -212,57 +216,69 @@ class LandingAIExtractProvider(Provider):
         except TimeoutError:
             raise
         except Exception as e:
+            debug_payload = {"cost_accounting": self._cost_accounting(accounting)}
             # Classify the error: rate limits and transient network errors are
             # retryable; everything else is permanent.
             error_str = str(e).lower()
             rate_limit_keywords = ["429", "rate limit", "rate_limit", "too many requests"]
             transient_keywords = ["timeout", "network", "connection", "503", "502", "504"]
             if any(keyword in error_str for keyword in rate_limit_keywords):
-                raise ProviderRateLimitError(f"Rate limited during extraction: {e}") from e
+                raise ProviderRateLimitError(
+                    f"Rate limited during extraction: {e}",
+                    debug_payload=debug_payload,
+                ) from e
             if any(keyword in error_str for keyword in transient_keywords):
-                raise ProviderTransientError(f"Transient error during extraction: {e}") from e
-            raise ProviderPermanentError(f"Error during extraction: {e}") from e
+                raise ProviderTransientError(
+                    f"Transient error during extraction: {e}",
+                    debug_payload=debug_payload,
+                ) from e
+            raise ProviderPermanentError(
+                f"Error during extraction: {e}",
+                debug_payload=debug_payload,
+            ) from e
+
+    def _record_stage_cost(self, result: dict[str, Any], stage: str, response: Any) -> None:
+        metadata = getattr(response, "metadata", None)
+        credits = _coerce_nonnegative(getattr(metadata, "credit_usage", None))
+        if credits is not None:
+            result[f"{stage}_credits"] = credits
+            emit_provider_event(
+                "cost.component",
+                component_id=f"landingai/{stage}",
+                cost_usd=credits * self.CREDIT_RATE_USD,
+                usage=_to_plain_data(metadata),
+            )
+        emit_provider_event("cost.attempt", **self._cost_accounting(result))
+
+    def _cost_accounting(self, result: Mapping[str, Any]) -> dict[str, Any]:
+        credits = [result[key] for key in ("parse_credits", "extract_credits") if key in result]
+        return {
+            "known_cost_usd": sum(credits) * self.CREDIT_RATE_USD if len(credits) > 0 else None,
+            "complete": len(credits) == 2,
+        }
 
     def _apply_cost_fields(self, result: dict[str, Any], parse_response: Any, extract_response: Any) -> None:
-        """Attach credit and USD cost fields to the raw output.
-
-        LandingAI Extract runs as parse -> extract and both steps bill credits.
-        Each SDK response reports its own credits under ``metadata.credit_usage``
-        -- ``ExtractResponse`` has no top-level ``credits_used`` field -- while the
-        page count is only on the parse metadata. We sum parse + extract credits
-        so the reported cost reflects the full pipeline, then convert to USD at
-        :attr:`CREDIT_RATE_USD`. When no credits are reported the cost fields are
-        left unset rather than defaulting to zero.
-        """
-        parse_credits = None
-        num_pages = None
-        parse_meta = getattr(parse_response, "metadata", None)
-        if parse_meta is not None:
-            parse_credits = _coerce_positive(getattr(parse_meta, "credit_usage", None))
-            num_pages = _coerce_positive(getattr(parse_meta, "page_count", None))
-
-        # ExtractResponse exposes its credits on metadata.credit_usage (there is
-        # no top-level ``credits_used`` attribute), same shape as parse metadata.
-        extract_credits = None
-        extract_meta = getattr(extract_response, "metadata", None)
-        if extract_meta is not None:
-            extract_credits = _coerce_positive(getattr(extract_meta, "credit_usage", None))
-
-        if parse_credits is not None:
-            result["parse_credits"] = parse_credits
-        if extract_credits is not None:
-            result["extract_credits_used"] = extract_credits
-
-        total_credits = (parse_credits or 0.0) + (extract_credits or 0.0)
-        if total_credits <= 0:
-            return
-
-        cost_usd = total_credits * self.CREDIT_RATE_USD
-        result["credits_used"] = total_credits
-        result["cost_usd"] = cost_usd
-        if num_pages is not None:
-            result["num_pages"] = num_pages
-            result["cost_per_page_usd"] = cost_usd / num_pages
+        """Retain known stage charges and distinguish a subtotal from full billing."""
+        accounting: dict[str, Any] = {}
+        for stage, response in (("parse", parse_response), ("extract", extract_response)):
+            metadata = getattr(response, "metadata", None)
+            credits = _coerce_nonnegative(getattr(metadata, "credit_usage", None))
+            if credits is not None:
+                accounting[f"{stage}_credits"] = credits
+        snapshot = self._cost_accounting(accounting)
+        result.update(accounting)
+        if "extract_credits" in accounting:
+            result["extract_credits_used"] = accounting["extract_credits"]
+        result["cost_usd"] = snapshot["known_cost_usd"]
+        result["_cost_complete"] = snapshot["complete"]
+        if snapshot["known_cost_usd"] is not None:
+            result["credits_used"] = sum(accounting.values())
+        metadata = getattr(parse_response, "metadata", None)
+        pages = _coerce_nonnegative(getattr(metadata, "page_count", None))
+        if pages is not None and pages > 0:
+            result["num_pages"] = pages
+            if snapshot["known_cost_usd"] is not None:
+                result["cost_per_page_usd"] = snapshot["known_cost_usd"] / pages
 
     def run_inference(self, pipeline: PipelineSpec, request: InferenceRequest) -> RawInferenceResult:
         """

@@ -110,13 +110,15 @@ class ExtendOperatorProvider(ExtendProvider):
     ) -> dict[str, Any]:
         cancelled = self._cancel_event.get()
         run_id: str | None = None
+        run: dict[str, Any] = {}
+        accounting: dict[str, Any] = {"known_cost_usd": None, "complete": False}
 
         def check_cancelled() -> None:
             if cancelled.is_set():
                 raise ProviderPermanentError(
                     f"Operator run {run_id} cancelled" if run_id is not None else "Operator extraction cancelled",
                     job_id=run_id,
-                    debug_payload={"operator_run_id": run_id} if run_id is not None else None,
+                    debug_payload={"operator_run_id": run_id, "processor_run": run, "cost_accounting": accounting},
                 )
 
         check_cancelled()
@@ -162,6 +164,7 @@ class ExtendOperatorProvider(ExtendProvider):
 
         run = response.model_dump(mode="json", by_alias=True)
         run_id = run["id"]
+        accounting = self._record_run_cost({"processor_run": run}, pipeline_config, accounting)
         emit_provider_event(
             "vendor.job_created",
             provider="extend_operator",
@@ -175,6 +178,7 @@ class ExtendOperatorProvider(ExtendProvider):
             try:
                 response = self._client.extract_runs.retrieve(run_id, request_options={"max_retries": 0})
                 run = response.model_dump(mode="json", by_alias=True)
+                accounting = self._record_run_cost({"processor_run": run}, pipeline_config, accounting)
                 consecutive_poll_errors = 0
             except Exception as error:
                 consecutive_poll_errors += 1
@@ -183,7 +187,11 @@ class ExtendOperatorProvider(ExtendProvider):
                 ) or consecutive_poll_errors > self._async_max_poll_errors:
                     # The harness must not create a new billed run after a
                     # polling failure. Include the existing ID for recovery.
-                    raise ProviderPermanentError(f"Cannot poll Operator run {run_id}: {error}") from error
+                    raise ProviderPermanentError(
+                        f"Cannot poll Operator run {run_id}: {error}",
+                        job_id=run_id,
+                        debug_payload={"processor_run": run, "cost_accounting": accounting},
+                    ) from error
 
         if run.get("status") == "PROCESSED":
             emit_provider_event(
@@ -197,12 +205,16 @@ class ExtendOperatorProvider(ExtendProvider):
         if run.get("status") != "PROCESSED":
             raise ProviderPermanentError(
                 f"Operator run {run_id} ended with {run.get('status')}: "
-                f"{run.get('failureReason')} {run.get('failureMessage')}"
+                f"{run.get('failureReason')} {run.get('failureMessage')}",
+                job_id=run_id,
+                debug_payload={"processor_run": run, "cost_accounting": accounting},
             )
 
         # Keep the shared Extend envelope for schema/citation normalization.
         return {
             "processor_run": run,
+            "cost_usd": accounting["known_cost_usd"],
+            "_cost_complete": accounting["complete"],
             "_extend_metadata": {
                 "file_id": file_id,
                 "api_version": "2026-02-09",

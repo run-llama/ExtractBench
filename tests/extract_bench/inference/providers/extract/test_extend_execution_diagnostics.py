@@ -46,7 +46,7 @@ def test_async_run_retains_receipt_and_terminal_payload(monkeypatch: pytest.Monk
                     "status": terminal_status,
                     "failureReason": "PARSING_ERROR" if terminal_status == "FAILED" else None,
                     "failureMessage": "diagnostic detail" if terminal_status == "FAILED" else None,
-                    "usage": {"credits": 7},
+                    "usage": {"credits": 7, "totalCredits": 9},
                     "futureDiagnostic": {"requestId": "request-test"},
                 },
             },
@@ -62,6 +62,8 @@ def test_async_run_retains_receipt_and_terminal_payload(monkeypatch: pytest.Monk
         payload = caught.value.debug_payload
         assert payload is not None
         assert payload["processor_run"]["failure_message"] == "diagnostic detail"
+        assert payload["cost_accounting"]["known_cost_usd"] == pytest.approx(0.1125)
+        assert payload["cost_accounting"]["complete"] is True
     else:
         payload = provider._run_processor_async("dp_test", "file_test")
     assert payload["processor_run"]["usage"]["credits"] == 7
