@@ -623,7 +623,11 @@ class ParseurProvider(Provider):
                     job_id=document_id,
                     debug_payload=document,
                 )
-        raise ProviderTransientError(f"Polling of document {document_id} stopped by the runner", job_id=document_id)
+        raise ProviderTransientError(
+            f"Polling of document {document_id} stopped by the runner",
+            job_id=document_id,
+            debug_payload=document,
+        )
 
     def _attach_cost_stats(self, raw_output: dict[str, Any]) -> None:
         num_pages = raw_output.get("num_pages")
@@ -735,6 +739,15 @@ class ParseurProvider(Provider):
             "conversion": conversion,
             "num_pages": page_count(file_path),
         }
+
+        self._attach_cost_stats(raw_output)
+        if raw_output.get("cost_usd") is not None:
+            emit_provider_event(
+                "cost.component",
+                component_id=f"parseur/{document_id}",
+                cost_usd=raw_output["cost_usd"],
+                usage={"credits_used": document.get("credits_used")},
+            )
 
         return RawInferenceResult(
             request=request,

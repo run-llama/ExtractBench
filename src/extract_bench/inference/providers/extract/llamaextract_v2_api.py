@@ -29,6 +29,7 @@ from extract_bench.inference.providers.base import (
 from extract_bench.inference.providers.cancellation import CancellableClientRegistry
 from extract_bench.inference.providers.extract.citations import extract_llamaextract_field_citations
 from extract_bench.inference.providers.extract.llamaextract_pricing import (
+    USD_PER_CREDIT,
     apply_pricing_fields,
     local_page_count,
 )
@@ -506,15 +507,37 @@ class LlamaExtractV2Provider(Provider):
 
         poll_history: list[dict[str, Any]] = []
         last_recorded_status: str | None = None
+        data: dict[str, Any] = {}
 
         while True:
             elapsed = time.monotonic() - start
             if elapsed > self._timeout:
-                raise ProviderTransientError(f"V2 extract job {job_id} did not complete within {self._timeout}s")
+                raise ProviderTransientError(
+                    f"V2 extract job {job_id} did not complete within {self._timeout}s",
+                    job_id=job_id,
+                    debug_payload=data,
+                )
 
             resp = client.get(f"/api/v2/extract/{job_id}", params=poll_params)
             resp.raise_for_status()
             data = resp.json()
+            usage = data.get("usage")
+            if isinstance(usage, dict):
+                credits = [usage.get(key) for key in ("extract_credits", "parse_credits")]
+                known = [value for value in credits if isinstance(value, (int, float))]
+                if len(known) > 0:
+                    cost = sum(known) * USD_PER_CREDIT
+                    data["cost_accounting"] = {
+                        "known_cost_usd": cost,
+                        "complete": len(known) == len(credits),
+                        "usage": usage,
+                    }
+                    emit_provider_event(
+                        "cost.component",
+                        component_id=f"llamaextract/{job_id}",
+                        cost_usd=cost,
+                        usage=usage,
+                    )
             status = data.get("status", "UNKNOWN")
 
             if status != last_recorded_status:
@@ -543,10 +566,18 @@ class LlamaExtractV2Provider(Provider):
 
                 if status == "FAILED":
                     error_msg = data.get("error_message", "Unknown error")
-                    raise ProviderPermanentError(f"V2 extract job {job_id} failed: {error_msg}")
+                    raise ProviderPermanentError(
+                        f"V2 extract job {job_id} failed: {error_msg}",
+                        job_id=job_id,
+                        debug_payload=data,
+                    )
 
                 if status == "CANCELLED":
-                    raise ProviderPermanentError(f"V2 extract job {job_id} was cancelled")
+                    raise ProviderPermanentError(
+                        f"V2 extract job {job_id} was cancelled",
+                        job_id=job_id,
+                        debug_payload=data,
+                    )
 
                 extract_metadata = data.get("extract_metadata") or {}
                 spawned_parse_job_id = (

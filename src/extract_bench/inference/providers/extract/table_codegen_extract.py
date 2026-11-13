@@ -21,6 +21,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from extract_bench.inference.events import emit_provider_event
 from extract_bench.inference.providers.base import (
     Provider,
     ProviderConfigError,
@@ -259,7 +260,10 @@ class TableCodegenExtractProvider(Provider):
         )
 
     # ------------------------------------------------------------------ #
-    def _parse_agentic(self, request: InferenceRequest) -> tuple[Document | ItemsDocument, float, int, str | None]:
+    def _parse_agentic(
+        self,
+        request: InferenceRequest,
+    ) -> tuple[Document | ItemsDocument, float | None, int, str | None]:
         """Run LlamaParse Agentic and return (document, parse_cost_usd, num_pages,
         parse_job_id). The document is a markdown-page ``Document`` or, with
         ``document_mode="items"``, an ``ItemsDocument`` over the parse's typed
@@ -281,6 +285,14 @@ class TableCodegenExtractProvider(Provider):
         )
         raw_parse = parse_provider.run_inference(parse_pipeline, parse_request)
         parse_result = parse_provider.normalize(raw_parse)
+        parse_cost = raw_parse.raw_output.get("cost_usd")
+        parse_job_id = extract_job_id_from_raw_payload(raw_parse.raw_output)
+        if parse_cost is not None:
+            emit_provider_event(
+                "cost.component",
+                component_id=f"table_codegen/parse/{parse_job_id}",
+                cost_usd=parse_cost,
+            )
         parse_out = parse_result.output
         if not isinstance(parse_out, ParseOutput):
             raise ProviderPermanentError(
@@ -300,19 +312,19 @@ class TableCodegenExtractProvider(Provider):
             pages = [{"page_num": p.page_index + 1, "text": p.markdown} for p in parse_out.pages]
             document = Document(pages)
             n_pages = len(pages)
-        parse_cost = float(raw_parse.raw_output.get("cost_usd") or 0.0)
+        parse_cost = raw_parse.raw_output.get("cost_usd")
         num_pages = int(raw_parse.raw_output.get("num_pages") or n_pages)
         parse_job_id = extract_job_id_from_raw_payload(raw_parse.raw_output)
         return document, parse_cost, num_pages, parse_job_id
 
-    def _codegen_cost(self, usage: dict[str, Any]) -> float:
+    def _codegen_cost(self, usage: dict[str, Any]) -> float | None:
         cin, cout = pricing_for_model(self._model, self._pricing)  # longest-prefix match
         if not cin and not cout:
             logger.warning(
-                "table_codegen_extract: no pricing for model %r — codegen cost will be reported as $0",
+                "table_codegen_extract: no pricing for model %r — codegen cost is unknown",
                 self._model,
             )
-            return 0.0
+            return None
         n_in = float(usage.get("input", 0) or 0)
         n_out = float(usage.get("output", 0) or 0)
         read = float(usage.get("cache_read", 0) or 0)
@@ -326,9 +338,10 @@ class TableCodegenExtractProvider(Provider):
             read_rate, write_rate = pricing_for_model(self._model, self._cache_pricing)
             if (read or write) and not (read_rate or write_rate):
                 logger.warning(
-                    "table_codegen_extract: no cache pricing for model %r — cache tokens will be reported as $0",
+                    "table_codegen_extract: no cache pricing for model %r — cache cost is unknown",
                     self._model,
                 )
+                return None
             in_cost = (n_in * cin + read * read_rate + write * write_rate) / 1e6
         elif self._llm_provider == "google":
             # Gemini prompt_token_count INCLUDES cached tokens; the cached subset bills
@@ -363,6 +376,12 @@ class TableCodegenExtractProvider(Provider):
 
         # 1) LlamaParse Agentic FIRST — its parsed output is the pipeline's input.
         document, parse_cost, num_pages, parse_job_id = self._parse_agentic(request)
+        if parse_cost is not None:
+            emit_provider_event(
+                "cost.component",
+                component_id=f"table_codegen/parse/{parse_job_id}",
+                cost_usd=parse_cost,
+            )
         if isinstance(document, ItemsDocument):
             if not document.items():
                 logger.warning(
@@ -376,6 +395,11 @@ class TableCodegenExtractProvider(Provider):
                 "only; check the parse_config table output mode (tables must be HTML, not markdown).",
                 request.example_id,
             )
+
+        def record_codegen_usage(usage: dict[str, int]) -> None:
+            cost = self._codegen_cost(usage)
+            if cost is not None:
+                emit_provider_event("cost.component", component_id="table_codegen/agent", cost_usd=cost, usage=usage)
 
         # 2) Agent authors + gates an extractor; run it over the full document.
         result = generate_extractor(
@@ -398,29 +422,28 @@ class TableCodegenExtractProvider(Provider):
             turn_budget_hint=self._turn_budget_hint,
             thinking_level=self._thinking_level,
             effort=self._effort,
+            on_usage=record_codegen_usage,
         )
-        # Accept a clean submit OR a *_salvaged result (the agent ran out of turns but
-        # had produced a viable run — see generate_extractor's salvage). Everything else
-        # is transient, not permanent: a gate failure within max_turns is sampling noise
-        # (draw-to-draw variance is large) — let the runner's retry take a fresh sample.
-        accepted = result["status"] == "done" or str(result["status"]).endswith("_salvaged")
-        if not accepted or not isinstance(result.get("output"), dict):
-            raise ProviderTransientError(
-                f"table_codegen_extract: agent did not produce a valid extraction "
-                f"(status={result['status']}, turns={result.get('turns')})."
-            )
-
         completed_at = datetime.now()
         usage = result.get("usage") or {}
-        codegen_cost = self._codegen_cost(usage)
-        cost_usd = round(parse_cost + codegen_cost, 6)
+        codegen_cost = self._codegen_cost(usage) if len(usage) > 0 else None
+        known_costs = [cost for cost in (parse_cost, codegen_cost) if cost is not None]
+        cost_usd = round(sum(known_costs), 6) if len(known_costs) > 0 else None
+        if codegen_cost is not None:
+            emit_provider_event(
+                "cost.component",
+                component_id="table_codegen/agent",
+                cost_usd=codegen_cost,
+                usage=usage,
+            )
         raw_output: dict[str, Any] = {
-            "data": result["output"],
+            "data": result.get("output"),
             "model": self._model,
             "usage": usage,
             "num_pages": num_pages,
             "cost_usd": cost_usd,
-            "cost_per_page_usd": (cost_usd / num_pages) if num_pages else None,
+            "_cost_complete": parse_cost is not None and codegen_cost is not None,
+            "cost_per_page_usd": (cost_usd / num_pages) if num_pages and cost_usd is not None else None,
             "parse_cost_usd": parse_cost,
             "codegen_cost_usd": codegen_cost,
             # The evaluator copies parse_job_id into the report. parse_pages is the
@@ -467,6 +490,23 @@ class TableCodegenExtractProvider(Provider):
                 "script": result.get("script", "") or "",
             },
         }
+        raw_output["cost_accounting"] = {
+            "known_cost_usd": cost_usd,
+            "complete": raw_output["_cost_complete"],
+            "usage": usage,
+        }
+        # Accept a clean submit OR a *_salvaged result (the agent ran out of turns but
+        # had produced a viable run — see generate_extractor's salvage). Everything else
+        # is transient, not permanent: a gate failure within max_turns is sampling noise
+        # (draw-to-draw variance is large) — let the runner's retry take a fresh sample.
+        accepted = result["status"] == "done" or str(result["status"]).endswith("_salvaged")
+        if not accepted or not isinstance(result.get("output"), dict):
+            raise ProviderTransientError(
+                f"table_codegen_extract: agent did not produce a valid extraction "
+                f"(status={result['status']}, turns={result.get('turns')}).",
+                debug_payload=raw_output,
+            )
+
         return RawInferenceResult(
             request=request,
             pipeline=pipeline,

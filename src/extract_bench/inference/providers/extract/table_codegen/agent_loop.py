@@ -92,6 +92,7 @@ def run_agent(
     thinking_level: str | None = None,
     turn_note: Callable[[int, int], str | None] | None = None,
     effort: str | None = None,
+    on_usage: Callable[[dict[str, int]], None] | None = None,
 ) -> dict[str, Any]:
     """Drive a tool-use loop. ``on_turn_start(turn_index)`` is called at the top
     of each turn before the model is queried — handlers that need to tell turns
@@ -120,10 +121,21 @@ def run_agent(
             trace_result_limit,
             turn_note,
             effort,
+            on_usage=on_usage,
         )
     if provider == "openai":
         return _run_openai(
-            model, system, tools, tmap, max_turns, verbose, api_key, on_turn_start, trace_result_limit, turn_note
+            model,
+            system,
+            tools,
+            tmap,
+            max_turns,
+            verbose,
+            api_key,
+            on_turn_start,
+            trace_result_limit,
+            turn_note,
+            on_usage=on_usage,
         )
     if provider == "google":
         return _run_google(
@@ -139,6 +151,7 @@ def run_agent(
             trace_result_limit,
             thinking_level,
             turn_note,
+            on_usage=on_usage,
         )
     raise ValueError(f"unknown provider: {provider!r} (expected 'anthropic', 'openai', or 'google')")
 
@@ -181,6 +194,7 @@ def _run_anthropic(
     trace_result_limit: int | None = 2000,
     turn_note: Callable[[int, int], str | None] | None = None,
     effort: str | None = None,
+    on_usage: Callable[[dict[str, int]], None] | None = None,
 ) -> dict[str, Any]:
     import anthropic
     from anthropic.types import TextBlock, ToolUseBlock
@@ -221,6 +235,8 @@ def _run_anthropic(
         usage["output"] += u.output_tokens or 0
         usage["cache_read"] += getattr(u, "cache_read_input_tokens", 0) or 0
         usage["cache_write"] += getattr(u, "cache_creation_input_tokens", 0) or 0
+        if on_usage is not None:
+            on_usage(dict(usage))
         messages.append({"role": "assistant", "content": resp.content})
         text = "".join(b.text for b in resp.content if isinstance(b, TextBlock))
         tool_uses = [b for b in resp.content if isinstance(b, ToolUseBlock)]
@@ -290,6 +306,7 @@ def _run_openai(
     on_turn_start: Callable[[int], None] | None = None,
     trace_result_limit: int | None = 2000,
     turn_note: Callable[[int, int], str | None] | None = None,
+    on_usage: Callable[[dict[str, int]], None] | None = None,
 ) -> dict[str, Any]:
     from openai import OpenAI
 
@@ -319,6 +336,8 @@ def _run_openai(
             usage["output"] += resp.usage.completion_tokens or 0
             details = getattr(resp.usage, "prompt_tokens_details", None)
             usage["cache_read"] += getattr(details, "cached_tokens", 0) or 0
+            if on_usage is not None:
+                on_usage(dict(usage))
         msg = resp.choices[0].message
         messages.append(msg)
         calls = msg.tool_calls or []
@@ -376,6 +395,7 @@ def _run_google(
     trace_result_limit: int | None = 2000,
     thinking_level: str | None = None,
     turn_note: Callable[[int, int], str | None] | None = None,
+    on_usage: Callable[[dict[str, int]], None] | None = None,
 ) -> dict[str, Any]:
     """Google/Gemini tool-use loop via genai ``models.generate_content``.
 
@@ -446,6 +466,8 @@ def _run_google(
             usage["output"] += getattr(meta, "candidates_token_count", 0) or 0
             usage["cache_read"] += getattr(meta, "cached_content_token_count", 0) or 0
             usage["thinking"] += getattr(meta, "thoughts_token_count", 0) or 0
+            if on_usage is not None:
+                on_usage(dict(usage))
         candidates = getattr(resp, "candidates", None) or []
         candidate = candidates[0] if candidates else None
         content = getattr(candidate, "content", None) if candidate is not None else None

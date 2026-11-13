@@ -14,6 +14,7 @@ from urllib.parse import urlencode, urlparse, urlunparse
 
 import requests
 
+from extract_bench.inference.events import emit_provider_event
 from extract_bench.inference.limits import EXTRACT_HARD_TIMEOUT_S, execution_budget
 from extract_bench.inference.providers.base import (
     Provider,
@@ -215,16 +216,38 @@ class AzureContentUnderstandingProvider(Provider):
 
     def _poll_operation(self, operation_url: str, *, context: str) -> dict[str, Any]:
         budget = execution_budget()
+        body: dict[str, Any] = {}
         for _ in range(self._max_polls):
             response = self._request("GET", operation_url, context=context)
             body = _response_json(response)
+            _apply_usage_cost_fields(body, self.base_config)
+            if body.get("cost_usd") is not None:
+                body["cost_accounting"] = {
+                    "known_cost_usd": body["cost_usd"],
+                    "complete": False,
+                    "usage": body.get("usage"),
+                }
+                emit_provider_event(
+                    "cost.component",
+                    component_id=f"azure/{operation_url}",
+                    cost_usd=body["cost_usd"],
+                    usage=body.get("usage"),
+                )
             status = str(body.get("status", "")).lower()
             if status in _TERMINAL_STATUSES:
                 if status == "succeeded":
                     return body
-                raise ProviderPermanentError(f"Azure Content Understanding {context} failed: {body}")
+                raise ProviderPermanentError(
+                    f"Azure Content Understanding {context} failed: {body}",
+                    job_id=operation_url,
+                    debug_payload=body,
+                )
             budget.wait(self._poll_interval)
-        raise ProviderTransientError(f"Timed out waiting for Azure Content Understanding {context}")
+        raise ProviderTransientError(
+            f"Timed out waiting for Azure Content Understanding {context}",
+            job_id=operation_url,
+            debug_payload=body,
+        )
 
     def _url(self, path: str, extra_params: Mapping[str, str] | None = None) -> str:
         params = {"api-version": self._api_version}
