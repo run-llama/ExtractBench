@@ -1,13 +1,14 @@
 """Provider progress belongs to its attempt even when a paid stage fails."""
 
 import asyncio
+import errno
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock
 
 import pytest
 
-from extract_bench.inference.events import bind_provider_event_sink, emit_provider_event
+from extract_bench.inference.events import ProviderEventError, bind_provider_event_sink, emit_provider_event
 from extract_bench.inference.limits import ExecutionBudget
 
 
@@ -60,3 +61,37 @@ def test_landingai_records_parse_before_cancellation_and_rechecks_budget(cancel_
         assert 70 < client.parse.call_args.kwargs["timeout"] <= 100
     assert received[0][0] == "stage.completed"
     assert received[0][1]["raw_output"]["credit_usage"] == 2
+
+
+def test_sink_failure_waits_for_vendor_work_then_fails_permanently() -> None:
+    completed = []
+
+    def record(event: str, payload: object) -> None:
+        raise OSError(errno.ENOSPC, "trace disk full")
+
+    with pytest.raises(ProviderEventError) as caught:
+        with bind_provider_event_sink(record):
+            emit_provider_event("vendor.job_created", job_id="paid-job")
+            completed.append("poll completed")
+    assert completed == ["poll completed"]
+    assert caught.value.job_id == "paid-job"
+    assert isinstance(caught.value.__cause__, OSError)
+    emit_provider_event("unbound")
+
+
+def test_pulse_trace_disk_failure_does_not_prevent_remote_cancellation(monkeypatch: pytest.MonkeyPatch) -> None:
+    pytest.importorskip("requests")
+    from extract_bench.inference.providers.extract.pulse import PulseExtractProvider
+
+    provider = PulseExtractProvider("pulse_extract", {"api_key": "test"})
+    delete = Mock(return_value=SimpleNamespace(status_code=200))
+    monkeypatch.setattr("extract_bench.inference.providers.extract.pulse.requests.delete", delete)
+
+    def record(event: str, payload: object) -> None:
+        raise OSError(errno.ENOSPC, "trace disk full")
+
+    with pytest.raises(ProviderEventError) as caught, bind_provider_event_sink(record):
+        provider._cancel_remote_job("paid-job")
+    assert caught.value.job_id == "paid-job"
+    delete.assert_called_once()
+    assert delete.call_args.args[0].endswith("/job/paid-job")

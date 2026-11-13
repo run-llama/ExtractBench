@@ -880,48 +880,36 @@ class ExtendProvider(Provider):
         except TimeoutError as error:
             # Cleanup gets one polling interval beyond the exhausted document
             # budget, without SDK retries; retain failures for remote recovery.
-            trace_failure: Exception | None = None
+            emit_provider_event("vendor.cancellation_requested", provider="extend", job_id=run_id)
             try:
-                try:
-                    emit_provider_event(
-                        "vendor.cancellation_requested",
-                        provider="extend",
-                        job_id=run_id,
-                    )
-                finally:
-                    # A full trace disk must not leave the paid vendor job running.
-                    try:
-                        response = self._client.processor_run.cancel(
-                            id=run_id,
-                            request_options=cast(
-                                RequestOptions,
-                                {"timeout_in_seconds": DEFAULT_POLL_INTERVAL_S, "max_retries": 0},
-                            ),
-                        )
-                        execution["cancel_response"] = self._run_response_to_dict(response)
-                    except Exception as cancel_error:
-                        execution["cancel_error"] = str(cancel_error)
-                        emit_provider_event(
-                            "vendor.cancellation_failed",
-                            provider="extend",
-                            job_id=run_id,
-                            error=str(cancel_error),
-                        )
-                    else:
-                        emit_provider_event(
-                            "vendor.cancellation_completed",
-                            provider="extend",
-                            job_id=run_id,
-                            response=execution["cancel_response"],
-                        )
-            except Exception as trace_error:
-                trace_failure = trace_error
-                execution["cancellation_trace_error"] = str(trace_error)
+                response = self._client.processor_run.cancel(
+                    id=run_id,
+                    request_options=cast(
+                        RequestOptions,
+                        {"timeout_in_seconds": DEFAULT_POLL_INTERVAL_S, "max_retries": 0},
+                    ),
+                )
+                execution["cancel_response"] = self._run_response_to_dict(response)
+            except Exception as cancel_error:
+                execution["cancel_error"] = str(cancel_error)
+                emit_provider_event(
+                    "vendor.cancellation_failed",
+                    provider="extend",
+                    job_id=run_id,
+                    error=str(cancel_error),
+                )
+            else:
+                emit_provider_event(
+                    "vendor.cancellation_completed",
+                    provider="extend",
+                    job_id=run_id,
+                    response=execution["cancel_response"],
+                )
             raise ProviderPermanentError(
                 f"Extend processor run {run_id} cancelled or exceeded its deadline",
                 job_id=run_id,
                 debug_payload={"_extend_execution": execution},
-            ) from (trace_failure if trace_failure is not None else error)
+            ) from error
 
     def _extract_document(
         self,

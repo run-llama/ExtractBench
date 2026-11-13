@@ -293,41 +293,19 @@ class ReductoExtractProvider(Provider):
                 except (TimeoutError, asyncio.CancelledError):
                     # Cancellation is cleanup: give it a bounded request after
                     # extraction time is exhausted, without submitting new work.
-                    cancellation: dict[str, Any] = {}
+                    emit_provider_event("vendor.cancellation_requested", provider="reducto", job_id=job_id)
                     try:
-                        try:
-                            emit_provider_event(
-                                "vendor.cancellation_requested",
-                                provider="reducto",
-                                job_id=job_id,
-                            )
-                        finally:
-                            # Cancellation still runs when the trace sink cannot write.
-                            try:
-                                await asyncio.to_thread(client.job.cancel, job_id, timeout=10)
-                            except Exception as cancel_error:
-                                cancellation["cancel_error"] = str(cancel_error)
-                                logging.getLogger(__name__).warning("Reducto job cancellation failed", exc_info=True)
-                                emit_provider_event(
-                                    "vendor.cancellation_failed",
-                                    provider="reducto",
-                                    job_id=job_id,
-                                    error=str(cancel_error),
-                                )
-                            else:
-                                cancellation["cancel_request_succeeded"] = True
-                                emit_provider_event(
-                                    "vendor.cancellation_completed",
-                                    provider="reducto",
-                                    job_id=job_id,
-                                )
-                    except Exception as trace_error:
-                        cancellation["cancellation_trace_error"] = str(trace_error)
-                        raise ProviderPermanentError(
-                            f"Reducto job {job_id} cancellation telemetry failed: {trace_error}",
+                        await asyncio.to_thread(client.job.cancel, job_id, timeout=10)
+                    except Exception as cancel_error:
+                        logging.getLogger(__name__).warning("Reducto job cancellation failed", exc_info=True)
+                        emit_provider_event(
+                            "vendor.cancellation_failed",
+                            provider="reducto",
                             job_id=job_id,
-                            debug_payload=cancellation,
-                        ) from trace_error
+                            error=str(cancel_error),
+                        )
+                    else:
+                        emit_provider_event("vendor.cancellation_completed", provider="reducto", job_id=job_id)
                     raise
             else:
 

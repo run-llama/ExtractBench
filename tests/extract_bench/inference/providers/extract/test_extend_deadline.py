@@ -23,7 +23,17 @@ from extract_bench.schemas.pipeline_io import InferenceRequest
 
 @pytest.mark.parametrize(
     "stop_at",
-    ["create", "get", "poll_error", "deadline", "cancel_error", "trace_requested", "trace_completed", "trace_failed"],
+    [
+        "create",
+        "get",
+        "poll_error",
+        "deadline",
+        "cancel_error",
+        "trace_requested",
+        "trace_completed",
+        "trace_failed",
+        "trace_job_created",
+    ],
 )
 def test_cancelled_polling_cannot_return_late_success_or_start_another_run(
     monkeypatch: pytest.MonkeyPatch,
@@ -78,13 +88,17 @@ def test_cancelled_polling_cannot_return_late_success_or_start_another_run(
 
     def record(event: str, payload: Mapping[str, Any]) -> None:
         events.append((event, payload))
-        if event == "vendor.cancellation_" + stop_at.removeprefix("trace_"):
+        if event == (
+            "vendor.job_created"
+            if stop_at == "trace_job_created"
+            else "vendor.cancellation_" + stop_at.removeprefix("trace_")
+        ):
             raise OSError(errno.ENOSPC, "trace disk full")
 
     with (
+        pytest.raises(ProviderPermanentError, match="deadline") as caught,
         bind_provider_event_sink(record),
         budget.activate(),
-        pytest.raises(ProviderPermanentError, match="deadline") as caught,
     ):
         provider.run_inference(pipeline, request)
     assert events[0] == ("vendor.job_created", {"provider": "extend", "stage": "processor_run", "job_id": "dpr_test"})
@@ -102,8 +116,9 @@ def test_cancelled_polling_cannot_return_late_success_or_start_another_run(
         else execution["cancel_response"]["success"]
     )
     if stop_at.startswith("trace_"):
-        assert "trace disk full" in execution["cancellation_trace_error"]
-        assert isinstance(caught.value.__cause__, OSError)
+        assert any("trace disk full" in note for note in caught.value.__notes__)
+        assert caught.value.debug_payload["provider_event_failure"]["payload"]["job_id"] == "dpr_test"
+        assert isinstance(caught.value.__cause__, TimeoutError)
     assert client.processor_run.create.call_count == 1
     assert client.processor_run.get.call_count == (0 if stop_at == "create" else 1)
     assert client.processor_run.cancel.call_count == 1

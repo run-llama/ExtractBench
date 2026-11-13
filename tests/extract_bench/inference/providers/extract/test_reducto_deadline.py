@@ -14,7 +14,6 @@ pytest.importorskip("pypdf", reason="dev and runners extras required")
 
 from extract_bench.inference.events import bind_provider_event_sink
 from extract_bench.inference.limits import ExecutionBudget
-from extract_bench.inference.providers.base import ProviderPermanentError
 from extract_bench.inference.providers.extract import reducto
 
 
@@ -58,7 +57,7 @@ def test_upload_consumes_budget_and_cancellation_prevents_extract(
             assert client.upload.call_args.kwargs["timeout"] > 90
 
 
-@pytest.mark.parametrize("trace_failure", [None, "requested", "completed", "failed"])
+@pytest.mark.parametrize("trace_failure", [None, "requested", "completed", "failed", "job_created"])
 def test_cancelled_deep_poll_stops_polling_and_cancels_vendor_job(
     monkeypatch: pytest.MonkeyPatch,
     trace_failure: str | None,
@@ -80,15 +79,15 @@ def test_cancelled_deep_poll_stops_polling_and_cancels_vendor_job(
         client.job.cancel.side_effect = OSError("cancel unavailable")
 
     def record(event: str, payload: Mapping[str, Any]) -> None:
-        if event == f"vendor.cancellation_{trace_failure}":
+        if event == (
+            "vendor.job_created" if trace_failure == "job_created" else f"vendor.cancellation_{trace_failure}"
+        ):
             raise OSError(errno.ENOSPC, "trace disk full")
 
-    expected_error = TimeoutError if trace_failure is None else ProviderPermanentError
-    with budget.activate(), bind_provider_event_sink(record), pytest.raises(expected_error) as caught:
+    with pytest.raises(TimeoutError) as caught, budget.activate(), bind_provider_event_sink(record):
         asyncio.run(provider._extract_pdf_async("unused.pdf", {}, deep_extract=True))
     if trace_failure is not None:
-        assert caught.value.job_id == "job"
-        assert "trace disk full" in caught.value.debug_payload["cancellation_trace_error"]
+        assert any("trace disk full" in note for note in caught.value.__notes__)
     assert client.job.get.call_count == 1
     client.job.cancel.assert_called_once_with("job", timeout=10)
 
