@@ -26,6 +26,7 @@ from datalab_sdk import AsyncDatalabClient
 from datalab_sdk.models import ExtractOptions
 from pypdf import PdfReader
 
+from extract_bench.inference.events import emit_provider_event
 from extract_bench.inference.limits import execution_budget
 from extract_bench.inference.providers.base import (
     Provider,
@@ -166,6 +167,12 @@ class DatalabExtractProvider(Provider):
 
             extraction_latency_ms = (time.perf_counter() - extraction_started) * 1000
             raw_response: dict[str, Any] = dataclasses.asdict(result)
+            emit_provider_event(
+                "stage.completed",
+                provider="datalab",
+                stage="extract",
+                raw_output=raw_response,
+            )
             if self._extraction_mode == "fast":
                 raw_response = await self._wait_for_confidence(raw_response, base_url=client.base_url)
 

@@ -17,6 +17,7 @@ from typing import Any
 
 import httpx
 
+from extract_bench.inference.events import emit_provider_event
 from extract_bench.inference.limits import EXTRACT_HARD_TIMEOUT_S
 from extract_bench.inference.providers.base import (
     Provider,
@@ -329,10 +330,23 @@ class LlamaExtractV2Provider(Provider):
             resp.raise_for_status()
             job = resp.json()
             job_id = job["id"]
+            emit_provider_event(
+                "vendor.job_created",
+                provider="llamaextract_v2",
+                stage="extract",
+                job_id=job_id,
+            )
             logger.info("V2 extract job created: %s", job_id)
 
             # 4. Poll
             result = self._poll_job(client, job_id, params)
+            emit_provider_event(
+                "stage.completed",
+                provider="llamaextract_v2",
+                stage="extract",
+                job_id=job_id,
+                raw_output=result,
+            )
             if parse_job_id is not None:
                 result["parse_job_id"] = parse_job_id
             if parse_config_id is not None:

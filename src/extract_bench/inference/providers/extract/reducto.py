@@ -10,6 +10,7 @@ from typing import Any, cast
 
 from reducto import Reducto
 
+from extract_bench.inference.events import emit_provider_event
 from extract_bench.inference.limits import execution_budget
 from extract_bench.inference.providers.base import (
     Provider,
@@ -246,23 +247,41 @@ class ReductoExtractProvider(Provider):
             if deep_extract:
                 # Async jobs avoid expiring presigned tokens on long extracts.
                 # Each stage shares the document deadline, including upload time.
-                submitted = await budget.run_async(
-                    asyncio.to_thread(
-                        client.extract.run_job,
+                def submit_job() -> Any:
+                    submitted = client.extract.run_job(
                         input=cast(Any, upload),
                         instructions=cast(Any, instructions),
                         settings=cast(Any, settings),
                         timeout=budget.remaining(),
-                    ),
-                )
+                    )
+                    emit_provider_event(
+                        "vendor.job_created",
+                        provider="reducto",
+                        stage="extract",
+                        job_id=submitted.job_id,
+                    )
+                    return submitted
+
+                submitted = await budget.run_async(asyncio.to_thread(submit_job))
                 job_id = submitted.job_id
                 try:
                     while True:
                         if cancel_event is not None and cancel_event.is_set():
                             budget.cancel()
-                        job = await budget.run_async(
-                            asyncio.to_thread(client.job.get, job_id, timeout=budget.remaining()),
-                        )
+
+                        def poll_job() -> Any:
+                            job = client.job.get(job_id, timeout=budget.remaining())
+                            if job.status == "Completed":
+                                emit_provider_event(
+                                    "stage.completed",
+                                    provider="reducto",
+                                    stage="extract",
+                                    job_id=job_id,
+                                    raw_output=job.model_dump(),
+                                )
+                            return job
+
+                        job = await budget.run_async(asyncio.to_thread(poll_job))
                         status = getattr(job, "status", None)
                         if status == "Completed":
                             result = job.result
@@ -274,21 +293,38 @@ class ReductoExtractProvider(Provider):
                 except (TimeoutError, asyncio.CancelledError):
                     # Cancellation is cleanup: give it a bounded request after
                     # extraction time is exhausted, without submitting new work.
+                    emit_provider_event("vendor.cancellation_requested", provider="reducto", job_id=job_id)
                     try:
                         await asyncio.to_thread(client.job.cancel, job_id, timeout=10)
-                    except Exception:
+                    except Exception as cancel_error:
                         logging.getLogger(__name__).warning("Reducto job cancellation failed", exc_info=True)
+                        emit_provider_event(
+                            "vendor.cancellation_failed",
+                            provider="reducto",
+                            job_id=job_id,
+                            error=str(cancel_error),
+                        )
+                    else:
+                        emit_provider_event("vendor.cancellation_completed", provider="reducto", job_id=job_id)
                     raise
             else:
-                result = await budget.run_async(
-                    asyncio.to_thread(
-                        cast(Any, client.extract.run),
+
+                def extract_sync() -> Any:
+                    result = cast(Any, client.extract.run)(
                         input=upload,
                         instructions=instructions,
                         settings=settings,
                         timeout=budget.remaining(),
-                    ),
-                )
+                    )
+                    emit_provider_event(
+                        "stage.completed",
+                        provider="reducto",
+                        stage="extract",
+                        raw_output=result.model_dump(),
+                    )
+                    return result
+
+                result = await budget.run_async(asyncio.to_thread(extract_sync))
 
             # Capture the original Reducto API response as-is. The result is a
             # union of response models (or None for a job that completed with
@@ -331,7 +367,7 @@ class ReductoExtractProvider(Provider):
 
             return raw_response
 
-        except TimeoutError:
+        except (TimeoutError, ProviderPermanentError):
             raise
         except Exception as e:
             # Check if it's a transient error (network, timeout, etc.)

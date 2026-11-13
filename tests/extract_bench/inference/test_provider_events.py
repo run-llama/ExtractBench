@@ -1,0 +1,116 @@
+"""Provider progress belongs to its attempt even when a paid stage fails."""
+
+import asyncio
+import errno
+from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import Mock
+
+import pytest
+
+from extract_bench.inference.events import ProviderEventError, bind_provider_event_sink, emit_provider_event
+from extract_bench.inference.limits import ExecutionBudget
+
+
+def test_event_context_survives_worker_handoff_and_is_reset_after_failure() -> None:
+    received = []
+
+    def fail() -> None:
+        emit_provider_event("vendor.job_created", job_id="accepted")
+        raise RuntimeError("poll failed")
+
+    async def run() -> None:
+        with bind_provider_event_sink(lambda event, data: received.append((event, data))):
+            await asyncio.to_thread(fail)
+
+    with pytest.raises(RuntimeError, match="poll failed"):
+        asyncio.run(run())
+    emit_provider_event("unbound")
+    assert received == [("vendor.job_created", {"job_id": "accepted"})]
+
+
+@pytest.mark.parametrize("cancel_after_parse", [False, True])
+def test_landingai_records_parse_before_cancellation_and_rechecks_budget(cancel_after_parse: bool) -> None:
+    pytest.importorskip("landingai_ade")
+    from extract_bench.inference.providers.extract.landingai import LandingAIExtractProvider
+
+    budget = ExecutionBudget(100)
+    client = Mock()
+
+    def parse(**kwargs: object) -> SimpleNamespace:
+        budget.deadline -= 30
+        if cancel_after_parse:
+            budget.cancel()
+        return SimpleNamespace(markdown="text", model_dump=lambda: {"markdown": "text", "credit_usage": 2})
+
+    client.parse.side_effect = parse
+    client.extract.return_value = SimpleNamespace(extraction={}, model_dump=lambda: {"extraction": {}})
+    provider = LandingAIExtractProvider.__new__(LandingAIExtractProvider)
+    provider._base_config = {}
+    provider._model = None
+    provider._client = client
+    received = []
+    with budget.activate(), bind_provider_event_sink(lambda event, data: received.append((event, data))):
+        if cancel_after_parse:
+            with pytest.raises(TimeoutError, match="deadline"):
+                provider._extract_from_document(Path("doc.pdf"), {})
+            client.extract.assert_not_called()
+        else:
+            provider._extract_from_document(Path("doc.pdf"), {})
+            assert 0 < client.extract.call_args.kwargs["timeout"] < 70
+        assert 70 < client.parse.call_args.kwargs["timeout"] <= 100
+    assert received[0][0] == "stage.completed"
+    assert received[0][1]["raw_output"]["credit_usage"] == 2
+
+
+def test_sink_failure_waits_for_vendor_work_then_fails_permanently() -> None:
+    completed = []
+
+    def record(event: str, payload: object) -> None:
+        raise OSError(errno.ENOSPC, "trace disk full")
+
+    with pytest.raises(ProviderEventError) as caught:
+        with bind_provider_event_sink(record):
+            emit_provider_event("vendor.job_created", job_id="paid-job")
+            completed.append("poll completed")
+    assert completed == ["poll completed"]
+    assert caught.value.debug_payload["provider_event_failure"]["payload"]["job_id"] == "paid-job"
+    assert isinstance(caught.value.__cause__, OSError)
+    emit_provider_event("unbound")
+
+
+def test_pulse_trace_disk_failure_does_not_prevent_remote_cancellation(monkeypatch: pytest.MonkeyPatch) -> None:
+    pytest.importorskip("requests")
+    from extract_bench.inference.providers.extract.pulse import PulseExtractProvider
+
+    provider = PulseExtractProvider("pulse_extract", {"api_key": "test"})
+    delete = Mock(return_value=SimpleNamespace(status_code=200))
+    monkeypatch.setattr("extract_bench.inference.providers.extract.pulse.requests.delete", delete)
+
+    def record(event: str, payload: object) -> None:
+        raise OSError(errno.ENOSPC, "trace disk full")
+
+    with pytest.raises(ProviderEventError) as caught, bind_provider_event_sink(record):
+        provider._cancel_remote_job("paid-job")
+    assert caught.value.debug_payload["provider_event_failure"]["payload"]["job_id"] == "paid-job"
+    delete.assert_called_once()
+    assert delete.call_args.args[0].endswith("/job/paid-job")
+
+
+@pytest.mark.parametrize("job_id", [None, "current-job"])
+def test_sink_failure_does_not_replace_current_error_with_predecessor_job_id(job_id: str | None) -> None:
+    from extract_bench.inference.providers.base import ProviderPermanentError
+
+    expected = ProviderPermanentError("new submission rejected", job_id=job_id)
+
+    def record(event: str, payload: object) -> None:
+        raise OSError("trace disk full")
+
+    with pytest.raises(ProviderPermanentError) as caught:
+        with bind_provider_event_sink(record) as capture:
+            emit_provider_event("vendor.cancellation_requested", job_id="previous-job")
+            raise expected
+    assert caught.value is expected
+    assert caught.value.job_id == job_id
+    assert capture.failure is not None
+    assert capture.failure.debug_payload["provider_event_failure"]["payload"]["job_id"] == "previous-job"

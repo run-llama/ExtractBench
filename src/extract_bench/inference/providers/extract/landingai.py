@@ -9,6 +9,8 @@ from typing import Any
 
 from landingai_ade import LandingAIADE
 
+from extract_bench.inference.events import emit_provider_event
+from extract_bench.inference.limits import execution_budget
 from extract_bench.inference.providers.base import (
     Provider,
     ProviderConfigError,
@@ -111,14 +113,22 @@ class LandingAIExtractProvider(Provider):
         :return: Raw API response as dictionary
         :raises ProviderError: For any API errors
         """
+        budget = execution_budget()
         try:
             # First, parse the document
             parse_model = self.base_config.get("parse_model", "dpt-2-latest")
             parse_response = self._client.parse(
                 document=document_path,
                 model=parse_model,
+                timeout=budget.remaining(),
             )
 
+            emit_provider_event(
+                "stage.completed",
+                provider="landingai",
+                stage="parse",
+                raw_output=_to_plain_data(parse_response),
+            )
             # Get markdown from parse response
             markdown = parse_response.markdown if hasattr(parse_response, "markdown") else ""
 
@@ -138,8 +148,15 @@ class LandingAIExtractProvider(Provider):
             schema_json = json.dumps(schema) if isinstance(schema, dict) else schema
 
             # Extract data from markdown using the extract method
+            extract_kwargs["timeout"] = budget.remaining()
             response = self._client.extract(schema=schema_json, markdown=markdown, **extract_kwargs)
 
+            emit_provider_event(
+                "stage.completed",
+                provider="landingai",
+                stage="extract",
+                raw_output=_to_plain_data(response),
+            )
             # Convert response to dictionary format
             result: dict[str, Any] = {
                 "data": {},
@@ -192,6 +209,8 @@ class LandingAIExtractProvider(Provider):
 
             return result
 
+        except TimeoutError:
+            raise
         except Exception as e:
             # Classify the error: rate limits and transient network errors are
             # retryable; everything else is permanent.

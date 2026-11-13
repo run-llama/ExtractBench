@@ -556,3 +556,28 @@ def test_async_terminal_failure_includes_job_diagnostics(
     assert exc_info.value.job_id == "job-1"
     assert exc_info.value.debug_payload["state"]["status"] == "failed"
     assert exc_info.value.debug_payload["poll_history"][0]["status"] == "failed"
+
+
+def test_cancelled_poll_preserves_completed_response(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A cancellation during HTTP GET rejects success but keeps returned usage."""
+    from extract_bench.inference.events import bind_provider_event_sink
+
+    provider = _provider({"async_run": True})
+    control = provider._register_request("doc")
+    payload = {"status": "completed", "result": {"data": {}}, "credits_used": 3}
+
+    def get(*args: object, **kwargs: object) -> _FakeResponse:
+        control.cancelled.set()
+        return _FakeResponse(payload)
+
+    monkeypatch.setattr("extract_bench.inference.providers.extract.pulse.requests.get", get)
+    monkeypatch.setattr(
+        "extract_bench.inference.providers.extract.pulse.requests.delete",
+        lambda *args, **kwargs: _FakeResponse({"status": "cancelled"}),
+    )
+    events = []
+    with bind_provider_event_sink(lambda event, data: events.append((event, data))):
+        with pytest.raises(ProviderPermanentError):
+            provider._poll_job("job", context="extract", example_id="doc", control=control)
+    completed = [data for event, data in events if event == "stage.completed"]
+    assert completed[0]["raw_output"]["credits_used"] == 3

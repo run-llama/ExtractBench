@@ -26,6 +26,7 @@ from typing import Any
 import requests
 from requests.adapters import HTTPAdapter
 
+from extract_bench.inference.events import emit_provider_event
 from extract_bench.inference.limits import EXTRACT_HARD_TIMEOUT_S
 from extract_bench.inference.providers.base import (
     Provider,
@@ -552,7 +553,14 @@ class ParseurProvider(Provider):
         attachments = (data or {}).get("attachments") or []
         if not attachments or not attachments[0].get("DocumentID"):
             raise ProviderPermanentError(f"Upload response did not contain a document id: {data!r}")
-        return str(attachments[0]["DocumentID"])
+        document_id = str(attachments[0]["DocumentID"])
+        emit_provider_event(
+            "vendor.job_created",
+            provider="parseur",
+            stage="extract",
+            job_id=document_id,
+        )
+        return document_id
 
     def _wait_for_document(
         self, document_id: str, deadline: float, stop: threading.Event
@@ -693,6 +701,13 @@ class ParseurProvider(Provider):
             document_id, started_at, deadline = upload
             try:
                 document, result = self._wait_for_document(document_id, deadline, stop)
+                emit_provider_event(
+                    "stage.completed",
+                    provider="parseur",
+                    stage="extract",
+                    job_id=document_id,
+                    raw_output={"document": document, "result": result},
+                )
             except ProviderError:
                 if not stop.is_set():
                     with self._attempt_lock:

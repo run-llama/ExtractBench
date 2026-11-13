@@ -1,7 +1,10 @@
 """Reducto must stop between paid stages when a document is cancelled."""
 
 import asyncio
+import errno
+from collections.abc import Mapping
 from types import SimpleNamespace
+from typing import Any
 from unittest.mock import Mock
 
 import pytest
@@ -9,6 +12,7 @@ import pytest
 pytest.importorskip("reducto", reason="dev and runners extras required")
 pytest.importorskip("pypdf", reason="dev and runners extras required")
 
+from extract_bench.inference.events import bind_provider_event_sink
 from extract_bench.inference.limits import ExecutionBudget
 from extract_bench.inference.providers.extract import reducto
 
@@ -30,9 +34,14 @@ def test_upload_consumes_budget_and_cancellation_prevents_extract(
         return "uploaded"
 
     client.upload.side_effect = upload
-    client.extract.run.return_value = SimpleNamespace(data={})
+    result = SimpleNamespace(model_dump=lambda: {"data": {}})
+    client.extract.run.return_value = result
     client.extract.run_job.return_value = SimpleNamespace(job_id="job")
-    client.job.get.return_value = SimpleNamespace(status="Completed", result=SimpleNamespace(data={}))
+    client.job.get.return_value = SimpleNamespace(
+        status="Completed",
+        result=result,
+        model_dump=lambda: {"status": "Completed", "result": result.model_dump()},
+    )
     monkeypatch.setattr(reducto, "Reducto", lambda **kwargs: client)
     provider = reducto.ReductoExtractProvider("reducto_extract", {"api_key": "test"})
     with budget.activate():
@@ -48,7 +57,11 @@ def test_upload_consumes_budget_and_cancellation_prevents_extract(
             assert client.upload.call_args.kwargs["timeout"] > 90
 
 
-def test_cancelled_deep_poll_stops_polling_and_cancels_vendor_job(monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.parametrize("trace_failure", [None, "requested", "completed", "failed", "job_created"])
+def test_cancelled_deep_poll_stops_polling_and_cancels_vendor_job(
+    monkeypatch: pytest.MonkeyPatch,
+    trace_failure: str | None,
+) -> None:
     budget = ExecutionBudget(100)
     client = Mock()
     client.extract.run_job.return_value = SimpleNamespace(job_id="job")
@@ -62,7 +75,61 @@ def test_cancelled_deep_poll_stops_polling_and_cancels_vendor_job(monkeypatch: p
     client.job.get.side_effect = poll
     monkeypatch.setattr(reducto, "Reducto", lambda **kwargs: client)
     provider = reducto.ReductoExtractProvider("reducto_extract", {"api_key": "test"})
-    with budget.activate(), pytest.raises(TimeoutError, match="deadline"):
+    if trace_failure == "failed":
+        client.job.cancel.side_effect = OSError("cancel unavailable")
+
+    def record(event: str, payload: Mapping[str, Any]) -> None:
+        if event == (
+            "vendor.job_created" if trace_failure == "job_created" else f"vendor.cancellation_{trace_failure}"
+        ):
+            raise OSError(errno.ENOSPC, "trace disk full")
+
+    with pytest.raises(TimeoutError) as caught, budget.activate(), bind_provider_event_sink(record):
         asyncio.run(provider._extract_pdf_async("unused.pdf", {}, deep_extract=True))
+    if trace_failure is not None:
+        assert any("trace disk full" in note for note in caught.value.__notes__)
     assert client.job.get.call_count == 1
     client.job.cancel.assert_called_once_with("job", timeout=10)
+
+
+def test_cancelled_awaiter_still_records_late_submission(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The SDK worker can accept a paid job after its async caller was cancelled."""
+    import threading
+
+    from extract_bench.inference.events import bind_provider_event_sink
+
+    started = threading.Event()
+    release = threading.Event()
+    recorded = threading.Event()
+    events = []
+    client = Mock()
+
+    def submit(**kwargs: object) -> SimpleNamespace:
+        started.set()
+        assert release.wait(5)
+        return SimpleNamespace(job_id="late-paid-job")
+
+    def record(event: str, payload: object) -> None:
+        events.append((event, payload))
+        recorded.set()
+
+    client.extract.run_job.side_effect = submit
+    monkeypatch.setattr(reducto, "Reducto", lambda **kwargs: client)
+    provider = reducto.ReductoExtractProvider("reducto_extract", {"api_key": "test"})
+
+    async def run() -> None:
+        with ExecutionBudget(100).activate(), bind_provider_event_sink(record):
+            task = asyncio.create_task(provider._extract_pdf_async("unused.pdf", {}, deep_extract=True))
+            try:
+                assert await asyncio.to_thread(started.wait, 5)
+                task.cancel()
+                with pytest.raises(asyncio.CancelledError):
+                    await task
+            finally:
+                release.set()
+            assert await asyncio.to_thread(recorded.wait, 5)
+
+    asyncio.run(run())
+    assert events[0][0] == "vendor.job_created"
+    assert events[0][1]["job_id"] == "late-paid-job"
+    client.job.get.assert_not_called()
