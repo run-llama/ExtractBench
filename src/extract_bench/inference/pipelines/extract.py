@@ -557,6 +557,13 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
 
     # Bypass Datalab's server cache: a cached result returns at once and bills
     # $0, so a rerun would report neither the real cost nor the real latency.
+    register_fn(
+        _pipeline_spec(
+            pipeline_name="datalab_extract_turbo",
+            provider_name="datalab_extract",
+            config={"extraction_mode": "turbo", "skip_cache": True},
+        )
+    )
     for _parse_mode, _extraction_mode in (("fast", "fast"), ("accurate", "balanced"), ("accurate", "accurate")):
         register_fn(
             _pipeline_spec(

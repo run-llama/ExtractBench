@@ -14,6 +14,7 @@ import dataclasses
 import json
 import math
 import os
+import time
 from collections.abc import Mapping, Sequence
 from datetime import datetime
 from pathlib import Path
@@ -48,6 +49,7 @@ DATALAB_PARSE_COST_PER_PAGE_USD = {
     "accurate": 0.01,
 }
 DATALAB_EXTRACT_COST_PER_PAGE_USD = {
+    "turbo": 0.006,
     "fast": 0.006,
     "balanced": 0.015,
     "accurate": 0.02,
@@ -76,8 +78,8 @@ class DatalabExtractProvider(Provider):
             - ``api_key``: Datalab API key (defaults to DATALAB_API_KEY env var)
             - ``parse_mode``: Document parse mode — ``fast`` / ``balanced`` /
               ``accurate``. Falls back to ``mode`` for legacy configs.
-            - ``extraction_mode``: Extraction mode — ``fast`` / ``balanced`` /
-              ``accurate``.
+            - ``extraction_mode``: Extraction mode — ``turbo`` / ``fast`` / ``balanced`` /
+              ``accurate``. Turbo skips parsing and returns no citations or scores.
               Fast mode also waits for optional confidence scores.
             - ``max_pages``: Maximum number of pages to process (optional).
             - ``page_range``: Comma-separated page ranges (e.g. ``"0-2,4"``).
@@ -99,9 +101,13 @@ class DatalabExtractProvider(Provider):
                 "Datalab API key is required. Set DATALAB_API_KEY environment variable or pass api_key in base_config."
             )
 
-        self._parse_mode = self.base_config.get("parse_mode", self.base_config.get("mode", "fast"))
         self._extraction_mode = self.base_config.get("extraction_mode")
-        if self._parse_mode not in DATALAB_PARSE_COST_PER_PAGE_USD:
+        self._parse_mode = (
+            None
+            if self._extraction_mode == "turbo"
+            else self.base_config.get("parse_mode", self.base_config.get("mode", "fast"))
+        )
+        if self._extraction_mode != "turbo" and self._parse_mode not in DATALAB_PARSE_COST_PER_PAGE_USD:
             raise ProviderConfigError(
                 f"Unsupported Datalab parse mode: {self._parse_mode!r}. "
                 f"Expected one of {sorted(DATALAB_PARSE_COST_PER_PAGE_USD)}."
@@ -128,6 +134,7 @@ class DatalabExtractProvider(Provider):
     async def _extract_pdf_async(self, pdf_path: str, schema: dict[str, Any]) -> dict[str, Any]:
         """Call Datalab Extract and return the full response as a plain dict."""
         try:
+            extraction_started = time.perf_counter()
             pdf_page_count = _read_pdf_page_count(pdf_path)
             options = ExtractOptions(
                 page_schema=json.dumps(_adapt_schema_for_datalab(schema)),
@@ -153,10 +160,14 @@ class DatalabExtractProvider(Provider):
                     poll_interval=self._poll_interval,  # type: ignore[arg-type]
                 )
 
+            extraction_latency_ms = (time.perf_counter() - extraction_started) * 1000
             raw_response: dict[str, Any] = dataclasses.asdict(result)
             if self._extraction_mode == "fast":
                 raw_response = await self._wait_for_confidence(raw_response, base_url=client.base_url)
 
+            # Client-observed time includes upload, parsing, and extraction.
+            # Confidence waiting is measured separately; neither is server compute time.
+            raw_response["extraction_latency_ms"] = extraction_latency_ms
             raw_response["_config"] = {
                 "mode": self._parse_mode,
                 "parse_mode": self._parse_mode,
@@ -200,6 +211,7 @@ class DatalabExtractProvider(Provider):
         Fast scores arrive after extraction. A failed or interrupted score wait
         leaves the completed extraction usable; it never submits another job.
         """
+        confidence_started = time.perf_counter()
         budget = execution_budget()
         status = "timeout"
         polls = 0
@@ -270,6 +282,7 @@ class DatalabExtractProvider(Provider):
                         completed["_confidence_poll_error"] = type(error).__name__
                         status = "poll_error"
                         break
+        completed["confidence_wait_ms"] = (time.perf_counter() - confidence_started) * 1000
         completed["_confidence_polling"] = {"status": status, "polls": polls}
         return completed
 
@@ -377,13 +390,18 @@ def _attach_datalab_extract_pricing(
     raw_output: dict[str, Any],
     *,
     page_count: int | None,
-    parse_mode: str,
+    parse_mode: str | None,
     extraction_mode: str,
 ) -> None:
     if page_count is None or page_count <= 0:
         return
 
-    parse_cost_per_page = DATALAB_PARSE_COST_PER_PAGE_USD[parse_mode]
+    if extraction_mode == "turbo":
+        parse_cost_per_page = 0.0
+    else:
+        if parse_mode is None:
+            raise ValueError("A parse mode is required for non-Turbo extraction")
+        parse_cost_per_page = DATALAB_PARSE_COST_PER_PAGE_USD[parse_mode]
     extract_cost_per_page = DATALAB_EXTRACT_COST_PER_PAGE_USD[extraction_mode]
     parse_cost = parse_cost_per_page * page_count
     extract_cost = extract_cost_per_page * page_count

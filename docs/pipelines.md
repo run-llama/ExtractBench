@@ -47,7 +47,8 @@ uv run extract-bench run <pipeline_name>
 | `extend_extract_operator` | Extend | Operator extraction on the 2026-02-09 API with word-level citations; cost from the run's reported usage (`EXTEND_API_KEY`) |
 | `landingai_extract` | LandingAI ADE | |
 | `parseur_extract_v3_vision` | Parseur | AI Vision engine v3; no citations (`PARSEUR_API_KEY`) |
-| `datalab_parse_fast_extract_fast` | Datalab Fast | Fast parsing and extraction with source citations; a separate, free confidence step runs afterward, which the pipeline waits for within a bounded window |
+| `datalab_extract_turbo` | Datalab Turbo | Image-only extraction; no parsing, citations, or confidence scores |
+| `datalab_parse_fast_extract_fast` | Datalab Fast | Fast parsing and extraction with source citations; a separate, free confidence step runs afterward, which the pipeline waits for within a bounded window. Raw results record `extraction_latency_ms` and `confidence_wait_ms` separately |
 | `datalab_parse_accurate_extract_balanced` | Datalab Balanced | Accurate parsing and Balanced extraction with source citations and inline field verification |
 | `datalab_parse_accurate_extract_accurate` | Datalab Accurate | Accurate parsing and extraction with source citations and inline field verification |
 | `pulse_schema_non_effort` / `pulse_schema_effort` | Pulse | Pulse Ultra 2, WLBB enabled, then `/schema` with effort off/on (`PULSE_API_KEY`) |
