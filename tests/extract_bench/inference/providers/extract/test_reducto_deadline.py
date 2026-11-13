@@ -1,7 +1,10 @@
 """Reducto must stop between paid stages when a document is cancelled."""
 
 import asyncio
+import errno
+from collections.abc import Mapping
 from types import SimpleNamespace
+from typing import Any
 from unittest.mock import Mock
 
 import pytest
@@ -9,7 +12,9 @@ import pytest
 pytest.importorskip("reducto", reason="dev and runners extras required")
 pytest.importorskip("pypdf", reason="dev and runners extras required")
 
+from extract_bench.inference.events import bind_provider_event_sink
 from extract_bench.inference.limits import ExecutionBudget
+from extract_bench.inference.providers.base import ProviderPermanentError
 from extract_bench.inference.providers.extract import reducto
 
 
@@ -53,7 +58,11 @@ def test_upload_consumes_budget_and_cancellation_prevents_extract(
             assert client.upload.call_args.kwargs["timeout"] > 90
 
 
-def test_cancelled_deep_poll_stops_polling_and_cancels_vendor_job(monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.parametrize("trace_failure", [None, "requested", "completed", "failed"])
+def test_cancelled_deep_poll_stops_polling_and_cancels_vendor_job(
+    monkeypatch: pytest.MonkeyPatch,
+    trace_failure: str | None,
+) -> None:
     budget = ExecutionBudget(100)
     client = Mock()
     client.extract.run_job.return_value = SimpleNamespace(job_id="job")
@@ -67,8 +76,19 @@ def test_cancelled_deep_poll_stops_polling_and_cancels_vendor_job(monkeypatch: p
     client.job.get.side_effect = poll
     monkeypatch.setattr(reducto, "Reducto", lambda **kwargs: client)
     provider = reducto.ReductoExtractProvider("reducto_extract", {"api_key": "test"})
-    with budget.activate(), pytest.raises(TimeoutError, match="deadline"):
+    if trace_failure == "failed":
+        client.job.cancel.side_effect = OSError("cancel unavailable")
+
+    def record(event: str, payload: Mapping[str, Any]) -> None:
+        if event == f"vendor.cancellation_{trace_failure}":
+            raise OSError(errno.ENOSPC, "trace disk full")
+
+    expected_error = TimeoutError if trace_failure is None else ProviderPermanentError
+    with budget.activate(), bind_provider_event_sink(record), pytest.raises(expected_error) as caught:
         asyncio.run(provider._extract_pdf_async("unused.pdf", {}, deep_extract=True))
+    if trace_failure is not None:
+        assert caught.value.job_id == "job"
+        assert "trace disk full" in caught.value.debug_payload["cancellation_trace_error"]
     assert client.job.get.call_count == 1
     client.job.cancel.assert_called_once_with("job", timeout=10)
 

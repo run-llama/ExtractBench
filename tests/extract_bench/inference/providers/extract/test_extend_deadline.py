@@ -1,7 +1,10 @@
 """Exercise cancellation through the real Extend polling loop without vendor calls."""
 
+import errno
+from collections.abc import Mapping
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
 from unittest.mock import Mock
 
 import pytest
@@ -18,7 +21,10 @@ from extract_bench.inference.providers.extract.extend import ExtendProvider
 from extract_bench.schemas.pipeline_io import InferenceRequest
 
 
-@pytest.mark.parametrize("stop_at", ["create", "get", "poll_error", "deadline", "cancel_error"])
+@pytest.mark.parametrize(
+    "stop_at",
+    ["create", "get", "poll_error", "deadline", "cancel_error", "trace_requested", "trace_completed", "trace_failed"],
+)
 def test_cancelled_polling_cannot_return_late_success_or_start_another_run(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -65,12 +71,18 @@ def test_cancelled_polling_cannot_return_late_success_or_start_another_run(
     client.processor_run.create.side_effect = create
     client.processor_run.get.side_effect = get
     client.processor_run.cancel.return_value = SimpleNamespace(model_dump=lambda: {"success": True})
-    if stop_at == "cancel_error":
+    if stop_at in ("cancel_error", "trace_failed"):
         client.processor_run.cancel.side_effect = httpx.ReadTimeout("cancel unavailable")
 
     events = []
+
+    def record(event: str, payload: Mapping[str, Any]) -> None:
+        events.append((event, payload))
+        if event == "vendor.cancellation_" + stop_at.removeprefix("trace_"):
+            raise OSError(errno.ENOSPC, "trace disk full")
+
     with (
-        bind_provider_event_sink(lambda event, payload: events.append((event, payload))),
+        bind_provider_event_sink(record),
         budget.activate(),
         pytest.raises(ProviderPermanentError, match="deadline") as caught,
     ):
@@ -78,13 +90,20 @@ def test_cancelled_polling_cannot_return_late_success_or_start_another_run(
     assert events[0] == ("vendor.job_created", {"provider": "extend", "stage": "processor_run", "job_id": "dpr_test"})
     assert any(event == "vendor.cancellation_requested" for event, _ in events)
     assert events[-1][0] == (
-        "vendor.cancellation_failed" if stop_at == "cancel_error" else "vendor.cancellation_completed"
+        "vendor.cancellation_failed" if stop_at in ("cancel_error", "trace_failed") else "vendor.cancellation_completed"
     )
     assert caught.value.job_id == "dpr_test"
     assert caught.value.debug_payload is not None
     execution = caught.value.debug_payload["_extend_execution"]
     assert execution["create_response"]["processor_run"]["id"] == "dpr_test"
-    assert "cancel_error" in execution if stop_at == "cancel_error" else execution["cancel_response"]["success"]
+    assert (
+        "cancel_error" in execution
+        if stop_at in ("cancel_error", "trace_failed")
+        else execution["cancel_response"]["success"]
+    )
+    if stop_at.startswith("trace_"):
+        assert "trace disk full" in execution["cancellation_trace_error"]
+        assert isinstance(caught.value.__cause__, OSError)
     assert client.processor_run.create.call_count == 1
     assert client.processor_run.get.call_count == (0 if stop_at == "create" else 1)
     assert client.processor_run.cancel.call_count == 1
