@@ -85,7 +85,7 @@ def test_rejected_codegen_retains_parse_cost_and_agent_usage(tmp_path: Path, mon
     assert payload["cost_accounting"]["complete"] is False
 
 
-@pytest.mark.parametrize("usage", [{"documentPagesStandard": 2}, {}])
+@pytest.mark.parametrize("usage", [{"documentPagesStandard": 2}, {}, {"tokens": {}}, {"documentPagesStandard": None}])
 def test_failed_azure_operation_retains_usage(monkeypatch: pytest.MonkeyPatch, usage: dict) -> None:
     provider = azure.AzureContentUnderstandingProvider(
         "azure_content_understanding", {"endpoint": "https://test.invalid", "api_key": "offline"}
@@ -96,7 +96,7 @@ def test_failed_azure_operation_retains_usage(monkeypatch: pytest.MonkeyPatch, u
         provider._poll_operation("https://test.invalid/op/1", context="analyze")
     assert caught.value.job_id == "https://test.invalid/op/1"
     assert caught.value.debug_payload["usage"] == body["usage"]
-    if len(usage) == 0:
+    if usage.get("documentPagesStandard") is None:
         assert caught.value.debug_payload.get("cost_usd") is None
 
 

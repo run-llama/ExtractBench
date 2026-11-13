@@ -298,6 +298,26 @@ def _apply_usage_cost_fields(raw_output: dict[str, Any], config: Mapping[str, An
     usage = raw_output.get("usage")
     if not isinstance(usage, Mapping) or len(usage) == 0:
         return
+    quantities = [
+        usage.get(key)
+        for key in (
+            "documentPagesStandard",
+            "documentPagesBasic",
+            "documentPagesMinimal",
+            "contextualizationTokens",
+            "contextualizationToken",
+        )
+    ]
+    tokens = usage.get("tokens")
+    if isinstance(tokens, Mapping):
+        quantities.extend(
+            value
+            for key, value in tokens.items()
+            if str(key).endswith(("-input", "-output"))
+            and any(rate > 0 for rate in _completion_model_rates(str(key).rsplit("-", 1)[0], config))
+        )
+    if not any(isinstance(value, (int, float)) for value in quantities):
+        return
 
     breakdown = _usage_cost_breakdown(usage, config)
     if not breakdown:
