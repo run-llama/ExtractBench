@@ -397,6 +397,7 @@ class TableCodegenExtractProvider(Provider):
             )
 
         def record_codegen_usage(usage: dict[str, int]) -> None:
+            emit_provider_event("vendor.usage", provider="table_codegen", model=self._model, usage=usage)
             cost = self._codegen_cost(usage)
             if cost is not None:
                 emit_provider_event("cost.component", component_id="table_codegen/agent", cost_usd=cost, usage=usage)
