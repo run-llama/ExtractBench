@@ -63,7 +63,7 @@ The 14 paper baselines and their pipeline names:
 | `llamaextract_cost_effective` | LlamaExtract Cost-Effective |
 | `reducto_deep_extract` | Reducto Deep Extract |
 | `extend_extract_max` | Extend (Max Context) |
-| `datalab_parse_accurate_extract_balanced` | Datalab (Accurate + Balanced) |
+| `datalab_extract_balanced` | Datalab (Accurate + Balanced) |
 | `codex_code_extract_gpt_5_5_low` | Codex (GPT-5.5) |
 | `claude_code_extract_opus_4_8` | Claude Code (Opus 4.8) |
 | `qwen3_6_35b_a3b_fp8_vllm_extract_oneshot_structured_output_file` | Qwen3.6 35B (self-hosted) |

@@ -24,6 +24,10 @@ from extract_bench.inference.providers.extract import datalab
         "scores",
         "ready",
         "turbo",
+        "balanced",
+        "accurate",
+        "override",
+        "no_cost",
         "delayed",
         "pending_deadline",
         "http_error",
@@ -49,6 +53,7 @@ def test_extraction_survives_optional_scoring_with_separate_timing(
             "success": True,
             "status": "complete",
             "page_count": 1,
+            "cost_breakdown": None if outcome in ("turbo", "no_cost") else {"final_cost_cents": 1.7},
             "extraction_schema_json": '{"total":10}',
             "extraction_score_average": None,
             "extraction_scoring_status": "partial",
@@ -61,8 +66,10 @@ def test_extraction_survives_optional_scoring_with_separate_timing(
 
         async def submit(request: web.Request) -> web.Response:
             form = await request.post()
-            if outcome == "turbo":
-                assert form["extraction_mode"] == "turbo"
+            assert form["extraction_mode"] == pipeline.config["extraction_mode"]
+            if outcome == "override":
+                assert form["mode"] == "fast"
+            else:
                 assert "mode" not in form
             calls["submit"] += 1
             return web.json_response({"success": True, "request_id": "job", "request_check_url": "/api/v1/extract/job"})
@@ -114,10 +121,20 @@ def test_extraction_survives_optional_scoring_with_separate_timing(
         )
         source = tmp_path / "doc.pdf"
         source.write_bytes(b"%PDF-1.4 local test")
-        pipeline = get_pipeline("datalab_extract_turbo" if outcome == "turbo" else "datalab_parse_fast_extract_fast")
+        extraction_mode = {
+            "turbo": "turbo",
+            "balanced": "balanced",
+            "accurate": "accurate",
+            "override": "balanced",
+            "no_cost": "balanced",
+        }.get(outcome, "fast")
+        pipeline = get_pipeline(f"datalab_extract_{extraction_mode}")
+        config = {**pipeline.config, "api_key": "local-test", "poll_interval": 0.001}
+        if outcome == "override":
+            config["parse_mode"] = "fast"
         provider = datalab.DatalabExtractProvider(
             "datalab_extract",
-            {**pipeline.config, "api_key": "local-test", "poll_interval": 0.001},
+            config,
         )
         try:
             with budget.activate():
@@ -125,12 +142,22 @@ def test_extraction_survives_optional_scoring_with_separate_timing(
             assert json.loads(result["extraction_schema_json"])["total"] == 10
             assert calls["submit"] == 1
             assert result["extraction_latency_ms"] == 2000
-            expected_polls = {"turbo": 1, "ready": 1, "delayed": 66, "pending_deadline": 4}.get(outcome, 2)
+            expected_polls = (
+                1 if extraction_mode != "fast" else {"ready": 1, "delayed": 66, "pending_deadline": 4}.get(outcome, 2)
+            )
             assert calls["poll"] == expected_polls
-            if outcome == "turbo":
-                assert "confidence_wait_ms" not in result
+            if outcome == "no_cost":
+                assert "cost_usd" not in result
+            elif outcome == "turbo":
                 assert result["parse_cost_usd"] == 0
                 assert result["cost_usd"] == pytest.approx(0.006)
+            else:
+                assert result["cost_usd"] == pytest.approx(0.017)
+                assert result["cost_per_page_usd"] == pytest.approx(0.017)
+            if outcome not in ("turbo", "override"):
+                assert "datalab_pricing" not in result
+            if extraction_mode != "fast":
+                assert "confidence_wait_ms" not in result
                 assert datalab._build_field_citations(json.loads(result["extraction_schema_json"]), {}) == []
                 return
             assert result["confidence_wait_ms"] == (expected_polls - 1) * 5000

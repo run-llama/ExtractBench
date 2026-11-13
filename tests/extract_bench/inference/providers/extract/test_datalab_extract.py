@@ -5,9 +5,7 @@ import pytest
 pytest.importorskip("pypdf", reason="dev and runners extras required; run: uv sync --extra dev --extra runners")
 pytest.importorskip("datalab_sdk", reason="dev and runners extras required; run: uv sync --extra dev --extra runners")
 
-from extract_bench.inference.pipelines import get_pipeline
 from extract_bench.inference.providers.extract.datalab import (
-    DatalabExtractProvider,
     _attach_datalab_extract_pricing,
     _build_field_citations,
     _promote_api_cost_breakdown,
@@ -66,22 +64,18 @@ def test_meta_sidecar_produces_no_citations() -> None:
 
 
 @pytest.mark.parametrize(
-    ("pipeline_name", "parse_mode", "extraction_mode", "expected_cost_per_page"),
+    ("parse_mode", "extraction_mode", "expected_cost_per_page"),
     [
-        ("datalab_parse_fast_extract_fast", "fast", "fast", 0.010),
-        ("datalab_parse_accurate_extract_balanced", "accurate", "balanced", 0.025),
-        ("datalab_parse_accurate_extract_accurate", "accurate", "accurate", 0.030),
+        ("fast", "fast", 0.010),
+        ("accurate", "balanced", 0.025),
+        ("accurate", "accurate", 0.030),
     ],
 )
-def test_explicit_datalab_extract_pipeline_pricing(
-    pipeline_name: str, parse_mode: str, extraction_mode: str, expected_cost_per_page: float
+def test_explicit_parse_pricing_includes_extraction_cost(
+    parse_mode: str,
+    extraction_mode: str,
+    expected_cost_per_page: float,
 ) -> None:
-    pipeline = get_pipeline(pipeline_name)
-    assert pipeline.config["parse_mode"] == parse_mode
-    assert pipeline.config["extraction_mode"] == extraction_mode
-    assert pipeline.config["skip_cache"] is True
-    DatalabExtractProvider("datalab_extract", {**pipeline.config, "api_key": "test-key"})
-
     raw_output: dict[str, object] = {}
     _attach_datalab_extract_pricing(raw_output, page_count=10, parse_mode=parse_mode, extraction_mode=extraction_mode)
 

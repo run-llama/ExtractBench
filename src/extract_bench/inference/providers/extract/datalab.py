@@ -77,7 +77,7 @@ class DatalabExtractProvider(Provider):
         :param base_config: Optional configuration with:
             - ``api_key``: Datalab API key (defaults to DATALAB_API_KEY env var)
             - ``parse_mode``: Document parse mode — ``fast`` / ``balanced`` /
-              ``accurate``. Falls back to ``mode`` for legacy configs.
+              ``accurate``. Omit to use Datalab’s default; ``mode`` is a legacy alias.
             - ``extraction_mode``: Extraction mode — ``turbo`` / ``fast`` / ``balanced`` /
               ``accurate``. Turbo skips parsing and returns no citations or scores.
               Fast mode also waits for optional confidence scores.
@@ -103,9 +103,9 @@ class DatalabExtractProvider(Provider):
         self._parse_mode = (
             None
             if self._extraction_mode == "turbo"
-            else self.base_config.get("parse_mode", self.base_config.get("mode", "fast"))
+            else self.base_config.get("parse_mode", self.base_config.get("mode"))
         )
-        if self._extraction_mode != "turbo" and self._parse_mode not in DATALAB_PARSE_COST_PER_PAGE_USD:
+        if self._parse_mode is not None and self._parse_mode not in DATALAB_PARSE_COST_PER_PAGE_USD:
             raise ProviderConfigError(
                 f"Unsupported Datalab parse mode: {self._parse_mode!r}. "
                 f"Expected one of {sorted(DATALAB_PARSE_COST_PER_PAGE_USD)}."
@@ -174,6 +174,8 @@ class DatalabExtractProvider(Provider):
             }
 
             page_count = _coerce_positive_page_count(raw_response.get("page_count")) or pdf_page_count
+            if page_count is not None:
+                raw_response["page_count"] = page_count
             if self._extraction_mode is not None:
                 _attach_datalab_extract_pricing(
                     raw_response,
@@ -181,12 +183,7 @@ class DatalabExtractProvider(Provider):
                     parse_mode=self._parse_mode,
                     extraction_mode=self._extraction_mode,
                 )
-                _promote_api_cost_breakdown(raw_response)
-            else:
-                # Legacy configs did not pin extraction_mode. Preserve the API
-                # reported cost when available instead of guessing the account
-                # default.
-                _promote_api_cost_breakdown(raw_response)
+            _promote_api_cost_breakdown(raw_response)
 
             return raw_response
 
@@ -394,7 +391,9 @@ def _attach_datalab_extract_pricing(
         parse_cost_per_page = 0.0
     else:
         if parse_mode is None:
-            raise ValueError("A parse mode is required for non-Turbo extraction")
+            # Server-selected parsing has no local rate assumption. Use the
+            # reported cost breakdown; missing billing data stays unknown.
+            return
         parse_cost_per_page = DATALAB_PARSE_COST_PER_PAGE_USD[parse_mode]
     extract_cost_per_page = DATALAB_EXTRACT_COST_PER_PAGE_USD[extraction_mode]
     parse_cost = parse_cost_per_page * page_count
