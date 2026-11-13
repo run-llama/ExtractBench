@@ -38,7 +38,12 @@ from extract_bench.evaluation.layout_adapters import create_layout_adapter_for_r
 from extract_bench.evaluation.metrics.field_grounding.extract_adapter import (
     compute_failure_field_denominator,
 )
-from extract_bench.evaluation.stats import build_cost_stats, build_operational_stats
+from extract_bench.evaluation.stats import (
+    COST_STAT_NAMES,
+    apply_cost_sidecar,
+    build_cost_stats,
+    build_operational_stats,
+)
 from extract_bench.schemas.evaluation import EvaluationResult, EvaluationSummary, MetricValue
 from extract_bench.schemas.layout_detection_output import LayoutOutput
 from extract_bench.schemas.pipeline_io import InferenceRequest, InferenceResult
@@ -626,8 +631,8 @@ class EvaluationRunner:
             with open(result_path) as f:
                 data = json.load(f)
             cost_path = result_path.with_name(result_path.name.removesuffix(".result.json") + ".cost.json")
-            if cost_path.exists():
-                data["raw_output"]["_attempt_accounting"] = json.loads(cost_path.read_text(encoding="utf-8"))
+            if data["product_type"] == ProductType.EXTRACT:
+                apply_cost_sidecar(data["raw_output"], cost_path)
             return InferenceResult.model_validate(data)
         except Exception:
             return None
@@ -1497,6 +1502,17 @@ class EvaluationRunner:
                         f"(pipeline produced no result.json) with zero-scored results"
                     )
 
+        # Scoring errors do not erase an already incurred inference bill.
+        inference_costs = {
+            (inf.pipeline_name, tc.test_id): build_cost_stats(inf.raw_output)
+            for inf, tc, _evaluator, _mode in non_qa_evaluations
+            if inf.product_type == ProductType.EXTRACT
+        }
+        for result in evaluation_results:
+            cost_stats = inference_costs.get((result.pipeline_name, result.test_id))
+            if cost_stats is not None:
+                result.stats = [stat for stat in result.stats if stat.name not in COST_STAT_NAMES] + cost_stats
+
         # Aggregate metrics
         aggregate_metrics = self._aggregate_metrics(evaluation_results)
         aggregate_diagnostic_metrics = self._aggregate_metrics(
@@ -1619,8 +1635,7 @@ class EvaluationRunner:
                 # pipeline_name when the runner-level filter is unset.
                 tagged = dict(entry)
                 cost_path = errors_path.parent / f"{entry.get('example_id')}.cost.json"
-                if cost_path.exists():
-                    tagged["_attempt_accounting"] = json.loads(cost_path.read_text(encoding="utf-8"))
+                apply_cost_sidecar(tagged, cost_path)
                 tagged.setdefault("_pipeline_dir", pipeline_dir_name)
                 errors.append(tagged)
         return errors
@@ -1728,7 +1743,7 @@ class EvaluationRunner:
                         )
                         for name in sorted(diagnostic_metric_names)
                     ],
-                    stats=build_cost_stats(entry),
+                    stats=build_cost_stats(entry) if product_type == "extract" else [],
                     error=rendered_error,
                     job_id=entry.get("job_id"),
                     tags=list(test_case.tags),
@@ -1808,11 +1823,9 @@ class EvaluationRunner:
                 if (pipe, tc.test_id) in accounted:
                     continue
                 cost_path = pipeline_dir / f"{tc.test_id}.cost.json"
-                cost_raw = (
-                    {"_attempt_accounting": json.loads(cost_path.read_text(encoding="utf-8"))}
-                    if cost_path.exists()
-                    else {}
-                )
+                cost_raw: dict[str, Any] = {}
+                if product_type == "extract":
+                    apply_cost_sidecar(cost_raw, cost_path)
                 synthesized.append(
                     EvaluationResult(
                         test_id=tc.test_id,
@@ -1828,7 +1841,7 @@ class EvaluationRunner:
                             MetricValue(metric_name=name, value=0.0, metadata=dict(failure_metadata))
                             for name in sorted(diag_names)
                         ],
-                        stats=build_cost_stats(cost_raw),
+                        stats=build_cost_stats(cost_raw) if product_type == "extract" else [],
                         error="No prediction emitted",
                         tags=list(tc.tags),
                     )
@@ -2115,9 +2128,9 @@ class EvaluationRunner:
         stat_values: dict[str, list[float]] = {}
         stat_units: dict[str, str] = {}
         for r in evaluation_results:
-            if not r.success:
-                continue
             for s in r.stats:
+                if not r.success and (r.product_type != "extract" or s.name not in COST_STAT_NAMES):
+                    continue
                 stat_values.setdefault(s.name, []).append(s.value)
                 stat_units[s.name] = s.unit
 

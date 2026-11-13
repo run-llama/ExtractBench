@@ -10,7 +10,7 @@ import tempfile
 import threading
 import time
 from collections.abc import Callable, Generator, Iterator, Mapping
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -107,7 +107,7 @@ class _AttemptCost:
             "ordinal": self.ordinal,
             "outcome": self.outcome,
             "cost_usd": self.known_cost_usd,
-            "cost_complete": self.complete,
+            "cost_complete": self.complete and self.outcome not in {"running", "cancelling"},
             "components": {key: dict(value) for key, value in self.components.items()},
             "usage": self.usage,
         }
@@ -360,7 +360,7 @@ class InferenceRunner:
         attempts = self._cost_attempts.get(example_id, [])
         known = [attempt.known_cost_usd for attempt in attempts if attempt.known_cost_usd is not None]
         subtotal = sum(known) if len(known) > 0 else None
-        complete = len(attempts) > 0 and all(attempt.complete for attempt in attempts)
+        complete = len(attempts) > 0 and all(attempt.snapshot()["cost_complete"] for attempt in attempts)
         successful = next((attempt for attempt in reversed(attempts) if attempt.outcome == "success"), None)
         return {
             "attempts": [attempt.snapshot() for attempt in attempts],
@@ -383,47 +383,74 @@ class InferenceRunner:
         return snapshot
 
     def _attach_error_costs(self, summary: RunSummary) -> None:
+        if self.pipeline.product_type != ProductType.EXTRACT:
+            return
         with self._cost_lock:
             for entry in summary.errors:
                 example_id = entry["example_id"]
                 entry["_attempt_accounting"] = self._cost_snapshot(example_id)
 
+    def _call_provider(self, request: InferenceRequest) -> RawInferenceResult:
+        with self._execution_budget_context(request), self._provider_request_context(request) as provider_request:
+            provider_request = provider_request.model_copy(update={"artifact_dir": str(self.output_dir / "traces")})
+            raw_result = self.provider.run_inference(self.pipeline, provider_request)
+        if raw_result.request != request:
+            raw_result = raw_result.model_copy(update={"request": request})
+        return raw_result
+
+    def _record_cost(self, example_id: str, attempt: _AttemptCost, event: str, payload: Mapping[str, Any]) -> None:
+        if event not in {"cost.component", "cost.attempt"}:
+            return
+        with self._cost_lock:
+            attempt.observe(payload, component=event == "cost.component")
+            self._persist_costs(example_id)
+
     def _run_provider_inference(self, request: InferenceRequest) -> RawInferenceResult:
         """Persist each attempt's costs before returning or propagating its error."""
+        if request.product_type != ProductType.EXTRACT:
+            return self._call_provider(request)
         if request.example_id in self._cancelled_examples:
             raise ProviderPermanentError("Document execution deadline exceeded")
         with self._cost_lock:
-            attempts = self._cost_attempts.setdefault(request.example_id, [])
+            if request.example_id not in self._cost_attempts:
+                path = self.output_dir / f"{request.example_id}.cost.json"
+                restored = []
+                if path.exists():
+                    # A restart retains previous paid attempts. Invalid history fails
+                    # before another vendor call, rather than overwriting that bill.
+                    previous = json.loads(path.read_text(encoding="utf-8"))
+                    for entry in previous["attempts"]:
+                        prior = _AttemptCost(
+                            ordinal=entry["ordinal"],
+                            outcome=entry["outcome"],
+                            components=entry.get("components", {}),
+                            usage=entry.get("usage"),
+                        )
+                        prior.observe({"known_cost_usd": entry["cost_usd"], "complete": entry["cost_complete"]})
+                        if prior.outcome in {"running", "cancelling"}:
+                            prior.outcome = "interrupted"
+                            prior.complete = False
+                        restored.append(prior)
+                self._cost_attempts[request.example_id] = restored
+            attempts = self._cost_attempts[request.example_id]
             attempt = _AttemptCost(ordinal=len(attempts) + 1)
             attempts.append(attempt)
             self._persist_costs(request.example_id)
 
         def record(event: str, payload: Mapping[str, Any]) -> None:
-            if event not in {"cost.component", "cost.attempt"}:
-                return
-            with self._cost_lock:
-                attempt.observe(payload, component=event == "cost.component")
-                self._persist_costs(request.example_id)
+            self._record_cost(request.example_id, attempt, event, payload)
 
         capture = None
         try:
             with bind_provider_event_sink(record) as capture:
-                with (
-                    self._execution_budget_context(request),
-                    self._provider_request_context(request) as provider_request,
-                ):
-                    provider_request = provider_request.model_copy(
-                        update={"artifact_dir": str(self.output_dir / "traces")}
-                    )
-                    raw_result = self.provider.run_inference(self.pipeline, provider_request)
+                raw_result = self._call_provider(request)
                 with self._cost_lock:
                     raw = raw_result.raw_output
                     if "cost_usd" in raw or "_cost_complete" in raw:
                         attempt.observe(
                             {"known_cost_usd": raw.get("cost_usd"), "complete": raw.get("_cost_complete", True)}
                         )
-                    if attempt.outcome == "running":
-                        attempt.outcome = "success"
+                    attempt.outcome = "cancelled" if attempt.outcome == "cancelling" else "success"
                     snapshot = self._persist_costs(request.example_id)
                     raw.update(
                         {
@@ -442,16 +469,13 @@ class InferenceRunner:
                 payload = getattr(error, "debug_payload", None)
                 if isinstance(payload, dict) and isinstance(payload.get("cost_accounting"), dict):
                     attempt.observe(payload["cost_accounting"])
-                if attempt.outcome == "running":
-                    attempt.outcome = "error"
+                attempt.outcome = "cancelled" if attempt.outcome == "cancelling" else "error"
                 snapshot = self._persist_costs(request.example_id)
                 if isinstance(error, ProviderError):
                     error.debug_payload = {**(error.debug_payload or {}), "_attempt_accounting": snapshot}
             if capture is not None and capture.failure is not None and capture.failure is not error:
                 raise capture.failure from error
             raise
-        if raw_result.request != request:
-            raw_result = raw_result.model_copy(update={"request": request})
         return raw_result
 
     def shutdown(self) -> None:
@@ -519,19 +543,38 @@ class InferenceRunner:
             if budget is not None:
                 budget.cancel()
         with self._cost_lock:
-            for attempt in self._cost_attempts.get(example_id, []):
-                if attempt.outcome == "running":
-                    attempt.outcome = "cancelled"
-                    attempt.complete = False
+            active = next(
+                (
+                    attempt
+                    for attempt in reversed(self._cost_attempts.get(example_id, []))
+                    if attempt.outcome == "running"
+                ),
+                None,
+            )
+            if active is not None:
+                active.outcome = "cancelling"
+                active.complete = False
+
+        def record(event: str, payload: Mapping[str, Any]) -> None:
+            if active is not None:
+                self._record_cost(example_id, active, event, payload)
+
         cancel_fn = getattr(self.provider, "cancel", None)
-        if callable(cancel_fn):
-            try:
-                cancel_fn(example_id)
-            except Exception as exc:  # pragma: no cover - defensive
-                print(f"  Warning: provider.cancel({example_id}) raised: {exc}")
-        future.cancel()
-        with self._cost_lock:
-            self._persist_costs(example_id)
+        try:
+            if callable(cancel_fn):
+                with (
+                    bind_provider_event_sink(record)
+                    if self.pipeline.product_type == ProductType.EXTRACT
+                    else nullcontext()
+                ):
+                    cancel_fn(example_id)
+        except Exception as exc:  # Cancellation still proceeds if the remote hook fails.
+            print(f"  Warning: provider.cancel({example_id}) raised: {exc}")
+        finally:
+            future.cancel()
+            if self.pipeline.product_type == ProductType.EXTRACT:
+                with self._cost_lock:
+                    self._persist_costs(example_id)
 
     def _cancel_inflight_and_drain(
         self,
