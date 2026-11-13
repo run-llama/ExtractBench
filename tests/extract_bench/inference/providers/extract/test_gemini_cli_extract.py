@@ -32,6 +32,11 @@ from extract_bench.inference.providers.extract.gemini_cli_trace import GeminiCli
             },
             0.01534,
         ),
+        (
+            "gemini-4-hydrogen",
+            {"promptTokenCount": 1000, "cachedContentTokenCount": 400, "totalTokenCount": 1643},
+            0.0057525,
+        ),
         ("gemini-3.1-pro-preview-customtools", {"promptTokenCount": 200_000, "totalTokenCount": 200_100}, 0.4012),
         ("gemini-3.1-pro-preview-customtools", {"promptTokenCount": 200_001, "totalTokenCount": 200_101}, 0.801804),
         ("gemini-4-argon", {"promptTokenCount": 0, "totalTokenCount": 0}, 0),
