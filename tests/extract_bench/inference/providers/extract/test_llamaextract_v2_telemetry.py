@@ -6,7 +6,7 @@ import pytest
 
 httpx = pytest.importorskip("httpx")
 
-from extract_bench.inference.pipelines import get_pipeline  # noqa: E402
+from extract_bench.inference.pipelines import get_pipeline, list_pipelines  # noqa: E402
 from extract_bench.inference.providers.extract import llamaextract_v2_api as module  # noqa: E402
 from extract_bench.schemas.pipeline import PipelineSpec  # noqa: E402
 from extract_bench.schemas.pipeline_io import InferenceRequest, RawInferenceResult  # noqa: E402
@@ -137,3 +137,14 @@ def test_registered_max_request_preserves_billed_model_cost_or_unknown(
     repriced = provider.normalize(raw)
     assert repriced.raw_output.get("cost_usd") is None
     assert repriced.raw_output.get("credits_used") is None
+
+
+def test_hosted_extract_registrations_request_confidence_instead_of_api_default_off() -> None:
+    """A newly registered hosted tier must not silently lose all confidence metrics."""
+    missing = [
+        name
+        for name in list_pipelines()
+        if (pipeline := get_pipeline(name)).provider_name == "llamaextract_v2"
+        and pipeline.config.get("confidence_scores") is not True
+    ]
+    assert missing == []

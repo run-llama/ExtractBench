@@ -49,6 +49,7 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
                     "tier": _tier,
                     "extract_version": "2.6",
                     "cite_sources": True,
+                    "confidence_scores": True,
                 },
             )
         )
