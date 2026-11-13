@@ -277,7 +277,7 @@ class ReductoExtractProvider(Provider):
                                     provider="reducto",
                                     stage="extract",
                                     job_id=job_id,
-                                    raw_output=job.model_dump() if hasattr(job, "model_dump") else vars(job),
+                                    raw_output=job.model_dump() if hasattr(job, "model_dump") else job,
                                 )
                             return job
 
@@ -327,7 +327,7 @@ class ReductoExtractProvider(Provider):
                         "stage.completed",
                         provider="reducto",
                         stage="extract",
-                        raw_output=result.model_dump() if hasattr(result, "model_dump") else vars(result),
+                        raw_output=result.model_dump() if hasattr(result, "model_dump") else result,
                     )
                     return result
 
