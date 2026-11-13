@@ -9,9 +9,6 @@ import pytest
 pytest.importorskip("reducto", reason="dev and runners extras required")
 pytest.importorskip("pypdf", reason="dev and runners extras required")
 
-from reducto.types import V3Extract
-from reducto.types.job_get_response import AsyncJobResponse
-
 from extract_bench.inference.limits import ExecutionBudget
 from extract_bench.inference.providers.extract import reducto
 
@@ -33,10 +30,14 @@ def test_upload_consumes_budget_and_cancellation_prevents_extract(
         return "uploaded"
 
     client.upload.side_effect = upload
-    result = V3Extract.model_validate({"result": {}, "usage": {"num_fields": 0, "num_pages": 1}})
+    result = SimpleNamespace(model_dump=lambda: {"data": {}})
     client.extract.run.return_value = result
     client.extract.run_job.return_value = SimpleNamespace(job_id="job")
-    client.job.get.return_value = AsyncJobResponse.model_validate({"status": "Completed", "result": result})
+    client.job.get.return_value = SimpleNamespace(
+        status="Completed",
+        result=result,
+        model_dump=lambda: {"status": "Completed", "result": result.model_dump()},
+    )
     monkeypatch.setattr(reducto, "Reducto", lambda **kwargs: client)
     provider = reducto.ReductoExtractProvider("reducto_extract", {"api_key": "test"})
     with budget.activate():
