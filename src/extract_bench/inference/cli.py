@@ -255,8 +255,9 @@ class InferenceCLI:
                     "codex_deepseek_extract",
                     "codex_glm_extract",
                     "gemini_cli_extract",
+                    "pi_extract",
                 }:
-                    raise ValueError("--harness_version requires a Claude Code, Codex, or Gemini CLI pipeline")
+                    raise ValueError("--harness_version requires a Claude Code, Codex, Gemini CLI, or pi pipeline")
                 pipeline_spec = pipeline_spec.model_copy(
                     update={"config": {**pipeline_spec.config, HARNESS_VERSION: harness_version}},
                 )

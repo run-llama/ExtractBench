@@ -41,6 +41,7 @@ uv run extract-bench run <pipeline_name>
 | `codex_code_extract_gpt_6_luna_medium_evidence` / `codex_code_extract_gpt_6_luna_high_evidence` / `codex_code_extract_gpt_6_luna_xhigh_evidence` / `codex_code_extract_gpt_6_sol_low_evidence` / `codex_code_extract_gpt_6_sol_medium_evidence` / `codex_code_extract_gpt_6_sol_high_evidence` | Codex CLI | GPT-6 Luna and Sol extraction with page and box citations at the effort in the name; unrestricted shell, no cost cap |
 | `codex_code_extract_gpt_6_astra_xhigh_evidence` / `codex_code_extract_gpt_6_1_sol_{low,medium,high,xhigh}_evidence` / `codex_code_extract_gpt_6_1_terra_{low,medium}_evidence` | Codex CLI | GPT-6 Astra, GPT-6.1 Sol and GPT-6.1 Terra extraction with page and box citations at the effort in the name; unrestricted shell, no cost cap |
 | `codex_code_extract_gpt_6_luna_{low,medium,high,xhigh}_evidence_prompt_opt` | Codex CLI | GPT-6 Luna evidence extraction plus a short prompt addendum: always write the output files, the documents are authorized for extraction, no field needs web access |
+| `pi_extract_hy4_vision_evidence` | pi 0.84.1 | Tencent Hy4 on TokenHub, reasoning high, vision, page/box citations; uses `TENCENT_TOKENHUB_API_KEY`; [setup](#pi) |
 | `reducto_extract` / `reducto_extract_v4` / `reducto_deep_extract` | Reducto | `_v4` uses Reducto's v4 extract model |
 | `extend_extract` | Extend Performance + Review Agent | latest stable model, Review Agent scores, line/property citations; async API 2026-02-09 |
 | `extend_extract_max` | Extend Max Context + Review Agent | same settings as Performance, with `large_array_max_context` |
@@ -96,7 +97,7 @@ These pipelines use a separately installed CLI to inspect documents and write ex
 
 Run the commands below from the repository root, with Node.js 22+ and npm installed. Replace `X.Y.Z` in each example with the exact CLI release to use. Each example runs the full public Pro dataset at concurrency 1; the benchmark downloads it automatically. For a single document, replace `--dataset pro` with `--file /path/to/document.pdf`, keeping its matching `document.test.json` beside it. Omit `--dataset pro` to use original ExtractBench.
 
-Set `harness_version` in pipeline config, or pass `--harness_version X.Y.Z` to `extract-bench run` or `extract-bench inference run`; the flag becomes part of the saved pipeline config. Claude Code, Codex (including DeepSeek/GLM variants), and Gemini CLI verify the installed executable before extraction and reject mismatches. Install the same exact release separately and use the matching `claude_bin`, `codex_bin`, or `gemini_bin` config key for a non-default installation. Each attempt records its version and executable in `traces/<harness>/*.harness.json`; successful outputs also include `raw_output.harness`. Probe failures retain a record with an unknown actual version and the error. For a rerun, install and require the original attempt's recorded version. Omitting the pin records the installed version without requiring one. KYNEX already verifies its fixed Git revision.
+Set `harness_version` in pipeline config, or pass `--harness_version X.Y.Z` to `extract-bench run` or `extract-bench inference run`; the flag becomes part of the saved pipeline config. Claude Code, Codex (including DeepSeek/GLM variants), Gemini CLI, and pi verify the installed executable before extraction and reject mismatches. Install the same exact release separately and use the matching `claude_bin`, `codex_bin`, `gemini_bin`, or `pi_bin` config key for a non-default installation. Each attempt records its version and executable in `traces/<harness>/*.harness.json`; successful outputs also include `raw_output.harness`. Probe failures retain a record with an unknown actual version and the error. For a rerun, install and require the original attempt's recorded version. Omitting the pin records the installed version without requiring one. KYNEX already verifies its fixed Git revision.
 
 #### Claude Code
 
@@ -146,6 +147,21 @@ This pipeline uses medium thinking, an isolated CLI home, local tools and `citat
 Requests use Google's native Gemini API. To use a native Gemini-compatible gateway, set `GOOGLE_GEMINI_BASE_URL` and any required `GEMINI_CLI_CUSTOM_HEADERS` (`name: value, name: value`). Credentials remain in the recorder, outside CLI/tool subprocess environments.
 
 Incremental JSONL journals under the output directory's `traces/` contain prompts, CLI events, native request/response content, timing, usage and outcomes. Each event is flushed and synced; use a durable output volume to survive machine loss. Costs include helper models, thinking tokens and observed failed-request usage. Missing usage stays unknown: `known_cost_usd` records the measured subtotal, while `total_cost_usd` is populated only when accounting is complete. Separate attempts have separate journals; include all applicable attempts when reporting total spend.
+
+#### pi
+
+Install the [pi coding agent](https://github.com/earendil-works/pi) and set a Tencent TokenHub API key with access to Hy4:
+
+```bash
+uv sync --extra local
+npm install -g @earendil-works/pi-coding-agent@X.Y.Z
+pi --version
+export TENCENT_TOKENHUB_API_KEY="your-tokenhub-api-key"
+uv run extract-bench run pi_extract_hy4_vision_evidence \
+  --dataset pro --max_concurrent 1 --harness_version X.Y.Z
+```
+
+Each request gets its own pi `models.json` (endpoint, key and prices) outside the agent's working directory, and pi runs without skills, extensions, prompt templates or context files. The pipeline pins reasoning to `high`, lets the model read rendered pages as images and writes `citations.json` evidence. It calls TokenHub's OpenAI-compatible endpoint, set by `base_url` in the pipeline config. Cost is pi's reported cost at TokenHub's list rates; `max_cost_usd` is a post-hoc flag, not a spending limit.
 
 ---
 
