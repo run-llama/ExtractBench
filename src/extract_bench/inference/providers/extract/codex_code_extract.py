@@ -734,6 +734,8 @@ class CodexCodeExtractProvider(Provider):
             try:
                 returncode, stderr_tail = self._run_cli(cmd, prompt, workdir, request.example_id, lines)
                 usage, usage_observed, cost_complete = codex_usage_accounting(self._json_events(lines))
+                # This subtotal covers one CLI invocation. The synthetic ID keeps
+                # repeated Codex stages in the same outer attempt additive.
                 if usage_observed:
                     emit_provider_event(
                         "cost.component",

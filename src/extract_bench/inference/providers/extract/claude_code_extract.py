@@ -546,6 +546,8 @@ class ClaudeCodeExtractProvider(Provider):
                 else None
             )
             accounting = {"known_cost_usd": cost_usd, "complete": cost_usd is not None, "usage": usage}
+            # The terminal total covers one CLI invocation. A fresh ID keeps
+            # two Claude invocations in the same outer attempt from overwriting each other.
             if cost_usd is not None:
                 emit_provider_event(
                     "cost.component", component_id=f"claude:{uuid.uuid4().hex}", cost_usd=cost_usd, usage=usage

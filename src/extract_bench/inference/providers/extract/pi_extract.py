@@ -539,6 +539,8 @@ class PiExtractProvider(Provider):
             try:
                 returncode, stderr_tail = self._run_cli(cmd, workdir, pi_home, request.example_id, lines, prompt)
                 summary = summarize_pi_events(lines)
+                # The summary already adds every reported turn in this CLI invocation.
+                # Give each invocation its own ID so an outer attempt can include several.
                 if summary.cost_observed:
                     emit_provider_event(
                         "cost.component",
