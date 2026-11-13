@@ -21,11 +21,11 @@ def test_parse_cost_survives_missing_or_failed_extraction(extract_credits: float
     provider._client = Mock()
     provider._client.parse.return_value = SimpleNamespace(
         markdown="text",
-        metadata=SimpleNamespace(credit_usage=12, page_count=2),
+        metadata=SimpleNamespace(credit_usage=12, page_count=2, job_id="parse-1"),
     )
     provider._client.extract.return_value = SimpleNamespace(
         extraction={},
-        metadata=SimpleNamespace(credit_usage=extract_credits),
+        metadata=SimpleNamespace(credit_usage=extract_credits, job_id="extract-1"),
     )
     events = []
     if extract_credits == "failure":
@@ -50,8 +50,14 @@ def test_multiple_invocations_do_not_replace_each_others_charges() -> None:
     provider._base_config = {}
     provider._model = None
     provider._client = Mock()
-    provider._client.parse.return_value = SimpleNamespace(markdown="text", metadata=SimpleNamespace(credit_usage=12))
-    provider._client.extract.return_value = SimpleNamespace(extraction={}, metadata=SimpleNamespace(credit_usage=5))
+    provider._client.parse.side_effect = [
+        SimpleNamespace(markdown="text", metadata=SimpleNamespace(credit_usage=12, job_id=f"parse-{index}"))
+        for index in range(2)
+    ]
+    provider._client.extract.side_effect = [
+        SimpleNamespace(extraction={}, metadata=SimpleNamespace(credit_usage=5, job_id=f"extract-{index}"))
+        for index in range(2)
+    ]
     charges = {}
 
     def record(event: str, payload: dict) -> None:

@@ -171,3 +171,24 @@ def test_terminal_job_usage_is_journaled_even_after_cancellation(
     assert len(charges) == 1
     # The successful public Deep rate has a minimum; failure uses only returned billing.
     assert charges[0]["cost_usd"] == pytest.approx(0.48 if status == "Completed" else credits * 0.015)
+
+
+def test_sync_job_ids_keep_distinct_calls_separate_when_optional_id_is_absent(monkeypatch: pytest.MonkeyPatch) -> None:
+    client = Mock()
+    responses = [{"job_id": "known", "usage": {"credits": 4}}, {"usage": {"credits": 4}}, {"usage": {"credits": 4}}]
+    client.extract.run.side_effect = [
+        SimpleNamespace(model_dump=lambda payload=payload: payload) for payload in responses
+    ]
+    monkeypatch.setattr(reducto, "Reducto", lambda **kwargs: client)
+    provider = reducto.ReductoExtractProvider("reducto_extract", {"api_key": "test"})
+    charges = {}
+
+    def record(event: str, payload: dict) -> None:
+        if event == "cost.component":
+            charges[payload["component_id"]] = payload["cost_usd"]
+
+    with bind_provider_event_sink(record):
+        for _ in responses:
+            asyncio.run(provider._extract_pdf_async("unused.pdf", {}))
+    assert charges["reducto/known"] == pytest.approx(0.06)
+    assert sum(charges.values()) == pytest.approx(0.18)

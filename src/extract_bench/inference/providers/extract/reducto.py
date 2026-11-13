@@ -255,7 +255,6 @@ class ReductoExtractProvider(Provider):
         budget = execution_budget()
         accounting: dict[str, Any] = {"known_cost_usd": None, "complete": False}
         last_response: dict[str, Any] = {}
-        call_id = uuid4().hex
         client = Reducto(api_key=self._api_key, timeout=budget.remaining(), max_retries=0)
         try:
             if cancel_event is not None and cancel_event.is_set():
@@ -377,7 +376,12 @@ class ReductoExtractProvider(Provider):
                         timeout=budget.remaining(),
                     )
                     last_response = result.model_dump()
-                    accounting = self._record_cost(last_response, {}, f"reducto/{call_id}", pdf_path)
+                    # Repeated component IDs replace cumulative charges within an attempt.
+                    # The synchronous SDK result has an optional job_id. Use it when
+                    # present; a local ID keeps separate calls distinct when absent.
+                    response_id = last_response.get("job_id")
+                    component_id = f"reducto/{response_id if response_id is not None else uuid4().hex}"
+                    accounting = self._record_cost(last_response, {}, component_id, pdf_path)
                     emit_provider_event(
                         "stage.completed",
                         provider="reducto",

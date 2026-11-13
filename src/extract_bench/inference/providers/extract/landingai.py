@@ -7,7 +7,6 @@ from collections.abc import Mapping
 from datetime import datetime
 from pathlib import Path
 from typing import Any
-from uuid import uuid4
 
 from landingai_ade import LandingAIADE
 
@@ -117,7 +116,6 @@ class LandingAIExtractProvider(Provider):
         """
         budget = execution_budget()
         accounting: dict[str, Any] = {}
-        call_id = uuid4().hex
         try:
             # First, parse the document
             parse_model = self.base_config.get("parse_model", "dpt-2-latest")
@@ -133,7 +131,7 @@ class LandingAIExtractProvider(Provider):
                 stage="parse",
                 raw_output=_to_plain_data(parse_response),
             )
-            self._record_stage_cost(accounting, "parse", parse_response, call_id)
+            self._record_stage_cost(accounting, "parse", parse_response)
             # Get markdown from parse response
             markdown = parse_response.markdown if hasattr(parse_response, "markdown") else ""
 
@@ -162,7 +160,7 @@ class LandingAIExtractProvider(Provider):
                 stage="extract",
                 raw_output=_to_plain_data(response),
             )
-            self._record_stage_cost(accounting, "extract", response, call_id)
+            self._record_stage_cost(accounting, "extract", response)
             # Convert response to dictionary format
             result: dict[str, Any] = {
                 "data": {},
@@ -244,15 +242,17 @@ class LandingAIExtractProvider(Provider):
         result: dict[str, Any],
         stage: str,
         response: Any,
-        call_id: str,
     ) -> None:
         metadata = getattr(response, "metadata", None)
         credits = _coerce_nonnegative(getattr(metadata, "credit_usage", None))
         if credits is not None:
             result[f"{stage}_credits"] = credits
+            # Repeated component IDs replace cumulative charges within an attempt.
+            # Both SDK responses require metadata.job_id; scope it by stage so
+            # parse and extract charges, and separate invocations, stay distinct.
             emit_provider_event(
                 "cost.component",
-                component_id=f"landingai/{call_id}/{stage}",
+                component_id=f"landingai/{stage}/{metadata.job_id}",
                 cost_usd=credits * self.CREDIT_RATE_USD,
                 usage=_to_plain_data(metadata),
             )

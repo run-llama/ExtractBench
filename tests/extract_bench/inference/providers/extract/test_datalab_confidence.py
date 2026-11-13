@@ -202,3 +202,35 @@ def test_score_survives_unknown_citation_and_parent_scores_are_ignored() -> None
     assert [(citation.field_path, citation.confidence, citation.page) for citation in citations] == [
         ("items.0.total", 0.75, None)
     ]
+
+
+def test_missing_request_ids_do_not_merge_separate_extraction_charges(monkeypatch: pytest.MonkeyPatch) -> None:
+    from datalab_sdk.models import ConversionResult
+
+    from extract_bench.inference.events import bind_provider_event_sink
+
+    class Client:
+        base_url = "https://unused.invalid"
+
+        async def __aenter__(self) -> "Client":
+            return self
+
+        async def __aexit__(self, *args: object) -> None:
+            return None
+
+        async def extract(self, *args: object, **kwargs: object) -> ConversionResult:
+            return ConversionResult(success=True, output_format="json", cost_breakdown={"final_cost_cents": 2})
+
+    monkeypatch.setattr(datalab, "AsyncDatalabClient", lambda **kwargs: Client())
+    monkeypatch.setattr(datalab, "_read_pdf_page_count", lambda path: 1)
+    provider = datalab.DatalabExtractProvider("datalab_extract", {"api_key": "unused", "extraction_mode": "balanced"})
+    charges = {}
+
+    def record(event: str, payload: dict) -> None:
+        if event == "cost.component":
+            charges[payload["component_id"]] = payload["cost_usd"]
+
+    with bind_provider_event_sink(record):
+        asyncio.run(provider._extract_pdf_async("unused.pdf", {}))
+        asyncio.run(provider._extract_pdf_async("unused.pdf", {}))
+    assert sum(charges.values()) == pytest.approx(0.04)

@@ -140,7 +140,6 @@ class DatalabExtractProvider(Provider):
     async def _extract_pdf_async(self, pdf_path: str, schema: dict[str, Any]) -> dict[str, Any]:
         """Call Datalab Extract and return the full response as a plain dict."""
         raw_response: dict[str, Any] = {}
-        component_id = f"datalab/{uuid4().hex}"
         try:
             extraction_started = time.perf_counter()
             pdf_page_count = _read_pdf_page_count(pdf_path)
@@ -170,6 +169,11 @@ class DatalabExtractProvider(Provider):
 
             extraction_latency_ms = (time.perf_counter() - extraction_started) * 1000
             raw_response = dataclasses.asdict(result)
+            # Repeated component IDs replace cumulative charges within an attempt.
+            # The SDK's request_id is optional; a local ID keeps separate calls
+            # distinct when absent. Choose once and reuse through confidence polls.
+            request_id = raw_response.get("request_id")
+            component_id = f"datalab/{request_id if request_id is not None else uuid4().hex}"
             page_count = _coerce_positive_page_count(raw_response.get("page_count")) or pdf_page_count
             if page_count is not None:
                 raw_response["page_count"] = page_count
