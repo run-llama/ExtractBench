@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+from collections.abc import Mapping
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -160,6 +161,17 @@ class GeminiDirectExtractProvider(Provider):
         }
         return {key: value for key, value in counters.items() if value is not None}
 
+    def _estimate_extract_cost_usd(self, usage: Mapping[str, int]) -> float | None:
+        return (
+            (
+                usage.get("input_tokens", 0) * self._input_price_per_1m
+                + (usage.get("output_tokens", 0) + usage.get("thinking_tokens", 0)) * self._output_price_per_1m
+            )
+            / 1_000_000
+            if "input_tokens" in usage or "output_tokens" in usage
+            else None
+        )
+
     def _call_api(
         self,
         schema: dict[str, Any],
@@ -204,15 +216,7 @@ class GeminiDirectExtractProvider(Provider):
         )
 
         usage = self._extract_usage(response)
-        cost_usd = (
-            (
-                usage.get("input_tokens", 0) * self._input_price_per_1m
-                + (usage.get("output_tokens", 0) + usage.get("thinking_tokens", 0)) * self._output_price_per_1m
-            )
-            / 1_000_000
-            if "input_tokens" in usage or "output_tokens" in usage
-            else None
-        )
+        cost_usd = self._estimate_extract_cost_usd(usage)
         response_id = getattr(response, "response_id", None)
         accounting = record_response_cost(
             cost_usd,
@@ -304,15 +308,7 @@ class GeminiDirectExtractProvider(Provider):
         latency_ms = int((completed_at - started_at).total_seconds() * 1000)
 
         usage = raw_output["usage"]
-        extract_cost_usd = (
-            (
-                usage.get("input_tokens", 0) * self._input_price_per_1m
-                + (usage.get("output_tokens", 0) + usage.get("thinking_tokens", 0)) * self._output_price_per_1m
-            )
-            / 1_000_000
-            if "input_tokens" in usage or "output_tokens" in usage
-            else None
-        )
+        extract_cost_usd = self._estimate_extract_cost_usd(usage)
         raw_output["_cost_complete"] = "input_tokens" in usage and "output_tokens" in usage
         cost_usd = extract_cost_usd
         num_pages = parsed_doc.num_pages if parsed_doc and parsed_doc.num_pages > 0 else page_count(file_path)
