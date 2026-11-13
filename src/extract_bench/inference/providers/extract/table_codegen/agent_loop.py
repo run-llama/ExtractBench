@@ -209,6 +209,7 @@ def _run_anthropic(
     messages: list[dict[str, Any]] = [{"role": "user", "content": "Begin."}]
     trace: list[dict[str, Any]] = []
     usage: dict[str, int] = {"input": 0, "output": 0, "cache_read": 0, "cache_write": 0}
+    usage.update(reported_calls=0, unreported_calls=0)
     t0 = time.time()
 
     def fin(d: dict[str, Any]) -> dict[str, Any]:
@@ -231,6 +232,7 @@ def _run_anthropic(
             **extra,
         )
         u = resp.usage
+        usage["reported_calls"] += 1
         usage["input"] += u.input_tokens or 0
         usage["output"] += u.output_tokens or 0
         usage["cache_read"] += getattr(u, "cache_read_input_tokens", 0) or 0
@@ -318,6 +320,7 @@ def _run_openai(
     messages: list[Any] = [{"role": "system", "content": system}, {"role": "user", "content": "Begin."}]
     trace: list[dict[str, Any]] = []
     usage: dict[str, int] = {"input": 0, "output": 0, "cache_read": 0, "cache_write": 0}
+    usage.update(reported_calls=0, unreported_calls=0)
     t0 = time.time()
 
     def fin(d: dict[str, Any]) -> dict[str, Any]:
@@ -331,13 +334,16 @@ def _run_openai(
         resp = client.chat.completions.create(  # type: ignore[call-overload]
             model=model, messages=messages, tools=spec, tool_choice="auto"
         )
-        if resp.usage:
+        if resp.usage is not None:
+            usage["reported_calls"] += 1
             usage["input"] += resp.usage.prompt_tokens or 0
             usage["output"] += resp.usage.completion_tokens or 0
             details = getattr(resp.usage, "prompt_tokens_details", None)
             usage["cache_read"] += getattr(details, "cached_tokens", 0) or 0
-            if on_usage is not None:
-                on_usage(dict(usage))
+        else:
+            usage["unreported_calls"] += 1
+        if on_usage is not None:
+            on_usage(dict(usage))
         msg = resp.choices[0].message
         messages.append(msg)
         calls = msg.tool_calls or []
@@ -446,6 +452,7 @@ def _run_google(
     # (candidates_token_count) — Gemini reports the two apart and bills thinking at the
     # output rate, so the provider's cost branch adds it to output (see _codegen_cost).
     usage: dict[str, int] = {"input": 0, "output": 0, "cache_read": 0, "cache_write": 0, "thinking": 0}
+    usage.update(reported_calls=0, unreported_calls=0)
     t0 = time.time()
 
     def fin(d: dict[str, Any]) -> dict[str, Any]:
@@ -459,6 +466,7 @@ def _run_google(
         resp = client.models.generate_content(model=model, contents=contents, config=gen_config)
         meta = getattr(resp, "usage_metadata", None)
         if meta is not None:
+            usage["reported_calls"] += 1
             # prompt_token_count INCLUDES cached tokens (like OpenAI prompt_tokens);
             # cached_content_token_count is the cached subset. Implicit caching has no
             # write surcharge, so cache_write stays 0.
@@ -466,8 +474,10 @@ def _run_google(
             usage["output"] += getattr(meta, "candidates_token_count", 0) or 0
             usage["cache_read"] += getattr(meta, "cached_content_token_count", 0) or 0
             usage["thinking"] += getattr(meta, "thoughts_token_count", 0) or 0
-            if on_usage is not None:
-                on_usage(dict(usage))
+        else:
+            usage["unreported_calls"] += 1
+        if on_usage is not None:
+            on_usage(dict(usage))
         candidates = getattr(resp, "candidates", None) or []
         candidate = candidates[0] if candidates else None
         content = getattr(candidate, "content", None) if candidate is not None else None

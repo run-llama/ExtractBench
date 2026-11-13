@@ -59,7 +59,7 @@ def test_rejected_codegen_retains_parse_cost_and_agent_usage(tmp_path: Path, mon
     provider = table_codegen_extract.TableCodegenExtractProvider("table_codegen_extract", {"api_key": "offline"})
     document = SimpleNamespace(tables=lambda: [1], to_pages=lambda: [])
     monkeypatch.setattr(provider, "_parse_agentic", lambda request: (document, 1.25, 1, "parse-1"))
-    usage = {"input": 1000, "output": 100}
+    usage = {"input": 1000, "output": 100, "reported_calls": 1, "unreported_calls": 1}
     monkeypatch.setattr(
         table_codegen_extract, "generate_extractor", lambda *args, **kwargs: {"status": "max_turns", "usage": usage}
     )
@@ -82,18 +82,22 @@ def test_rejected_codegen_retains_parse_cost_and_agent_usage(tmp_path: Path, mon
     assert payload["parse_cost_usd"] == 1.25
     assert payload["usage"] == usage
     assert payload["cost_accounting"]["known_cost_usd"] > 1.25
+    assert payload["cost_accounting"]["complete"] is False
 
 
-def test_failed_azure_operation_retains_usage(monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.parametrize("usage", [{"documentPagesStandard": 2}, {}])
+def test_failed_azure_operation_retains_usage(monkeypatch: pytest.MonkeyPatch, usage: dict) -> None:
     provider = azure.AzureContentUnderstandingProvider(
         "azure_content_understanding", {"endpoint": "https://test.invalid", "api_key": "offline"}
     )
-    body = {"status": "Failed", "usage": {"documentPagesStandard": 2}}
+    body = {"status": "Failed", "usage": usage}
     monkeypatch.setattr(provider, "_request", lambda *args, **kwargs: SimpleNamespace(json=lambda: body, content=b"{}"))
     with pytest.raises(ProviderPermanentError) as caught:
         provider._poll_operation("https://test.invalid/op/1", context="analyze")
     assert caught.value.job_id == "https://test.invalid/op/1"
     assert caught.value.debug_payload["usage"] == body["usage"]
+    if len(usage) == 0:
+        assert caught.value.debug_payload.get("cost_usd") is None
 
 
 @pytest.mark.parametrize("timeout", [False, True])
@@ -127,3 +131,48 @@ def test_codegen_records_usage_before_malformed_response_raises(monkeypatch: pyt
         run_agent("openai", "fixture", "extract", [], on_usage=recorded.append)
     assert recorded[0]["input"] == 17
     assert recorded[0]["output"] == 4
+
+
+def test_codegen_retains_parse_charge_when_parse_normalization_fails(monkeypatch: pytest.MonkeyPatch) -> None:
+    provider = table_codegen_extract.TableCodegenExtractProvider("table_codegen_extract", {"api_key": "offline"})
+    parse_provider = SimpleNamespace(
+        run_inference=lambda *args: SimpleNamespace(raw_output={"cost_usd": 0.75}),
+        normalize=Mock(side_effect=ProviderPermanentError("malformed parse")),
+    )
+    monkeypatch.setattr(table_codegen_extract, "LlamaParseProvider", lambda *args, **kwargs: parse_provider)
+    request = InferenceRequest.model_validate(
+        {"example_id": "one", "source_file_path": "one.pdf", "product_type": "extract"}
+    )
+    events = []
+    with bind_provider_event_sink(lambda name, payload: events.append((name, payload))):
+        with pytest.raises(ProviderPermanentError, match="malformed parse"):
+            provider._parse_agentic(request)
+    assert events[0][1]["cost_usd"] == 0.75
+
+
+def test_codegen_missing_usage_does_not_erase_prior_observed_usage(monkeypatch: pytest.MonkeyPatch) -> None:
+    import openai
+
+    from extract_bench.inference.providers.extract.table_codegen.agent_loop import run_agent
+
+    tool = SimpleNamespace(id="call", function=SimpleNamespace(name="missing_tool", arguments="{}"))
+    responses = iter(
+        [
+            SimpleNamespace(
+                usage=SimpleNamespace(prompt_tokens=17, completion_tokens=4),
+                choices=[
+                    SimpleNamespace(message=SimpleNamespace(content="", tool_calls=[tool]), finish_reason="tool_calls")
+                ],
+            ),
+            SimpleNamespace(
+                usage=None,
+                choices=[SimpleNamespace(message=SimpleNamespace(content="", tool_calls=[]), finish_reason="stop")],
+            ),
+        ]
+    )
+    client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=lambda **kwargs: next(responses))))
+    monkeypatch.setattr(openai, "OpenAI", lambda **kwargs: client)
+    result = run_agent("openai", "fixture", "extract", [])
+    assert result["usage"]["input"] == 17
+    assert result["usage"]["reported_calls"] == 1
+    assert result["usage"]["unreported_calls"] == 1

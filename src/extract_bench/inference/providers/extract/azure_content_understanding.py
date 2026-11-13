@@ -296,7 +296,7 @@ def _content_understanding_endpoint(endpoint: str) -> str:
 
 def _apply_usage_cost_fields(raw_output: dict[str, Any], config: Mapping[str, Any]) -> None:
     usage = raw_output.get("usage")
-    if not isinstance(usage, Mapping):
+    if not isinstance(usage, Mapping) or len(usage) == 0:
         return
 
     breakdown = _usage_cost_breakdown(usage, config)
