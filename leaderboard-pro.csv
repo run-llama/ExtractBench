@@ -97,6 +97,13 @@ LlamaExtract Cost Effective,LlamaExtract,llamaextract_cost_effective,,true,condi
 LlamaExtract Cost Effective,LlamaExtract,llamaextract_cost_effective,,true,relational_diagrams,20,19,0.00,29.85,62.41,65.74,0.010000,0,0,,0.00,29.85,62.41,65.74
 LlamaExtract Cost Effective,LlamaExtract,llamaextract_cost_effective,,true,charts_and_maps,25,10,0.00,37.57,70.82,73.32,0.010000,0,0,,0.00,37.57,70.82,73.32
 LlamaExtract Cost Effective,LlamaExtract,llamaextract_cost_effective,,true,long_single_pages,7,7,0.00,0.10,0.00,0.00,0.010000,0,0,,0.00,0.10,0.00,0.00
+Pi (Tencent Hy4),Coding Agents,pi_extract_hy4_vision_evidence,high,true,all,100,81,23.00,27.56,23.05,23.74,0.097720,0,,,42.00,68.05,54.71,61.63
+Pi (Tencent Hy4),Coding Agents,pi_extract_hy4_vision_evidence,high,true,interpretation_rules,22,22,4.55,17.15,16.10,16.87,0.040491,0,,,18.18,68.27,60.21,63.97
+Pi (Tencent Hy4),Coding Agents,pi_extract_hy4_vision_evidence,high,true,custom_terminology,14,14,0.00,0.00,0.00,0.00,0.036496,0,,,35.71,62.38,38.73,53.32
+Pi (Tencent Hy4),Coding Agents,pi_extract_hy4_vision_evidence,high,true,conditional_aggregation,12,9,8.33,16.22,6.67,8.89,0.033334,0,,,25.00,57.29,35.19,42.96
+Pi (Tencent Hy4),Coding Agents,pi_extract_hy4_vision_evidence,high,true,relational_diagrams,20,19,50.00,50.00,45.70,46.39,0.054345,0,,,75.00,81.17,79.78,82.23
+Pi (Tencent Hy4),Coding Agents,pi_extract_hy4_vision_evidence,high,true,charts_and_maps,25,10,40.00,43.37,48.50,49.00,0.055435,0,,,52.00,72.78,58.50,59.00
+Pi (Tencent Hy4),Coding Agents,pi_extract_hy4_vision_evidence,high,true,long_single_pages,7,7,14.29,14.29,14.29,14.29,1.328915,0,,,28.57,42.75,21.04,42.75
 Pulse Effort,Specialized APIs,pulse_schema_effort,,true,all,100,81,18.00,70.53,18.74,74.77,0.105000,0,,,18.00,70.53,18.74,74.77
 Pulse Effort,Specialized APIs,pulse_schema_effort,,true,interpretation_rules,22,22,9.09,93.83,26.79,79.91,0.105000,0,,,9.09,93.83,26.79,79.91
 Pulse Effort,Specialized APIs,pulse_schema_effort,,true,custom_terminology,14,14,50.00,82.13,23.30,77.34,0.105000,0,,,50.00,82.13,23.30,77.34

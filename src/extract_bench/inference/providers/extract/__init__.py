@@ -34,6 +34,7 @@ _PROVIDER_MODULES = [
     "openai_responses",
     "kynex",
     "parseur",
+    "pi_extract",
     "pulse",
     "reducto",
     "table_codegen_extract",

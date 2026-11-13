@@ -73,6 +73,7 @@ Pro has no `--test` subset. To try a pipeline on a smaller slice, run a single c
 | `extend_extract_operator` | Extend Operator |
 | `claude_code_extract_sonnet_5_5_evidence` | Claude Code Sonnet 5.5 |
 | `gemini_cli_extract_gemini_4_argon_medium_thinking_vision_evidence` | Gemini CLI (Gemini 4 Argon Medium) |
+| `pi_extract_hy4_vision_evidence` | Pi (Tencent Hy4) |
 | `llamaextract_agentic` | LlamaExtract Agentic |
 | `pulse_schema_effort` | Pulse Effort |
 | `codex_code_extract_gpt_6_1_sol_low_evidence` | Codex GPT-6.1 Sol |
