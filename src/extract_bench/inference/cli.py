@@ -13,6 +13,7 @@ from rich.console import Console
 from rich.table import Table
 
 from extract_bench.inference.pipelines import get_pipeline, list_pipelines
+from extract_bench.inference.providers.extract.cli_harness import HARNESS_VERSION
 from extract_bench.inference.providers.registry import create_provider
 from extract_bench.inference.renormalize import renormalize_results
 from extract_bench.inference.runner import DEFAULT_TIMEOUT_RETRIES, InferenceRunner
@@ -160,6 +161,7 @@ class InferenceCLI:
         force_exit_on_completion: bool = True,
         shuffle_seed: int | None = None,
         max_concurrent_pages: int | None = None,
+        harness_version: str | None = None,
     ) -> int:
         """
         Run inference on a directory, auto-detecting structure and requirements.
@@ -213,6 +215,7 @@ class InferenceCLI:
             timeout_retries=timeout_retries,
             force_exit_on_completion=force_exit_on_completion,
             shuffle_seed=shuffle_seed,
+            harness_version=harness_version,
         )
 
     def _run_test_cases(
@@ -234,6 +237,7 @@ class InferenceCLI:
         force_exit_on_completion: bool = True,
         shuffle_seed: int | None = None,
         max_concurrent_pages: int | None = None,
+        harness_version: str | None = None,
     ) -> int:
         """Internal method to run inference on test cases."""
         try:
@@ -243,6 +247,19 @@ class InferenceCLI:
             except ValueError as e:
                 print(f"Error: {e}", file=sys.stderr)
                 return 1
+
+            if harness_version is not None:
+                if pipeline_spec.provider_name not in {
+                    "claude_code_extract",
+                    "codex_code_extract",
+                    "codex_deepseek_extract",
+                    "codex_glm_extract",
+                    "gemini_cli_extract",
+                }:
+                    raise ValueError("--harness_version requires a Claude Code, Codex, or Gemini CLI pipeline")
+                pipeline_spec = pipeline_spec.model_copy(
+                    update={"config": {**pipeline_spec.config, HARNESS_VERSION: harness_version}},
+                )
 
             # Allow pipeline_name override
             if pipeline_name_override:

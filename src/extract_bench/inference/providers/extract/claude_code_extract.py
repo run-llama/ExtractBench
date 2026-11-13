@@ -37,6 +37,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from extract_bench.inference.limits import execution_budget
 from extract_bench.inference.providers.base import (
     Provider,
     ProviderConfigError,
@@ -49,6 +50,7 @@ from extract_bench.inference.providers.extract.agent_evidence import (
     citations_from_agent_file,
     read_agent_citations_file,
 )
+from extract_bench.inference.providers.extract.cli_harness import CLAUDE_UPDATE_ENV, HARNESS_VERSION, CliHarness
 from extract_bench.inference.providers.extract.direct_model_utils import (
     IMAGE_EXTENSIONS,
     add_additional_properties_false,
@@ -102,6 +104,12 @@ class ClaudeCodeExtractProvider(Provider):
         # Cost controls (see module docstring):
         self._max_cost_usd: float | None = self.base_config.get("max_cost_usd")
         self._claude_bin: str = self.base_config.get("claude_bin", "claude")
+        self._harness = CliHarness(
+            "claude_code",
+            self._claude_bin,
+            self.base_config.get(HARNESS_VERSION),
+            env=CLAUDE_UPDATE_ENV,
+        )
         self._extra_flags: list[str] = list(self.base_config.get("extra_flags", []))
         # --bare: minimal mode — skip hooks/plugins/auto-memory and CLAUDE.md
         # auto-discovery for a clean, reproducible benchmark run (the faithful
@@ -250,7 +258,7 @@ class ClaudeCodeExtractProvider(Provider):
         - ``ProviderConfigError`` if the ``claude`` binary is missing.
         - ``ProviderPermanentError`` if the streaming cost crosses ``max_cost_usd``.
         """
-        env = {**os.environ}
+        env = {**os.environ, **CLAUDE_UPDATE_ENV}
         if self._api_key:
             env["ANTHROPIC_API_KEY"] = self._api_key
 
@@ -469,6 +477,7 @@ class ClaudeCodeExtractProvider(Provider):
     def _config_snapshot(self) -> dict[str, Any]:
         return {
             "model": self._model,
+            HARNESS_VERSION: self._harness.version,
             "max_cost_usd": self._max_cost_usd,
             "bare": self._bare,
             "non_zdr": self._non_zdr,
@@ -502,6 +511,7 @@ class ClaudeCodeExtractProvider(Provider):
             )
 
         started_at = datetime.now()
+        harness = self._harness.prepare(pipeline, request)
         schema = self._prepare_schema(request.schema_override)
         num_pages = page_count(src)
 
@@ -514,6 +524,8 @@ class ClaudeCodeExtractProvider(Provider):
 
             prompt, schema_delivery = self._stage_prompt(schema, staged_name, workdir)
             cmd = self._build_cmd(prompt, mcp_config)
+            cmd[0] = str(harness["executable"])
+            execution_budget().remaining()
             lines: list[str] = []
             returncode, stderr_tail = self._run_cli(cmd, workdir, request.example_id, lines)
             result_event = self._parse_result_event(lines)
@@ -528,6 +540,7 @@ class ClaudeCodeExtractProvider(Provider):
         cost_usd = (result_event or {}).get("total_cost_usd")
         raw_output: dict[str, Any] = {
             "data": data,
+            "harness": harness,
             "model": self._model,
             "usage": usage,
             "num_pages": num_pages,
@@ -564,9 +577,10 @@ class ClaudeCodeExtractProvider(Provider):
         return normalize_extract_result(raw_result)
 
     def cancel(self, example_id: str) -> bool:
+        probe_cancelled = self._harness.cancel(example_id)
         with self._procs_lock:
             proc = self._procs.get(example_id)
         if proc is None:
-            return False
+            return probe_cancelled
         self._terminate(proc)
         return True

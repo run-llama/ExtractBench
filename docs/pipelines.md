@@ -91,7 +91,9 @@ cp .env.example .env
 
 These pipelines use a separately installed CLI to inspect documents and write extraction results with local tools. Run them in a container or VM: they execute shell commands without interactive approval, and evidence pipelines can have unrestricted shell access.
 
-Run the commands below from the repository root, with Node.js 22+ and npm installed. Each example runs the full public Pro dataset at concurrency 1; the benchmark downloads it automatically. For a single document, replace `--dataset pro` with `--file /path/to/document.pdf`, keeping its matching `document.test.json` beside it. Omit `--dataset pro` to use original ExtractBench.
+Run the commands below from the repository root, with Node.js 22+ and npm installed. Replace `X.Y.Z` in each example with the exact CLI release to use. Each example runs the full public Pro dataset at concurrency 1; the benchmark downloads it automatically. For a single document, replace `--dataset pro` with `--file /path/to/document.pdf`, keeping its matching `document.test.json` beside it. Omit `--dataset pro` to use original ExtractBench.
+
+Set `harness_version` in pipeline config, or pass `--harness_version X.Y.Z` to `extract-bench run` or `extract-bench inference run`; the flag becomes part of the saved pipeline config. Claude Code, Codex (including DeepSeek/GLM variants), and Gemini CLI verify the installed executable before extraction and reject mismatches. Install the same exact release separately and use the matching `claude_bin`, `codex_bin`, or `gemini_bin` config key for a non-default installation. Each attempt records its version and executable in `traces/<harness>/*.harness.json`; successful outputs also include `raw_output.harness`. Probe failures retain a record with an unknown actual version and the error. For a rerun, install and require the original attempt's recorded version. Omitting the pin records the installed version without requiring one. KYNEX already verifies its fixed Git revision.
 
 #### Claude Code
 
@@ -99,11 +101,11 @@ Install [Claude Code](https://code.claude.com/docs/en/setup) and set an Anthropi
 
 ```bash
 uv sync --extra anthropic
-npm install -g @anthropic-ai/claude-code@latest
+npm install -g @anthropic-ai/claude-code@X.Y.Z
 claude --version
 export ANTHROPIC_API_KEY="your-anthropic-api-key"
 uv run extract-bench run claude_code_extract_opus_5_5_evidence \
-  --dataset pro --max_concurrent 1
+  --dataset pro --max_concurrent 1 --harness_version X.Y.Z
 ```
 
 Opus 5.5 requires CLI 2.1.280 or newer. The non-evidence Opus pipelines use `--bare`, which requires `ANTHROPIC_API_KEY` or a configured `apiKeyHelper`; a logged-in Claude session alone is insufficient. The evidence variants do not enable `--bare` and can also use a logged-in session. Cost comes from the CLI's `total_cost_usd`.
@@ -114,26 +116,26 @@ Install [Codex CLI](https://learn.chatgpt.com/docs/codex/cli) and set `CODEX_API
 
 ```bash
 uv sync --extra openai
-npm install -g @openai/codex@latest
+npm install -g @openai/codex@X.Y.Z
 codex --version
 export CODEX_API_KEY="your-openai-api-key"
 uv run extract-bench run codex_code_extract_gpt_5_5_low_evidence \
-  --dataset pro --max_concurrent 1
+  --dataset pro --max_concurrent 1 --harness_version X.Y.Z
 ```
 
-The adapter reads `CODEX_API_KEY`, rather than the `OPENAI_API_KEY` used by direct API pipelines. Use a CLI release supporting `exec --json --ephemeral --ignore-user-config --ignore-rules`; this repository does not pin a Codex CLI version. Record the installed version with your results. Evidence variants write page/box citations and use `danger-full-access`; non-evidence variants use `workspace-write`. Cost is estimated from reported token usage.
+The adapter reads `CODEX_API_KEY`, rather than the `OPENAI_API_KEY` used by direct API pipelines. Use a CLI release supporting `exec --json --ephemeral --ignore-user-config --ignore-rules`. The provider records and verifies the selected version. Evidence variants write page/box citations and use `danger-full-access`; non-evidence variants use `workspace-write`. Cost is estimated from reported token usage.
 
 #### Gemini CLI
 
-Install the pinned Gemini CLI version and set a Google API key with access to Argon:
+Install the selected Gemini CLI version and set a Google API key with access to Argon:
 
 ```bash
 uv sync --extra google
-npm install -g @google/gemini-cli@0.59.0
+npm install -g @google/gemini-cli@X.Y.Z
 gemini --version
 export GEMINI_API_KEY="your-google-api-key"
 uv run extract-bench run gemini_cli_extract_gemini_4_argon_medium_thinking_vision_evidence \
-  --dataset pro --max_concurrent 1
+  --dataset pro --max_concurrent 1 --harness_version X.Y.Z
 ```
 
 This pipeline uses medium thinking, an isolated CLI home, local tools and `citations.json` evidence. The runner enforces a 1,800-second deadline without restarting failed documents. `max_cost_usd` is a post-hoc flag, not a spending limit.

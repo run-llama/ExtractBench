@@ -143,6 +143,7 @@ def test_evidence_reaches_normalized_output(
 
     monkeypatch.setattr(provider, "_run_cli", run_cli)
     monkeypatch.setattr(provider, "_raise_for_status", lambda *args: None)
+    monkeypatch.setattr(provider._harness, "prepare", lambda *args: {"executable": "unused"})
     if provider_class is ClaudeCodeExtractProvider:
         monkeypatch.setattr(provider, "_parse_result_event", lambda lines: {"usage": {}, "total_cost_usd": 0.01})
     else:

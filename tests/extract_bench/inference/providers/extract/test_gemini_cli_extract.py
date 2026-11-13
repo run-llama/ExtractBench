@@ -138,6 +138,7 @@ if sys.argv[1] == "True":
 Path("citations.json").write_text('[{"field_path":"name","page":1,"bbox":[0.1,0.2,0.3,0.4]}]')
 print(json.dumps({"type":"result", "status":"success", "stats":{}}))
 """
+    monkeypatch.setattr(provider._harness, "prepare", lambda *args: {"executable": sys.executable})
     monkeypatch.setattr(provider, "_build_cmd", lambda: [sys.executable, "-c", script, str(write_output)])
     runner = InferenceRunner(provider, pipeline, tmp_path / "output", max_concurrent=1, use_rich=False)
     request = InferenceRequest(
