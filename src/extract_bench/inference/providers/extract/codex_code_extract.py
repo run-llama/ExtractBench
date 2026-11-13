@@ -22,10 +22,13 @@ import shutil
 import subprocess
 import tempfile
 import threading
+import uuid
+from collections.abc import Iterable, Mapping
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from extract_bench.inference.events import emit_provider_event
 from extract_bench.inference.limits import execution_budget
 from extract_bench.inference.providers.base import (
     Provider,
@@ -113,6 +116,46 @@ _LONG_CONTEXT_THRESHOLD_TOKENS = 272_000
 # GPT-6 and GPT-6.1 are absent: Codex caps gpt-6-astra/sol/luna/gpt-6.1-sol at
 # model_context_window=258400, so no single request reaches OpenAI's per-request 272K threshold.
 _LONG_CONTEXT_MODELS = ("gpt-5.6-sol", "gpt-5.5", "gpt-5.4")
+
+
+_CODEX_USAGE_KEYS = (
+    "input_tokens",
+    "cached_input_tokens",
+    "cache_write_input_tokens",
+    "output_tokens",
+    "reasoning_output_tokens",
+)
+
+
+def codex_turn_usage(event: Mapping[str, Any]) -> dict[str, int]:
+    usage = event.get("usage")
+    if event.get("type") != "turn.completed" or not isinstance(usage, dict):
+        return {}
+    return {key: value for key in _CODEX_USAGE_KEYS if type(value := usage.get(key)) is int and value >= 0}
+
+
+def codex_usage_accounting(events: Iterable[Mapping[str, Any]]) -> tuple[dict[str, int], bool, bool]:
+    """Return token sums, whether any billable usage was observed, and whether every turn reported it."""
+    usage = dict.fromkeys(_CODEX_USAGE_KEYS, 0)
+    observed = False
+    complete = True
+    open_turns = 0
+    for event in events:
+        event_type = event.get("type")
+        if event_type == "turn.started":
+            open_turns += 1
+        elif event_type == "turn.failed":
+            open_turns = max(0, open_turns - 1)
+            complete = False
+        elif event_type == "turn.completed":
+            open_turns = max(0, open_turns - 1)
+            valid = codex_turn_usage(event)
+            observed = observed or "input_tokens" in valid or "output_tokens" in valid
+            complete = complete and "input_tokens" in valid and "output_tokens" in valid
+            for key, value in valid.items():
+                usage[key] += value
+    usage["total_tokens"] = usage["input_tokens"] + usage["output_tokens"]
+    return usage, observed, observed and complete and open_turns == 0
 
 
 @register_provider("codex_code_extract")
@@ -357,35 +400,6 @@ class CodexCodeExtractProvider(Provider):
                 events.append(event)
         return events
 
-    @classmethod
-    def _usage_from_events(cls, lines: list[str]) -> dict[str, int]:
-        usage = {
-            "input_tokens": 0,
-            "cached_input_tokens": 0,
-            "cache_write_input_tokens": 0,
-            "output_tokens": 0,
-            "reasoning_output_tokens": 0,
-            "total_tokens": 0,
-        }
-        for event in cls._json_events(lines):
-            if event.get("type") != "turn.completed":
-                continue
-            event_usage = event.get("usage") or {}
-            if not isinstance(event_usage, dict):
-                continue
-            for key in (
-                "input_tokens",
-                "cached_input_tokens",
-                "cache_write_input_tokens",
-                "output_tokens",
-                "reasoning_output_tokens",
-            ):
-                value = event_usage.get(key)
-                if isinstance(value, int):
-                    usage[key] += value
-        usage["total_tokens"] = usage["input_tokens"] + usage["output_tokens"]
-        return usage
-
     @staticmethod
     def _trace_tail(lines: list[str]) -> list[Any]:
         tail: list[Any] = []
@@ -598,12 +612,14 @@ class CodexCodeExtractProvider(Provider):
         usage = raw_output.get("usage")
         if not isinstance(usage, dict):
             return
-        cost_usd = self._estimate_cost_usd(usage)
+        cost_usd = self._estimate_cost_usd(usage) if raw_output.get("_cost_usage_observed") is not False else None
         num_pages = raw_output.get("num_pages") or 0
         raw_output["cost_usd"] = cost_usd
-        raw_output["cost_per_page_usd"] = (cost_usd / num_pages) if num_pages else None
+        raw_output["cost_per_page_usd"] = (cost_usd / num_pages) if cost_usd is not None and num_pages else None
         raw_output["pricing"] = self._pricing_snapshot(usage)
-        raw_output["cost_exceeded_budget"] = self._max_cost_usd is not None and cost_usd > self._max_cost_usd
+        raw_output["cost_exceeded_budget"] = (
+            self._max_cost_usd is not None and cost_usd is not None and cost_usd > self._max_cost_usd
+        )
 
     def _estimate_cost_usd(self, usage: dict[str, int]) -> float:
         input_tokens = int(usage.get("input_tokens", 0) or 0)
@@ -717,6 +733,14 @@ class CodexCodeExtractProvider(Provider):
             agent_citations: Any = None
             try:
                 returncode, stderr_tail = self._run_cli(cmd, prompt, workdir, request.example_id, lines)
+                usage, usage_observed, cost_complete = codex_usage_accounting(self._json_events(lines))
+                if usage_observed:
+                    emit_provider_event(
+                        "cost.component",
+                        component_id=f"codex:{uuid.uuid4().hex}",
+                        cost_usd=self._estimate_cost_usd(usage),
+                        usage=usage,
+                    )
                 self._raise_for_status(returncode, lines, stderr_tail)
                 self._raise_for_sandbox_failures(lines)
                 data = self._read_output_json(output_path)
@@ -734,18 +758,25 @@ class CodexCodeExtractProvider(Provider):
                 )
                 if isinstance(exc.debug_payload, dict):
                     payload.update(exc.debug_payload)
+                usage, usage_observed, cost_complete = codex_usage_accounting(self._json_events(lines))
+                payload["cost_accounting"] = {
+                    "known_cost_usd": self._estimate_cost_usd(usage) if usage_observed else None,
+                    "complete": cost_complete and returncode == 0,
+                    "usage": usage,
+                }
                 exc.debug_payload = payload
                 raise
 
         completed_at = datetime.now()
         latency_ms = int((completed_at - started_at).total_seconds() * 1000)
 
-        usage = self._usage_from_events(lines)
         raw_output: dict[str, Any] = {
             "data": data,
             "harness": harness,
             "model": self._model,
             "usage": usage,
+            "_cost_usage_observed": usage_observed,
+            "_cost_complete": cost_complete,
             "num_pages": num_pages,
             "_config": self._config_snapshot(),
             "_command_execution": self._command_execution_diagnostics(lines),

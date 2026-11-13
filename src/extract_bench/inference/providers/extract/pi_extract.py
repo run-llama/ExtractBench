@@ -25,16 +25,20 @@ per-file deadline cancels it through ``cancel``.
 from __future__ import annotations
 
 import json
+import math
 import os
 import shutil
 import subprocess
 import tempfile
 import threading
+import uuid
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from extract_bench.inference.events import emit_provider_event
 from extract_bench.inference.limits import execution_budget
 from extract_bench.inference.providers.base import (
     Provider,
@@ -92,14 +96,127 @@ _PRICE_KEYS = ("input_price_per_1m", "output_price_per_1m", "cache_read_price_pe
 
 
 @dataclass
-class _EventSummary:
+class PiEventSummary:
     """Everything downstream code needs from one pi NDJSON trace, in a single pass."""
 
     usage: dict[str, int]
     cost: dict[str, float]
+    cost_observed: bool
+    cost_complete: bool
     error_messages: list[str]
     tool_diagnostics: dict[str, Any]
     trace_tail: list[Any]
+
+
+def pi_reported_cost(usage: Mapping[str, Any]) -> float | None:
+    cost = usage.get("cost")
+    total = cost.get("total") if isinstance(cost, dict) else None
+    if isinstance(total, (int, float)) and not isinstance(total, bool) and math.isfinite(total) and total >= 0:
+        return float(total)
+    return None
+
+
+def summarize_pi_events(lines: list[str]) -> PiEventSummary:
+    """Parse pi's NDJSON trace once and derive usage, cost, errors, and tool diagnostics.
+
+    Each assistant ``message_end`` carries the usage for that one completion
+    call (not a running session total), so summing every turn gives the run
+    total. pi also computes a dollar cost per turn from the ``models.json``
+    rates; sum that too so ``usage.cost.total`` can be read back directly.
+
+    Error detection reads ``errorMessage`` off any ``message_end`` whose
+    ``stopReason`` is ``"error"``, independent of exit code: pi exits 0 even
+    when a turn fails at the model/transport level, so failure detection
+    cannot rely on the process return code alone.
+    """
+    usage = {
+        "input_tokens": 0,
+        "cached_input_tokens": 0,
+        "cache_write_tokens": 0,
+        "output_tokens": 0,
+        "reasoning_output_tokens": 0,
+        "total_tokens": 0,
+    }
+    cost = {"input": 0.0, "output": 0.0, "cache_read": 0.0, "cache_write": 0.0, "total": 0.0}
+    cost_observed = False
+    cost_complete = True
+    error_messages: list[str] = []
+    tool_completed = tool_succeeded = tool_failed = 0
+    tool_failures: list[dict[str, Any]] = []
+
+    for line in lines:
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(event, dict):
+            continue
+        event_type = event.get("type")
+
+        if event_type == "message_end":
+            message = event.get("message")
+            if not isinstance(message, dict):
+                continue
+            if message.get("stopReason") == "error":
+                error_message = message.get("errorMessage")
+                if isinstance(error_message, str) and error_message:
+                    error_messages.append(error_message)
+            if message.get("role") != "assistant":
+                continue
+            turn_usage = message.get("usage")
+            if not isinstance(turn_usage, dict):
+                cost_complete = False
+                continue
+            usage["input_tokens"] += int(turn_usage.get("input") or 0)
+            usage["cached_input_tokens"] += int(turn_usage.get("cacheRead") or 0)
+            usage["cache_write_tokens"] += int(turn_usage.get("cacheWrite") or 0)
+            usage["output_tokens"] += int(turn_usage.get("output") or 0)
+            usage["reasoning_output_tokens"] += int(turn_usage.get("reasoning") or 0)
+            usage["total_tokens"] += int(turn_usage.get("totalTokens") or 0)
+            turn_cost = turn_usage.get("cost")
+            turn_total = pi_reported_cost(turn_usage)
+            if turn_total is not None and isinstance(turn_cost, dict):
+                cost_observed = True
+                cost["input"] += float(turn_cost.get("input") or 0)
+                cost["output"] += float(turn_cost.get("output") or 0)
+                cost["cache_read"] += float(turn_cost.get("cacheRead") or 0)
+                cost["cache_write"] += float(turn_cost.get("cacheWrite") or 0)
+                cost["total"] += turn_total
+            else:
+                cost_complete = False
+
+        elif event_type == "tool_execution_end":
+            tool_completed += 1
+            if event.get("isError"):
+                tool_failed += 1
+                tool_failures.append(
+                    {"tool": event.get("toolName"), "args": event.get("args"), "result": event.get("result")}
+                )
+            else:
+                tool_succeeded += 1
+
+    trace_tail: list[Any] = []
+    for line in lines[-_TRACE_TAIL_EVENTS:]:
+        try:
+            trace_tail.append(json.loads(line))
+        except json.JSONDecodeError:
+            trace_tail.append(line)
+
+    tool_diagnostics = {
+        "completed": tool_completed,
+        "succeeded": tool_succeeded,
+        "failed": tool_failed,
+        "failures": tool_failures[:5],
+    }
+    return PiEventSummary(
+        usage=usage,
+        cost=cost,
+        cost_observed=cost_observed,
+        cost_complete=cost_observed and cost_complete,
+        error_messages=error_messages,
+        tool_diagnostics=tool_diagnostics,
+        trace_tail=trace_tail,
+    )
 
 
 @register_provider("pi_extract")
@@ -319,101 +436,7 @@ class PiExtractProvider(Provider):
         except subprocess.TimeoutExpired:
             proc.kill()
 
-    @staticmethod
-    def _summarize_events(lines: list[str]) -> _EventSummary:
-        """Parse pi's NDJSON trace once and derive usage, cost, errors, and tool diagnostics.
-
-        Each assistant ``message_end`` carries the usage for that one completion
-        call (not a running session total), so summing every turn gives the run
-        total. pi also computes a dollar cost per turn from the ``models.json``
-        rates; sum that too so ``usage.cost.total`` can be read back directly.
-
-        Error detection reads ``errorMessage`` off any ``message_end`` whose
-        ``stopReason`` is ``"error"``, independent of exit code: pi exits 0 even
-        when a turn fails at the model/transport level, so failure detection
-        cannot rely on the process return code alone.
-        """
-        usage = {
-            "input_tokens": 0,
-            "cached_input_tokens": 0,
-            "cache_write_tokens": 0,
-            "output_tokens": 0,
-            "reasoning_output_tokens": 0,
-            "total_tokens": 0,
-        }
-        cost = {"input": 0.0, "output": 0.0, "cache_read": 0.0, "cache_write": 0.0, "total": 0.0}
-        error_messages: list[str] = []
-        tool_completed = tool_succeeded = tool_failed = 0
-        tool_failures: list[dict[str, Any]] = []
-
-        for line in lines:
-            try:
-                event = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if not isinstance(event, dict):
-                continue
-            event_type = event.get("type")
-
-            if event_type == "message_end":
-                message = event.get("message")
-                if not isinstance(message, dict):
-                    continue
-                if message.get("stopReason") == "error":
-                    error_message = message.get("errorMessage")
-                    if isinstance(error_message, str) and error_message:
-                        error_messages.append(error_message)
-                if message.get("role") != "assistant":
-                    continue
-                turn_usage = message.get("usage")
-                if not isinstance(turn_usage, dict):
-                    continue
-                usage["input_tokens"] += int(turn_usage.get("input") or 0)
-                usage["cached_input_tokens"] += int(turn_usage.get("cacheRead") or 0)
-                usage["cache_write_tokens"] += int(turn_usage.get("cacheWrite") or 0)
-                usage["output_tokens"] += int(turn_usage.get("output") or 0)
-                usage["reasoning_output_tokens"] += int(turn_usage.get("reasoning") or 0)
-                usage["total_tokens"] += int(turn_usage.get("totalTokens") or 0)
-                turn_cost = turn_usage.get("cost")
-                if isinstance(turn_cost, dict):
-                    cost["input"] += float(turn_cost.get("input") or 0)
-                    cost["output"] += float(turn_cost.get("output") or 0)
-                    cost["cache_read"] += float(turn_cost.get("cacheRead") or 0)
-                    cost["cache_write"] += float(turn_cost.get("cacheWrite") or 0)
-                    cost["total"] += float(turn_cost.get("total") or 0)
-
-            elif event_type == "tool_execution_end":
-                tool_completed += 1
-                if event.get("isError"):
-                    tool_failed += 1
-                    tool_failures.append(
-                        {"tool": event.get("toolName"), "args": event.get("args"), "result": event.get("result")}
-                    )
-                else:
-                    tool_succeeded += 1
-
-        trace_tail: list[Any] = []
-        for line in lines[-_TRACE_TAIL_EVENTS:]:
-            try:
-                trace_tail.append(json.loads(line))
-            except json.JSONDecodeError:
-                trace_tail.append(line)
-
-        tool_diagnostics = {
-            "completed": tool_completed,
-            "succeeded": tool_succeeded,
-            "failed": tool_failed,
-            "failures": tool_failures[:5],
-        }
-        return _EventSummary(
-            usage=usage,
-            cost=cost,
-            error_messages=error_messages,
-            tool_diagnostics=tool_diagnostics,
-            trace_tail=trace_tail,
-        )
-
-    def _raise_for_status(self, returncode: int, summary: _EventSummary, stderr_tail: str = "") -> None:
+    def _raise_for_status(self, returncode: int, summary: PiEventSummary, stderr_tail: str = "") -> None:
         error_messages = summary.error_messages
         if returncode == 0 and not error_messages:
             return
@@ -512,16 +535,23 @@ class PiExtractProvider(Provider):
             stderr_tail = ""
             agent_citations: Any = None
             data: dict[str, Any] = {}
-            summary: _EventSummary | None = None
+            summary: PiEventSummary | None = None
             try:
                 returncode, stderr_tail = self._run_cli(cmd, workdir, pi_home, request.example_id, lines, prompt)
-                summary = self._summarize_events(lines)
+                summary = summarize_pi_events(lines)
+                if summary.cost_observed:
+                    emit_provider_event(
+                        "cost.component",
+                        component_id=f"pi:{uuid.uuid4().hex}",
+                        cost_usd=summary.cost["total"],
+                        usage=summary.usage,
+                    )
                 self._raise_for_status(returncode, summary, stderr_tail)
                 data = self._read_output_json(output_path)
                 if self._evidence_mode:
                     agent_citations = read_agent_citations_file(workdir / "citations.json")
             except ProviderError as exc:
-                summary = summary or self._summarize_events(lines)
+                summary = summary or summarize_pi_events(lines)
                 payload: dict[str, Any] = {
                     "returncode": returncode,
                     "stderr_tail": stderr_tail,
@@ -539,6 +569,11 @@ class PiExtractProvider(Provider):
                         pass
                 if isinstance(exc.debug_payload, dict):
                     payload.update(exc.debug_payload)
+                payload["cost_accounting"] = {
+                    "known_cost_usd": summary.cost["total"] if summary.cost_observed else None,
+                    "complete": summary.cost_complete and returncode == 0 and len(summary.error_messages) == 0,
+                    "usage": summary.usage,
+                }
                 exc.debug_payload = payload
                 raise
 
@@ -546,7 +581,7 @@ class PiExtractProvider(Provider):
         latency_ms = int((completed_at - started_at).total_seconds() * 1000)
 
         assert summary is not None
-        cost_usd = summary.cost["total"]
+        cost_usd = summary.cost["total"] if summary.cost_observed else None
         raw_output: dict[str, Any] = {
             "data": data,
             "harness": harness,
@@ -554,9 +589,12 @@ class PiExtractProvider(Provider):
             "usage": summary.usage,
             "num_pages": num_pages,
             "cost_usd": cost_usd,
-            "cost_per_page_usd": (cost_usd / num_pages) if num_pages else None,
+            "_cost_complete": summary.cost_complete,
+            "cost_per_page_usd": (cost_usd / num_pages) if cost_usd is not None and num_pages else None,
             "pricing": self._pricing_snapshot(),
-            "cost_exceeded_budget": self._max_cost_usd is not None and cost_usd > self._max_cost_usd,
+            "cost_exceeded_budget": (
+                self._max_cost_usd is not None and cost_usd is not None and cost_usd > self._max_cost_usd
+            ),
             "_config": self._config_snapshot(),
             "_tool_execution": summary.tool_diagnostics,
             "_trace_tail": summary.trace_tail,
