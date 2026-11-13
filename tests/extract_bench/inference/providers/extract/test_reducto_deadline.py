@@ -66,3 +66,46 @@ def test_cancelled_deep_poll_stops_polling_and_cancels_vendor_job(monkeypatch: p
         asyncio.run(provider._extract_pdf_async("unused.pdf", {}, deep_extract=True))
     assert client.job.get.call_count == 1
     client.job.cancel.assert_called_once_with("job", timeout=10)
+
+
+def test_cancelled_awaiter_still_records_late_submission(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The SDK worker can accept a paid job after its async caller was cancelled."""
+    import threading
+
+    from extract_bench.inference.events import bind_provider_event_sink
+
+    started = threading.Event()
+    release = threading.Event()
+    recorded = threading.Event()
+    events = []
+    client = Mock()
+
+    def submit(**kwargs: object) -> SimpleNamespace:
+        started.set()
+        assert release.wait(5)
+        return SimpleNamespace(job_id="late-paid-job")
+
+    def record(event: str, payload: object) -> None:
+        events.append((event, payload))
+        recorded.set()
+
+    client.extract.run_job.side_effect = submit
+    monkeypatch.setattr(reducto, "Reducto", lambda **kwargs: client)
+    provider = reducto.ReductoExtractProvider("reducto_extract", {"api_key": "test"})
+
+    async def run() -> None:
+        with ExecutionBudget(100).activate(), bind_provider_event_sink(record):
+            task = asyncio.create_task(provider._extract_pdf_async("unused.pdf", {}, deep_extract=True))
+            try:
+                assert await asyncio.to_thread(started.wait, 5)
+                task.cancel()
+                with pytest.raises(asyncio.CancelledError):
+                    await task
+            finally:
+                release.set()
+            assert await asyncio.to_thread(recorded.wait, 5)
+
+    asyncio.run(run())
+    assert events[0][0] == "vendor.job_created"
+    assert events[0][1]["job_id"] == "late-paid-job"
+    client.job.get.assert_not_called()

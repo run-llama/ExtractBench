@@ -128,7 +128,7 @@ def test_sdk_poll_allowance_uses_remaining_time_and_keeps_fractional_interval(
     client = AsyncMock()
     client.__aenter__.return_value = client
     client.extract.return_value = Result()
-    monkeypatch.setattr(datalab, "AsyncDatalabClient", lambda **kwargs: client)
+    monkeypatch.setattr(datalab, "TracingDatalabClient", lambda **kwargs: client)
     provider = datalab.DatalabExtractProvider("datalab_extract", {"api_key": "test", "poll_interval": interval})
     with budget.activate():
         now = 11.0 if expired else 6.75

@@ -22,6 +22,7 @@ from urllib.parse import urljoin, urlparse
 
 import requests
 
+from extract_bench.inference.events import emit_provider_event
 from extract_bench.inference.limits import EXTRACT_HARD_TIMEOUT_S
 from extract_bench.inference.providers.base import (
     Provider,
@@ -462,15 +463,23 @@ class PulseExtractProvider(Provider):
                 self._inflight_jobs.pop(example_id, None)
 
     def _cancel_remote_job(self, job_id: str) -> None:
+        emit_provider_event("vendor.cancellation_requested", provider="pulse", job_id=job_id)
         try:
-            requests.delete(
+            response = requests.delete(
                 f"{self._api_base_url}/job/{job_id}",
                 headers=self._headers(),
                 timeout=min(self._request_timeout, 5.0),
                 allow_redirects=False,
             )
-        except requests.RequestException:
-            pass
+        except requests.RequestException as error:
+            emit_provider_event("vendor.cancellation_failed", provider="pulse", job_id=job_id, error=str(error))
+        else:
+            emit_provider_event(
+                "vendor.cancellation_completed" if 200 <= response.status_code < 300 else "vendor.cancellation_failed",
+                provider="pulse",
+                job_id=job_id,
+                status_code=response.status_code,
+            )
 
     def _poll_job(
         self,
@@ -563,6 +572,18 @@ class PulseExtractProvider(Provider):
                         },
                     ) from exc
 
+                returned: dict[str, Any] | None = None
+                if 200 <= response.status_code < 300:
+                    returned = self._handle_response(response, context=f"{context} poll")
+                    returned_status = str(returned.get("status") or returned.get("job_status") or "").lower()
+                    if returned_status in _JOB_SUCCESS_STATUSES:
+                        emit_provider_event(
+                            "stage.completed",
+                            provider="pulse",
+                            stage=context,
+                            job_id=job_id,
+                            raw_output=returned,
+                        )
                 self._ensure_active(
                     control,
                     context=f"{context} job {job_id} poll",
@@ -588,7 +609,7 @@ class PulseExtractProvider(Provider):
                         },
                     )
 
-                state = self._handle_response(response, context=f"{context} poll")
+                state = returned if returned is not None else self._handle_response(response, context=f"{context} poll")
                 consecutive_errors = 0
                 last_state = state
                 status = str(state.get("status") or state.get("job_status") or "").lower()
@@ -653,8 +674,17 @@ class PulseExtractProvider(Provider):
     ) -> dict[str, Any]:
         job_id = raw.get("job_id")
         accepted_job_id = job_id if isinstance(job_id, str) and job_id else None
-        self._ensure_active(control, context=context, job_id=accepted_job_id)
+        if accepted_job_id is not None:
+            emit_provider_event(
+                "vendor.job_created",
+                provider="pulse",
+                stage=context,
+                job_id=accepted_job_id,
+            )
         status = str(raw.get("status") or "").lower()
+        if status in _JOB_SUCCESS_STATUSES or accepted_job_id is None:
+            emit_provider_event("stage.completed", provider="pulse", stage=context, raw_output=raw)
+        self._ensure_active(control, context=context, job_id=accepted_job_id)
         if isinstance(job_id, str) and job_id and (self._async_run or status in {"pending", "queued", "processing"}):
             if status in _JOB_SUCCESS_STATUSES and isinstance(raw.get("result"), dict):
                 return self._fetch_large_result(raw["result"], context=context, control=control)

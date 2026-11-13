@@ -17,6 +17,7 @@ from extend_ai import Extend
 from extend_ai.core.api_error import ApiError
 from extend_ai.core.request_options import RequestOptions
 
+from extract_bench.inference.events import emit_provider_event
 from extract_bench.inference.limits import DEFAULT_POLL_INTERVAL_S, ExecutionBudget, execution_budget
 from extract_bench.inference.providers.base import (
     Provider,
@@ -757,7 +758,14 @@ class ExtendProvider(Provider):
                 sync=True,  # Synchronous processing - waits for completion
                 request_options=self._request_options(),
             )
-            return self._run_response_to_dict(run_response)
+            payload = self._run_response_to_dict(run_response)
+            emit_provider_event(
+                "stage.completed",
+                provider="extend",
+                stage="processor_run",
+                raw_output=payload,
+            )
+            return payload
 
         except ApiError as e:
             self._handle_api_error(e, "processor run")
@@ -803,6 +811,12 @@ class ExtendProvider(Provider):
         if not run_id:
             raise ProviderPermanentError(f"No processor run id in async create response: {create_response}")
 
+        emit_provider_event(
+            "vendor.job_created",
+            provider="extend",
+            stage="processor_run",
+            job_id=run_id,
+        )
         poll_history: list[dict[str, Any]] = []
         execution: dict[str, Any] = {
             "create_response": self._run_response_to_dict(create_response),
@@ -836,6 +850,15 @@ class ExtendProvider(Provider):
                     budget.wait(self._poll_interval * 2)
                     continue
 
+                # Record returned terminal data even when the scoring deadline has passed.
+                if getattr(getattr(get_response, "processor_run", None), "status", None) == "PROCESSED":
+                    emit_provider_event(
+                        "stage.completed",
+                        provider="extend",
+                        stage="processor_run",
+                        job_id=run_id,
+                        raw_output=self._run_response_to_dict(get_response),
+                    )
                 # A response arriving after cancellation must not become a late success.
                 budget.remaining()
                 run = getattr(get_response, "processor_run", None)
@@ -857,6 +880,11 @@ class ExtendProvider(Provider):
         except TimeoutError as error:
             # Cleanup gets one polling interval beyond the exhausted document
             # budget, without SDK retries; retain failures for remote recovery.
+            emit_provider_event(
+                "vendor.cancellation_requested",
+                provider="extend",
+                job_id=run_id,
+            )
             try:
                 response = self._client.processor_run.cancel(
                     id=run_id,
@@ -866,8 +894,20 @@ class ExtendProvider(Provider):
                     ),
                 )
                 execution["cancel_response"] = self._run_response_to_dict(response)
+                emit_provider_event(
+                    "vendor.cancellation_completed",
+                    provider="extend",
+                    job_id=run_id,
+                    response=execution["cancel_response"],
+                )
             except Exception as cancel_error:
                 execution["cancel_error"] = str(cancel_error)
+                emit_provider_event(
+                    "vendor.cancellation_failed",
+                    provider="extend",
+                    job_id=run_id,
+                    error=str(cancel_error),
+                )
             raise ProviderPermanentError(
                 f"Extend processor run {run_id} cancelled or exceeded its deadline",
                 job_id=run_id,

@@ -10,6 +10,7 @@ from typing import Any
 
 from extend_ai.core.api_error import ApiError
 
+from extract_bench.inference.events import emit_provider_event
 from extract_bench.inference.providers.base import ProviderPermanentError
 from extract_bench.inference.providers.extract.extend import (
     USD_PER_CREDIT,
@@ -161,6 +162,12 @@ class ExtendOperatorProvider(ExtendProvider):
 
         run = response.model_dump(mode="json", by_alias=True)
         run_id = run["id"]
+        emit_provider_event(
+            "vendor.job_created",
+            provider="extend_operator",
+            stage="extract",
+            job_id=run_id,
+        )
         consecutive_poll_errors = 0
         while run.get("status") in ("PENDING", "PROCESSING"):
             if cancelled.wait(self._poll_interval):
@@ -178,6 +185,14 @@ class ExtendOperatorProvider(ExtendProvider):
                     # polling failure. Include the existing ID for recovery.
                     raise ProviderPermanentError(f"Cannot poll Operator run {run_id}: {error}") from error
 
+        if run.get("status") == "PROCESSED":
+            emit_provider_event(
+                "stage.completed",
+                provider="extend_operator",
+                stage="extract",
+                job_id=run_id,
+                raw_output=run,
+            )
         check_cancelled()
         if run.get("status") != "PROCESSED":
             raise ProviderPermanentError(

@@ -22,10 +22,10 @@ from typing import Any, Literal
 from urllib.parse import quote
 
 import aiohttp
-from datalab_sdk import AsyncDatalabClient
 from datalab_sdk.models import ExtractOptions
 from pypdf import PdfReader
 
+from extract_bench.inference.events import emit_provider_event
 from extract_bench.inference.limits import execution_budget
 from extract_bench.inference.providers.base import (
     Provider,
@@ -33,6 +33,7 @@ from extract_bench.inference.providers.base import (
     ProviderPermanentError,
     ProviderTransientError,
 )
+from extract_bench.inference.providers.extract.datalab_client import TracingDatalabClient
 from extract_bench.inference.providers.registry import register_provider
 from extract_bench.schemas.extract_output import ExtractOutput, FieldCitation
 from extract_bench.schemas.pipeline import PipelineSpec
@@ -154,7 +155,7 @@ class DatalabExtractProvider(Provider):
             if self._page_range is not None:
                 options.page_range = self._page_range
 
-            async with AsyncDatalabClient(api_key=self._api_key) as client:
+            async with TracingDatalabClient(api_key=self._api_key) as client:
                 # The SDK accepts a poll count, not a deadline. Size its sleep
                 # allowance from the remaining budget; run_async owns the cutoff.
                 result = await client.extract(
@@ -166,6 +167,12 @@ class DatalabExtractProvider(Provider):
 
             extraction_latency_ms = (time.perf_counter() - extraction_started) * 1000
             raw_response: dict[str, Any] = dataclasses.asdict(result)
+            emit_provider_event(
+                "stage.completed",
+                provider="datalab",
+                stage="extract",
+                raw_output=raw_response,
+            )
             if self._extraction_mode == "fast":
                 raw_response = await self._wait_for_confidence(raw_response, base_url=client.base_url)
 

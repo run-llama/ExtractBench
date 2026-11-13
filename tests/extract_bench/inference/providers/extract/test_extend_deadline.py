@@ -10,6 +10,7 @@ pytest.importorskip("extend_ai", reason="Extend SDK is optional")
 
 import httpx
 
+from extract_bench.inference.events import bind_provider_event_sink
 from extract_bench.inference.limits import ExecutionBudget
 from extract_bench.inference.pipelines import get_pipeline
 from extract_bench.inference.providers.base import ProviderPermanentError
@@ -67,8 +68,18 @@ def test_cancelled_polling_cannot_return_late_success_or_start_another_run(
     if stop_at == "cancel_error":
         client.processor_run.cancel.side_effect = httpx.ReadTimeout("cancel unavailable")
 
-    with budget.activate(), pytest.raises(ProviderPermanentError, match="deadline") as caught:
+    events = []
+    with (
+        bind_provider_event_sink(lambda event, payload: events.append((event, payload))),
+        budget.activate(),
+        pytest.raises(ProviderPermanentError, match="deadline") as caught,
+    ):
         provider.run_inference(pipeline, request)
+    assert events[0] == ("vendor.job_created", {"provider": "extend", "stage": "processor_run", "job_id": "dpr_test"})
+    assert any(event == "vendor.cancellation_requested" for event, _ in events)
+    assert events[-1][0] == (
+        "vendor.cancellation_failed" if stop_at == "cancel_error" else "vendor.cancellation_completed"
+    )
     assert caught.value.job_id == "dpr_test"
     assert caught.value.debug_payload is not None
     execution = caught.value.debug_payload["_extend_execution"]
