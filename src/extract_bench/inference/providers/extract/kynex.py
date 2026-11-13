@@ -162,6 +162,7 @@ async def _extract_async(
                 proc = subprocess.run(
                     cmd,
                     capture_output=True,
+                    check=False,
                     text=True,
                     cwd=str(repo),
                     timeout=timeout,
