@@ -90,8 +90,6 @@ class DatalabExtractProvider(Provider):
             - ``save_checkpoint``: Save a checkpoint after processing.
             - ``skip_cache``: Bypass server-side cache (default: False).
             - ``poll_interval``: Seconds between polls (default: 3).
-            - ``score_max_polls``: Maximum additional Fast confidence polls (default: 60).
-            - ``score_poll_interval``: Seconds between confidence polls (defaults to ``poll_interval``).
         """
         super().__init__(provider_name, base_config)
 
@@ -124,10 +122,6 @@ class DatalabExtractProvider(Provider):
         self._output_format = self.base_config.get("output_format", "json")
         self._save_checkpoint = self.base_config.get("save_checkpoint", False)
         self._skip_cache = self.base_config.get("skip_cache", False)
-        self._score_max_polls = int(self.base_config.get("score_max_polls", 60))
-        self._score_poll_interval = float(self.base_config.get("score_poll_interval", self._poll_interval))
-        if self._score_max_polls < 0 or not math.isfinite(self._score_poll_interval) or self._score_poll_interval <= 0:
-            raise ProviderConfigError("Confidence polling requires a nonnegative count and a positive finite interval")
         if not math.isfinite(self._poll_interval) or self._poll_interval <= 0:
             raise ProviderConfigError("poll_interval must be positive and finite")
 
@@ -213,7 +207,7 @@ class DatalabExtractProvider(Provider):
         """
         confidence_started = time.perf_counter()
         budget = execution_budget()
-        status = "timeout"
+        status: str
         polls = 0
         request_id = completed.get("request_id")
         if completed.get("extraction_score_average") is not None:
@@ -225,9 +219,9 @@ class DatalabExtractProvider(Provider):
         else:
             url = f"{base_url.rstrip('/')}/api/v1/extract/{quote(request_id, safe='')}"
             async with aiohttp.ClientSession() as session:
-                for _ in range(self._score_max_polls):
+                while True:
                     try:
-                        await budget.run_async(asyncio.sleep(self._score_poll_interval))
+                        await budget.run_async(asyncio.sleep(self._poll_interval))
                         async with session.get(
                             url,
                             headers={"X-API-Key": self._api_key},

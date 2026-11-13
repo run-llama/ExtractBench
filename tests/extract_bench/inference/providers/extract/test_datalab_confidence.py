@@ -24,7 +24,8 @@ from extract_bench.inference.providers.extract import datalab
         "scores",
         "ready",
         "turbo",
-        "timeout",
+        "delayed",
+        "pending_deadline",
         "http_error",
         "invalid",
         "failed",
@@ -71,7 +72,11 @@ def test_extraction_survives_optional_scoring_with_separate_timing(
             clock["now"] += 2.0 if calls["poll"] == 1 else 5.0
             if outcome == "ready":
                 return web.json_response(scored)
-            if calls["poll"] == 1 or outcome == "timeout":
+            if calls["poll"] == 1 or (outcome == "delayed" and calls["poll"] < 66):
+                return web.json_response(initial)
+            if outcome == "pending_deadline":
+                if calls["poll"] == 4:
+                    budget.deadline = 0
                 return web.json_response(initial)
             if outcome == "http_error":
                 return web.json_response({"error": "unavailable"}, status=503)
@@ -112,7 +117,7 @@ def test_extraction_survives_optional_scoring_with_separate_timing(
         pipeline = get_pipeline("datalab_extract_turbo" if outcome == "turbo" else "datalab_parse_fast_extract_fast")
         provider = datalab.DatalabExtractProvider(
             "datalab_extract",
-            {**pipeline.config, "api_key": "local-test", "score_max_polls": 1, "score_poll_interval": 0.001},
+            {**pipeline.config, "api_key": "local-test", "poll_interval": 0.001},
         )
         try:
             with budget.activate():
@@ -120,15 +125,16 @@ def test_extraction_survives_optional_scoring_with_separate_timing(
             assert json.loads(result["extraction_schema_json"])["total"] == 10
             assert calls["submit"] == 1
             assert result["extraction_latency_ms"] == 2000
-            assert calls["poll"] == (1 if outcome in ("turbo", "ready") else 2)
+            expected_polls = {"turbo": 1, "ready": 1, "delayed": 66, "pending_deadline": 4}.get(outcome, 2)
+            assert calls["poll"] == expected_polls
             if outcome == "turbo":
                 assert "confidence_wait_ms" not in result
                 assert result["parse_cost_usd"] == 0
                 assert result["cost_usd"] == pytest.approx(0.006)
                 assert datalab._build_field_citations(json.loads(result["extraction_schema_json"]), {}) == []
                 return
-            assert result["confidence_wait_ms"] == (0 if outcome == "ready" else 5000)
-            if outcome in ("scores", "signed", "ready"):
+            assert result["confidence_wait_ms"] == (expected_polls - 1) * 5000
+            if outcome in ("scores", "signed", "ready", "delayed"):
                 assert result["_confidence_polling"]["status"] == "scores_ready"
                 citations = datalab._build_field_citations(json.loads(result["extraction_schema_json"]), {})
                 assert [(citation.field_path, citation.confidence, citation.bbox) for citation in citations] == [
@@ -136,7 +142,6 @@ def test_extraction_survives_optional_scoring_with_separate_timing(
                 ]
             else:
                 assert result["_confidence_polling"]["status"] in {
-                    "timeout",
                     "poll_error",
                     "scoring_failed",
                     "deadline_exceeded",
