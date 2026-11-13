@@ -8,6 +8,12 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
+
+pytest.importorskip("PIL", reason="runners extra required")
+pytest.importorskip("pdf2image", reason="runners extra required")
+pytest.importorskip("pypdf", reason="runners extra required")
+pytest.importorskip("openai", reason="runners extra required")
+
 from PIL import Image
 
 from extract_bench.inference.providers.extract.glm_zai_extract import GLMDeepInfraExtractProvider
