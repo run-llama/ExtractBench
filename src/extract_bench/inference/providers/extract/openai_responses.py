@@ -42,6 +42,7 @@ from typing import Any
 from openai import OpenAI
 from pypdf import PdfReader
 
+from extract_bench.inference.cost_accounting import preserve_cost_on_error, record_response_cost
 from extract_bench.inference.limits import EXTRACT_HARD_TIMEOUT_S, ExecutionBudget, execution_budget
 from extract_bench.inference.providers.base import (
     Provider,
@@ -310,18 +311,9 @@ class OpenAIResponsesExtractProvider(Provider):
                     # Best-effort cleanup — don't fail the call on it.
                     pass
 
-        # Parse the structured output.
-        raw_text = resp.output_text
-        try:
-            data = json.loads(raw_text)
-        except json.JSONDecodeError as e:
-            raise ProviderPermanentError(
-                f"Model returned non-JSON output despite structured-output request: {e}"
-            ) from e
-
         usage = resp.usage
-        input_tokens = getattr(usage, "input_tokens", None) or getattr(usage, "prompt_tokens", None) or 0
-        output_tokens = getattr(usage, "output_tokens", None) or getattr(usage, "completion_tokens", None) or 0
+        input_tokens = getattr(usage, "input_tokens", None)
+        output_tokens = getattr(usage, "output_tokens", None)
         cached_input_tokens = None
         reasoning_tokens = None
         in_details = getattr(usage, "input_tokens_details", None)
@@ -331,8 +323,7 @@ class OpenAIResponsesExtractProvider(Provider):
         if out_details is not None:
             reasoning_tokens = getattr(out_details, "reasoning_tokens", None)
 
-        return {
-            "data": data,
+        raw_output = {
             "model": self._model,
             "usage": {
                 "input_tokens": input_tokens,
@@ -348,6 +339,26 @@ class OpenAIResponsesExtractProvider(Provider):
                 "output_price_per_1m": self._output_price_per_1m,
             },
         }
+        raw_output["usage"] = {key: value for key, value in raw_output["usage"].items() if value is not None}
+        self.recompute_cost(raw_output)
+        raw_output.update(
+            record_response_cost(
+                raw_output.get("cost_usd"),
+                raw_output["usage"],
+                complete="input_tokens" in raw_output["usage"] and "output_tokens" in raw_output["usage"],
+            )
+        )
+        with preserve_cost_on_error(raw_output):
+            # Parse the structured output.
+            raw_text = resp.output_text
+            try:
+                data = json.loads(raw_text)
+            except json.JSONDecodeError as e:
+                raise ProviderPermanentError(
+                    f"Model returned non-JSON output despite structured-output request: {e}"
+                ) from e
+        raw_output["data"] = data
+        return raw_output
 
     # -- Provider interface -------------------------------------------------
 
@@ -367,6 +378,10 @@ class OpenAIResponsesExtractProvider(Provider):
         """
         usage = raw_output.get("usage")
         if not isinstance(usage, dict):
+            return
+        if "input_tokens" not in usage and "output_tokens" not in usage:
+            raw_output["cost_usd"] = raw_output.get("parse_cost_usd")
+            raw_output["_cost_complete"] = False
             return
 
         in_tok = usage.get("input_tokens") or 0
@@ -419,7 +434,9 @@ class OpenAIResponsesExtractProvider(Provider):
                 raw_output = self._call_api(schema, document_text=parsed_doc.text)
             else:
                 raw_output = self._call_api(schema, source_path=file_path)
-        except (ProviderPermanentError, ProviderTransientError, ProviderConfigError):
+        except (ProviderPermanentError, ProviderTransientError, ProviderConfigError) as error:
+            if parsed_doc is not None:
+                parsed_doc.add_error_cost(error)
             raise
         except Exception as e:
             error_str = str(e).lower()
@@ -451,6 +468,12 @@ class OpenAIResponsesExtractProvider(Provider):
         # Cost tracking — keys read by evaluation/stats.py, derived from usage so
         # a saved run can be re-priced.
         self.recompute_cost(raw_output)
+        if parsed_doc is not None:
+            raw_output["_cost_complete"] = (
+                raw_output.get("_cost_complete", True)
+                and parsed_doc.cost_complete
+                and parsed_doc.parse_cost_usd is not None
+            )
 
         return RawInferenceResult(
             request=request,

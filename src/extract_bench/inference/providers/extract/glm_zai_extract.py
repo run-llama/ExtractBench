@@ -25,6 +25,7 @@ from typing import Any
 
 from openai import OpenAI
 
+from extract_bench.inference.cost_accounting import preserve_cost_on_error, record_response_cost
 from extract_bench.inference.limits import EXTRACT_HARD_TIMEOUT_S, execution_budget
 from extract_bench.inference.providers.base import (
     Provider,
@@ -203,58 +204,73 @@ class GLMZaiExtractProvider(Provider):
 
         kwargs["timeout"] = min(self._api_timeout_s, execution_budget().remaining())
         response = self._client.chat.completions.create(**kwargs)
-        choice = response.choices[0]
-        label = self._vendor_label()
-        if getattr(choice, "finish_reason", None) == "length":
-            raise ProviderPermanentError(
-                f"{label} hit max_tokens before completing the JSON response. Increase max_tokens."
-            )
-
-        content = getattr(choice.message, "content", "") or ""
-        try:
-            data = json.loads(content)
-        except json.JSONDecodeError as e:
-            raise ProviderPermanentError(f"{label} returned non-JSON output despite response_format: {e}") from e
-
         usage = self._extract_usage(response)
-        return {
-            "data": data,
-            "model": self._model,
-            "usage": usage,
-            "_config": {
-                "provider": "glm_zai",
-                "base_url": self._base_url,
-                "input_mode": "file",
-                "additional_properties_false": self._additional_properties_false,
-                "temperature": self._temperature,
-                "reasoning_effort": self._reasoning_effort,
-                "max_tokens": self._max_tokens,
-                "api_timeout_s": self._api_timeout_s,
-                "max_cost_usd": self._max_cost_usd,
-                **self._pricing_snapshot(),
-            },
-        }
+        cost_usd = self._estimate_cost_usd(usage) if "input_tokens" in usage or "output_tokens" in usage else None
+        accounting = record_response_cost(
+            cost_usd,
+            usage,
+            complete="input_tokens" in usage and "output_tokens" in usage,
+        )
+        with preserve_cost_on_error({**accounting, "usage": usage}):
+            choice = response.choices[0]
+            label = self._vendor_label()
+            if getattr(choice, "finish_reason", None) == "length":
+                raise ProviderPermanentError(
+                    f"{label} hit max_tokens before completing the JSON response. Increase max_tokens."
+                )
+
+            content = getattr(choice.message, "content", "") or ""
+            try:
+                data = json.loads(content)
+            except json.JSONDecodeError as e:
+                raise ProviderPermanentError(f"{label} returned non-JSON output despite response_format: {e}") from e
+
+            return {
+                **accounting,
+                "data": data,
+                "model": self._model,
+                "usage": usage,
+                "_config": {
+                    "provider": "glm_zai",
+                    "base_url": self._base_url,
+                    "input_mode": "file",
+                    "additional_properties_false": self._additional_properties_false,
+                    "temperature": self._temperature,
+                    "reasoning_effort": self._reasoning_effort,
+                    "max_tokens": self._max_tokens,
+                    "api_timeout_s": self._api_timeout_s,
+                    "max_cost_usd": self._max_cost_usd,
+                    **self._pricing_snapshot(),
+                },
+            }
 
     @staticmethod
     def _extract_usage(response: Any) -> dict[str, int]:
         usage = getattr(response, "usage", None)
         if usage is None:
-            return {"input_tokens": 0, "cached_input_tokens": 0, "output_tokens": 0, "total_tokens": 0}
+            return {}
 
-        input_tokens = getattr(usage, "prompt_tokens", None) or getattr(usage, "input_tokens", None) or 0
-        output_tokens = getattr(usage, "completion_tokens", None) or getattr(usage, "output_tokens", None) or 0
-        total_tokens = getattr(usage, "total_tokens", None) or input_tokens + output_tokens
+        input_tokens = getattr(usage, "prompt_tokens", None)
+        if input_tokens is None:
+            input_tokens = getattr(usage, "input_tokens", None)
+        output_tokens = getattr(usage, "completion_tokens", None)
+        if output_tokens is None:
+            output_tokens = getattr(usage, "output_tokens", None)
+        total_tokens = getattr(usage, "total_tokens", None)
+        if total_tokens is None and input_tokens is not None and output_tokens is not None:
+            total_tokens = input_tokens + output_tokens
         cached_input_tokens = 0
         details = getattr(usage, "prompt_tokens_details", None)
         if details is not None:
             cached_input_tokens = getattr(details, "cached_tokens", None) or 0
 
-        return {
-            "input_tokens": int(input_tokens),
+        counters = {
+            "input_tokens": input_tokens,
             "cached_input_tokens": int(cached_input_tokens),
-            "output_tokens": int(output_tokens),
-            "total_tokens": int(total_tokens),
+            "output_tokens": output_tokens,
+            "total_tokens": total_tokens,
         }
+        return {key: value for key, value in counters.items() if value is not None}
 
     def _estimate_cost_usd(self, usage: dict[str, int]) -> float:
         input_tokens = int(usage.get("input_tokens", 0) or 0)
@@ -309,12 +325,14 @@ class GLMZaiExtractProvider(Provider):
         latency_ms = int((completed_at - started_at).total_seconds() * 1000)
 
         num_pages = page_count(file_path)
-        cost_usd = self._estimate_cost_usd(raw_output["usage"])
+        cost_usd = raw_output["cost_usd"]
         raw_output["extract_cost_usd"] = cost_usd
         raw_output["cost_usd"] = cost_usd
-        raw_output["cost_exceeded_budget"] = self._max_cost_usd is not None and cost_usd > self._max_cost_usd
+        raw_output["cost_exceeded_budget"] = (
+            self._max_cost_usd is not None and cost_usd is not None and cost_usd > self._max_cost_usd
+        )
         raw_output["num_pages"] = num_pages
-        raw_output["cost_per_page_usd"] = cost_usd / num_pages if num_pages > 0 else None
+        raw_output["cost_per_page_usd"] = cost_usd / num_pages if num_pages > 0 and cost_usd is not None else None
 
         return RawInferenceResult(
             request=request,

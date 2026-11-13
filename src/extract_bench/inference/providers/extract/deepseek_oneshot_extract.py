@@ -26,6 +26,7 @@ import os
 from pathlib import Path
 from typing import Any
 
+from extract_bench.inference.cost_accounting import preserve_cost_on_error
 from extract_bench.inference.providers.base import (
     ProviderConfigError,
     ProviderPermanentError,
@@ -140,7 +141,8 @@ class DeepSeekOneshotExtractProvider(GLMZaiExtractProvider):
 
     def _call_api(self, schema: dict[str, Any], source_path: Path) -> dict[str, Any]:
         result = super()._call_api(schema, source_path)
-        self._reject_degenerate_json(result.get("data"), schema)
+        with preserve_cost_on_error(result):
+            self._reject_degenerate_json(result.get("data"), schema)
         result["_config"].update(
             {
                 "provider": "deepseek",

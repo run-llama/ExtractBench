@@ -240,6 +240,25 @@ class CollaborativeDirectExtractProvider(Provider):
         except Exception as exc:
             second_error = exc
 
+        # A stage can fail after returning a bill. Include that bill even when
+        # the other stage supplies the selected extraction.
+        stage_costs: list[float] = []
+        cost_complete = True
+        for raw, error in ((first_raw, first_error), (second_raw, second_error)):
+            if raw is not None:
+                amount = raw.raw_output.get("cost_usd")
+                complete = raw.raw_output.get("_cost_complete", amount is not None)
+            else:
+                snapshot = (
+                    (error.debug_payload or {}).get("cost_accounting", {}) if isinstance(error, ProviderError) else {}
+                )
+                amount = snapshot.get("known_cost_usd")
+                complete = snapshot.get("complete", False)
+            if amount is not None:
+                stage_costs.append(float(amount))
+            cost_complete = cost_complete and complete and amount is not None
+        cost_usd = sum(stage_costs) if len(stage_costs) > 0 else None
+
         if second_raw is not None:
             selected_raw = second_raw
             selection_reason = "second_stage_success"
@@ -247,12 +266,17 @@ class CollaborativeDirectExtractProvider(Provider):
             selected_raw = first_raw
             selection_reason = "second_stage_failed_returning_first_stage"
         else:
-            raise self._failure_to_raise(first_error, second_error)
+            error = self._failure_to_raise(first_error, second_error)
+            error.debug_payload = {
+                "cost_accounting": {"known_cost_usd": cost_usd, "complete": cost_complete},
+                "first_stage": self._stage_payload("first", first_raw, first_error),
+                "second_stage": self._stage_payload("second", second_raw, second_error),
+            }
+            raise error
 
         completed_at = datetime.now()
         successful_stages = [raw for raw in (first_raw, second_raw) if raw is not None]
         usage = self._aggregate_usage(successful_stages)
-        cost_usd = sum(float(raw.raw_output.get("cost_usd") or 0.0) for raw in successful_stages)
         num_pages = int(selected_raw.raw_output.get("num_pages") or 0)
 
         raw_output = {
@@ -262,6 +286,7 @@ class CollaborativeDirectExtractProvider(Provider):
             "selection_reason": selection_reason,
             "num_pages": num_pages,
             "cost_usd": cost_usd,
+            "_cost_complete": cost_complete,
             "usage": usage,
             "input_tokens": usage["input_tokens"],
             "output_tokens": usage["output_tokens"],
@@ -285,7 +310,7 @@ class CollaborativeDirectExtractProvider(Provider):
                 },
             },
         }
-        if num_pages > 0:
+        if num_pages > 0 and cost_usd is not None:
             raw_output["cost_per_page_usd"] = cost_usd / num_pages
 
         return RawInferenceResult(

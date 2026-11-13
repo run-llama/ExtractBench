@@ -12,6 +12,7 @@ from typing import Any
 
 import httpx
 
+from extract_bench.inference.cost_accounting import preserve_cost_on_error, record_response_cost
 from extract_bench.inference.limits import execution_budget
 from extract_bench.inference.providers.base import (
     Provider,
@@ -220,14 +221,17 @@ class AnthropicDirectExtractProvider(Provider):
     def _usage_from_response(response: Any) -> dict[str, int]:
         usage = getattr(response, "usage", None)
         if usage is None:
-            return {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0}
-        input_tokens = getattr(usage, "input_tokens", 0) or 0
-        output_tokens = getattr(usage, "output_tokens", 0) or 0
-        return {
+            return {}
+        input_tokens = getattr(usage, "input_tokens", None)
+        output_tokens = getattr(usage, "output_tokens", None)
+        counters = {
             "input_tokens": input_tokens,
             "output_tokens": output_tokens,
-            "total_tokens": input_tokens + output_tokens,
+            "total_tokens": input_tokens + output_tokens
+            if input_tokens is not None and output_tokens is not None
+            else None,
         }
+        return {key: value for key, value in counters.items() if value is not None}
 
     def _message_content(self, source_path: Path) -> tuple[list[dict[str, Any]], bool]:
         ext = source_path.suffix.lower()
@@ -298,38 +302,55 @@ class AnthropicDirectExtractProvider(Provider):
         else:
             response = self._client.messages.create(**kwargs)
 
-        stop_reason = getattr(response, "stop_reason", None)
-        if stop_reason in {"refusal", "max_tokens"}:
-            raise ProviderPermanentError(f"Anthropic extraction stopped before schema output: {stop_reason}")
+        usage = self._usage_from_response(response)
+        cost_usd = (
+            (
+                usage.get("input_tokens", 0) * self._input_price_per_1m
+                + usage.get("output_tokens", 0) * self._output_price_per_1m
+            )
+            / 1_000_000
+            if "input_tokens" in usage or "output_tokens" in usage
+            else None
+        )
+        accounting = record_response_cost(
+            cost_usd,
+            usage,
+            complete="input_tokens" in usage and "output_tokens" in usage,
+        )
+        with preserve_cost_on_error({**accounting, "usage": usage}):
+            stop_reason = getattr(response, "stop_reason", None)
+            if stop_reason in {"refusal", "max_tokens"}:
+                raise ProviderPermanentError(f"Anthropic extraction stopped before schema output: {stop_reason}")
 
-        parsed_output = getattr(response, "parsed_output", None)
-        if parsed_output is not None:
-            data = parsed_output
-        else:
-            raw_text = self._text_from_response(response)
-            try:
-                data = json.loads(raw_text)
-            except json.JSONDecodeError as e:
-                raise ProviderPermanentError(
-                    f"Model returned non-JSON output despite structured-output request: {e}"
-                ) from e
+            parsed_output = getattr(response, "parsed_output", None)
+            if parsed_output is not None:
+                data = parsed_output
+            else:
+                raw_text = self._text_from_response(response)
+                try:
+                    data = json.loads(raw_text)
+                except json.JSONDecodeError as e:
+                    raise ProviderPermanentError(
+                        f"Model returned non-JSON output despite structured-output request: {e}"
+                    ) from e
 
-        return {
-            "data": data,
-            "model": self._model,
-            "usage": self._usage_from_response(response),
-            "_config": {
-                "additional_properties_false": self._additional_properties_false,
-                "all_properties_required": self._all_properties_required,
-                "strict": self._strict,
-                "schema_name": self._schema_name,
-                "max_tokens": self._max_tokens,
-                "thinking": self._thinking,
-                "effort": self._effort,
-                "input_price_per_1m": self._input_price_per_1m,
-                "output_price_per_1m": self._output_price_per_1m,
-            },
-        }
+            return {
+                **accounting,
+                "data": data,
+                "model": self._model,
+                "usage": usage,
+                "_config": {
+                    "additional_properties_false": self._additional_properties_false,
+                    "all_properties_required": self._all_properties_required,
+                    "strict": self._strict,
+                    "schema_name": self._schema_name,
+                    "max_tokens": self._max_tokens,
+                    "thinking": self._thinking,
+                    "effort": self._effort,
+                    "input_price_per_1m": self._input_price_per_1m,
+                    "output_price_per_1m": self._output_price_per_1m,
+                },
+            }
 
     def run_inference(self, pipeline: PipelineSpec, request: InferenceRequest) -> RawInferenceResult:
         if request.product_type != ProductType.EXTRACT:
@@ -356,7 +377,9 @@ class AnthropicDirectExtractProvider(Provider):
                 raw_output = self._call_api(schema, document_text=parsed_doc.text)
             else:
                 raw_output = self._call_api(schema, source_path=file_path)
-        except (ProviderPermanentError, ProviderTransientError, ProviderConfigError):
+        except (ProviderPermanentError, ProviderTransientError, ProviderConfigError) as error:
+            if parsed_doc is not None:
+                parsed_doc.add_error_cost(error)
             raise
         except Exception as e:
             error_str = str(e).lower()
@@ -391,15 +414,20 @@ class AnthropicDirectExtractProvider(Provider):
         latency_ms = int((completed_at - started_at).total_seconds() * 1000)
 
         usage = raw_output["usage"]
-        input_tokens = int(usage.get("input_tokens", 0) or 0)
-        output_tokens = int(usage.get("output_tokens", 0) or 0)
         extract_cost_usd = (
-            input_tokens / 1_000_000 * self._input_price_per_1m + output_tokens / 1_000_000 * self._output_price_per_1m
+            (
+                usage.get("input_tokens", 0) * self._input_price_per_1m
+                + usage.get("output_tokens", 0) * self._output_price_per_1m
+            )
+            / 1_000_000
+            if "input_tokens" in usage or "output_tokens" in usage
+            else None
         )
+        raw_output["_cost_complete"] = "input_tokens" in usage and "output_tokens" in usage
         cost_usd = extract_cost_usd
         num_pages = parsed_doc.num_pages if parsed_doc and parsed_doc.num_pages > 0 else page_count(file_path)
         if parsed_doc is not None:
-            cost_usd += parsed_doc.parse_cost_usd
+            cost_usd = parsed_doc.add_extract_cost(raw_output)
             raw_output["extract_cost_usd"] = extract_cost_usd
             raw_output["parse_cost_usd"] = parsed_doc.parse_cost_usd
             raw_output["parse_metadata"] = parsed_doc.metadata
@@ -408,7 +436,7 @@ class AnthropicDirectExtractProvider(Provider):
             raw_output["_config"]["parse_source"] = self.base_config.get("parse_source") or {}
         raw_output["num_pages"] = num_pages
         raw_output["cost_usd"] = cost_usd
-        if num_pages > 0:
+        if num_pages > 0 and cost_usd is not None:
             raw_output["cost_per_page_usd"] = cost_usd / num_pages
 
         return RawInferenceResult(

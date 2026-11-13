@@ -21,6 +21,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
+from extract_bench.inference.cost_accounting import preserve_cost_on_error, record_response_cost
 from extract_bench.inference.providers.base import (
     ProviderConfigError,
     ProviderPermanentError,
@@ -31,14 +32,41 @@ from extract_bench.schemas.pipeline_io import InferenceRequest
 from extract_bench.schemas.product import ProductType
 
 
+class CostedError(Protocol):
+    debug_payload: dict[str, Any] | None
+
+
 @dataclass
 class ParsedDocumentText:
     """Text rendering of a parsed document plus parse-stage accounting."""
 
     text: str
     num_pages: int
-    parse_cost_usd: float
+    parse_cost_usd: float | None
     metadata: dict[str, Any] = field(default_factory=dict)
+    cost_complete: bool = True
+
+    def add_extract_cost(self, raw_output: dict[str, Any]) -> float | None:
+        """Combine known stage charges, retaining whether both stages are priced."""
+        extract_cost = raw_output.get("cost_usd")
+        raw_output["_cost_complete"] = (
+            self.cost_complete
+            and self.parse_cost_usd is not None
+            and extract_cost is not None
+            and raw_output.get("_cost_complete", True)
+        )
+        known = [cost for cost in (self.parse_cost_usd, extract_cost) if cost is not None]
+        return sum(known) if len(known) > 0 else None
+
+    def add_error_cost(self, error: CostedError) -> None:
+        snapshot = (error.debug_payload or {}).get("cost_accounting", {})
+        raw = {"cost_usd": snapshot.get("known_cost_usd"), "_cost_complete": snapshot.get("complete", False)}
+        known_cost = self.add_extract_cost(raw)
+        error.debug_payload = {
+            **(error.debug_payload or {}),
+            "parse_metadata": self.metadata,
+            "cost_accounting": {"known_cost_usd": known_cost, "complete": raw["_cost_complete"]},
+        }
 
 
 class ParseTextSource(Protocol):
@@ -90,41 +118,44 @@ class LlamaParseTextSource:
             product_type=ProductType.PARSE,
         )
         raw_parse = parse_provider.run_inference(parse_pipeline, parse_request)
-        parse_result = parse_provider.normalize(raw_parse)
-        parse_output = parse_result.output
-        if not isinstance(parse_output, ParseOutput):
-            raise ProviderPermanentError(
-                f"LlamaParseTextSource: expected ParseOutput from LlamaParse, got {type(parse_output).__name__}."
-            )
-
-        page_texts = [(p.page_index + 1, p.markdown) for p in parse_output.pages]
-        if any(markdown.strip() for _, markdown in page_texts):
-            text = render_paged_markdown(page_texts)
-        elif parse_output.markdown.strip():
-            text = parse_output.markdown
-        else:
-            raise ProviderPermanentError(
-                f"LlamaParseTextSource: parse produced no text for {request.example_id} — nothing to extract from."
-            )
-
         raw_output = raw_parse.raw_output
-        num_pages = int(raw_output.get("num_pages") or len(parse_output.pages))
-        metadata: dict[str, Any] = {
-            "type": "llamaparse",
-            "tier": self._parse_config.get("tier"),
-            "version": self._parse_config.get("version"),
-            "num_pages": num_pages,
-        }
-        for key in ("job_id", "credits_used"):
-            if raw_output.get(key) is not None:
-                metadata[key] = raw_output[key]
+        record_response_cost(raw_output.get("cost_usd"), {"parse_job_id": raw_output.get("job_id")})
+        with preserve_cost_on_error(raw_output):
+            parse_result = parse_provider.normalize(raw_parse)
+            parse_output = parse_result.output
+            if not isinstance(parse_output, ParseOutput):
+                raise ProviderPermanentError(
+                    f"LlamaParseTextSource: expected ParseOutput from LlamaParse, got {type(parse_output).__name__}."
+                )
 
-        return ParsedDocumentText(
-            text=text,
-            num_pages=num_pages,
-            parse_cost_usd=float(raw_output.get("cost_usd") or 0.0),
-            metadata=metadata,
-        )
+            page_texts = [(p.page_index + 1, p.markdown) for p in parse_output.pages]
+            if any(markdown.strip() for _, markdown in page_texts):
+                text = render_paged_markdown(page_texts)
+            elif parse_output.markdown.strip():
+                text = parse_output.markdown
+            else:
+                raise ProviderPermanentError(
+                    f"LlamaParseTextSource: parse produced no text for {request.example_id} — nothing to extract from."
+                )
+
+            num_pages = int(raw_output.get("num_pages") or len(parse_output.pages))
+            metadata: dict[str, Any] = {
+                "type": "llamaparse",
+                "tier": self._parse_config.get("tier"),
+                "version": self._parse_config.get("version"),
+                "num_pages": num_pages,
+            }
+            for key in ("job_id", "credits_used"):
+                if raw_output.get(key) is not None:
+                    metadata[key] = raw_output[key]
+
+            return ParsedDocumentText(
+                text=text,
+                num_pages=num_pages,
+                parse_cost_usd=raw_output.get("cost_usd"),
+                cost_complete=raw_output.get("_cost_complete", raw_output.get("cost_usd") is not None),
+                metadata=metadata,
+            )
 
 
 def create_parse_text_source(config: dict[str, Any] | None) -> ParseTextSource:
