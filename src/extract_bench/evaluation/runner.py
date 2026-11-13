@@ -38,7 +38,7 @@ from extract_bench.evaluation.layout_adapters import create_layout_adapter_for_r
 from extract_bench.evaluation.metrics.field_grounding.extract_adapter import (
     compute_failure_field_denominator,
 )
-from extract_bench.evaluation.stats import build_operational_stats
+from extract_bench.evaluation.stats import build_cost_stats, build_operational_stats
 from extract_bench.schemas.evaluation import EvaluationResult, EvaluationSummary, MetricValue
 from extract_bench.schemas.layout_detection_output import LayoutOutput
 from extract_bench.schemas.pipeline_io import InferenceRequest, InferenceResult
@@ -625,6 +625,9 @@ class EvaluationRunner:
         try:
             with open(result_path) as f:
                 data = json.load(f)
+            cost_path = result_path.with_name(result_path.name.removesuffix(".result.json") + ".cost.json")
+            if cost_path.exists():
+                data["raw_output"]["_attempt_accounting"] = json.loads(cost_path.read_text(encoding="utf-8"))
             return InferenceResult.model_validate(data)
         except Exception:
             return None
@@ -1615,6 +1618,9 @@ class EvaluationRunner:
                 # Tag with the pipeline directory name so synthesis can recover
                 # pipeline_name when the runner-level filter is unset.
                 tagged = dict(entry)
+                cost_path = errors_path.parent / f"{entry.get('example_id')}.cost.json"
+                if cost_path.exists():
+                    tagged["_attempt_accounting"] = json.loads(cost_path.read_text(encoding="utf-8"))
                 tagged.setdefault("_pipeline_dir", pipeline_dir_name)
                 errors.append(tagged)
         return errors
@@ -1722,6 +1728,7 @@ class EvaluationRunner:
                         )
                         for name in sorted(diagnostic_metric_names)
                     ],
+                    stats=build_cost_stats(entry),
                     error=rendered_error,
                     job_id=entry.get("job_id"),
                     tags=list(test_case.tags),
@@ -1800,6 +1807,12 @@ class EvaluationRunner:
             for tc in test_cases_dict.values():
                 if (pipe, tc.test_id) in accounted:
                     continue
+                cost_path = pipeline_dir / f"{tc.test_id}.cost.json"
+                cost_raw = (
+                    {"_attempt_accounting": json.loads(cost_path.read_text(encoding="utf-8"))}
+                    if cost_path.exists()
+                    else {}
+                )
                 synthesized.append(
                     EvaluationResult(
                         test_id=tc.test_id,
@@ -1815,6 +1828,7 @@ class EvaluationRunner:
                             MetricValue(metric_name=name, value=0.0, metadata=dict(failure_metadata))
                             for name in sorted(diag_names)
                         ],
+                        stats=build_cost_stats(cost_raw),
                         error="No prediction emitted",
                         tags=list(tc.tags),
                     )
@@ -2129,6 +2143,9 @@ class EvaluationRunner:
                 "unit": stat_units[name],
             }
 
+        if any(value == 0 for value in stat_values.get("cost_complete", [])):
+            aggregate.pop("cost_usd", None)
+            aggregate.pop("cost_per_page_usd", None)
         return aggregate
 
     def _has_mixed_rules(self, test_case: TestCase) -> bool:

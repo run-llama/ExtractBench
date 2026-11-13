@@ -1,5 +1,8 @@
 """Shared helper to build operational RunStat entries from an InferenceResult."""
 
+from collections.abc import Mapping
+from typing import Any
+
 from extract_bench.schemas.evaluation import RunStat
 from extract_bench.schemas.pipeline_io import InferenceResult
 
@@ -18,8 +21,6 @@ _RAW_OUTPUT_STATS: list[tuple[str, str]] = [
     ("agent_usage_usd", "$"),
     ("total_credits", "credits"),
     ("num_pages_billed", "pages"),
-    ("cost_usd", "$"),
-    ("cost_per_page_usd", "$/page"),
     ("input_cost_usd", "$"),
     ("tool_use_prompt_cost_usd", "$"),
     ("cached_input_cost_usd", "$"),
@@ -58,14 +59,39 @@ _RAW_OUTPUT_STATS: list[tuple[str, str]] = [
 ]
 
 
+def build_cost_stats(raw: Mapping[str, Any]) -> list[RunStat]:
+    """Publish known charges separately when any attempt has incomplete billing."""
+    accounting = raw.get("_attempt_accounting")
+    if isinstance(accounting, dict):
+        known = accounting["known_cost_usd"]
+        complete = accounting["cost_complete"]
+    else:
+        known = raw.get("cost_usd")
+        complete = raw.get("_cost_complete", known is not None)
+    complete = known is not None and complete is True
+    stats = [RunStat(name="cost_complete", value=float(complete), unit="ratio")]
+    if known is not None:
+        stats.append(RunStat(name="known_cost_usd", value=known, unit="$"))
+        if complete:
+            stats.append(RunStat(name="cost_usd", value=known, unit="$"))
+    if complete:
+        pages = raw.get("num_pages")
+        per_page = raw.get("cost_per_page_usd")
+        if isinstance(pages, (int, float)) and pages > 0 and (isinstance(accounting, dict) or per_page is None):
+            per_page = known / pages
+        if per_page is not None:
+            stats.append(RunStat(name="cost_per_page_usd", value=per_page, unit="$/page"))
+    return stats
+
+
 def build_operational_stats(inference_result: InferenceResult) -> list[RunStat]:
     """Build operational stats from an inference result.
 
     Extracts latency from the dedicated field and cost-related stats
     from raw_output (pre-computed by the provider).
     """
-    stats: list[RunStat] = []
     raw = inference_result.raw_output
+    stats = build_cost_stats(raw)
 
     # Latency (from dedicated field)
     if inference_result.latency_in_ms is not None:
