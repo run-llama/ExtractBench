@@ -34,6 +34,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 
+from extract_bench.inference.limits import execution_budget
 from extract_bench.inference.providers.base import (
     Provider,
     ProviderConfigError,
@@ -47,6 +48,7 @@ from extract_bench.inference.providers.extract.agent_evidence import (
     citations_from_agent_file,
     read_agent_citations_file,
 )
+from extract_bench.inference.providers.extract.cli_harness import HARNESS_VERSION, CliHarness
 from extract_bench.inference.providers.extract.direct_model_utils import (
     IMAGE_EXTENSIONS,
     add_additional_properties_false,
@@ -87,6 +89,7 @@ class GeminiCliExtractProvider(Provider):
         self._thinking_level: str | None = self.base_config.get("thinking_level")
         self._max_cost_usd: float | None = self.base_config.get("max_cost_usd")
         self._gemini_bin: str = self.base_config.get("gemini_bin", "gemini")
+        self._harness = CliHarness("gemini_cli_extract", self._gemini_bin, self.base_config.get(HARNESS_VERSION))
         self._promote_repeated: bool = bool(self.base_config.get("promote_repeated_structure", True))
         self._additional_properties_false: bool = bool(self.base_config.get("additional_properties_false", True))
         self._evidence_mode: bool = bool(self.base_config.get("evidence_mode", False))
@@ -155,7 +158,7 @@ class GeminiCliExtractProvider(Provider):
     def _build_settings(self) -> dict[str, Any]:
         settings: dict[str, Any] = {
             "security": {"auth": {"selectedType": "gemini-api-key"}},
-            "general": {"disableAutoUpdate": True, "disableUpdateNag": True},
+            "general": {"disableAutoUpdate": True, "disableUpdateNag": True, "enableAutoUpdate": False},
             "privacy": {"usageStatisticsEnabled": False},
             "telemetry": {"enabled": False},
             "tools": {"exclude": ["google_web_search", "web_fetch"]},
@@ -371,6 +374,7 @@ class GeminiCliExtractProvider(Provider):
 
     def _config_snapshot(self) -> dict[str, Any]:
         return {
+            HARNESS_VERSION: self._harness.version,
             "model": self._model,
             "base_url": self._base_url,
             "thinking_level": self._thinking_level,
@@ -429,6 +433,7 @@ class GeminiCliExtractProvider(Provider):
             )
 
         started_at = datetime.now()
+        harness = self._harness.prepare(pipeline, request)
         schema = self._prepare_schema(request.schema_override)
         num_pages = page_count(src)
 
@@ -444,6 +449,8 @@ class GeminiCliExtractProvider(Provider):
 
             prompt = self._build_prompt(schema, staged_name)
             cmd = self._build_cmd()
+            cmd[0] = harness["executable"]
+            execution_budget().remaining()
             lines: deque[str] = deque(maxlen=_TRACE_TAIL_EVENTS)
             tool_usage = {"tool_counts": {}, "shell_commands": [], "failed_tool_calls": 0}
             returncode: int | None = None
@@ -503,6 +510,7 @@ class GeminiCliExtractProvider(Provider):
         cost_usd = accounting["known_cost_usd"]
         raw_output: dict[str, Any] = {
             "data": data,
+            "harness": harness,
             "model": self._model,
             "usage": {"requests": accounting["requests"], "cli_stats": stats},
             "num_pages": num_pages,
@@ -538,12 +546,13 @@ class GeminiCliExtractProvider(Provider):
         return normalize_extract_result(raw_result)
 
     def cancel(self, example_id: str) -> bool:
+        probe_cancelled = self._harness.cancel(example_id)
         with self._procs_lock:
             proc = self._procs.get(example_id)
             trace = self._traces.get(example_id)
         if trace is not None:
             trace.cancel("runner cancellation")
         if proc is None:
-            return False
+            return probe_cancelled
         self._terminate(proc)
         return True

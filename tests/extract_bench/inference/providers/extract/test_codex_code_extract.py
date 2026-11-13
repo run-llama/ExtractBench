@@ -19,6 +19,13 @@ from extract_bench.schemas.product import ProductType
 Provider = codex_code_extract.CodexCodeExtractProvider
 
 
+@pytest.fixture(autouse=True)
+def mock_external_version_probe(monkeypatch: pytest.MonkeyPatch) -> None:
+    from extract_bench.inference.providers.extract.cli_harness import CliHarness
+
+    monkeypatch.setattr(CliHarness, "prepare", lambda *args: {"executable": "codex", "version": "0.123.0"})
+
+
 def _pipeline() -> PipelineSpec:
     return PipelineSpec(
         pipeline_name="codex_code_extract_gpt_5_4_low",

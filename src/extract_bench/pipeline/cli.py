@@ -78,6 +78,7 @@ class PipelineCLI:
         shuffle_seed: int | None = None,
         max_concurrent_pages: int | None = None,
         dataset: str = "extractbench",
+        harness_version: str | None = None,
     ) -> int:
         """
         Run the full benchmark pipeline: inference -> evaluation -> report -> open browser.
@@ -130,6 +131,7 @@ class PipelineCLI:
                     tags=tags,
                     open_report=open_report,
                     skip_inference=skip_inference,
+                    harness_version=harness_version,
                 )
 
             # Default input_dir based on --test (./data/test vs ./data) so
@@ -178,6 +180,7 @@ class PipelineCLI:
                     group=group,
                     tags=tags,
                     force_exit_on_completion=False,
+                    harness_version=harness_version,
                 )
 
                 if exit_code != 0:
@@ -447,6 +450,7 @@ class PipelineCLI:
         skip_inference: bool,
         shuffle_seed: int | None = None,
         max_concurrent_pages: int | None = None,
+        harness_version: str | None = None,
     ) -> int:
         """Run pipeline on a single file by creating a temporary directory structure."""
         import shutil
@@ -508,6 +512,7 @@ class PipelineCLI:
                     verbose=verbose,
                     tags=tags,
                     force_exit_on_completion=False,
+                    harness_version=harness_version,
                 )
 
                 if exit_code != 0:

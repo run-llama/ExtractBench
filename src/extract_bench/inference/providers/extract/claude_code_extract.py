@@ -29,14 +29,11 @@ from __future__ import annotations
 
 import json
 import os
-import re
 import shutil
 import subprocess
 import tempfile
 import threading
-import uuid
-from collections.abc import Mapping
-from datetime import UTC, datetime
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -53,6 +50,7 @@ from extract_bench.inference.providers.extract.agent_evidence import (
     citations_from_agent_file,
     read_agent_citations_file,
 )
+from extract_bench.inference.providers.extract.cli_harness import CLAUDE_UPDATE_ENV, HARNESS_VERSION, CliHarness
 from extract_bench.inference.providers.extract.direct_model_utils import (
     IMAGE_EXTENSIONS,
     add_additional_properties_false,
@@ -85,11 +83,6 @@ _TRANSIENT_KEYWORDS = ("overloaded", "529", "503", "502", "504", "timeout", "tim
 # gets its schema moved to ./schema.json instead (see ``_stage_prompt``).
 _MAX_INLINE_PROMPT_BYTES = 120_000
 _SCHEMA_FILE_NAME = "schema.json"
-_CLAUDE_VERSION = "claude_version"
-_CLI_UPDATES_DISABLED = {"DISABLE_AUTOUPDATER": "1", "DISABLE_UPDATES": "1"}
-_EXACT_VERSION = re.compile(r"[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?")
-# --version is local startup, not inference; a stuck launcher should fail early.
-_VERSION_PROBE_TIMEOUT_S = 30
 
 
 @register_provider("claude_code_extract")
@@ -111,11 +104,12 @@ class ClaudeCodeExtractProvider(Provider):
         # Cost controls (see module docstring):
         self._max_cost_usd: float | None = self.base_config.get("max_cost_usd")
         self._claude_bin: str = self.base_config.get("claude_bin", "claude")
-        self._claude_version: str | None = self.base_config.get(_CLAUDE_VERSION, os.getenv("CLAUDE_CODE_VERSION"))
-        if self._claude_version is not None and (
-            not isinstance(self._claude_version, str) or _EXACT_VERSION.fullmatch(self._claude_version) is None
-        ):
-            raise ProviderConfigError("claude_version must be an exact version, such as 2.1.280")
+        self._harness = CliHarness(
+            "claude_code",
+            self._claude_bin,
+            self.base_config.get(HARNESS_VERSION),
+            env=CLAUDE_UPDATE_ENV,
+        )
         self._extra_flags: list[str] = list(self.base_config.get("extra_flags", []))
         # --bare: minimal mode — skip hooks/plugins/auto-memory and CLAUDE.md
         # auto-discovery for a clean, reproducible benchmark run (the faithful
@@ -149,38 +143,6 @@ class ClaudeCodeExtractProvider(Provider):
         else:
             # API key is optional here: claude may be authed via a logged-in session.
             self._api_key = self.base_config.get("api_key") or os.getenv("ANTHROPIC_API_KEY")
-
-    def _resolve_harness(self) -> Mapping[str, str | None]:
-        """Probe the same executable used for inference and reject version drift."""
-        executable = shutil.which(self._claude_bin)
-        if executable is None:
-            raise ProviderConfigError(f"Claude Code executable not found: {self._claude_bin}")
-        # Freeze native-install symlinks before probing so a launcher update
-        # between the probe and extraction cannot select a different version.
-        executable = str(Path(executable).resolve())
-        timeout = min(_VERSION_PROBE_TIMEOUT_S, execution_budget().remaining())
-        try:
-            probe = subprocess.run(
-                [executable, "--version"],
-                capture_output=True,
-                text=True,
-                env={**os.environ, **_CLI_UPDATES_DISABLED},
-                timeout=timeout,
-                check=True,
-            )
-        except (OSError, subprocess.SubprocessError) as error:
-            raise ProviderConfigError(f"Could not read Claude Code version from {executable}: {error}") from error
-        version = probe.stdout.strip().split(" ", 1)[0]
-        if _EXACT_VERSION.fullmatch(version) is None:
-            raise ProviderConfigError(f"Unrecognized Claude Code version output: {probe.stdout.strip()!r}")
-        harness = {"executable": executable, "version": version, "requested_version": self._claude_version}
-        if self._claude_version is not None and version != self._claude_version:
-            raise ProviderConfigError(
-                f"Claude Code version mismatch: requested {self._claude_version}, found {version} at {executable}. "
-                "Install the requested version or point claude_bin at that installation.",
-                debug_payload={"harness": harness},
-            )
-        return harness
 
     # ------------------------------------------------------------------
     # Schema + prompt + command construction
@@ -296,7 +258,7 @@ class ClaudeCodeExtractProvider(Provider):
         - ``ProviderConfigError`` if the ``claude`` binary is missing.
         - ``ProviderPermanentError`` if the streaming cost crosses ``max_cost_usd``.
         """
-        env = {**os.environ, **_CLI_UPDATES_DISABLED}
+        env = {**os.environ, **CLAUDE_UPDATE_ENV}
         if self._api_key:
             env["ANTHROPIC_API_KEY"] = self._api_key
 
@@ -515,7 +477,7 @@ class ClaudeCodeExtractProvider(Provider):
     def _config_snapshot(self) -> dict[str, Any]:
         return {
             "model": self._model,
-            _CLAUDE_VERSION: self._claude_version,
+            HARNESS_VERSION: self._harness.version,
             "max_cost_usd": self._max_cost_usd,
             "bare": self._bare,
             "non_zdr": self._non_zdr,
@@ -549,24 +511,7 @@ class ClaudeCodeExtractProvider(Provider):
             )
 
         started_at = datetime.now()
-        harness = self._resolve_harness()
-        # Write before the paid call: timeout/failure paths do not return raw_output.
-        if request.artifact_dir is not None:
-            directory = Path(request.artifact_dir) / "claude_code"
-            directory.mkdir(parents=True, exist_ok=True)
-            artifact = directory / f"{uuid.uuid4().hex}.harness.json"
-            with artifact.open("w", encoding="utf-8") as stream:
-                json.dump(
-                    {
-                        "example_id": request.example_id,
-                        "pipeline_name": pipeline.pipeline_name,
-                        "recorded_at": datetime.now(UTC).isoformat(),
-                        **harness,
-                    },
-                    stream,
-                )
-                stream.flush()
-                os.fsync(stream.fileno())
+        harness = self._harness.prepare(pipeline, request)
         schema = self._prepare_schema(request.schema_override)
         num_pages = page_count(src)
 
@@ -632,9 +577,10 @@ class ClaudeCodeExtractProvider(Provider):
         return normalize_extract_result(raw_result)
 
     def cancel(self, example_id: str) -> bool:
+        probe_cancelled = self._harness.cancel(example_id)
         with self._procs_lock:
             proc = self._procs.get(example_id)
         if proc is None:
-            return False
+            return probe_cancelled
         self._terminate(proc)
         return True

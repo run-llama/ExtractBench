@@ -133,6 +133,7 @@ class BenchCLI:
         shuffle_seed: int | None = None,
         max_concurrent_pages: int | None = None,
         dataset: str = "extractbench",
+        harness_version: str | None = None,
     ) -> int:
         """Run end-to-end benchmark: inference -> evaluation -> report.
 
@@ -150,6 +151,7 @@ class BenchCLI:
             tags: Tags for this run
             open_report: Open HTML report in browser (default: True)
             skip_inference: Skip inference, only re-evaluate (default: False)
+            harness_version: Exact coding-agent CLI version, saved in pipeline configuration.
             dataset: "extractbench" (default) or "pro"; Pro uses ./data-pro and ./output-pro
             test: Download and run on the small test dataset (6 documents: 3 short, 2 medium, 1 long)
 
@@ -175,6 +177,7 @@ class BenchCLI:
             skip_inference=skip_inference,
             test=test,
             dataset=dataset,
+            harness_version=harness_version,
         )
 
     def download(

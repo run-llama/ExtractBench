@@ -26,6 +26,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from extract_bench.inference.limits import execution_budget
 from extract_bench.inference.providers.base import (
     Provider,
     ProviderConfigError,
@@ -39,6 +40,7 @@ from extract_bench.inference.providers.extract.agent_evidence import (
     citations_from_agent_file,
     read_agent_citations_file,
 )
+from extract_bench.inference.providers.extract.cli_harness import HARNESS_VERSION, CliHarness
 from extract_bench.inference.providers.extract.direct_model_utils import (
     IMAGE_EXTENSIONS,
     add_additional_properties_false,
@@ -126,6 +128,7 @@ class CodexCodeExtractProvider(Provider):
         self._model: str = self.base_config.get("model", self.DEFAULT_MODEL)
         self._max_cost_usd: float | None = self.base_config.get("max_cost_usd", self.DEFAULT_MAX_COST_USD)
         self._codex_bin: str = self.base_config.get("codex_bin", "codex")
+        self._harness = CliHarness("codex_code_extract", self._codex_bin, self.base_config.get(HARNESS_VERSION))
         # SECURITY: the CLI runs on the host with `--ask-for-approval never`, so
         # `sandbox` is the only thing between a benchmark document and your machine.
         # `workspace-write` confines writes to the temp workdir. Treat benchmark PDFs
@@ -253,6 +256,7 @@ class CodexCodeExtractProvider(Provider):
             cmd += ["-c", override]
         if image_path is not None:
             cmd += ["--image", str(image_path)]
+        cmd += ["-c", "check_for_update_on_startup=false"]
         cmd += ["--output-last-message", str(last_message_path), *self._extra_flags, "-"]
         return cmd
 
@@ -641,6 +645,7 @@ class CodexCodeExtractProvider(Provider):
 
     def _config_snapshot(self) -> dict[str, Any]:
         return {
+            HARNESS_VERSION: self._harness.version,
             "model": self._model,
             "max_cost_usd": self._max_cost_usd,
             "sandbox": self._sandbox,
@@ -683,6 +688,7 @@ class CodexCodeExtractProvider(Provider):
             )
 
         started_at = datetime.now()
+        harness = self._harness.prepare(pipeline, request)
         schema = self._prepare_schema(request.schema_override)
         num_pages = page_count(src)
 
@@ -703,6 +709,8 @@ class CodexCodeExtractProvider(Provider):
                 last_message_path=last_message_path,
                 image_path=image_path,
             )
+            cmd[0] = harness["executable"]
+            execution_budget().remaining()
             lines: list[str] = []
             returncode: int | None = None
             stderr_tail = ""
@@ -735,6 +743,7 @@ class CodexCodeExtractProvider(Provider):
         usage = self._usage_from_events(lines)
         raw_output: dict[str, Any] = {
             "data": data,
+            "harness": harness,
             "model": self._model,
             "usage": usage,
             "num_pages": num_pages,
@@ -772,9 +781,10 @@ class CodexCodeExtractProvider(Provider):
         return normalize_extract_result(raw_result)
 
     def cancel(self, example_id: str) -> bool:
+        probe_cancelled = self._harness.cancel(example_id)
         with self._procs_lock:
             proc = self._procs.get(example_id)
         if proc is None:
-            return False
+            return probe_cancelled
         self._terminate(proc)
         return True
