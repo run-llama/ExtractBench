@@ -18,7 +18,9 @@ from collections.abc import Mapping, Sequence
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
+import aiohttp
 from datalab_sdk import AsyncDatalabClient
 from datalab_sdk.models import ExtractOptions
 from pypdf import PdfReader
@@ -76,8 +78,7 @@ class DatalabExtractProvider(Provider):
               ``accurate``. Falls back to ``mode`` for legacy configs.
             - ``extraction_mode``: Extraction mode — ``fast`` / ``balanced`` /
               ``accurate``.
-              Datalab documents this as a raw form field; the SDK does not expose
-              it as a typed ``ExtractOptions`` attribute.
+              Fast mode also waits for optional confidence scores.
             - ``max_pages``: Maximum number of pages to process (optional).
             - ``page_range``: Comma-separated page ranges (e.g. ``"0-2,4"``).
             - ``output_format``: Conversion output format the extract endpoint
@@ -87,6 +88,8 @@ class DatalabExtractProvider(Provider):
             - ``save_checkpoint``: Save a checkpoint after processing.
             - ``skip_cache``: Bypass server-side cache (default: False).
             - ``poll_interval``: Seconds between polls (default: 3).
+            - ``score_max_polls``: Maximum additional Fast confidence polls (default: 60).
+            - ``score_poll_interval``: Seconds between confidence polls (defaults to ``poll_interval``).
         """
         super().__init__(provider_name, base_config)
 
@@ -115,6 +118,10 @@ class DatalabExtractProvider(Provider):
         self._output_format = self.base_config.get("output_format", "json")
         self._save_checkpoint = self.base_config.get("save_checkpoint", False)
         self._skip_cache = self.base_config.get("skip_cache", False)
+        self._score_max_polls = int(self.base_config.get("score_max_polls", 60))
+        self._score_poll_interval = float(self.base_config.get("score_poll_interval", self._poll_interval))
+        if self._score_max_polls < 0 or not math.isfinite(self._score_poll_interval) or self._score_poll_interval <= 0:
+            raise ProviderConfigError("Confidence polling requires a nonnegative count and a positive finite interval")
         if not math.isfinite(self._poll_interval) or self._poll_interval <= 0:
             raise ProviderConfigError("poll_interval must be positive and finite")
 
@@ -130,8 +137,6 @@ class DatalabExtractProvider(Provider):
                 skip_cache=self._skip_cache,
             )
             if self._extraction_mode is not None:
-                # datalab-python-sdk currently serializes unknown attributes via
-                # ProcessingOptions.to_form_data(), but does not type this field.
                 options.extraction_mode = self._extraction_mode
             if self._max_pages is not None:
                 options.max_pages = self._max_pages
@@ -149,6 +154,8 @@ class DatalabExtractProvider(Provider):
                 )
 
             raw_response: dict[str, Any] = dataclasses.asdict(result)
+            if self._extraction_mode == "fast":
+                raw_response = await self._wait_for_confidence(raw_response, base_url=client.base_url)
 
             raw_response["_config"] = {
                 "mode": self._parse_mode,
@@ -186,6 +193,85 @@ class DatalabExtractProvider(Provider):
             if any(keyword in error_str for keyword in transient_keywords):
                 raise ProviderTransientError(f"Transient error during extraction: {e}") from e
             raise ProviderPermanentError(f"Error during extraction: {e}") from e
+
+    async def _wait_for_confidence(self, completed: dict[str, Any], *, base_url: str) -> dict[str, Any]:
+        """Refresh the completed job through the documented REST result endpoint.
+
+        Fast scores arrive after extraction. A failed or interrupted score wait
+        leaves the completed extraction usable; it never submits another job.
+        """
+        budget = execution_budget()
+        status = "timeout"
+        polls = 0
+        request_id = completed.get("request_id")
+        if completed.get("extraction_score_average") is not None:
+            status = "scores_ready"
+        elif completed.get("extraction_scoring_status") == "failed":
+            status = "scoring_failed"
+        elif not isinstance(request_id, str) or request_id == "":
+            status = "missing_request_id"
+        else:
+            url = f"{base_url.rstrip('/')}/api/v1/extract/{quote(request_id, safe='')}"
+            async with aiohttp.ClientSession() as session:
+                for _ in range(self._score_max_polls):
+                    try:
+                        await budget.run_async(asyncio.sleep(self._score_poll_interval))
+                        async with session.get(
+                            url,
+                            headers={"X-API-Key": self._api_key},
+                            timeout=aiohttp.ClientTimeout(total=budget.remaining()),
+                            allow_redirects=False,
+                        ) as response:
+                            response.raise_for_status()
+                            refreshed = await response.json()
+                        budget.remaining()
+                        if not isinstance(refreshed, dict):
+                            raise ValueError("Confidence response must be an object")
+                        polls += 1
+                        if refreshed.get("status") != "complete" or refreshed.get("success") is False:
+                            status = "scoring_failed"
+                            break
+                        # Regional results can be signed downloads. Credentials
+                        # belong only on the API request, not on the storage URL.
+                        result_url = refreshed.get("result_url")
+                        if result_url is not None:
+                            if not isinstance(result_url, str) or result_url == "":
+                                raise ValueError("Result URL must be a nonempty string")
+                            async with session.get(
+                                result_url,
+                                timeout=aiohttp.ClientTimeout(total=budget.remaining()),
+                            ) as response:
+                                response.raise_for_status()
+                                downloaded = await response.json()
+                            budget.remaining()
+                            if not isinstance(downloaded, dict):
+                                raise ValueError("Downloaded result must be an object")
+                            refreshed = {
+                                **downloaded,
+                                **{key: value for key, value in refreshed.items() if value is not None},
+                            }
+                        if refreshed.get("success") is False:
+                            status = "scoring_failed"
+                            break
+                        if refreshed.get("extraction_scoring_status") == "failed":
+                            status = "scoring_failed"
+                            break
+                        completed = {
+                            **completed,
+                            **{key: value for key, value in refreshed.items() if value is not None},
+                        }
+                        if completed.get("extraction_score_average") is not None:
+                            status = "scores_ready"
+                            break
+                    except (TimeoutError, asyncio.CancelledError):
+                        status = "deadline_exceeded"
+                        break
+                    except (aiohttp.ClientError, ValueError) as error:
+                        completed["_confidence_poll_error"] = type(error).__name__
+                        status = "poll_error"
+                        break
+        completed["_confidence_polling"] = {"status": status, "polls": polls}
+        return completed
 
     def run_inference(self, pipeline: PipelineSpec, request: InferenceRequest) -> RawInferenceResult:
         if request.product_type != ProductType.EXTRACT:
@@ -524,7 +610,25 @@ def _collect_citations(
                         if citation is not None:
                             citations.append(citation)
                 continue
-            if key.endswith(_SCORE_SUFFIX) or key.endswith(_META_SUFFIX):
+            if key.endswith(_SCORE_SUFFIX):
+                field_name = key[: -len(_SCORE_SUFFIX)]
+                field_value = node.get(field_name)
+                if field_name in node and not isinstance(field_value, (Mapping, list)):
+                    confidence = _score_confidence(value)
+                    block_ids = node.get(field_name + _CITATIONS_SUFFIX)
+                    if confidence is not None and (block_ids is None or block_ids == []):
+                        citations.append(
+                            FieldCitation(
+                                field_path=".".join([*path, field_name]),
+                                page=None,
+                                bbox=None,
+                                source="datalab",
+                                confidence=confidence,
+                                metadata=_score_metadata(value),
+                            ),
+                        )
+                continue
+            if key.endswith(_META_SUFFIX):
                 continue
             _collect_citations(
                 value,
@@ -561,6 +665,7 @@ def _citation_from_block_id(
             page=None,
             bbox=None,
             source="datalab",
+            confidence=_score_confidence(score_obj),
             metadata={"block_id": block_id, **_score_metadata(score_obj)},
         )
 
@@ -571,12 +676,7 @@ def _citation_from_block_id(
 
     reference_text = info.get("html") if isinstance(info.get("html"), str) else None
 
-    confidence = None
-    if isinstance(score_obj, Mapping):
-        raw_score = score_obj.get("score")
-        if isinstance(raw_score, (int, float)):
-            # Datalab scores are 1..5; normalize to [0, 1] for the bench schema.
-            confidence = max(0.0, min(1.0, (float(raw_score) - 1.0) / 4.0))
+    confidence = _score_confidence(score_obj)
 
     metadata: dict[str, Any] = {
         "block_id": block_id,
@@ -609,6 +709,13 @@ def _normalize_bbox(bbox_pixels: Any, page_w: float, page_h: float) -> list[floa
     if page_w <= 0 or page_h <= 0:
         return None
     return [x1 / page_w, y1 / page_h, (x2 - x1) / page_w, (y2 - y1) / page_h]
+
+
+def _score_confidence(score_obj: Any) -> float | None:
+    score = score_obj.get("score") if isinstance(score_obj, Mapping) else score_obj
+    if isinstance(score, bool) or not isinstance(score, (int, float)) or not math.isfinite(score):
+        return None
+    return max(0.0, min(1.0, (float(score) - 1.0) / 4.0))
 
 
 def _score_metadata(score_obj: Any) -> dict[str, Any]:
