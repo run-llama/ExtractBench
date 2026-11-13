@@ -3,6 +3,7 @@
 from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
 from contextvars import ContextVar
+from dataclasses import dataclass
 from typing import Any
 
 from extract_bench.inference.providers.base import ProviderError, ProviderPermanentError
@@ -15,43 +16,44 @@ class ProviderEventError(ProviderPermanentError):
     """Event persistence failed; repeating paid extraction cannot repair the journal."""
 
 
+@dataclass
+class ProviderEventCapture:
+    failure: ProviderEventError | None = None
+
+
 @contextmanager
-def bind_provider_event_sink(sink: ProviderEventSink) -> Iterator[None]:
+def bind_provider_event_sink(sink: ProviderEventSink) -> Iterator[ProviderEventCapture]:
     """Defer sink failures until vendor polling and cancellation have finished.
 
     Preserve an existing provider error, attaching the first failed event as
     diagnostics. Otherwise fail permanently at the caller boundary so a storage
     error cannot trigger another paid extraction.
     """
-    failure: ProviderEventError | None = None
+    capture = ProviderEventCapture()
 
     def record(event: str, payload: Mapping[str, Any]) -> None:
-        nonlocal failure
         try:
             sink(event, payload)
         except Exception as error:
-            if failure is None:
-                failure = ProviderEventError(
+            if capture.failure is None:
+                capture.failure = ProviderEventError(
                     f"Provider event {event} could not be persisted: {error}",
-                    job_id=payload.get("job_id"),
                     debug_payload={"provider_event_failure": {"event": event, "payload": dict(payload)}},
                 )
-                failure.__cause__ = error
+                capture.failure.__cause__ = error
 
     token = _sink.set(record)
     try:
-        yield
+        yield capture
     except BaseException as error:
-        if failure is not None:
-            error.add_note(str(failure))
+        if capture.failure is not None:
+            error.add_note(str(capture.failure))
             if isinstance(error, ProviderError):
-                error.debug_payload = {**(error.debug_payload or {}), **(failure.debug_payload or {})}
-                if error.job_id is None:
-                    error.job_id = failure.job_id
+                error.debug_payload = {**(error.debug_payload or {}), **(capture.failure.debug_payload or {})}
         raise
     else:
-        if failure is not None:
-            raise failure
+        if capture.failure is not None:
+            raise capture.failure
     finally:
         _sink.reset(token)
 

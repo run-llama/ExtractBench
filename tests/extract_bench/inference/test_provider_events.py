@@ -74,7 +74,7 @@ def test_sink_failure_waits_for_vendor_work_then_fails_permanently() -> None:
             emit_provider_event("vendor.job_created", job_id="paid-job")
             completed.append("poll completed")
     assert completed == ["poll completed"]
-    assert caught.value.job_id == "paid-job"
+    assert caught.value.debug_payload["provider_event_failure"]["payload"]["job_id"] == "paid-job"
     assert isinstance(caught.value.__cause__, OSError)
     emit_provider_event("unbound")
 
@@ -92,6 +92,25 @@ def test_pulse_trace_disk_failure_does_not_prevent_remote_cancellation(monkeypat
 
     with pytest.raises(ProviderEventError) as caught, bind_provider_event_sink(record):
         provider._cancel_remote_job("paid-job")
-    assert caught.value.job_id == "paid-job"
+    assert caught.value.debug_payload["provider_event_failure"]["payload"]["job_id"] == "paid-job"
     delete.assert_called_once()
     assert delete.call_args.args[0].endswith("/job/paid-job")
+
+
+@pytest.mark.parametrize("job_id", [None, "current-job"])
+def test_sink_failure_does_not_replace_current_error_with_predecessor_job_id(job_id: str | None) -> None:
+    from extract_bench.inference.providers.base import ProviderPermanentError
+
+    expected = ProviderPermanentError("new submission rejected", job_id=job_id)
+
+    def record(event: str, payload: object) -> None:
+        raise OSError("trace disk full")
+
+    with pytest.raises(ProviderPermanentError) as caught:
+        with bind_provider_event_sink(record) as capture:
+            emit_provider_event("vendor.cancellation_requested", job_id="previous-job")
+            raise expected
+    assert caught.value is expected
+    assert caught.value.job_id == job_id
+    assert capture.failure is not None
+    assert capture.failure.debug_payload["provider_event_failure"]["payload"]["job_id"] == "previous-job"
