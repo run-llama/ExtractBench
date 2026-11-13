@@ -8,6 +8,7 @@ import threading
 from datetime import datetime
 from pathlib import Path
 from typing import Any, cast
+from uuid import uuid4
 
 from reducto import Reducto
 
@@ -178,7 +179,6 @@ class ReductoExtractProvider(Provider):
                 cost_usd=cost,
                 usage=raw.get("usage"),
             )
-        emit_provider_event("cost.attempt", **snapshot)
         return snapshot
 
     def __init__(self, provider_name: str, base_config: dict[str, Any] | None = None):
@@ -255,6 +255,7 @@ class ReductoExtractProvider(Provider):
         budget = execution_budget()
         accounting: dict[str, Any] = {"known_cost_usd": None, "complete": False}
         last_response: dict[str, Any] = {}
+        call_id = uuid4().hex
         client = Reducto(api_key=self._api_key, timeout=budget.remaining(), max_retries=0)
         try:
             if cancel_event is not None and cancel_event.is_set():
@@ -376,7 +377,7 @@ class ReductoExtractProvider(Provider):
                         timeout=budget.remaining(),
                     )
                     last_response = result.model_dump()
-                    accounting = self._record_cost(last_response, {}, "reducto/extract", pdf_path)
+                    accounting = self._record_cost(last_response, {}, f"reducto/{call_id}", pdf_path)
                     emit_provider_event(
                         "stage.completed",
                         provider="reducto",

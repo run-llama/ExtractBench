@@ -20,6 +20,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Literal
 from urllib.parse import quote
+from uuid import uuid4
 
 import aiohttp
 from datalab_sdk import AsyncDatalabClient
@@ -139,6 +140,7 @@ class DatalabExtractProvider(Provider):
     async def _extract_pdf_async(self, pdf_path: str, schema: dict[str, Any]) -> dict[str, Any]:
         """Call Datalab Extract and return the full response as a plain dict."""
         raw_response: dict[str, Any] = {}
+        component_id = f"datalab/{uuid4().hex}"
         try:
             extraction_started = time.perf_counter()
             pdf_page_count = _read_pdf_page_count(pdf_path)
@@ -178,7 +180,7 @@ class DatalabExtractProvider(Provider):
                     parse_mode=self._parse_mode,
                     extraction_mode=self._extraction_mode,
                 )
-            self._record_cost(raw_response)
+            self._record_cost(raw_response, component_id)
             emit_provider_event(
                 "stage.completed",
                 provider="datalab",
@@ -186,7 +188,11 @@ class DatalabExtractProvider(Provider):
                 raw_output=raw_response,
             )
             if self._extraction_mode == "fast":
-                raw_response = await self._wait_for_confidence(raw_response, base_url=client.base_url)
+                raw_response = await self._wait_for_confidence(
+                    raw_response,
+                    base_url=client.base_url,
+                    component_id=component_id,
+                )
 
             # Client-observed time includes upload, parsing, and extraction.
             # Confidence waiting is measured separately; neither is server compute time.
@@ -226,20 +232,25 @@ class DatalabExtractProvider(Provider):
                 debug_payload=debug_payload,
             ) from e
 
-    def _record_cost(self, raw_response: dict[str, Any]) -> None:
+    def _record_cost(self, raw_response: dict[str, Any], component_id: str) -> None:
         _promote_api_cost_breakdown(raw_response)
         cost = raw_response.get("cost_usd")
         raw_response["_cost_complete"] = cost is not None
         if cost is not None:
             emit_provider_event(
                 "cost.component",
-                component_id=f"datalab/{raw_response.get('request_id', 'extract')}",
+                component_id=component_id,
                 cost_usd=cost,
                 usage=raw_response.get("cost_breakdown"),
             )
-        emit_provider_event("cost.attempt", known_cost_usd=cost, complete=cost is not None)
 
-    async def _wait_for_confidence(self, completed: dict[str, Any], *, base_url: str) -> dict[str, Any]:
+    async def _wait_for_confidence(
+        self,
+        completed: dict[str, Any],
+        *,
+        base_url: str,
+        component_id: str,
+    ) -> dict[str, Any]:
         """Refresh the completed job through the documented REST result endpoint.
 
         Fast scores arrive after extraction. A failed or interrupted score wait
@@ -304,7 +315,7 @@ class DatalabExtractProvider(Provider):
                             **completed,
                             **{key: value for key, value in refreshed.items() if value is not None},
                         }
-                        self._record_cost(completed)
+                        self._record_cost(completed, component_id)
                         if completed.get("extraction_score_average") is not None:
                             status = ConfidencePollingStatusValues.SCORES_READY
                             break

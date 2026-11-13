@@ -770,8 +770,6 @@ class ExtendProvider(Provider):
                 cost_usd=cost,
                 usage=run.get("usage"),
             )
-        if cost is not None or run.get("status") in ("PROCESSED", "FAILED", "CANCELLED"):
-            emit_provider_event("cost.attempt", **snapshot)
         return snapshot
 
     def _run_processor(
