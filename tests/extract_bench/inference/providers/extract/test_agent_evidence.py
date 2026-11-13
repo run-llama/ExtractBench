@@ -144,6 +144,7 @@ def test_evidence_reaches_normalized_output(
     monkeypatch.setattr(provider, "_run_cli", run_cli)
     monkeypatch.setattr(provider, "_raise_for_status", lambda *args: None)
     if provider_class is ClaudeCodeExtractProvider:
+        monkeypatch.setattr(provider, "_resolve_harness", lambda: {"executable": "claude", "version": "2.1.280"})
         monkeypatch.setattr(provider, "_parse_result_event", lambda lines: {"usage": {}, "total_cost_usd": 0.01})
     else:
         monkeypatch.setattr(provider, "_raise_for_sandbox_failures", lambda lines: None)

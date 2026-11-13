@@ -99,12 +99,15 @@ Install [Claude Code](https://code.claude.com/docs/en/setup) and set an Anthropi
 
 ```bash
 uv sync --extra anthropic
-npm install -g @anthropic-ai/claude-code@latest
+export CLAUDE_CODE_VERSION="2.1.280"  # choose an exact release supporting your model
+npm install -g "@anthropic-ai/claude-code@$CLAUDE_CODE_VERSION"
 claude --version
 export ANTHROPIC_API_KEY="your-anthropic-api-key"
 uv run extract-bench run claude_code_extract_opus_5_5_evidence \
   --dataset pro --max_concurrent 1
 ```
+
+`CLAUDE_CODE_VERSION` (or pipeline config `claude_version`, which takes precedence) requires an exact CLI version. The provider checks `claude --version` before extraction and fails on a mismatch; installation remains a setup step. Use `claude_bin` to select a separate installation. Updates are disabled for benchmark subprocesses. The actual version and executable are saved in `raw_output.harness` and, before extraction starts, in `traces/claude_code/*.harness.json`, including document identity, so timed-out attempts retain their harness version. To rerun one, install and require its recorded version. Omitting the pin still records the installed version but permits different versions across runs.
 
 Opus 5.5 requires CLI 2.1.280 or newer. The non-evidence Opus pipelines use `--bare`, which requires `ANTHROPIC_API_KEY` or a configured `apiKeyHelper`; a logged-in Claude session alone is insufficient. The evidence variants do not enable `--bare` and can also use a logged-in session. Cost comes from the CLI's `total_cost_usd`.
 
