@@ -69,6 +69,13 @@ Gemini CLI (Gemini 4 Argon Medium),Coding Agents,gemini_cli_extract_gemini_4_arg
 Gemini CLI (Gemini 4 Argon Medium),Coding Agents,gemini_cli_extract_gemini_4_argon_medium_thinking_vision_evidence,medium,true,relational_diagrams,20,19,45.00,59.95,57.05,59.29,0.130325,0,,,55.00,79.77,70.70,72.94
 Gemini CLI (Gemini 4 Argon Medium),Coding Agents,gemini_cli_extract_gemini_4_argon_medium_thinking_vision_evidence,medium,true,charts_and_maps,25,10,36.00,58.29,70.00,70.00,0.224565,0,,,56.00,85.47,80.00,80.00
 Gemini CLI (Gemini 4 Argon Medium),Coding Agents,gemini_cli_extract_gemini_4_argon_medium_thinking_vision_evidence,medium,true,long_single_pages,7,7,14.29,14.29,6.45,14.29,3.141275,0,,,28.57,28.57,6.55,28.57
+Gemini CLI (Gemini 4 Hydrogen),Coding Agents,gemini_cli_extract_gemini_4_hydrogen_high_thinking_vision_evidence,high,true,all,100,81,24.00,32.88,20.50,21.82,0.143150,0,,,28.00,42.41,30.25,32.45
+Gemini CLI (Gemini 4 Hydrogen),Coding Agents,gemini_cli_extract_gemini_4_hydrogen_high_thinking_vision_evidence,high,true,interpretation_rules,22,22,9.09,9.09,8.78,8.78,0.034278,0,,,18.18,22.73,21.69,21.74
+Gemini CLI (Gemini 4 Hydrogen),Coding Agents,gemini_cli_extract_gemini_4_hydrogen_high_thinking_vision_evidence,high,true,custom_terminology,14,14,0.00,0.00,0.00,0.00,0.038910,0,,,7.14,7.14,4.75,4.76
+Gemini CLI (Gemini 4 Hydrogen),Coding Agents,gemini_cli_extract_gemini_4_hydrogen_high_thinking_vision_evidence,high,true,conditional_aggregation,12,9,33.33,43.81,18.52,18.52,0.041985,0,,,33.33,43.81,18.52,18.52
+Gemini CLI (Gemini 4 Hydrogen),Coding Agents,gemini_cli_extract_gemini_4_hydrogen_high_thinking_vision_evidence,high,true,relational_diagrams,20,19,45.00,45.00,41.98,42.49,0.060937,0,,,50.00,63.11,57.49,58.81
+Gemini CLI (Gemini 4 Hydrogen),Coding Agents,gemini_cli_extract_gemini_4_hydrogen_high_thinking_vision_evidence,high,true,charts_and_maps,25,10,32.00,62.51,50.00,50.00,0.083553,0,,,32.00,66.13,60.00,60.00
+Gemini CLI (Gemini 4 Hydrogen),Coding Agents,gemini_cli_extract_gemini_4_hydrogen_high_thinking_vision_evidence,high,true,long_single_pages,7,7,14.29,14.29,0.36,14.29,1.892295,0,,,14.29,28.53,6.81,28.53
 LlamaExtract Agentic,LlamaExtract,llamaextract_agentic,,true,all,100,81,20.00,71.32,58.01,63.77,0.031200,0,0,,20.00,71.32,58.01,63.77
 LlamaExtract Agentic,LlamaExtract,llamaextract_agentic,,true,interpretation_rules,22,22,13.64,95.54,76.03,87.92,0.031200,0,0,,13.64,95.54,76.03,87.92
 LlamaExtract Agentic,LlamaExtract,llamaextract_agentic,,true,custom_terminology,14,14,35.71,95.39,55.62,65.16,0.031200,0,0,,35.71,95.39,55.62,65.16
