@@ -271,13 +271,13 @@ class ReductoExtractProvider(Provider):
 
                         def poll_job() -> Any:
                             job = client.job.get(job_id, timeout=budget.remaining())
-                            if getattr(job, "status", None) == "Completed":
+                            if job.status == "Completed":
                                 emit_provider_event(
                                     "stage.completed",
                                     provider="reducto",
                                     stage="extract",
                                     job_id=job_id,
-                                    raw_output=job.model_dump() if hasattr(job, "model_dump") else job,
+                                    raw_output=job.model_dump(),
                                 )
                             return job
 
@@ -327,7 +327,7 @@ class ReductoExtractProvider(Provider):
                         "stage.completed",
                         provider="reducto",
                         stage="extract",
-                        raw_output=result.model_dump() if hasattr(result, "model_dump") else result,
+                        raw_output=result.model_dump(),
                     )
                     return result
 
