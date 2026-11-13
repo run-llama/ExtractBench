@@ -68,7 +68,7 @@ def test_meta_sidecar_produces_no_citations() -> None:
 @pytest.mark.parametrize(
     ("pipeline_name", "parse_mode", "extraction_mode", "expected_cost_per_page"),
     [
-        ("datalab_parse_accurate_extract_fast", "accurate", "fast", 0.016),
+        ("datalab_parse_fast_extract_fast", "fast", "fast", 0.010),
         ("datalab_parse_accurate_extract_balanced", "accurate", "balanced", 0.025),
         ("datalab_parse_accurate_extract_accurate", "accurate", "accurate", 0.030),
     ],
