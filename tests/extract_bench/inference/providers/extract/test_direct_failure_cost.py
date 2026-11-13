@@ -8,6 +8,8 @@ from unittest.mock import Mock
 
 import pytest
 
+pytest.importorskip("pypdf", reason="dev and runners extras required")
+
 from extract_bench.inference.events import bind_provider_event_sink
 from extract_bench.inference.providers.base import Provider, ProviderError, ProviderPermanentError
 from extract_bench.inference.providers.extract.anthropic_direct import AnthropicDirectExtractProvider
