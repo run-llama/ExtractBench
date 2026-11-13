@@ -22,6 +22,7 @@ from typing import Any, Literal
 from urllib.parse import quote
 
 import aiohttp
+from datalab_sdk import AsyncDatalabClient
 from datalab_sdk.models import ExtractOptions
 from pypdf import PdfReader
 
@@ -33,7 +34,6 @@ from extract_bench.inference.providers.base import (
     ProviderPermanentError,
     ProviderTransientError,
 )
-from extract_bench.inference.providers.extract.datalab_client import TracingDatalabClient
 from extract_bench.inference.providers.registry import register_provider
 from extract_bench.schemas.extract_output import ExtractOutput, FieldCitation
 from extract_bench.schemas.pipeline import PipelineSpec
@@ -155,7 +155,7 @@ class DatalabExtractProvider(Provider):
             if self._page_range is not None:
                 options.page_range = self._page_range
 
-            async with TracingDatalabClient(api_key=self._api_key) as client:
+            async with AsyncDatalabClient(api_key=self._api_key) as client:
                 # The SDK accepts a poll count, not a deadline. Size its sleep
                 # allowance from the remaining budget; run_async owns the cutoff.
                 result = await client.extract(

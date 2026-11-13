@@ -3,7 +3,7 @@
 import asyncio
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import Mock
 
 import pytest
 
@@ -26,23 +26,6 @@ def test_event_context_survives_worker_handoff_and_is_reset_after_failure() -> N
         asyncio.run(run())
     emit_provider_event("unbound")
     assert received == [("vendor.job_created", {"job_id": "accepted"})]
-
-
-def test_datalab_submission_is_recorded_before_sdk_polling(monkeypatch: pytest.MonkeyPatch) -> None:
-    pytest.importorskip("datalab_sdk")
-    from datalab_sdk import AsyncDatalabClient
-
-    from extract_bench.inference.providers.extract.datalab_client import TracingDatalabClient
-
-    submit = AsyncMock(return_value={"request_id": "paid", "request_check_url": "https://example.test/status"})
-    monkeypatch.setattr(AsyncDatalabClient, "_submit_with_retry", submit)
-    received = []
-    client = TracingDatalabClient.__new__(TracingDatalabClient)
-    with bind_provider_event_sink(lambda event, data: received.append((event, data))):
-        asyncio.run(client._submit_with_retry("extract", data={"schema": "{}"}))
-    assert received[0][0] == "vendor.job_created"
-    assert received[0][1]["job_id"] == "paid"
-    assert received[0][1]["request_check_url"] == submit.return_value["request_check_url"]
 
 
 @pytest.mark.parametrize("cancel_after_parse", [False, True])
