@@ -18,7 +18,7 @@ import time
 from collections.abc import Mapping, Sequence
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 from urllib.parse import quote
 
 import aiohttp
@@ -54,6 +54,16 @@ DATALAB_EXTRACT_COST_PER_PAGE_USD = {
     "balanced": 0.015,
     "accurate": 0.02,
 }
+
+
+ConfidencePollingStatus = Literal["scores_ready", "scoring_failed", "deadline_exceeded", "poll_error"]
+
+
+class ConfidencePollingStatusValues:
+    SCORES_READY: ConfidencePollingStatus = "scores_ready"
+    SCORING_FAILED: ConfidencePollingStatus = "scoring_failed"
+    DEADLINE_EXCEEDED: ConfidencePollingStatus = "deadline_exceeded"
+    POLL_ERROR: ConfidencePollingStatus = "poll_error"
 
 
 @register_provider("datalab_extract")
@@ -204,15 +214,15 @@ class DatalabExtractProvider(Provider):
         """
         confidence_started = time.perf_counter()
         budget = execution_budget()
-        status: str
+        status: ConfidencePollingStatus
         polls = 0
         request_id = completed.get("request_id")
         if completed.get("extraction_score_average") is not None:
-            status = "scores_ready"
+            status = ConfidencePollingStatusValues.SCORES_READY
         elif completed.get("extraction_scoring_status") == "failed":
-            status = "scoring_failed"
+            status = ConfidencePollingStatusValues.SCORING_FAILED
         elif not isinstance(request_id, str) or request_id == "":
-            status = "missing_request_id"
+            raise ValueError("Completed Fast extraction is missing its request_id")
         else:
             url = f"{base_url.rstrip('/')}/api/v1/extract/{quote(request_id, safe='')}"
             async with aiohttp.ClientSession() as session:
@@ -232,8 +242,7 @@ class DatalabExtractProvider(Provider):
                             raise ValueError("Confidence response must be an object")
                         polls += 1
                         if refreshed.get("status") != "complete" or refreshed.get("success") is False:
-                            status = "scoring_failed"
-                            break
+                            raise ValueError(f"Expected completed extraction, got {refreshed.get('status')!r}")
                         # Regional results can be signed downloads. Credentials
                         # belong only on the API request, not on the storage URL.
                         result_url = refreshed.get("result_url")
@@ -254,24 +263,23 @@ class DatalabExtractProvider(Provider):
                                 **{key: value for key, value in refreshed.items() if value is not None},
                             }
                         if refreshed.get("success") is False:
-                            status = "scoring_failed"
-                            break
+                            raise ValueError("Completed extraction result reports success=false")
                         if refreshed.get("extraction_scoring_status") == "failed":
-                            status = "scoring_failed"
+                            status = ConfidencePollingStatusValues.SCORING_FAILED
                             break
                         completed = {
                             **completed,
                             **{key: value for key, value in refreshed.items() if value is not None},
                         }
                         if completed.get("extraction_score_average") is not None:
-                            status = "scores_ready"
+                            status = ConfidencePollingStatusValues.SCORES_READY
                             break
                     except (TimeoutError, asyncio.CancelledError):
-                        status = "deadline_exceeded"
+                        status = ConfidencePollingStatusValues.DEADLINE_EXCEEDED
                         break
-                    except (aiohttp.ClientError, ValueError) as error:
+                    except aiohttp.ClientError as error:
                         completed["_confidence_poll_error"] = type(error).__name__
-                        status = "poll_error"
+                        status = ConfidencePollingStatusValues.POLL_ERROR
                         break
         completed["confidence_wait_ms"] = (time.perf_counter() - confidence_started) * 1000
         completed["_confidence_polling"] = {"status": status, "polls": polls}
@@ -723,7 +731,9 @@ def _normalize_bbox(bbox_pixels: Any, page_w: float, page_h: float) -> list[floa
 
 
 def _score_confidence(score_obj: Any) -> float | None:
-    score = score_obj.get("score") if isinstance(score_obj, Mapping) else score_obj
+    if score_obj is None:
+        return None
+    score = score_obj["score"]
     if isinstance(score, bool) or not isinstance(score, (int, float)) or not math.isfinite(score):
         return None
     return max(0.0, min(1.0, (float(score) - 1.0) / 4.0))

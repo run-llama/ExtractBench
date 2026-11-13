@@ -91,7 +91,7 @@ def test_extraction_survives_optional_scoring_with_separate_timing(
                 return web.json_response([])
             if outcome == "failed":
                 return web.json_response(
-                    {**initial, "extraction_schema_json": None, "extraction_scoring_status": "failed"}
+                    {**initial, "extraction_schema_json": None, "extraction_scoring_status": "failed"},
                 )
             if outcome == "cancelled":
                 budget.cancel()
@@ -117,7 +117,9 @@ def test_extraction_survives_optional_scoring_with_separate_timing(
         await site.start()
         base_url = f"http://127.0.0.1:{runner.addresses[0][1]}"
         monkeypatch.setattr(
-            datalab, "AsyncDatalabClient", lambda **kwargs: AsyncDatalabClient(base_url=base_url, **kwargs)
+            datalab,
+            "AsyncDatalabClient",
+            lambda **kwargs: AsyncDatalabClient(base_url=base_url, **kwargs),
         )
         source = tmp_path / "doc.pdf"
         source.write_bytes(b"%PDF-1.4 local test")
@@ -137,6 +139,10 @@ def test_extraction_survives_optional_scoring_with_separate_timing(
             config,
         )
         try:
+            if outcome in ("invalid", "invalid_url"):
+                with budget.activate(), pytest.raises(datalab.ProviderPermanentError):
+                    await budget.run_async(provider._extract_pdf_async(str(source), {"type": "object"}))
+                return
             with budget.activate():
                 result = await budget.run_async(provider._extract_pdf_async(str(source), {"type": "object"}))
             assert json.loads(result["extraction_schema_json"])["total"] == 10
