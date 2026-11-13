@@ -341,11 +341,13 @@ class OpenAIResponsesExtractProvider(Provider):
         }
         raw_output["usage"] = {key: value for key, value in raw_output["usage"].items() if value is not None}
         self.recompute_cost(raw_output)
+        response_id = getattr(resp, "id", None)
         raw_output.update(
             record_response_cost(
                 raw_output.get("cost_usd"),
                 raw_output["usage"],
                 complete="input_tokens" in raw_output["usage"] and "output_tokens" in raw_output["usage"],
+                component_id=f"{self.provider_name}/{response_id}" if response_id is not None else None,
             )
         )
         with preserve_cost_on_error(raw_output):

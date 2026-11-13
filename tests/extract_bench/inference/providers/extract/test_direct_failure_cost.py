@@ -43,6 +43,8 @@ def test_paid_invalid_response_preserves_cost_and_missing_usage_stays_unknown(
 ) -> None:
     provider = provider_class("test", {"api_key": "test", "input_price_per_1m": 1, "output_price_per_1m": 1})
     response = NS(
+        id="sdk-response",
+        response_id="sdk-response",
         stop_reason="max_tokens",
         output_text="not json",
         text="not json",
@@ -98,6 +100,7 @@ def test_paid_invalid_response_preserves_cost_and_missing_usage_stays_unknown(
         assert snapshot["known_cost_usd"] == pytest.approx(reported_tokens / 1_000_000)
         assert snapshot["complete"] is True
         assert len(components) == 1
+        assert components[0]["component_id"] == "test/sdk-response"
         assert components[0]["cost_usd"] == snapshot["known_cost_usd"]
 
 

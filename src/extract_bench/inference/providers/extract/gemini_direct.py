@@ -213,10 +213,12 @@ class GeminiDirectExtractProvider(Provider):
             if "input_tokens" in usage or "output_tokens" in usage
             else None
         )
+        response_id = getattr(response, "response_id", None)
         accounting = record_response_cost(
             cost_usd,
             usage,
             complete="input_tokens" in usage and "output_tokens" in usage,
+            component_id=f"{self.provider_name}/{response_id}" if response_id is not None else None,
         )
         with preserve_cost_on_error({**accounting, "usage": usage}):
             finish_reason = self._finish_reason(response)

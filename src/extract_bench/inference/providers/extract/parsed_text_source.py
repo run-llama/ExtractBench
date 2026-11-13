@@ -119,7 +119,12 @@ class LlamaParseTextSource:
         )
         raw_parse = parse_provider.run_inference(parse_pipeline, parse_request)
         raw_output = raw_parse.raw_output
-        record_response_cost(raw_output.get("cost_usd"), {"parse_job_id": raw_output.get("job_id")})
+        job_id = raw_output.get("job_id")
+        record_response_cost(
+            raw_output.get("cost_usd"),
+            {"parse_job_id": job_id},
+            component_id=f"llamaparse/{job_id}" if job_id is not None else None,
+        )
         with preserve_cost_on_error(raw_output):
             parse_result = parse_provider.normalize(raw_parse)
             parse_output = parse_result.output
