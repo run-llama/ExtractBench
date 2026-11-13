@@ -77,7 +77,10 @@ def test_hy4_pipeline_uses_tokenhub_list_prices_and_runner_deadline() -> None:
         spec.config["cache_read_price_per_1m"],
     ) == (0.834, 2.501, 0.042)
     assert EXTRACT_HARD_TIMEOUT_S == 3 * 60 * 60
-    assert isinstance(create_provider(spec), PiExtractProvider)
+    provider = create_provider(spec)
+    assert isinstance(provider, PiExtractProvider)
+    assert spec.config["max_cost_usd"] is None
+    assert provider._max_cost_usd is None
 
 
 @pytest.mark.parametrize("missing", ["model", "base_url", "input_price_per_1m"])

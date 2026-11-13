@@ -447,7 +447,7 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
                 "api_key_env": "TENCENT_TOKENHUB_API_KEY",
                 "context_window": 960000,
                 "max_tokens": 32768,
-                "max_cost_usd": 5.00,
+                "max_cost_usd": None,
                 "input_price_per_1m": 0.834,
                 "output_price_per_1m": 2.501,
                 "cache_read_price_per_1m": 0.042,
