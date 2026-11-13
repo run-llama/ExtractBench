@@ -77,7 +77,7 @@ Pro has no `--test` subset. To try a pipeline on a smaller slice, run a single c
 | `pulse_schema_effort` | Pulse Effort |
 | `codex_code_extract_gpt_6_1_sol_low_evidence` | Codex GPT-6.1 Sol |
 | `reducto_deep_extract` | Reducto Deep |
-| `datalab_parse_accurate_extract_accurate` | Datalab Accurate |
+| `datalab_extract_accurate` | Datalab Accurate |
 | `llamaextract_cost_effective` | LlamaExtract Cost Effective |
 | `codex_code_extract_gpt_6_luna_medium_evidence_prompt_opt` | Codex GPT-6 Luna |
 

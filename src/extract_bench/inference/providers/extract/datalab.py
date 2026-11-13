@@ -14,11 +14,14 @@ import dataclasses
 import json
 import math
 import os
+import time
 from collections.abc import Mapping, Sequence
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
+from urllib.parse import quote
 
+import aiohttp
 from datalab_sdk import AsyncDatalabClient
 from datalab_sdk.models import ExtractOptions
 from pypdf import PdfReader
@@ -46,10 +49,21 @@ DATALAB_PARSE_COST_PER_PAGE_USD = {
     "accurate": 0.01,
 }
 DATALAB_EXTRACT_COST_PER_PAGE_USD = {
+    "turbo": 0.006,
     "fast": 0.006,
     "balanced": 0.015,
     "accurate": 0.02,
 }
+
+
+ConfidencePollingStatus = Literal["scores_ready", "scoring_failed", "deadline_exceeded", "poll_error"]
+
+
+class ConfidencePollingStatusValues:
+    SCORES_READY: ConfidencePollingStatus = "scores_ready"
+    SCORING_FAILED: ConfidencePollingStatus = "scoring_failed"
+    DEADLINE_EXCEEDED: ConfidencePollingStatus = "deadline_exceeded"
+    POLL_ERROR: ConfidencePollingStatus = "poll_error"
 
 
 @register_provider("datalab_extract")
@@ -73,11 +87,10 @@ class DatalabExtractProvider(Provider):
         :param base_config: Optional configuration with:
             - ``api_key``: Datalab API key (defaults to DATALAB_API_KEY env var)
             - ``parse_mode``: Document parse mode — ``fast`` / ``balanced`` /
-              ``accurate``. Falls back to ``mode`` for legacy configs.
-            - ``extraction_mode``: Extraction mode — ``fast`` / ``balanced`` /
-              ``accurate``.
-              Datalab documents this as a raw form field; the SDK does not expose
-              it as a typed ``ExtractOptions`` attribute.
+              ``accurate``. Omit to use Datalab’s default; ``mode`` is a legacy alias.
+            - ``extraction_mode``: Extraction mode — ``turbo`` / ``fast`` / ``balanced`` /
+              ``accurate``. Turbo skips parsing and returns no citations or scores.
+              Fast mode also waits for optional confidence scores.
             - ``max_pages``: Maximum number of pages to process (optional).
             - ``page_range``: Comma-separated page ranges (e.g. ``"0-2,4"``).
             - ``output_format``: Conversion output format the extract endpoint
@@ -96,9 +109,13 @@ class DatalabExtractProvider(Provider):
                 "Datalab API key is required. Set DATALAB_API_KEY environment variable or pass api_key in base_config."
             )
 
-        self._parse_mode = self.base_config.get("parse_mode", self.base_config.get("mode", "fast"))
         self._extraction_mode = self.base_config.get("extraction_mode")
-        if self._parse_mode not in DATALAB_PARSE_COST_PER_PAGE_USD:
+        self._parse_mode = (
+            None
+            if self._extraction_mode == "turbo"
+            else self.base_config.get("parse_mode", self.base_config.get("mode"))
+        )
+        if self._parse_mode is not None and self._parse_mode not in DATALAB_PARSE_COST_PER_PAGE_USD:
             raise ProviderConfigError(
                 f"Unsupported Datalab parse mode: {self._parse_mode!r}. "
                 f"Expected one of {sorted(DATALAB_PARSE_COST_PER_PAGE_USD)}."
@@ -121,6 +138,7 @@ class DatalabExtractProvider(Provider):
     async def _extract_pdf_async(self, pdf_path: str, schema: dict[str, Any]) -> dict[str, Any]:
         """Call Datalab Extract and return the full response as a plain dict."""
         try:
+            extraction_started = time.perf_counter()
             pdf_page_count = _read_pdf_page_count(pdf_path)
             options = ExtractOptions(
                 page_schema=json.dumps(_adapt_schema_for_datalab(schema)),
@@ -130,8 +148,6 @@ class DatalabExtractProvider(Provider):
                 skip_cache=self._skip_cache,
             )
             if self._extraction_mode is not None:
-                # datalab-python-sdk currently serializes unknown attributes via
-                # ProcessingOptions.to_form_data(), but does not type this field.
                 options.extraction_mode = self._extraction_mode
             if self._max_pages is not None:
                 options.max_pages = self._max_pages
@@ -148,8 +164,14 @@ class DatalabExtractProvider(Provider):
                     poll_interval=self._poll_interval,  # type: ignore[arg-type]
                 )
 
+            extraction_latency_ms = (time.perf_counter() - extraction_started) * 1000
             raw_response: dict[str, Any] = dataclasses.asdict(result)
+            if self._extraction_mode == "fast":
+                raw_response = await self._wait_for_confidence(raw_response, base_url=client.base_url)
 
+            # Client-observed time includes upload, parsing, and extraction.
+            # Confidence waiting is measured separately; neither is server compute time.
+            raw_response["extraction_latency_ms"] = extraction_latency_ms
             raw_response["_config"] = {
                 "mode": self._parse_mode,
                 "parse_mode": self._parse_mode,
@@ -162,6 +184,8 @@ class DatalabExtractProvider(Provider):
             }
 
             page_count = _coerce_positive_page_count(raw_response.get("page_count")) or pdf_page_count
+            if page_count is not None:
+                raw_response["page_count"] = page_count
             if self._extraction_mode is not None:
                 _attach_datalab_extract_pricing(
                     raw_response,
@@ -169,12 +193,7 @@ class DatalabExtractProvider(Provider):
                     parse_mode=self._parse_mode,
                     extraction_mode=self._extraction_mode,
                 )
-                _promote_api_cost_breakdown(raw_response)
-            else:
-                # Legacy configs did not pin extraction_mode. Preserve the API
-                # reported cost when available instead of guessing the account
-                # default.
-                _promote_api_cost_breakdown(raw_response)
+            _promote_api_cost_breakdown(raw_response)
 
             return raw_response
 
@@ -186,6 +205,85 @@ class DatalabExtractProvider(Provider):
             if any(keyword in error_str for keyword in transient_keywords):
                 raise ProviderTransientError(f"Transient error during extraction: {e}") from e
             raise ProviderPermanentError(f"Error during extraction: {e}") from e
+
+    async def _wait_for_confidence(self, completed: dict[str, Any], *, base_url: str) -> dict[str, Any]:
+        """Refresh the completed job through the documented REST result endpoint.
+
+        Fast scores arrive after extraction. A failed or interrupted score wait
+        leaves the completed extraction usable; it never submits another job.
+        """
+        confidence_started = time.perf_counter()
+        budget = execution_budget()
+        status: ConfidencePollingStatus
+        polls = 0
+        request_id = completed.get("request_id")
+        if completed.get("extraction_score_average") is not None:
+            status = ConfidencePollingStatusValues.SCORES_READY
+        elif completed.get("extraction_scoring_status") == "failed":
+            status = ConfidencePollingStatusValues.SCORING_FAILED
+        elif not isinstance(request_id, str) or request_id == "":
+            raise ValueError("Completed Fast extraction is missing its request_id")
+        else:
+            url = f"{base_url.rstrip('/')}/api/v1/extract/{quote(request_id, safe='')}"
+            async with aiohttp.ClientSession() as session:
+                while True:
+                    try:
+                        await budget.run_async(asyncio.sleep(self._poll_interval))
+                        async with session.get(
+                            url,
+                            headers={"X-API-Key": self._api_key},
+                            timeout=aiohttp.ClientTimeout(total=budget.remaining()),
+                            allow_redirects=False,
+                        ) as response:
+                            response.raise_for_status()
+                            refreshed = await response.json()
+                        budget.remaining()
+                        if not isinstance(refreshed, dict):
+                            raise ValueError("Confidence response must be an object")
+                        polls += 1
+                        if refreshed.get("status") != "complete" or refreshed.get("success") is False:
+                            raise ValueError(f"Expected completed extraction, got {refreshed.get('status')!r}")
+                        # Regional results can be signed downloads. Credentials
+                        # belong only on the API request, not on the storage URL.
+                        result_url = refreshed.get("result_url")
+                        if result_url is not None:
+                            if not isinstance(result_url, str) or result_url == "":
+                                raise ValueError("Result URL must be a nonempty string")
+                            async with session.get(
+                                result_url,
+                                timeout=aiohttp.ClientTimeout(total=budget.remaining()),
+                            ) as response:
+                                response.raise_for_status()
+                                downloaded = await response.json()
+                            budget.remaining()
+                            if not isinstance(downloaded, dict):
+                                raise ValueError("Downloaded result must be an object")
+                            refreshed = {
+                                **downloaded,
+                                **{key: value for key, value in refreshed.items() if value is not None},
+                            }
+                        if refreshed.get("success") is False:
+                            raise ValueError("Completed extraction result reports success=false")
+                        if refreshed.get("extraction_scoring_status") == "failed":
+                            status = ConfidencePollingStatusValues.SCORING_FAILED
+                            break
+                        completed = {
+                            **completed,
+                            **{key: value for key, value in refreshed.items() if value is not None},
+                        }
+                        if completed.get("extraction_score_average") is not None:
+                            status = ConfidencePollingStatusValues.SCORES_READY
+                            break
+                    except (TimeoutError, asyncio.CancelledError):
+                        status = ConfidencePollingStatusValues.DEADLINE_EXCEEDED
+                        break
+                    except aiohttp.ClientError as error:
+                        completed["_confidence_poll_error"] = type(error).__name__
+                        status = ConfidencePollingStatusValues.POLL_ERROR
+                        break
+        completed["confidence_wait_ms"] = (time.perf_counter() - confidence_started) * 1000
+        completed["_confidence_polling"] = {"status": status, "polls": polls}
+        return completed
 
     def run_inference(self, pipeline: PipelineSpec, request: InferenceRequest) -> RawInferenceResult:
         if request.product_type != ProductType.EXTRACT:
@@ -291,13 +389,20 @@ def _attach_datalab_extract_pricing(
     raw_output: dict[str, Any],
     *,
     page_count: int | None,
-    parse_mode: str,
+    parse_mode: str | None,
     extraction_mode: str,
 ) -> None:
     if page_count is None or page_count <= 0:
         return
 
-    parse_cost_per_page = DATALAB_PARSE_COST_PER_PAGE_USD[parse_mode]
+    if extraction_mode == "turbo":
+        parse_cost_per_page = 0.0
+    else:
+        if parse_mode is None:
+            # Server-selected parsing has no local rate assumption. Use the
+            # reported cost breakdown; missing billing data stays unknown.
+            return
+        parse_cost_per_page = DATALAB_PARSE_COST_PER_PAGE_USD[parse_mode]
     extract_cost_per_page = DATALAB_EXTRACT_COST_PER_PAGE_USD[extraction_mode]
     parse_cost = parse_cost_per_page * page_count
     extract_cost = extract_cost_per_page * page_count
@@ -524,7 +629,25 @@ def _collect_citations(
                         if citation is not None:
                             citations.append(citation)
                 continue
-            if key.endswith(_SCORE_SUFFIX) or key.endswith(_META_SUFFIX):
+            if key.endswith(_SCORE_SUFFIX):
+                field_name = key[: -len(_SCORE_SUFFIX)]
+                field_value = node.get(field_name)
+                if field_name in node and not isinstance(field_value, (Mapping, list)):
+                    confidence = _score_confidence(value)
+                    block_ids = node.get(field_name + _CITATIONS_SUFFIX)
+                    if confidence is not None and (block_ids is None or block_ids == []):
+                        citations.append(
+                            FieldCitation(
+                                field_path=".".join([*path, field_name]),
+                                page=None,
+                                bbox=None,
+                                source="datalab",
+                                confidence=confidence,
+                                metadata=_score_metadata(value),
+                            ),
+                        )
+                continue
+            if key.endswith(_META_SUFFIX):
                 continue
             _collect_citations(
                 value,
@@ -561,6 +684,7 @@ def _citation_from_block_id(
             page=None,
             bbox=None,
             source="datalab",
+            confidence=_score_confidence(score_obj),
             metadata={"block_id": block_id, **_score_metadata(score_obj)},
         )
 
@@ -571,12 +695,7 @@ def _citation_from_block_id(
 
     reference_text = info.get("html") if isinstance(info.get("html"), str) else None
 
-    confidence = None
-    if isinstance(score_obj, Mapping):
-        raw_score = score_obj.get("score")
-        if isinstance(raw_score, (int, float)):
-            # Datalab scores are 1..5; normalize to [0, 1] for the bench schema.
-            confidence = max(0.0, min(1.0, (float(raw_score) - 1.0) / 4.0))
+    confidence = _score_confidence(score_obj)
 
     metadata: dict[str, Any] = {
         "block_id": block_id,
@@ -609,6 +728,15 @@ def _normalize_bbox(bbox_pixels: Any, page_w: float, page_h: float) -> list[floa
     if page_w <= 0 or page_h <= 0:
         return None
     return [x1 / page_w, y1 / page_h, (x2 - x1) / page_w, (y2 - y1) / page_h]
+
+
+def _score_confidence(score_obj: Any) -> float | None:
+    if score_obj is None:
+        return None
+    score = score_obj["score"]
+    if isinstance(score, bool) or not isinstance(score, (int, float)) or not math.isfinite(score):
+        return None
+    return max(0.0, min(1.0, (float(score) - 1.0) / 4.0))
 
 
 def _score_metadata(score_obj: Any) -> dict[str, Any]:
