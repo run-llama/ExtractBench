@@ -110,6 +110,10 @@ PipelineOutput = Annotated[SerializeAsAny[BaseModel], BeforeValidator(coerce_pip
 """Field annotation for a normalized output: dispatches on ``task_type`` via the registry."""
 
 
+# Runner-recorded execution deadline in seconds, present only on a late response.
+EXECUTION_TIMEOUT_S = "_execution_timeout_s"
+
+
 class RawInferenceResult(BaseModel):
     """Raw result from provider before normalization."""
 

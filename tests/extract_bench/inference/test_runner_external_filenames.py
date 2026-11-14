@@ -8,6 +8,7 @@ path so results still pair with their test case.
 
 from __future__ import annotations
 
+import threading
 from datetime import datetime
 from pathlib import Path
 
@@ -47,6 +48,8 @@ def _runner(provider_name: str, config: dict | None = None) -> tuple[InferenceRu
     runner = InferenceRunner.__new__(InferenceRunner)
     runner._cancelled_examples = set()
     runner._execution_budgets = {}
+    runner._cost_attempts = {}
+    runner._cost_lock = threading.RLock()
     runner.per_file_timeout = 10800
     provider = _RecordingProvider()
     runner.provider = provider
