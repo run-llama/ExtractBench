@@ -20,6 +20,7 @@ import ast
 import json
 import re
 import traceback
+from collections.abc import Callable
 from typing import Any
 
 from .agent_loop import Tool, ToolLoopDone, run_agent
@@ -797,6 +798,7 @@ def generate_extractor(
     turn_budget_hint: bool = False,
     thinking_level: str | None = None,
     effort: str | None = None,
+    on_usage: Callable[[dict[str, int]], None] | None = None,
 ) -> dict[str, Any]:
     """Have the model author + validate an extractor, run it over ``document``,
     and return ``{status, output, script, trace, usage, turns, latency_s}``.
@@ -848,6 +850,7 @@ def generate_extractor(
         thinking_level=thinking_level,
         turn_note=turn_budget_message if turn_budget_hint else None,
         effort=effort,
+        on_usage=on_usage,
     )
     payload = result.get("payload") or {}
     status = result["status"]

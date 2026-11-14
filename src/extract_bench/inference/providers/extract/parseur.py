@@ -26,6 +26,10 @@ from typing import Any
 import requests
 from requests.adapters import HTTPAdapter
 
+from extract_bench.inference.cost_accounting import record_response_cost
+from extract_bench.inference.cost_contract import (
+    COST_USD,
+)
 from extract_bench.inference.events import emit_provider_event
 from extract_bench.inference.limits import EXTRACT_HARD_TIMEOUT_S
 from extract_bench.inference.providers.base import (
@@ -623,7 +627,11 @@ class ParseurProvider(Provider):
                     job_id=document_id,
                     debug_payload=document,
                 )
-        raise ProviderTransientError(f"Polling of document {document_id} stopped by the runner", job_id=document_id)
+        raise ProviderTransientError(
+            f"Polling of document {document_id} stopped by the runner",
+            job_id=document_id,
+            debug_payload=document,
+        )
 
     def _attach_cost_stats(self, raw_output: dict[str, Any]) -> None:
         num_pages = raw_output.get("num_pages")
@@ -735,6 +743,14 @@ class ParseurProvider(Provider):
             "conversion": conversion,
             "num_pages": page_count(file_path),
         }
+
+        self._attach_cost_stats(raw_output)
+        if raw_output.get(COST_USD) is not None:
+            record_response_cost(
+                raw_output[COST_USD],
+                {"credits_used": document.get("credits_used")},
+                component_id=f"parseur/{document_id}",
+            )
 
         return RawInferenceResult(
             request=request,
