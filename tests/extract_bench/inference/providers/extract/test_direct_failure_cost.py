@@ -92,16 +92,16 @@ def test_paid_invalid_response_preserves_cost_and_missing_usage_stays_unknown(
     assert api.call_count == 1
     snapshot = failure.value.debug_payload["cost_accounting"]
     components = [payload for event, payload in events if event == "cost.component"]
+    assert len(components) == 1
+    assert components[0]["component_id"] == "test/sdk-response"
+    assert components[0]["cost_usd"] == snapshot["known_cost_usd"]
+    assert components[0]["complete"] is snapshot["complete"]
     if reported_tokens is None:
         assert snapshot["known_cost_usd"] is None
         assert snapshot["complete"] is False
-        assert components == []
     else:
         assert snapshot["known_cost_usd"] == pytest.approx(reported_tokens / 1_000_000)
         assert snapshot["complete"] is True
-        assert len(components) == 1
-        assert components[0]["component_id"] == "test/sdk-response"
-        assert components[0]["cost_usd"] == snapshot["known_cost_usd"]
 
 
 @pytest.mark.parametrize("failed_cost", [None, 0.0, 0.5])

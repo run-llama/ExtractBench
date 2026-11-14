@@ -131,6 +131,7 @@ class LlamaParseTextSource:
         record_response_cost(
             raw_output.get(COST_USD),
             {PARSE_JOB_ID: job_id},
+            complete=raw_output.get(RAW_COST_COMPLETE, raw_output.get(COST_USD) is not None),
             component_id=f"llamaparse/{job_id}" if job_id is not None else None,
         )
         with preserve_cost_on_error(raw_output):
