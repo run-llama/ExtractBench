@@ -1,7 +1,7 @@
 """Shared billing events and reconciliation for paid extraction attempts."""
 
 import math
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Generator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import Any
@@ -59,7 +59,7 @@ def record_response_cost(
 
 
 @contextmanager
-def preserve_cost_on_error(raw_output: Mapping[str, Any]) -> Iterator[None]:
+def preserve_cost_on_error(raw_output: Mapping[str, Any]) -> Generator[None]:
     """Attach the call's known bill without changing its failure or retry classification."""
     try:
         yield
@@ -76,9 +76,6 @@ def preserve_cost_on_error(raw_output: Mapping[str, Any]) -> Iterator[None]:
         raise
 
 
-# Independently summed USD amounts can differ through binary float roundoff
-# (for example 0.1 + 0.2 versus 0.3). This is not a billing discrepancy allowance.
-COST_ROUNDOFF_REL_TOL = 1e-12
 SUCCESS_OUTCOME = "success"
 
 
@@ -112,7 +109,7 @@ class AttemptCost:
         prices = [item[COST_USD] for item in self.components.values() if item[COST_USD] is not None]
         candidates = [self.reported_cost_usd] if self.reported_cost_usd is not None else []
         if len(prices) > 0:
-            candidates.append(sum(prices))
+            candidates.append(math.fsum(prices))
         if self.complete:
             return self.reported_cost_usd
         return max(candidates, default=None)
@@ -127,17 +124,13 @@ class AttemptCost:
             complete = payload[COMPLETE]
             if not isinstance(complete, bool):
                 raise ValueError("Attempt completeness must be boolean")
-            component_total = sum(item[COST_USD] for item in self.components.values() if item[COST_USD] is not None)
-            if (
-                complete
-                and value is not None
-                and component_total > value
-                and not math.isclose(
-                    component_total,
-                    value,
-                    rel_tol=COST_ROUNDOFF_REL_TOL,
-                )
-            ):
+            prices = [item[COST_USD] for item in self.components.values() if item[COST_USD] is not None]
+            component_total = math.fsum(prices)
+            # Allow the measured summation error plus one representable step for
+            # rounding the total (0.1 + 0.2 versus 0.3). One component involves no
+            # summation, so its bill must match without any tolerance.
+            roundoff = abs(sum(prices) - component_total) + math.ulp(component_total) if len(prices) > 1 else 0.0
+            if complete and value is not None and component_total > value and component_total - value > roundoff:
                 raise ValueError(f"Final attempt cost {value} is below recorded component charges {component_total}")
             if value is not None:
                 self.reported_cost_usd = value

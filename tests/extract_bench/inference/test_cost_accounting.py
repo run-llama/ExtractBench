@@ -120,3 +120,15 @@ def test_paid_response_keeps_charge_and_usage_when_validation_fails() -> None:
     assert cost.known_cost_usd == 0.1
     assert cost.complete
     assert cost.usage == usage
+
+
+@pytest.mark.parametrize("components, final", [([1.0], 0.9999999999995), ([0.5, 0.5], 0.9999999999995)])
+def test_small_billing_discrepancy_is_not_mistaken_for_summation_roundoff(
+    components: list[float],
+    final: float,
+) -> None:
+    cost = AttemptCost()
+    for index, amount in enumerate(components):
+        cost.observe(COST_COMPONENT_EVENT, {COMPONENT_ID: str(index), COST_USD: amount})
+    with pytest.raises(ValueError, match="below recorded component charges"):
+        cost.observe(COST_ATTEMPT_EVENT, {KNOWN_COST_USD: final, COMPLETE: True})
