@@ -44,6 +44,11 @@ from extract_bench.evaluation.stats import (
     build_cost_stats,
     build_operational_stats,
 )
+from extract_bench.inference.cost_contract import (
+    COST_COMPLETE,
+    COST_PER_PAGE_USD,
+    COST_USD,
+)
 from extract_bench.schemas.evaluation import EvaluationResult, EvaluationSummary, MetricValue
 from extract_bench.schemas.layout_detection_output import LayoutOutput
 from extract_bench.schemas.pipeline_io import InferenceRequest, InferenceResult
@@ -2156,9 +2161,9 @@ class EvaluationRunner:
                 "unit": stat_units[name],
             }
 
-        if any(value == 0 for value in stat_values.get("cost_complete", [])):
-            aggregate.pop("cost_usd", None)
-            aggregate.pop("cost_per_page_usd", None)
+        if any(value == 0 for value in stat_values.get(COST_COMPLETE, [])):
+            aggregate.pop(COST_USD, None)
+            aggregate.pop(COST_PER_PAGE_USD, None)
         return aggregate
 
     def _has_mixed_rules(self, test_case: TestCase) -> bool:

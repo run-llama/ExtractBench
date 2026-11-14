@@ -12,6 +12,28 @@ import pytest
 from extract_bench.evaluation.runner import EvaluationRunner
 from extract_bench.evaluation.stats import build_cost_stats, build_operational_stats
 from extract_bench.inference import runner as runner_module
+from extract_bench.inference.cost_contract import (
+    ATTEMPT_ACCOUNTING,
+    ATTEMPTS,
+    COMPLETE,
+    COMPONENT_ID,
+    COMPONENTS,
+    COST_ACCOUNTING,
+    COST_ATTEMPT_EVENT,
+    COST_COMPLETE,
+    COST_COMPONENT_EVENT,
+    COST_PER_PAGE_USD,
+    COST_USD,
+    KNOWN_COST_USD,
+    MODEL,
+    OUTCOME,
+    PROVIDER,
+    RAW_COST_COMPLETE,
+    SUCCESSFUL_ATTEMPT_COST_USD,
+    TOTAL_COST_USD,
+    USAGE,
+    VENDOR_USAGE_EVENT,
+)
 from extract_bench.inference.events import emit_provider_event
 from extract_bench.inference.providers.base import Provider, ProviderPermanentError, ProviderTransientError
 from extract_bench.inference.runner import InferenceRunner, RunSummary
@@ -73,12 +95,12 @@ def test_retry_cost_includes_failed_attempt_without_assuming_unknown_bill_is_zer
 
     def fail() -> dict[str, Any]:
         if failed_bill is not None:
-            emit_provider_event("cost.component", component_id="first", cost_usd=failed_bill)
+            emit_provider_event(COST_COMPONENT_EVENT, **{COMPONENT_ID: "first", COST_USD: failed_bill})
         raise ProviderTransientError(
-            "retry", debug_payload={"cost_accounting": {"known_cost_usd": failed_bill, "complete": complete}}
+            "retry", debug_payload={COST_ACCOUNTING: {KNOWN_COST_USD: failed_bill, COMPLETE: complete}}
         )
 
-    runner = _runner(tmp_path, [fail, lambda: {"cost_usd": 3.0}])
+    runner = _runner(tmp_path, [fail, lambda: {COST_USD: 3.0}])
     source = tmp_path / "doc.pdf"
     source.write_bytes(b"pdf")
     try:
@@ -87,11 +109,11 @@ def test_retry_cost_includes_failed_attempt_without_assuming_unknown_bill_is_zer
         assert raw is not None and normalized is not None
         known = 3.0 + (failed_bill or 0)
         stats = {stat.name: stat.value for stat in build_cost_stats(normalized.raw_output)}
-        assert stats["known_cost_usd"] == known
-        assert stats.get("cost_usd") == (known if complete else None)
-        accounting = raw.raw_output["_attempt_accounting"]
-        assert len(accounting["attempts"]) == 2
-        assert accounting["successful_attempt_cost_usd"] == 3
+        assert stats[KNOWN_COST_USD] == known
+        assert stats.get(COST_USD) == (known if complete else None)
+        accounting = raw.raw_output[ATTEMPT_ACCOUNTING]
+        assert len(accounting[ATTEMPTS]) == 2
+        assert accounting[SUCCESSFUL_ATTEMPT_COST_USD] == 3
         assert json.loads((runner.output_dir / "doc.cost.json").read_text(encoding="utf-8")) == accounting
     finally:
         runner.shutdown()
@@ -108,11 +130,13 @@ def test_component_snapshots_and_final_bill_are_not_added_twice(
     expected_total: float | None,
 ) -> None:
     def paid() -> dict[str, Any]:
-        emit_provider_event("cost.component", component_id="parse", cost_usd=parse / 2)
-        emit_provider_event("cost.component", component_id="parse", cost_usd=parse, usage={"pages": 4})
-        emit_provider_event("cost.component", component_id="extract", cost_usd=extraction, usage={"tokens": 500})
-        emit_provider_event("cost.attempt", known_cost_usd=snapshot, complete=True)
-        return {"cost_usd": snapshot}
+        emit_provider_event(COST_COMPONENT_EVENT, **{COMPONENT_ID: "parse", COST_USD: parse / 2})
+        emit_provider_event(COST_COMPONENT_EVENT, **{COMPONENT_ID: "parse", COST_USD: parse, USAGE: {"pages": 4}})
+        emit_provider_event(
+            COST_COMPONENT_EVENT, **{COMPONENT_ID: "extract", COST_USD: extraction, USAGE: {"tokens": 500}}
+        )
+        emit_provider_event(COST_ATTEMPT_EVENT, **{KNOWN_COST_USD: snapshot, COMPLETE: True})
+        return {COST_USD: snapshot}
 
     runner = _runner(tmp_path, [paid])
     request = InferenceRequest(
@@ -122,12 +146,12 @@ def test_component_snapshots_and_final_bill_are_not_added_twice(
     try:
         raw = runner._run_provider_inference(request)
         stats = {stat.name: stat.value for stat in build_cost_stats(raw.raw_output)}
-        assert stats["known_cost_usd"] == pytest.approx(parse + extraction)
-        assert stats.get("cost_usd") == (pytest.approx(expected_total) if expected_total is not None else None)
+        assert stats[KNOWN_COST_USD] == pytest.approx(parse + extraction)
+        assert stats.get(COST_USD) == (pytest.approx(expected_total) if expected_total is not None else None)
         persisted = json.loads((runner.output_dir / "doc.cost.json").read_text(encoding="utf-8"))
-        assert persisted["attempts"][0]["components"] == {
-            "parse": {"cost_usd": parse, "usage": {"pages": 4}},
-            "extract": {"cost_usd": extraction, "usage": {"tokens": 500}},
+        assert persisted[ATTEMPTS][0][COMPONENTS] == {
+            "parse": {COST_USD: parse, USAGE: {"pages": 4}},
+            "extract": {COST_USD: extraction, USAGE: {"tokens": 500}},
         }
     finally:
         runner.shutdown()
@@ -139,7 +163,7 @@ def test_failure_report_retains_known_cost_and_distinguishes_unbilled_from_free(
 ) -> None:
     def fail() -> dict[str, Any]:
         raise ProviderPermanentError(
-            "failed", debug_payload={"cost_accounting": {"known_cost_usd": bill, "complete": bill is not None}}
+            "failed", debug_payload={COST_ACCOUNTING: {KNOWN_COST_USD: bill, COMPLETE: bill is not None}}
         )
 
     runner = _runner(tmp_path, [fail])
@@ -164,9 +188,9 @@ def test_failure_report_retains_known_cost_and_distinguishes_unbilled_from_free(
             product_type="extract",
         )
         stats = {stat.name: stat.value for stat in results[0].stats}
-        assert stats.get("known_cost_usd") == bill
-        assert stats.get("cost_usd") == bill
-        assert stats["cost_complete"] == float(bill is not None)
+        assert stats.get(KNOWN_COST_USD) == bill
+        assert stats.get(COST_USD) == bill
+        assert stats[COST_COMPLETE] == float(bill is not None)
     finally:
         runner.shutdown()
 
@@ -175,11 +199,11 @@ def test_cancelled_worker_preserves_stage_charge_before_it_returns(tmp_path: Pat
     runner = _runner(tmp_path, [])
 
     def cancel_during_call() -> dict[str, Any]:
-        emit_provider_event("cost.component", component_id="parse", cost_usd=2)
+        emit_provider_event(COST_COMPONENT_EVENT, **{COMPONENT_ID: "parse", COST_USD: 2})
         runner._signal_cancel_and_cancel_future("doc", concurrent.futures.Future())
         saved = json.loads((runner.output_dir / "doc.cost.json").read_text(encoding="utf-8"))
-        assert saved["known_cost_usd"] == 2
-        assert saved["total_cost_usd"] is None
+        assert saved[KNOWN_COST_USD] == 2
+        assert saved[TOTAL_COST_USD] is None
         raise ProviderPermanentError("cancelled")
 
     runner.provider.responses = iter([cancel_during_call])
@@ -188,7 +212,7 @@ def test_cancelled_worker_preserves_stage_charge_before_it_returns(tmp_path: Pat
     try:
         _, _, error = runner._process_document(source, "doc", ProductType.EXTRACT)
         assert error is not None
-        assert runner._cost_snapshot("doc")["attempts"][0]["outcome"] == "cancelled"
+        assert runner._cost_snapshot("doc")[ATTEMPTS][0][OUTCOME] == "cancelled"
     finally:
         runner.shutdown()
 
@@ -206,12 +230,12 @@ def test_report_does_not_publish_billed_subset_as_complete_run_cost(tmp_path: Pa
             success=True,
             stats=build_cost_stats(raw),
         )
-        for index, raw in enumerate([{"cost_usd": 3}, {"cost_usd": 2, "_cost_complete": False}])
+        for index, raw in enumerate([{COST_USD: 3}, {COST_USD: 2, RAW_COST_COMPLETE: False}])
     ]
     stats = evaluator._aggregate_stats(results)
-    assert "cost_usd" not in stats
-    assert stats["known_cost_usd"]["total"] == 5
-    assert stats["cost_complete"]["avg"] == 0.5
+    assert COST_USD not in stats
+    assert stats[KNOWN_COST_USD]["total"] == 5
+    assert stats[COST_COMPLETE]["avg"] == 0.5
 
 
 @pytest.mark.parametrize("crashed", [False, True])
@@ -226,12 +250,12 @@ def test_restarted_runner_keeps_paid_attempts_and_does_not_complete_interrupted_
 
     def first_attempt() -> dict[str, Any]:
         nonlocal checkpoint
-        emit_provider_event("cost.component", component_id="extract", cost_usd=2, usage={"tokens": 20})
-        emit_provider_event("cost.attempt", known_cost_usd=2, complete=True)
+        emit_provider_event(COST_COMPONENT_EVENT, **{COMPONENT_ID: "extract", COST_USD: 2, USAGE: {"tokens": 20}})
+        emit_provider_event(COST_ATTEMPT_EVENT, **{KNOWN_COST_USD: 2, COMPLETE: True})
         checkpoint = cost_path.read_text(encoding="utf-8")
         saved = json.loads(checkpoint)
-        assert saved["cost_complete"] is False
-        assert saved["attempts"][0]["cost_complete"] is False
+        assert saved[COST_COMPLETE] is False
+        assert saved[ATTEMPTS][0][COST_COMPLETE] is False
         raise ProviderPermanentError("failed")
 
     runner = _runner(tmp_path, [first_attempt])
@@ -243,16 +267,16 @@ def test_restarted_runner_keeps_paid_attempts_and_does_not_complete_interrupted_
         assert checkpoint is not None
         # Replay the last artifact available when a process dies before returning.
         cost_path.write_text(checkpoint, encoding="utf-8")
-    restarted = _runner(tmp_path, [lambda: {"cost_usd": 3}])
+    restarted = _runner(tmp_path, [lambda: {COST_USD: 3}])
     try:
         raw, _, error = restarted._process_document(source, "doc", ProductType.EXTRACT)
         assert error is None and raw is not None
-        assert raw.raw_output["cost_usd"] == 5
-        assert raw.raw_output["_cost_complete"] is (not crashed)
-        previous = raw.raw_output["_attempt_accounting"]["attempts"][0]
-        assert previous["components"]["extract"]["usage"] == {"tokens": 20}
-        assert previous["outcome"] == ("interrupted" if crashed else "error")
-        assert json.loads(cost_path.read_text(encoding="utf-8"))["known_cost_usd"] == 5
+        assert raw.raw_output[COST_USD] == 5
+        assert raw.raw_output[RAW_COST_COMPLETE] is (not crashed)
+        previous = raw.raw_output[ATTEMPT_ACCOUNTING][ATTEMPTS][0]
+        assert previous[COMPONENTS]["extract"][USAGE] == {"tokens": 20}
+        assert previous[OUTCOME] == ("interrupted" if crashed else "error")
+        assert json.loads(cost_path.read_text(encoding="utf-8"))[KNOWN_COST_USD] == 5
     finally:
         restarted.shutdown()
 
@@ -271,8 +295,8 @@ def test_cancellation_hook_costs_are_captured_from_controller_thread(tmp_path: P
     runner = _runner(tmp_path, [wait_for_cancel])
 
     def cancel(example_id: str) -> None:
-        emit_provider_event("cost.component", component_id="cancelled_job", cost_usd=7)
-        emit_provider_event("cost.attempt", known_cost_usd=7, complete=True)
+        emit_provider_event(COST_COMPONENT_EVENT, **{COMPONENT_ID: "cancelled_job", COST_USD: 7})
+        emit_provider_event(COST_ATTEMPT_EVENT, **{KNOWN_COST_USD: 7, COMPLETE: True})
 
     runner.provider.cancel = cancel
     source = tmp_path / "doc.pdf"
@@ -282,11 +306,11 @@ def test_cancellation_hook_costs_are_captured_from_controller_thread(tmp_path: P
         assert started.wait(timeout=10)
         runner._signal_cancel_and_cancel_future("doc", future)
         saved = json.loads((runner.output_dir / "doc.cost.json").read_text(encoding="utf-8"))
-        assert saved["known_cost_usd"] == 7
-        assert saved["cost_complete"] is False
+        assert saved[KNOWN_COST_USD] == 7
+        assert saved[COST_COMPLETE] is False
         release.set()
         future.result(timeout=10)
-        assert runner._cost_snapshot("doc")["total_cost_usd"] == 7
+        assert runner._cost_snapshot("doc")[TOTAL_COST_USD] == 7
     finally:
         release.set()
         runner.shutdown()
@@ -294,7 +318,7 @@ def test_cancellation_hook_costs_are_captured_from_controller_thread(tmp_path: P
 
 @pytest.mark.parametrize("content", ["{", "{}", '{"known_cost_usd": 2, "cost_complete": "yes"}'])
 def test_malformed_cost_sidecar_preserves_prediction_and_failure_rows(tmp_path: Path, content: str) -> None:
-    runner = _runner(tmp_path, [lambda: {"cost_usd": 2}])
+    runner = _runner(tmp_path, [lambda: {COST_USD: 2}])
     source = tmp_path / "doc.pdf"
     source.write_bytes(b"pdf")
     try:
@@ -305,8 +329,8 @@ def test_malformed_cost_sidecar_preserves_prediction_and_failure_rows(tmp_path: 
             result = evaluator._load_inference_result(runner.output_dir / "doc.result.json")
         assert result is not None
         stats = {stat.name: stat.value for stat in build_operational_stats(result)}
-        assert stats["known_cost_usd"] == 2
-        assert "cost_usd" not in stats
+        assert stats[KNOWN_COST_USD] == 2
+        assert COST_USD not in stats
         (runner.output_dir / "_errors.json").write_text('[{"example_id": "doc", "error": "failed"}]', encoding="utf-8")
         with pytest.warns(UserWarning, match="Unable to read cost accounting"):
             errors = evaluator._load_inference_errors(runner.output_dir, pipeline_name=None)
@@ -318,7 +342,7 @@ def test_malformed_cost_sidecar_preserves_prediction_and_failure_rows(tmp_path: 
 def test_parse_provider_keeps_existing_raw_costs_and_does_not_create_extract_accounting(tmp_path: Path) -> None:
     from extract_bench.schemas.parse_output import ParseOutput
 
-    runner = _runner(tmp_path, [lambda: {"cost_usd": 2, "cost_per_page_usd": 0.1}])
+    runner = _runner(tmp_path, [lambda: {COST_USD: 2, COST_PER_PAGE_USD: 0.1}])
     runner.pipeline = runner.pipeline.model_copy(update={"product_type": ProductType.PARSE})
     source = tmp_path / "doc.pdf"
     source.write_bytes(b"pdf")
@@ -326,7 +350,7 @@ def test_parse_provider_keeps_existing_raw_costs_and_does_not_create_extract_acc
         raw = runner._run_provider_inference(
             InferenceRequest(example_id="doc", source_file_path=str(source), product_type=ProductType.PARSE)
         )
-        assert raw.raw_output == {"cost_usd": 2, "cost_per_page_usd": 0.1}
+        assert raw.raw_output == {COST_USD: 2, COST_PER_PAGE_USD: 0.1}
         result = InferenceResult.model_validate(
             {
                 **raw.model_dump(),
@@ -334,7 +358,59 @@ def test_parse_provider_keeps_existing_raw_costs_and_does_not_create_extract_acc
             }
         )
         stats = {stat.name: stat.value for stat in build_operational_stats(result)}
-        assert stats == {"latency_ms": 1, "cost_usd": 2, "cost_per_page_usd": 0.1}
+        assert stats == {"latency_ms": 1, COST_USD: 2, COST_PER_PAGE_USD: 0.1}
         assert not (runner.output_dir / "doc.cost.json").exists()
+    finally:
+        runner.shutdown()
+
+
+def test_revised_component_bill_replaces_estimate_without_poisoning_completeness(tmp_path: Path) -> None:
+    def revised_bill() -> dict[str, Any]:
+        emit_provider_event(COST_COMPONENT_EVENT, **{COMPONENT_ID: "extract", COST_USD: 2})
+        emit_provider_event(COST_ATTEMPT_EVENT, **{KNOWN_COST_USD: 2, COMPLETE: True})
+        emit_provider_event(COST_COMPONENT_EVENT, **{COMPONENT_ID: "extract", COST_USD: 1})
+        emit_provider_event(COST_ATTEMPT_EVENT, **{KNOWN_COST_USD: 1, COMPLETE: True})
+        return {COST_USD: 1}
+
+    runner = _runner(tmp_path, [revised_bill])
+    source = tmp_path / "doc.pdf"
+    source.write_bytes(b"pdf")
+    try:
+        raw, _, error = runner._process_document(source, "doc", ProductType.EXTRACT)
+        assert error is None and raw is not None
+        assert raw.raw_output[COST_USD] == 1
+        assert raw.raw_output[RAW_COST_COMPLETE] is True
+        assert runner._cost_snapshot("doc")[TOTAL_COST_USD] == 1
+    finally:
+        runner.shutdown()
+
+
+@pytest.mark.parametrize("event", [COST_COMPONENT_EVENT, VENDOR_USAGE_EVENT])
+def test_unpriced_usage_survives_later_failure_without_inventing_a_zero_bill(tmp_path: Path, event: str) -> None:
+    def failed() -> dict[str, Any]:
+        for tokens in (10, 15):
+            emit_provider_event(
+                event,
+                **{
+                    COMPONENT_ID: "codegen",
+                    PROVIDER: "test_vendor",
+                    MODEL: "unpriced",
+                    COST_USD: None,
+                    USAGE: {"input_tokens": tokens},
+                },
+            )
+        raise ProviderPermanentError("later API call failed")
+
+    runner = _runner(tmp_path, [failed])
+    source = tmp_path / "doc.pdf"
+    source.write_bytes(b"pdf")
+    try:
+        runner._process_document(source, "doc", ProductType.EXTRACT)
+        accounting = json.loads((runner.output_dir / "doc.cost.json").read_text(encoding="utf-8"))
+        component = accounting[ATTEMPTS][0][COMPONENTS]["codegen"]
+        assert component == {PROVIDER: "test_vendor", MODEL: "unpriced", COST_USD: None, USAGE: {"input_tokens": 15}}
+        assert accounting[KNOWN_COST_USD] is None
+        assert accounting[TOTAL_COST_USD] is None
+        assert accounting[COST_COMPLETE] is False
     finally:
         runner.shutdown()

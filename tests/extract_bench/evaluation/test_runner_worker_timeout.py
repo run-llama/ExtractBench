@@ -27,6 +27,10 @@ from extract_bench.evaluation.runner import (
     _eval_stall_timeout_seconds,
     _largest_selected_gt_file_bytes,
 )
+from extract_bench.inference.cost_contract import (
+    COST_USD,
+    KNOWN_COST_USD,
+)
 from extract_bench.schemas.pipeline_io import InferenceRequest, InferenceResult
 from extract_bench.schemas.product import ProductType
 
@@ -340,7 +344,7 @@ def test_evaluation_failure_keeps_paid_inference_cost(
     test_id = _write_case(gt_dir, out_dir, "paid")
     result_path = out_dir / "test-pipe" / f"{test_id}.result.json"
     raw = json.loads(result_path.read_text(encoding="utf-8"))
-    raw["raw_output"]["cost_usd"] = 4
+    raw["raw_output"][COST_USD] = 4
     result_path.write_text(json.dumps(raw), encoding="utf-8")
 
     def failed_worker(*task: Any) -> dict[str, Any]:
@@ -363,5 +367,5 @@ def test_evaluation_failure_keeps_paid_inference_cost(
         max_workers=1,
     )
     assert summary.failed == 1
-    assert summary.aggregate_stats["cost_usd"]["total"] == 4
-    assert {stat.name: stat.value for stat in summary.per_example_results[0].stats}["known_cost_usd"] == 4
+    assert summary.aggregate_stats[COST_USD]["total"] == 4
+    assert {stat.name: stat.value for stat in summary.per_example_results[0].stats}[KNOWN_COST_USD] == 4

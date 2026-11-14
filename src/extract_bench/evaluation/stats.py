@@ -7,11 +7,19 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
+from extract_bench.inference.cost_contract import (
+    ATTEMPT_ACCOUNTING,
+    COST_COMPLETE,
+    COST_PER_PAGE_USD,
+    COST_USD,
+    KNOWN_COST_USD,
+    RAW_COST_COMPLETE,
+)
 from extract_bench.schemas.evaluation import RunStat
 from extract_bench.schemas.pipeline_io import InferenceResult
 from extract_bench.schemas.product import ProductType
 
-COST_STAT_NAMES = {"cost_usd", "known_cost_usd", "cost_per_page_usd", "cost_complete"}
+COST_STAT_NAMES = {COST_USD, KNOWN_COST_USD, COST_PER_PAGE_USD, COST_COMPLETE}
 
 # Stat keys to look for in raw_output, with their units
 _RAW_OUTPUT_STATS: list[tuple[str, str]] = [
@@ -28,8 +36,8 @@ _RAW_OUTPUT_STATS: list[tuple[str, str]] = [
     ("agent_usage_usd", "$"),
     ("total_credits", "credits"),
     ("num_pages_billed", "pages"),
-    ("cost_usd", "$"),
-    ("cost_per_page_usd", "$/page"),
+    (COST_USD, "$"),
+    (COST_PER_PAGE_USD, "$/page"),
     ("input_cost_usd", "$"),
     ("tool_use_prompt_cost_usd", "$"),
     ("cached_input_cost_usd", "$"),
@@ -74,8 +82,8 @@ def apply_cost_sidecar(raw: dict[str, Any], path: Path) -> None:
         return
     try:
         accounting = json.loads(path.read_text(encoding="utf-8"))
-        known = accounting["known_cost_usd"]
-        complete = accounting["cost_complete"]
+        known = accounting[KNOWN_COST_USD]
+        complete = accounting[COST_COMPLETE]
         if not isinstance(complete, bool):
             raise ValueError("cost_complete must be boolean")
         if known is not None and (
@@ -84,34 +92,34 @@ def apply_cost_sidecar(raw: dict[str, Any], path: Path) -> None:
             raise ValueError("known_cost_usd must be nonnegative and finite")
     except (OSError, ValueError, KeyError, TypeError) as error:
         warnings.warn(f"Unable to read cost accounting {path}: {error}", stacklevel=2)
-        existing = raw.get("_attempt_accounting")
-        known = existing.get("known_cost_usd") if isinstance(existing, dict) else raw.get("cost_usd")
-        accounting = {"known_cost_usd": known, "cost_complete": False}
-    raw["_attempt_accounting"] = accounting
+        existing = raw.get(ATTEMPT_ACCOUNTING)
+        known = existing.get(KNOWN_COST_USD) if isinstance(existing, dict) else raw.get(COST_USD)
+        accounting = {KNOWN_COST_USD: known, COST_COMPLETE: False}
+    raw[ATTEMPT_ACCOUNTING] = accounting
 
 
 def build_cost_stats(raw: Mapping[str, Any]) -> list[RunStat]:
     """Publish known charges separately when any attempt has incomplete billing."""
-    accounting = raw.get("_attempt_accounting")
+    accounting = raw.get(ATTEMPT_ACCOUNTING)
     if isinstance(accounting, dict):
-        known = accounting["known_cost_usd"]
-        complete = accounting["cost_complete"]
+        known = accounting[KNOWN_COST_USD]
+        complete = accounting[COST_COMPLETE]
     else:
-        known = raw.get("cost_usd")
-        complete = raw.get("_cost_complete", known is not None)
+        known = raw.get(COST_USD)
+        complete = raw.get(RAW_COST_COMPLETE, known is not None)
     complete = known is not None and complete is True
-    stats = [RunStat(name="cost_complete", value=float(complete), unit="ratio")]
+    stats = [RunStat(name=COST_COMPLETE, value=float(complete), unit="ratio")]
     if known is not None:
-        stats.append(RunStat(name="known_cost_usd", value=known, unit="$"))
+        stats.append(RunStat(name=KNOWN_COST_USD, value=known, unit="$"))
         if complete:
-            stats.append(RunStat(name="cost_usd", value=known, unit="$"))
+            stats.append(RunStat(name=COST_USD, value=known, unit="$"))
     if complete:
         pages = raw.get("num_pages")
-        per_page = raw.get("cost_per_page_usd")
+        per_page = raw.get(COST_PER_PAGE_USD)
         if isinstance(pages, (int, float)) and pages > 0 and (isinstance(accounting, dict) or per_page is None):
             per_page = known / pages
         if per_page is not None:
-            stats.append(RunStat(name="cost_per_page_usd", value=per_page, unit="$/page"))
+            stats.append(RunStat(name=COST_PER_PAGE_USD, value=per_page, unit="$/page"))
     return stats
 
 

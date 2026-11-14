@@ -32,6 +32,28 @@ from rich.progress import (
 )
 from rich.table import Table
 
+from extract_bench.inference.cost_contract import (
+    ATTEMPT_ACCOUNTING,
+    ATTEMPTS,
+    COMPLETE,
+    COMPONENT_ID,
+    COMPONENTS,
+    COST_ACCOUNTING,
+    COST_ATTEMPT_EVENT,
+    COST_COMPLETE,
+    COST_COMPONENT_EVENT,
+    COST_PER_PAGE_USD,
+    COST_USD,
+    KNOWN_COST_USD,
+    MODEL,
+    ORDINAL,
+    OUTCOME,
+    RAW_COST_COMPLETE,
+    SUCCESSFUL_ATTEMPT_COST_USD,
+    TOTAL_COST_USD,
+    USAGE,
+    VENDOR_USAGE_EVENT,
+)
 from extract_bench.inference.events import bind_provider_event_sink
 from extract_bench.inference.limits import EXTRACT_HARD_TIMEOUT_S, ExecutionBudget
 from extract_bench.inference.page_budget import PageBudget
@@ -72,44 +94,52 @@ class _AttemptCost:
     components: dict[str, dict[str, Any]] = field(default_factory=dict)
     usage: dict[str, Any] | None = None
     known_cost_usd: float | None = None
+    reported_cost_usd: float | None = None
     complete: bool = False
 
     def observe(self, payload: Mapping[str, Any], *, component: bool = False) -> None:
-        if not component and payload.get("usage") is not None:
-            self.usage = dict(payload["usage"])
-        value = payload.get("cost_usd" if component else "known_cost_usd")
-        if value is None:
-            self.complete = False
-            return
-        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value < 0:
+        value = payload.get(COST_USD if component else KNOWN_COST_USD)
+        if value is not None and (
+            isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value < 0
+        ):
             raise ValueError("Cost must be a finite nonnegative number or null")
-        previous = self.known_cost_usd
         if component:
-            component_id = payload["component_id"]
-            previous_component = self.components.get(component_id, {})
+            component_id = payload[COMPONENT_ID]
+            previous = self.components.get(component_id, {})
+            # A vendor can replace an estimate with a smaller final bill. Missing
+            # prices retain observed usage and any previously reported charge.
             self.components[component_id] = {
-                **previous_component,
-                "cost_usd": max(previous_component.get("cost_usd", 0.0), value),
+                **previous,
+                **{key: item for key, item in payload.items() if key not in {COMPONENT_ID, COST_USD}},
+                COST_USD: value if value is not None else previous.get(COST_USD),
             }
-            if payload.get("usage") is not None:
-                self.components[component_id]["usage"] = dict(payload["usage"])
-            value = sum(item["cost_usd"] for item in self.components.values())
-        self.known_cost_usd = max(previous if previous is not None else 0.0, value)
-        covers_observed = math.isclose(value, self.known_cost_usd, rel_tol=1e-12)
-        if component:
-            if previous is None or not math.isclose(previous, self.known_cost_usd, rel_tol=1e-12):
+            if self.components[component_id] != previous:
                 self.complete = False
         else:
-            self.complete = payload.get("complete") is True and covers_observed
+            if payload.get(USAGE) is not None:
+                self.usage = dict(payload[USAGE])
+            if value is not None:
+                self.reported_cost_usd = value
+            self.complete = value is not None and payload.get(COMPLETE) is True
+        priced = [item[COST_USD] for item in self.components.values() if item[COST_USD] is not None]
+        component_total = sum(priced) if len(priced) > 0 else None
+        candidates = [item for item in (self.reported_cost_usd, component_total) if item is not None]
+        self.known_cost_usd = max(candidates) if len(candidates) > 0 else None
+        if self.complete:
+            self.complete = self.reported_cost_usd is not None and math.isclose(
+                self.reported_cost_usd,
+                self.known_cost_usd,
+                rel_tol=1e-12,
+            )
 
     def snapshot(self) -> dict[str, Any]:
         return {
-            "ordinal": self.ordinal,
-            "outcome": self.outcome,
-            "cost_usd": self.known_cost_usd,
-            "cost_complete": self.complete and self.outcome not in {"running", "cancelling"},
-            "components": {key: dict(value) for key, value in self.components.items()},
-            "usage": self.usage,
+            ORDINAL: self.ordinal,
+            OUTCOME: self.outcome,
+            COST_USD: self.known_cost_usd,
+            COST_COMPLETE: self.complete and self.outcome not in {"running", "cancelling"},
+            COMPONENTS: {key: dict(value) for key, value in self.components.items()},
+            USAGE: self.usage,
         }
 
 
@@ -360,16 +390,16 @@ class InferenceRunner:
         attempts = self._cost_attempts.get(example_id, [])
         known = [attempt.known_cost_usd for attempt in attempts if attempt.known_cost_usd is not None]
         subtotal = sum(known) if len(known) > 0 else None
-        complete = len(attempts) > 0 and all(attempt.snapshot()["cost_complete"] for attempt in attempts)
+        complete = len(attempts) > 0 and all(attempt.snapshot()[COST_COMPLETE] for attempt in attempts)
         successful = next((attempt for attempt in reversed(attempts) if attempt.outcome == "success"), None)
         return {
-            "attempts": [attempt.snapshot() for attempt in attempts],
-            "known_cost_usd": subtotal,
-            "total_cost_usd": subtotal if complete else None,
-            "successful_attempt_cost_usd": (
+            ATTEMPTS: [attempt.snapshot() for attempt in attempts],
+            KNOWN_COST_USD: subtotal,
+            TOTAL_COST_USD: subtotal if complete else None,
+            SUCCESSFUL_ATTEMPT_COST_USD: (
                 successful.known_cost_usd if successful is not None and successful.complete else None
             ),
-            "cost_complete": complete,
+            COST_COMPLETE: complete,
         }
 
     def _persist_costs(self, example_id: str) -> dict[str, Any]:
@@ -388,7 +418,7 @@ class InferenceRunner:
         with self._cost_lock:
             for entry in summary.errors:
                 example_id = entry["example_id"]
-                entry["_attempt_accounting"] = self._cost_snapshot(example_id)
+                entry[ATTEMPT_ACCOUNTING] = self._cost_snapshot(example_id)
 
     def _call_provider(self, request: InferenceRequest) -> RawInferenceResult:
         with self._execution_budget_context(request), self._provider_request_context(request) as provider_request:
@@ -399,10 +429,10 @@ class InferenceRunner:
         return raw_result
 
     def _record_cost(self, example_id: str, attempt: _AttemptCost, event: str, payload: Mapping[str, Any]) -> None:
-        if event not in {"cost.component", "cost.attempt"}:
+        if event not in {COST_COMPONENT_EVENT, COST_ATTEMPT_EVENT, VENDOR_USAGE_EVENT}:
             return
         with self._cost_lock:
-            attempt.observe(payload, component=event == "cost.component")
+            attempt.observe(payload, component=event != COST_ATTEMPT_EVENT)
             self._persist_costs(example_id)
 
     def _run_provider_inference(self, request: InferenceRequest) -> RawInferenceResult:
@@ -419,14 +449,14 @@ class InferenceRunner:
                     # A restart retains previous paid attempts. Invalid history fails
                     # before another vendor call, rather than overwriting that bill.
                     previous = json.loads(path.read_text(encoding="utf-8"))
-                    for entry in previous["attempts"]:
+                    for entry in previous[ATTEMPTS]:
                         prior = _AttemptCost(
-                            ordinal=entry["ordinal"],
-                            outcome=entry["outcome"],
-                            components=entry.get("components", {}),
-                            usage=entry.get("usage"),
+                            ordinal=entry[ORDINAL],
+                            outcome=entry[OUTCOME],
+                            components=entry.get(COMPONENTS, {}),
+                            usage=entry.get(USAGE),
                         )
-                        prior.observe({"known_cost_usd": entry["cost_usd"], "complete": entry["cost_complete"]})
+                        prior.observe({KNOWN_COST_USD: entry[COST_USD], COMPLETE: entry[COST_COMPLETE]})
                         if prior.outcome in {"running", "cancelling"}:
                             prior.outcome = "interrupted"
                             prior.complete = False
@@ -446,33 +476,31 @@ class InferenceRunner:
                 raw_result = self._call_provider(request)
                 with self._cost_lock:
                     raw = raw_result.raw_output
-                    if "cost_usd" in raw or "_cost_complete" in raw:
-                        attempt.observe(
-                            {"known_cost_usd": raw.get("cost_usd"), "complete": raw.get("_cost_complete", True)}
-                        )
+                    if COST_USD in raw or RAW_COST_COMPLETE in raw:
+                        attempt.observe({KNOWN_COST_USD: raw.get(COST_USD), COMPLETE: raw.get(RAW_COST_COMPLETE, True)})
                     attempt.outcome = "cancelled" if attempt.outcome == "cancelling" else "success"
                     snapshot = self._persist_costs(request.example_id)
                     raw.update(
                         {
-                            "cost_usd": snapshot["known_cost_usd"],
-                            "_cost_complete": snapshot["cost_complete"],
-                            "_attempt_accounting": snapshot,
+                            COST_USD: snapshot[KNOWN_COST_USD],
+                            RAW_COST_COMPLETE: snapshot[COST_COMPLETE],
+                            ATTEMPT_ACCOUNTING: snapshot,
                         }
                     )
                     pages = raw.get("num_pages")
-                    if isinstance(pages, (int, float)) and pages > 0 and snapshot["total_cost_usd"] is not None:
-                        raw["cost_per_page_usd"] = snapshot["total_cost_usd"] / pages
-                    elif not snapshot["cost_complete"]:
-                        raw.pop("cost_per_page_usd", None)
+                    if isinstance(pages, (int, float)) and pages > 0 and snapshot[TOTAL_COST_USD] is not None:
+                        raw[COST_PER_PAGE_USD] = snapshot[TOTAL_COST_USD] / pages
+                    elif not snapshot[COST_COMPLETE]:
+                        raw.pop(COST_PER_PAGE_USD, None)
         except BaseException as error:
             with self._cost_lock:
                 payload = getattr(error, "debug_payload", None)
-                if isinstance(payload, dict) and isinstance(payload.get("cost_accounting"), dict):
-                    attempt.observe(payload["cost_accounting"])
+                if isinstance(payload, dict) and isinstance(payload.get(COST_ACCOUNTING), dict):
+                    attempt.observe(payload[COST_ACCOUNTING])
                 attempt.outcome = "cancelled" if attempt.outcome == "cancelling" else "error"
                 snapshot = self._persist_costs(request.example_id)
                 if isinstance(error, ProviderError):
-                    error.debug_payload = {**(error.debug_payload or {}), "_attempt_accounting": snapshot}
+                    error.debug_payload = {**(error.debug_payload or {}), ATTEMPT_ACCOUNTING: snapshot}
             if capture is not None and capture.failure is not None and capture.failure is not error:
                 raise capture.failure from error
             raise
@@ -747,7 +775,7 @@ class InferenceRunner:
             input_tok = content.get("inputTokens", 0) or 0
             output_tok = content.get("outputTokens", 0) or 0
             thinking_tok = content.get("thinkingTokens", 0) or 0
-            model = content.get("model", "unknown")
+            model = content.get(MODEL, "unknown")
 
             total_input += input_tok
             total_output += output_tok
