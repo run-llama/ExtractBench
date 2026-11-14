@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import subprocess
 import time
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -10,6 +11,8 @@ import pytest
 
 pytest.importorskip("pypdf", reason="dev and runners extras required; run: uv sync --extra dev --extra runners")
 
+from extract_bench.inference.cost_contract import COMPLETE, COST_COMPONENT_EVENT, COST_USD, RAW_COST_COMPLETE
+from extract_bench.inference.events import bind_provider_event_sink
 from extract_bench.inference.providers.base import ProviderTransientError
 from extract_bench.inference.providers.extract import codex_code_extract
 from extract_bench.schemas.pipeline import PipelineSpec
@@ -167,7 +170,7 @@ def test_usage_from_events_sums_turns() -> None:
         ),
     ]
 
-    assert Provider._usage_from_events(lines) == {
+    assert codex_code_extract.codex_usage_accounting(Provider._json_events(lines))[0] == {
         "input_tokens": 17,
         "cached_input_tokens": 3,
         "cache_write_input_tokens": 4,
@@ -356,6 +359,41 @@ def test_run_inference_reads_codex_output(monkeypatch: pytest.MonkeyPatch, tmp_p
     assert raw.raw_output["_config"]["sandbox"] == "workspace-write"
     assert raw.raw_output["_last_message_tail"] == ""
     assert captured["env"]["CODEX_API_KEY"] == "sk-test"
+
+
+@pytest.mark.parametrize("usage_case", ["missing", "partial", "zero"])
+def test_run_inference_preserves_codex_cost_coverage(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, usage_case: str
+) -> None:
+    lines = [json.dumps({"type": "thread.started"})]
+    match usage_case:
+        case "partial":
+            lines += [_turn_completed(), json.dumps({"type": "turn.started"})]
+        case "zero":
+            lines += [json.dumps({"type": "turn.completed", "usage": {"input_tokens": 0, "output_tokens": 0}})]
+
+    def fake_run(*args: Any) -> tuple[int, str]:
+        _, _, _, workdir, _, trace = args
+        trace.extend(lines)
+        (workdir / "output.json").write_text("{}", encoding="utf-8")
+        return 0, ""
+
+    monkeypatch.setattr(Provider, "_run_cli", fake_run)
+    provider = Provider("codex_code_extract", {"model": "gpt-5.4", "api_key": "sk-test"})
+    events: list[tuple[str, Mapping[str, Any]]] = []
+    with bind_provider_event_sink(lambda name, payload: events.append((name, payload))):
+        raw = provider.run_inference(_pipeline(), _request(str(_png(tmp_path)))).raw_output
+
+    expected_complete = usage_case == "zero"
+    assert raw[RAW_COST_COMPLETE] is expected_complete
+    if usage_case == "partial":
+        assert raw[COST_USD] > 0
+    else:
+        assert raw[COST_USD] == (0.0 if usage_case == "zero" else None)
+    ((name, component),) = events
+    assert name == COST_COMPONENT_EVENT
+    assert component[COMPLETE] is expected_complete
+    assert component[COST_USD] == raw[COST_USD]
 
 
 def test_a_run_longer_than_20_minutes_is_not_stopped_by_the_provider(
