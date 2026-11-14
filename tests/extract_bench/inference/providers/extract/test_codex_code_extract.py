@@ -10,6 +10,7 @@ import pytest
 
 pytest.importorskip("pypdf", reason="dev and runners extras required; run: uv sync --extra dev --extra runners")
 
+from extract_bench.inference.cost_contract import COST_USD, RAW_COST_COMPLETE
 from extract_bench.inference.providers.base import ProviderTransientError
 from extract_bench.inference.providers.extract import codex_code_extract
 from extract_bench.schemas.pipeline import PipelineSpec
@@ -379,11 +380,11 @@ def test_run_inference_preserves_codex_cost_coverage(
     provider = Provider("codex_code_extract", {"model": "gpt-5.4", "api_key": "sk-test"})
     raw = provider.run_inference(_pipeline(), _request(str(_png(tmp_path)))).raw_output
 
-    assert raw["_cost_complete"] is (usage_case == "zero")
+    assert raw[RAW_COST_COMPLETE] is (usage_case == "zero")
     if usage_case == "partial":
-        assert raw["cost_usd"] > 0
+        assert raw[COST_USD] > 0
     else:
-        assert raw["cost_usd"] == (0.0 if usage_case == "zero" else None)
+        assert raw[COST_USD] == (0.0 if usage_case == "zero" else None)
 
 
 def test_a_run_longer_than_20_minutes_is_not_stopped_by_the_provider(

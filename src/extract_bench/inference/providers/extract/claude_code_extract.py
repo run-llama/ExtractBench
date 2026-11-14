@@ -39,6 +39,18 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from extract_bench.inference.cost_contract import (
+    COMPLETE,
+    COMPONENT_ID,
+    COST_ACCOUNTING,
+    COST_COMPONENT_EVENT,
+    COST_PER_PAGE_USD,
+    COST_USD,
+    KNOWN_COST_USD,
+    RAW_COST_COMPLETE,
+    TOTAL_COST_USD,
+    USAGE,
+)
 from extract_bench.inference.events import emit_provider_event
 from extract_bench.inference.limits import execution_budget
 from extract_bench.inference.providers.base import (
@@ -371,7 +383,7 @@ class ClaudeCodeExtractProvider(Provider):
             return None, None
         event_type = event.get("type")
         event_type = event_type if isinstance(event_type, str) else None
-        cost = event.get("total_cost_usd")
+        cost = event.get(TOTAL_COST_USD)
         if isinstance(cost, (int, float)):
             return float(cost), event_type
         return None, event_type
@@ -533,10 +545,10 @@ class ClaudeCodeExtractProvider(Provider):
             lines: list[str] = []
             returncode, stderr_tail = self._run_cli(cmd, workdir, request.example_id, lines)
             result_event = self._parse_result_event(lines)
-            usage = result_event.get("usage", {}) if result_event is not None else {}
+            usage = result_event.get(USAGE, {}) if result_event is not None else {}
             if not isinstance(usage, dict):
                 usage = {}
-            terminal_cost = result_event.get("total_cost_usd") if result_event is not None else None
+            terminal_cost = result_event.get(TOTAL_COST_USD) if result_event is not None else None
             cost_usd = (
                 float(terminal_cost)
                 if isinstance(terminal_cost, (int, float))
@@ -545,19 +557,24 @@ class ClaudeCodeExtractProvider(Provider):
                 and terminal_cost >= 0
                 else None
             )
-            accounting = {"known_cost_usd": cost_usd, "complete": cost_usd is not None, "usage": usage}
+            accounting = {KNOWN_COST_USD: cost_usd, COMPLETE: cost_usd is not None, USAGE: usage}
             # The terminal total covers one CLI invocation. A fresh ID keeps
             # two Claude invocations in the same outer attempt from overwriting each other.
             if cost_usd is not None:
                 emit_provider_event(
-                    "cost.component", component_id=f"claude:{uuid.uuid4().hex}", cost_usd=cost_usd, usage=usage
+                    COST_COMPONENT_EVENT,
+                    **{
+                        COMPONENT_ID: f"claude:{uuid.uuid4().hex}",
+                        COST_USD: cost_usd,
+                        USAGE: usage,
+                    },
                 )
             try:
                 self._raise_for_status(returncode, result_event, lines, stderr_tail)
                 data = self._read_output_json(workdir)
                 agent_citations = read_agent_citations_file(workdir / "citations.json") if self._evidence_mode else None
             except ProviderError as exc:
-                exc.debug_payload = {**(exc.debug_payload or {}), "cost_accounting": accounting}
+                exc.debug_payload = {**(exc.debug_payload or {}), COST_ACCOUNTING: accounting}
                 raise
 
         completed_at = datetime.now()
@@ -567,12 +584,12 @@ class ClaudeCodeExtractProvider(Provider):
             "data": data,
             "harness": harness,
             "model": self._model,
-            "usage": usage,
+            USAGE: usage,
             "num_pages": num_pages,
             "schema_delivery": schema_delivery,
-            "cost_usd": cost_usd,
-            "_cost_complete": cost_usd is not None,
-            "cost_per_page_usd": (cost_usd / num_pages) if cost_usd is not None and num_pages else None,
+            COST_USD: cost_usd,
+            RAW_COST_COMPLETE: cost_usd is not None,
+            COST_PER_PAGE_USD: (cost_usd / num_pages) if cost_usd is not None and num_pages else None,
             "cost_exceeded_budget": (
                 self._max_cost_usd is not None and cost_usd is not None and cost_usd > self._max_cost_usd
             ),

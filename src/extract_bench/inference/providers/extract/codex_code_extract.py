@@ -28,6 +28,18 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from extract_bench.inference.cost_contract import (
+    COMPLETE,
+    COMPONENT_ID,
+    COST_ACCOUNTING,
+    COST_COMPONENT_EVENT,
+    COST_PER_PAGE_USD,
+    COST_USD,
+    KNOWN_COST_USD,
+    RAW_COST_COMPLETE,
+    RAW_COST_USAGE_OBSERVED,
+    USAGE,
+)
 from extract_bench.inference.events import emit_provider_event
 from extract_bench.inference.limits import execution_budget
 from extract_bench.inference.providers.base import (
@@ -128,7 +140,7 @@ _CODEX_USAGE_KEYS = (
 
 
 def codex_turn_usage(event: Mapping[str, Any]) -> dict[str, int]:
-    usage = event.get("usage")
+    usage = event.get(USAGE)
     if event.get("type") != "turn.completed" or not isinstance(usage, dict):
         return {}
     return {key: value for key in _CODEX_USAGE_KEYS if type(value := usage.get(key)) is int and value >= 0}
@@ -612,10 +624,10 @@ class CodexCodeExtractProvider(Provider):
         usage = raw_output.get("usage")
         if not isinstance(usage, dict):
             return
-        cost_usd = self._estimate_cost_usd(usage) if raw_output.get("_cost_usage_observed") is not False else None
+        cost_usd = self._estimate_cost_usd(usage) if raw_output.get(RAW_COST_USAGE_OBSERVED) is not False else None
         num_pages = raw_output.get("num_pages") or 0
-        raw_output["cost_usd"] = cost_usd
-        raw_output["cost_per_page_usd"] = (cost_usd / num_pages) if cost_usd is not None and num_pages else None
+        raw_output[COST_USD] = cost_usd
+        raw_output[COST_PER_PAGE_USD] = (cost_usd / num_pages) if cost_usd is not None and num_pages else None
         raw_output["pricing"] = self._pricing_snapshot(usage)
         raw_output["cost_exceeded_budget"] = (
             self._max_cost_usd is not None and cost_usd is not None and cost_usd > self._max_cost_usd
@@ -738,10 +750,12 @@ class CodexCodeExtractProvider(Provider):
                 # repeated Codex stages in the same outer attempt additive.
                 if usage_observed:
                     emit_provider_event(
-                        "cost.component",
-                        component_id=f"codex:{uuid.uuid4().hex}",
-                        cost_usd=self._estimate_cost_usd(usage),
-                        usage=usage,
+                        COST_COMPONENT_EVENT,
+                        **{
+                            COMPONENT_ID: f"codex:{uuid.uuid4().hex}",
+                            COST_USD: self._estimate_cost_usd(usage),
+                            USAGE: usage,
+                        },
                     )
                 self._raise_for_status(returncode, lines, stderr_tail)
                 self._raise_for_sandbox_failures(lines)
@@ -761,10 +775,10 @@ class CodexCodeExtractProvider(Provider):
                 if isinstance(exc.debug_payload, dict):
                     payload.update(exc.debug_payload)
                 usage, usage_observed, cost_complete = codex_usage_accounting(self._json_events(lines))
-                payload["cost_accounting"] = {
-                    "known_cost_usd": self._estimate_cost_usd(usage) if usage_observed else None,
-                    "complete": cost_complete and returncode == 0,
-                    "usage": usage,
+                payload[COST_ACCOUNTING] = {
+                    KNOWN_COST_USD: self._estimate_cost_usd(usage) if usage_observed else None,
+                    COMPLETE: cost_complete and returncode == 0,
+                    USAGE: usage,
                 }
                 exc.debug_payload = payload
                 raise
@@ -776,9 +790,9 @@ class CodexCodeExtractProvider(Provider):
             "data": data,
             "harness": harness,
             "model": self._model,
-            "usage": usage,
-            "_cost_usage_observed": usage_observed,
-            "_cost_complete": cost_complete,
+            USAGE: usage,
+            RAW_COST_USAGE_OBSERVED: usage_observed,
+            RAW_COST_COMPLETE: cost_complete,
             "num_pages": num_pages,
             "_config": self._config_snapshot(),
             "_command_execution": self._command_execution_diagnostics(lines),

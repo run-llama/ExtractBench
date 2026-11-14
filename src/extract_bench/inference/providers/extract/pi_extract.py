@@ -38,6 +38,17 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from extract_bench.inference.cost_contract import (
+    COMPLETE,
+    COMPONENT_ID,
+    COST_ACCOUNTING,
+    COST_COMPONENT_EVENT,
+    COST_PER_PAGE_USD,
+    COST_USD,
+    KNOWN_COST_USD,
+    RAW_COST_COMPLETE,
+    USAGE,
+)
 from extract_bench.inference.events import emit_provider_event
 from extract_bench.inference.limits import execution_budget
 from extract_bench.inference.providers.base import (
@@ -163,7 +174,7 @@ def summarize_pi_events(lines: list[str]) -> PiEventSummary:
                     error_messages.append(error_message)
             if message.get("role") != "assistant":
                 continue
-            turn_usage = message.get("usage")
+            turn_usage = message.get(USAGE)
             if not isinstance(turn_usage, dict):
                 cost_complete = False
                 continue
@@ -543,10 +554,12 @@ class PiExtractProvider(Provider):
                 # Give each invocation its own ID so an outer attempt can include several.
                 if summary.cost_observed:
                     emit_provider_event(
-                        "cost.component",
-                        component_id=f"pi:{uuid.uuid4().hex}",
-                        cost_usd=summary.cost["total"],
-                        usage=summary.usage,
+                        COST_COMPONENT_EVENT,
+                        **{
+                            COMPONENT_ID: f"pi:{uuid.uuid4().hex}",
+                            COST_USD: summary.cost["total"],
+                            USAGE: summary.usage,
+                        },
                     )
                 self._raise_for_status(returncode, summary, stderr_tail)
                 data = self._read_output_json(output_path)
@@ -571,10 +584,10 @@ class PiExtractProvider(Provider):
                         pass
                 if isinstance(exc.debug_payload, dict):
                     payload.update(exc.debug_payload)
-                payload["cost_accounting"] = {
-                    "known_cost_usd": summary.cost["total"] if summary.cost_observed else None,
-                    "complete": summary.cost_complete and returncode == 0 and len(summary.error_messages) == 0,
-                    "usage": summary.usage,
+                payload[COST_ACCOUNTING] = {
+                    KNOWN_COST_USD: summary.cost["total"] if summary.cost_observed else None,
+                    COMPLETE: summary.cost_complete and returncode == 0 and len(summary.error_messages) == 0,
+                    USAGE: summary.usage,
                 }
                 exc.debug_payload = payload
                 raise
@@ -588,11 +601,11 @@ class PiExtractProvider(Provider):
             "data": data,
             "harness": harness,
             "model": self._model,
-            "usage": summary.usage,
+            USAGE: summary.usage,
             "num_pages": num_pages,
-            "cost_usd": cost_usd,
-            "_cost_complete": summary.cost_complete,
-            "cost_per_page_usd": (cost_usd / num_pages) if cost_usd is not None and num_pages else None,
+            COST_USD: cost_usd,
+            RAW_COST_COMPLETE: summary.cost_complete,
+            COST_PER_PAGE_USD: (cost_usd / num_pages) if cost_usd is not None and num_pages else None,
             "pricing": self._pricing_snapshot(),
             "cost_exceeded_budget": (
                 self._max_cost_usd is not None and cost_usd is not None and cost_usd > self._max_cost_usd

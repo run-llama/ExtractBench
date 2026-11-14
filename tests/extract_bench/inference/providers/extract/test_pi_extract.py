@@ -11,6 +11,7 @@ import pytest
 
 pytest.importorskip("pypdf", reason="dev and runners extras required")
 
+from extract_bench.inference.cost_contract import COST_USD, RAW_COST_COMPLETE
 from extract_bench.inference.limits import EXTRACT_HARD_TIMEOUT_S
 from extract_bench.inference.pipelines import get_pipeline
 from extract_bench.inference.providers.base import (
@@ -251,8 +252,8 @@ def test_run_inference_marks_pi_cost_incomplete_when_a_turn_omits_it(tmp_path: P
 
     raw = PiExtractProvider("pi_extract", config).run_inference(_spec(config), _request(tmp_path)).raw_output
 
-    assert raw["_cost_complete"] is False
-    assert raw["cost_usd"] == (pytest.approx(0.001105) if prior_charge else None)
+    assert raw[RAW_COST_COMPLETE] is False
+    assert raw[COST_USD] == (pytest.approx(0.001105) if prior_charge else None)
 
 
 def test_error_event_fails_with_trace_in_debug_payload(tmp_path: Path) -> None:

@@ -8,6 +8,14 @@ import pytest
 
 pytest.importorskip("pypdf", reason="dev and runners extras required")
 
+from extract_bench.inference.cost_contract import (
+    COMPLETE,
+    COST_ACCOUNTING,
+    COST_COMPONENT_EVENT,
+    COST_USD,
+    KNOWN_COST_USD,
+    USAGE,
+)
 from extract_bench.inference.events import bind_provider_event_sink
 from extract_bench.inference.providers.base import ProviderPermanentError
 from extract_bench.inference.providers.extract import claude_code_extract
@@ -87,9 +95,9 @@ def test_claude_retains_known_terminal_cost_when_output_cannot_be_used(
     ):
         ClaudeCodeExtractProvider("claude_code_extract").run_inference(pipeline, request)
 
-    expected = {"known_cost_usd": 1.25, "complete": True, "usage": {"input_tokens": 1_000}}
+    expected = {KNOWN_COST_USD: 1.25, COMPLETE: True, USAGE: {"input_tokens": 1_000}}
     ((name, component),) = events
-    assert name == "cost.component"
-    assert component["cost_usd"] == expected["known_cost_usd"]
-    assert component["usage"] == expected["usage"]
-    assert excinfo.value.debug_payload["cost_accounting"] == expected
+    assert name == COST_COMPONENT_EVENT
+    assert component[COST_USD] == expected[KNOWN_COST_USD]
+    assert component[USAGE] == expected[USAGE]
+    assert excinfo.value.debug_payload[COST_ACCOUNTING] == expected
