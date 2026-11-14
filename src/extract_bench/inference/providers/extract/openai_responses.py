@@ -43,6 +43,14 @@ from openai import OpenAI
 from pypdf import PdfReader
 
 from extract_bench.inference.cost_accounting import preserve_cost_on_error, record_response_cost
+from extract_bench.inference.cost_contract import (
+    COST_PER_PAGE_USD,
+    COST_USD,
+    EXTRACT_COST_USD,
+    PARSE_COST_USD,
+    RAW_COST_COMPLETE,
+    USAGE,
+)
 from extract_bench.inference.limits import EXTRACT_HARD_TIMEOUT_S, ExecutionBudget, execution_budget
 from extract_bench.inference.providers.base import (
     Provider,
@@ -325,7 +333,7 @@ class OpenAIResponsesExtractProvider(Provider):
 
         raw_output = {
             "model": self._model,
-            "usage": {
+            USAGE: {
                 "input_tokens": input_tokens,
                 "output_tokens": output_tokens,
                 "cached_input_tokens": cached_input_tokens,
@@ -339,14 +347,14 @@ class OpenAIResponsesExtractProvider(Provider):
                 "output_price_per_1m": self._output_price_per_1m,
             },
         }
-        raw_output["usage"] = {key: value for key, value in raw_output["usage"].items() if value is not None}
+        raw_output[USAGE] = {key: value for key, value in raw_output[USAGE].items() if value is not None}
         self.recompute_cost(raw_output)
         response_id = getattr(resp, "id", None)
         raw_output.update(
             record_response_cost(
-                raw_output.get("cost_usd"),
-                raw_output["usage"],
-                complete="input_tokens" in raw_output["usage"] and "output_tokens" in raw_output["usage"],
+                raw_output.get(COST_USD),
+                raw_output[USAGE],
+                complete="input_tokens" in raw_output[USAGE] and "output_tokens" in raw_output[USAGE],
                 component_id=f"{self.provider_name}/{response_id}" if response_id is not None else None,
             )
         )
@@ -378,12 +386,12 @@ class OpenAIResponsesExtractProvider(Provider):
         re-pricing it would overwrite whatever cost it does carry with a zero,
         so leave it.
         """
-        usage = raw_output.get("usage")
+        usage = raw_output.get(USAGE)
         if not isinstance(usage, dict):
             return
         if "input_tokens" not in usage and "output_tokens" not in usage:
-            raw_output["cost_usd"] = raw_output.get("parse_cost_usd")
-            raw_output["_cost_complete"] = False
+            raw_output[COST_USD] = raw_output.get(PARSE_COST_USD)
+            raw_output[RAW_COST_COMPLETE] = False
             return
 
         in_tok = usage.get("input_tokens") or 0
@@ -392,15 +400,15 @@ class OpenAIResponsesExtractProvider(Provider):
             in_tok / 1_000_000 * self._input_price_per_1m + out_tok / 1_000_000 * self._output_price_per_1m
         )
         cost_usd = extract_cost_usd
-        parse_cost_usd = raw_output.get("parse_cost_usd")
+        parse_cost_usd = raw_output.get(PARSE_COST_USD)
         if parse_cost_usd is not None:
-            raw_output["extract_cost_usd"] = extract_cost_usd
+            raw_output[EXTRACT_COST_USD] = extract_cost_usd
             cost_usd += float(parse_cost_usd)
-        raw_output["cost_usd"] = cost_usd
+        raw_output[COST_USD] = cost_usd
 
         num_pages = raw_output.get("num_pages") or 0
         if num_pages > 0:
-            raw_output["cost_per_page_usd"] = cost_usd / num_pages
+            raw_output[COST_PER_PAGE_USD] = cost_usd / num_pages
 
         # Keep the recorded rates in step with the cost they explain, so a report
         # never shows a figure computed at one rate beside a different one.
@@ -461,7 +469,7 @@ class OpenAIResponsesExtractProvider(Provider):
 
         num_pages = parsed_doc.num_pages if parsed_doc and parsed_doc.num_pages > 0 else self._page_count(file_path)
         if parsed_doc is not None:
-            raw_output["parse_cost_usd"] = parsed_doc.parse_cost_usd
+            raw_output[PARSE_COST_USD] = parsed_doc.parse_cost_usd
             raw_output["parse_metadata"] = parsed_doc.metadata
             raw_output["parsed_text"] = parsed_doc.text
             raw_output["_config"]["input_mode"] = self._input_mode
@@ -471,8 +479,8 @@ class OpenAIResponsesExtractProvider(Provider):
         # a saved run can be re-priced.
         self.recompute_cost(raw_output)
         if parsed_doc is not None:
-            raw_output["_cost_complete"] = (
-                raw_output.get("_cost_complete", True)
+            raw_output[RAW_COST_COMPLETE] = (
+                raw_output.get(RAW_COST_COMPLETE, True)
                 and parsed_doc.cost_complete
                 and parsed_doc.parse_cost_usd is not None
             )

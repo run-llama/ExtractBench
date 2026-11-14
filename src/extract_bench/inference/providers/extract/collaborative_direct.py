@@ -12,6 +12,15 @@ import json
 from datetime import datetime
 from typing import Any
 
+from extract_bench.inference.cost_contract import (
+    COMPLETE,
+    COST_ACCOUNTING,
+    COST_PER_PAGE_USD,
+    COST_USD,
+    KNOWN_COST_USD,
+    RAW_COST_COMPLETE,
+    USAGE,
+)
 from extract_bench.inference.providers.base import (
     Provider,
     ProviderConfigError,
@@ -132,15 +141,15 @@ class CollaborativeDirectExtractProvider(Provider):
             "model": raw_output.get("model"),
             "latency_in_ms": raw_result.latency_in_ms,
             "num_pages": raw_output.get("num_pages"),
-            "cost_usd": raw_output.get("cost_usd"),
-            "cost_per_page_usd": raw_output.get("cost_per_page_usd"),
-            "usage": raw_output.get("usage"),
+            COST_USD: raw_output.get(COST_USD),
+            COST_PER_PAGE_USD: raw_output.get(COST_PER_PAGE_USD),
+            USAGE: raw_output.get(USAGE),
             "raw_output": raw_output,
         }
 
     @staticmethod
     def _token_count(raw_output: dict[str, Any], *keys: str) -> int:
-        usage = raw_output.get("usage")
+        usage = raw_output.get(USAGE)
         for key in keys:
             value = raw_output.get(key)
             if value is None and isinstance(usage, dict):
@@ -246,14 +255,14 @@ class CollaborativeDirectExtractProvider(Provider):
         cost_complete = True
         for raw, error in ((first_raw, first_error), (second_raw, second_error)):
             if raw is not None:
-                amount = raw.raw_output.get("cost_usd")
-                complete = raw.raw_output.get("_cost_complete", amount is not None)
+                amount = raw.raw_output.get(COST_USD)
+                complete = raw.raw_output.get(RAW_COST_COMPLETE, amount is not None)
             else:
                 snapshot = (
-                    (error.debug_payload or {}).get("cost_accounting", {}) if isinstance(error, ProviderError) else {}
+                    (error.debug_payload or {}).get(COST_ACCOUNTING, {}) if isinstance(error, ProviderError) else {}
                 )
-                amount = snapshot.get("known_cost_usd")
-                complete = snapshot.get("complete", False)
+                amount = snapshot.get(KNOWN_COST_USD)
+                complete = snapshot.get(COMPLETE, False)
             if amount is not None:
                 stage_costs.append(float(amount))
             cost_complete = cost_complete and complete and amount is not None
@@ -268,7 +277,7 @@ class CollaborativeDirectExtractProvider(Provider):
         else:
             error = self._failure_to_raise(first_error, second_error)
             error.debug_payload = {
-                "cost_accounting": {"known_cost_usd": cost_usd, "complete": cost_complete},
+                COST_ACCOUNTING: {KNOWN_COST_USD: cost_usd, COMPLETE: cost_complete},
                 "first_stage": self._stage_payload("first", first_raw, first_error),
                 "second_stage": self._stage_payload("second", second_raw, second_error),
             }
@@ -285,9 +294,9 @@ class CollaborativeDirectExtractProvider(Provider):
             "selected_stage": selected_raw.raw_output.get("_collaboration_stage"),
             "selection_reason": selection_reason,
             "num_pages": num_pages,
-            "cost_usd": cost_usd,
-            "_cost_complete": cost_complete,
-            "usage": usage,
+            COST_USD: cost_usd,
+            RAW_COST_COMPLETE: cost_complete,
+            USAGE: usage,
             "input_tokens": usage["input_tokens"],
             "output_tokens": usage["output_tokens"],
             "thinking_tokens": usage["thinking_tokens"],
@@ -311,7 +320,7 @@ class CollaborativeDirectExtractProvider(Provider):
             },
         }
         if num_pages > 0 and cost_usd is not None:
-            raw_output["cost_per_page_usd"] = cost_usd / num_pages
+            raw_output[COST_PER_PAGE_USD] = cost_usd / num_pages
 
         return RawInferenceResult(
             request=request,

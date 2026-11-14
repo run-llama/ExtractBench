@@ -31,6 +31,12 @@ from typing import Any
 from openai import OpenAI
 
 from extract_bench.inference.cost_accounting import preserve_cost_on_error, record_response_cost
+from extract_bench.inference.cost_contract import (
+    COST_PER_PAGE_USD,
+    COST_USD,
+    EXTRACT_COST_USD,
+    USAGE,
+)
 from extract_bench.inference.limits import EXTRACT_HARD_TIMEOUT_S, execution_budget
 from extract_bench.inference.providers.base import (
     Provider,
@@ -199,7 +205,7 @@ class KimiExtractProvider(Provider):
             complete="input_tokens" in usage and "output_tokens" in usage,
             component_id=f"{self.provider_name}/{response_id}" if response_id is not None else None,
         )
-        with preserve_cost_on_error({**accounting, "usage": usage}):
+        with preserve_cost_on_error({**accounting, USAGE: usage}):
             choice = response.choices[0]
             finish_reason = getattr(choice, "finish_reason", None)
             content = getattr(choice.message, "content", "") or ""
@@ -230,7 +236,7 @@ class KimiExtractProvider(Provider):
                 "truncated": truncated,
                 "finish_reason": finish_reason,
                 "model": self._model,
-                "usage": usage,
+                USAGE: usage,
                 "_config": {
                     "provider": "kimi",
                     "base_url": self._base_url,
@@ -247,7 +253,7 @@ class KimiExtractProvider(Provider):
 
     @staticmethod
     def _extract_usage(response: Any) -> dict[str, int]:
-        usage = getattr(response, "usage", None)
+        usage = getattr(response, USAGE, None)
         if usage is None:
             return {}
         input_tokens = getattr(usage, "prompt_tokens", None)
@@ -341,17 +347,17 @@ class KimiExtractProvider(Provider):
         completed_at = datetime.now()
         latency_ms = int((completed_at - started_at).total_seconds() * 1000)
 
-        extract_cost_usd = raw_output["cost_usd"]
+        extract_cost_usd = raw_output[COST_USD]
         cost_usd = extract_cost_usd
         num_pages = page_count(file_path)
 
-        raw_output["extract_cost_usd"] = extract_cost_usd
-        raw_output["cost_usd"] = cost_usd
+        raw_output[EXTRACT_COST_USD] = extract_cost_usd
+        raw_output[COST_USD] = cost_usd
         raw_output["cost_exceeded_budget"] = (
             self._max_cost_usd is not None and cost_usd is not None and cost_usd > self._max_cost_usd
         )
         raw_output["num_pages"] = num_pages
-        raw_output["cost_per_page_usd"] = cost_usd / num_pages if num_pages > 0 and cost_usd is not None else None
+        raw_output[COST_PER_PAGE_USD] = cost_usd / num_pages if num_pages > 0 and cost_usd is not None else None
 
         return RawInferenceResult(
             request=request,

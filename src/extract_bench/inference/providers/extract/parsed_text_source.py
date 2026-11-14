@@ -22,6 +22,14 @@ from dataclasses import dataclass, field
 from typing import Any, Protocol
 
 from extract_bench.inference.cost_accounting import preserve_cost_on_error, record_response_cost
+from extract_bench.inference.cost_contract import (
+    COMPLETE,
+    COST_ACCOUNTING,
+    COST_USD,
+    KNOWN_COST_USD,
+    PARSE_JOB_ID,
+    RAW_COST_COMPLETE,
+)
 from extract_bench.inference.providers.base import (
     ProviderConfigError,
     ProviderPermanentError,
@@ -48,24 +56,24 @@ class ParsedDocumentText:
 
     def add_extract_cost(self, raw_output: dict[str, Any]) -> float | None:
         """Combine known stage charges, retaining whether both stages are priced."""
-        extract_cost = raw_output.get("cost_usd")
-        raw_output["_cost_complete"] = (
+        extract_cost = raw_output.get(COST_USD)
+        raw_output[RAW_COST_COMPLETE] = (
             self.cost_complete
             and self.parse_cost_usd is not None
             and extract_cost is not None
-            and raw_output.get("_cost_complete", True)
+            and raw_output.get(RAW_COST_COMPLETE, True)
         )
         known = [cost for cost in (self.parse_cost_usd, extract_cost) if cost is not None]
         return sum(known) if len(known) > 0 else None
 
     def add_error_cost(self, error: CostedError) -> None:
-        snapshot = (error.debug_payload or {}).get("cost_accounting", {})
-        raw = {"cost_usd": snapshot.get("known_cost_usd"), "_cost_complete": snapshot.get("complete", False)}
+        snapshot = (error.debug_payload or {}).get(COST_ACCOUNTING, {})
+        raw = {COST_USD: snapshot.get(KNOWN_COST_USD), RAW_COST_COMPLETE: snapshot.get(COMPLETE, False)}
         known_cost = self.add_extract_cost(raw)
         error.debug_payload = {
             **(error.debug_payload or {}),
             "parse_metadata": self.metadata,
-            "cost_accounting": {"known_cost_usd": known_cost, "complete": raw["_cost_complete"]},
+            COST_ACCOUNTING: {KNOWN_COST_USD: known_cost, COMPLETE: raw[RAW_COST_COMPLETE]},
         }
 
 
@@ -121,8 +129,8 @@ class LlamaParseTextSource:
         raw_output = raw_parse.raw_output
         job_id = raw_output.get("job_id")
         record_response_cost(
-            raw_output.get("cost_usd"),
-            {"parse_job_id": job_id},
+            raw_output.get(COST_USD),
+            {PARSE_JOB_ID: job_id},
             component_id=f"llamaparse/{job_id}" if job_id is not None else None,
         )
         with preserve_cost_on_error(raw_output):
@@ -157,8 +165,8 @@ class LlamaParseTextSource:
             return ParsedDocumentText(
                 text=text,
                 num_pages=num_pages,
-                parse_cost_usd=raw_output.get("cost_usd"),
-                cost_complete=raw_output.get("_cost_complete", raw_output.get("cost_usd") is not None),
+                parse_cost_usd=raw_output.get(COST_USD),
+                cost_complete=raw_output.get(RAW_COST_COMPLETE, raw_output.get(COST_USD) is not None),
                 metadata=metadata,
             )
 

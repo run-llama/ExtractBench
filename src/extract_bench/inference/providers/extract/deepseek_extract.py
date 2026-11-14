@@ -16,6 +16,13 @@ from typing import Any
 from openai import OpenAI
 
 from extract_bench.inference.cost_accounting import preserve_cost_on_error, record_response_cost
+from extract_bench.inference.cost_contract import (
+    COST_PER_PAGE_USD,
+    COST_USD,
+    EXTRACT_COST_USD,
+    PARSE_COST_USD,
+    USAGE,
+)
 from extract_bench.inference.providers.base import (
     Provider,
     ProviderConfigError,
@@ -157,7 +164,7 @@ class DeepSeekExtractProvider(Provider):
             complete="input_tokens" in usage and "output_tokens" in usage,
             component_id=f"{self.provider_name}/{response_id}" if response_id is not None else None,
         )
-        with preserve_cost_on_error({**accounting, "usage": usage}):
+        with preserve_cost_on_error({**accounting, USAGE: usage}):
             choice = response.choices[0]
             finish_reason = getattr(choice, "finish_reason", None)
             if finish_reason == "length":
@@ -175,7 +182,7 @@ class DeepSeekExtractProvider(Provider):
                 **accounting,
                 "data": data,
                 "model": self._model,
-                "usage": usage,
+                USAGE: usage,
                 "_config": {
                     "provider": "deepseek",
                     "base_url": self._base_url,
@@ -192,7 +199,7 @@ class DeepSeekExtractProvider(Provider):
 
     @staticmethod
     def _extract_usage(response: Any) -> dict[str, int]:
-        usage = getattr(response, "usage", None)
+        usage = getattr(response, USAGE, None)
         if usage is None:
             return {}
 
@@ -289,16 +296,16 @@ class DeepSeekExtractProvider(Provider):
         completed_at = datetime.now()
         latency_ms = int((completed_at - started_at).total_seconds() * 1000)
 
-        extract_cost_usd = raw_output["cost_usd"]
+        extract_cost_usd = raw_output[COST_USD]
         cost_usd = parsed_doc.add_extract_cost(raw_output)
-        raw_output["extract_cost_usd"] = extract_cost_usd
-        raw_output["parse_cost_usd"] = parsed_doc.parse_cost_usd
-        raw_output["cost_usd"] = cost_usd
+        raw_output[EXTRACT_COST_USD] = extract_cost_usd
+        raw_output[PARSE_COST_USD] = parsed_doc.parse_cost_usd
+        raw_output[COST_USD] = cost_usd
         raw_output["cost_exceeded_budget"] = (
             self._max_cost_usd is not None and cost_usd is not None and cost_usd > self._max_cost_usd
         )
         raw_output["num_pages"] = parsed_doc.num_pages
-        raw_output["cost_per_page_usd"] = (
+        raw_output[COST_PER_PAGE_USD] = (
             cost_usd / parsed_doc.num_pages if parsed_doc.num_pages > 0 and cost_usd is not None else None
         )
         raw_output["parse_metadata"] = parsed_doc.metadata
