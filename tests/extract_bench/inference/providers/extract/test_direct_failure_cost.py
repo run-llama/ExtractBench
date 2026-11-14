@@ -10,6 +10,17 @@ import pytest
 
 pytest.importorskip("pypdf", reason="dev and runners extras required")
 
+from extract_bench.inference.cost_accounting import AttemptCost, record_response_cost
+from extract_bench.inference.cost_contract import (
+    COMPLETE,
+    COMPONENT_ID,
+    COST_ACCOUNTING,
+    COST_ATTEMPT_EVENT,
+    COST_COMPONENT_EVENT,
+    COST_USD,
+    KNOWN_COST_USD,
+    RAW_COST_COMPLETE,
+)
 from extract_bench.inference.events import bind_provider_event_sink
 from extract_bench.inference.providers.base import Provider, ProviderError, ProviderPermanentError
 from extract_bench.inference.providers.extract.anthropic_direct import AnthropicDirectExtractProvider
@@ -90,18 +101,25 @@ def test_paid_invalid_response_preserves_cost_and_missing_usage_stays_unknown(
             else:
                 provider._call_api(schema, Path("unused.pdf"))
     assert api.call_count == 1
-    snapshot = failure.value.debug_payload["cost_accounting"]
-    components = [payload for event, payload in events if event == "cost.component"]
+    snapshot = failure.value.debug_payload[COST_ACCOUNTING]
+    components = [payload for event, payload in events if event == COST_COMPONENT_EVENT]
     assert len(components) == 1
-    assert components[0]["component_id"] == "test/sdk-response"
-    assert components[0]["cost_usd"] == snapshot["known_cost_usd"]
-    assert components[0]["complete"] is snapshot["complete"]
+    assert components[0][COMPONENT_ID] == "test/sdk-response"
+    assert components[0][COST_USD] == snapshot[KNOWN_COST_USD]
+    assert components[0][COMPLETE] is snapshot[COMPLETE]
+    accounting = AttemptCost()
+    for event, payload in events:
+        accounting.observe(event, payload)
+    assert accounting.complete is False
+    accounting.observe(COST_ATTEMPT_EVENT, snapshot)
+    assert accounting.known_cost_usd == snapshot[KNOWN_COST_USD]
+    assert accounting.complete is snapshot[COMPLETE]
     if reported_tokens is None:
-        assert snapshot["known_cost_usd"] is None
-        assert snapshot["complete"] is False
+        assert snapshot[KNOWN_COST_USD] is None
+        assert snapshot[COMPLETE] is False
     else:
-        assert snapshot["known_cost_usd"] == pytest.approx(reported_tokens / 1_000_000)
-        assert snapshot["complete"] is True
+        assert snapshot[KNOWN_COST_USD] == pytest.approx(reported_tokens / 1_000_000)
+        assert snapshot[COMPLETE] is True
 
 
 @pytest.mark.parametrize("failed_cost", [None, 0.0, 0.5])
@@ -134,15 +152,19 @@ def test_collaboration_retains_failed_stage_bill_and_marks_unknown_stage_incompl
         schema_override={"type": "object"},
     )
 
+    accounting = AttemptCost()
+
     def run_stage(stage: PipelineSpec, request: InferenceRequest) -> RawInferenceResult:
+        assert accounting.complete is False
         amount = 0.25 if stage.pipeline_name == "first" else failed_cost
+        record_response_cost(amount, {}, component_id=stage.pipeline_name)
         if both_fail or stage.pipeline_name == "second":
             raise ProviderPermanentError(
                 "invalid output",
                 debug_payload={
-                    "cost_accounting": {
-                        "known_cost_usd": amount,
-                        "complete": amount is not None,
+                    COST_ACCOUNTING: {
+                        KNOWN_COST_USD: amount,
+                        COMPLETE: amount is not None,
                     }
                 },
             )
@@ -151,7 +173,7 @@ def test_collaboration_retains_failed_stage_bill_and_marks_unknown_stage_incompl
             pipeline=stage,
             pipeline_name=stage.pipeline_name,
             product_type=ProductType.EXTRACT,
-            raw_output={"data": {"answer": 1}, "cost_usd": amount},
+            raw_output={"data": {"answer": 1}, COST_USD: amount},
             started_at=datetime.now(UTC),
             completed_at=datetime.now(UTC),
             latency_in_ms=1,
@@ -159,17 +181,19 @@ def test_collaboration_retains_failed_stage_bill_and_marks_unknown_stage_incompl
 
     monkeypatch.setattr(provider, "_run_stage", run_stage)
     expected = 0.25 + (failed_cost if failed_cost is not None else 0)
-    if both_fail:
-        with pytest.raises(ProviderError) as failure:
-            provider.run_inference(pipeline, request)
-        snapshot = failure.value.debug_payload["cost_accounting"]
-        assert snapshot["known_cost_usd"] == expected
-        assert snapshot["complete"] is (failed_cost is not None)
-    else:
-        raw = provider.run_inference(pipeline, request).raw_output
-        assert raw["data"] == {"answer": 1}
-        assert raw["cost_usd"] == expected
-        assert raw["_cost_complete"] is (failed_cost is not None)
+    with bind_provider_event_sink(accounting.observe):
+        if both_fail:
+            with pytest.raises(ProviderError) as failure:
+                provider.run_inference(pipeline, request)
+            snapshot = failure.value.debug_payload[COST_ACCOUNTING]
+        else:
+            raw = provider.run_inference(pipeline, request).raw_output
+            assert raw["data"] == {"answer": 1}
+            snapshot = {KNOWN_COST_USD: raw[COST_USD], COMPLETE: raw[RAW_COST_COMPLETE]}
+    assert accounting.complete is False
+    accounting.observe(COST_ATTEMPT_EVENT, snapshot)
+    assert accounting.known_cost_usd == expected
+    assert accounting.complete is (failed_cost is not None)
 
 
 @pytest.mark.parametrize("parse_cost", [None, 0.0, 0.5])
@@ -179,10 +203,10 @@ def test_parsed_text_keeps_partial_charge_when_extract_has_no_usage(parse_cost: 
     parsed = ParsedDocumentText(text="document", num_pages=1, parse_cost_usd=parse_cost)
     error = ProviderPermanentError("network failure")
     parsed.add_error_cost(error)
-    assert error.debug_payload["cost_accounting"] == {"known_cost_usd": parse_cost, "complete": False}
-    raw: dict[str, Any] = {"cost_usd": None, "_cost_complete": False}
+    assert error.debug_payload[COST_ACCOUNTING] == {KNOWN_COST_USD: parse_cost, COMPLETE: False}
+    raw: dict[str, Any] = {COST_USD: None, RAW_COST_COMPLETE: False}
     assert parsed.add_extract_cost(raw) == parse_cost
-    assert raw["_cost_complete"] is False
+    assert raw[RAW_COST_COMPLETE] is False
 
 
 @pytest.mark.parametrize("counters", [{}, {"prompt_token_count": 120}, {"candidates_token_count": 120}])
@@ -200,12 +224,12 @@ def test_partial_gemini_sdk_usage_keeps_known_subtotal_incomplete(counters: dict
     provider._client = NS(models=NS(generate_content=Mock(return_value=response)))
     with pytest.raises(ProviderError) as failure:
         provider._call_api({"type": "object"}, document_text="document")
-    snapshot = failure.value.debug_payload["cost_accounting"]
-    assert snapshot["complete"] is False
+    snapshot = failure.value.debug_payload[COST_ACCOUNTING]
+    assert snapshot[COMPLETE] is False
     if len(counters) == 0:
-        assert snapshot["known_cost_usd"] is None
+        assert snapshot[KNOWN_COST_USD] is None
     else:
-        assert snapshot["known_cost_usd"] == pytest.approx(0.00012)
+        assert snapshot[KNOWN_COST_USD] == pytest.approx(0.00012)
 
 
 @pytest.mark.parametrize("parse_cost", [None, 0.25])
@@ -220,7 +244,7 @@ def test_empty_parse_retains_bill_before_any_extraction_starts(
     from extract_bench.schemas.product import ProductType
 
     parse_provider = Mock()
-    parse_provider.run_inference.return_value = NS(raw_output={"cost_usd": parse_cost})
+    parse_provider.run_inference.return_value = NS(raw_output={COST_USD: parse_cost})
     parse_provider.normalize.return_value = NS(
         output=ParseOutput(
             task_type="parse",
@@ -234,6 +258,6 @@ def test_empty_parse_retains_bill_before_any_extraction_starts(
     request = InferenceRequest(example_id="test", source_file_path="unused.pdf", product_type=ProductType.EXTRACT)
     with pytest.raises(ProviderError, match="no text") as failure:
         LlamaParseTextSource().parse(request)
-    snapshot = failure.value.debug_payload["cost_accounting"]
-    assert snapshot["known_cost_usd"] == parse_cost
-    assert snapshot["complete"] is (parse_cost is not None)
+    snapshot = failure.value.debug_payload[COST_ACCOUNTING]
+    assert snapshot[KNOWN_COST_USD] == parse_cost
+    assert snapshot[COMPLETE] is (parse_cost is not None)
