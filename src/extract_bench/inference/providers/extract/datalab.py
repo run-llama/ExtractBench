@@ -27,6 +27,19 @@ from datalab_sdk import AsyncDatalabClient
 from datalab_sdk.models import ExtractOptions
 from pypdf import PdfReader
 
+from extract_bench.inference.cost_contract import (
+    COMPLETE,
+    COMPONENT_ID,
+    COST_ACCOUNTING,
+    COST_COMPONENT_EVENT,
+    COST_PER_PAGE_USD,
+    COST_USD,
+    EXTRACT_COST_USD,
+    KNOWN_COST_USD,
+    PARSE_COST_USD,
+    RAW_COST_COMPLETE,
+    USAGE,
+)
 from extract_bench.inference.events import emit_provider_event
 from extract_bench.inference.limits import execution_budget
 from extract_bench.inference.providers.base import (
@@ -219,9 +232,9 @@ class DatalabExtractProvider(Provider):
         except Exception as e:
             debug_payload = {
                 "raw_response": raw_response,
-                "cost_accounting": {
-                    "known_cost_usd": raw_response.get("cost_usd"),
-                    "complete": raw_response.get("_cost_complete", False),
+                COST_ACCOUNTING: {
+                    KNOWN_COST_USD: raw_response.get(COST_USD),
+                    COMPLETE: raw_response.get(RAW_COST_COMPLETE, False),
                 },
             }
             error_str = str(e).lower()
@@ -238,14 +251,16 @@ class DatalabExtractProvider(Provider):
 
     def _record_cost(self, raw_response: dict[str, Any], component_id: str) -> None:
         _promote_api_cost_breakdown(raw_response)
-        cost = raw_response.get("cost_usd")
-        raw_response["_cost_complete"] = cost is not None
+        cost = raw_response.get(COST_USD)
+        raw_response[RAW_COST_COMPLETE] = cost is not None
         if cost is not None:
             emit_provider_event(
-                "cost.component",
-                component_id=component_id,
-                cost_usd=cost,
-                usage=raw_response.get("cost_breakdown"),
+                COST_COMPONENT_EVENT,
+                **{
+                    COMPONENT_ID: component_id,
+                    COST_USD: cost,
+                    USAGE: raw_response.get("cost_breakdown"),
+                },
             )
 
     async def _wait_for_confidence(
@@ -458,10 +473,10 @@ def _attach_datalab_extract_pricing(
     total_cost = parse_cost + extract_cost
 
     raw_output.setdefault("page_count", page_count)
-    raw_output["parse_cost_usd"] = parse_cost
-    raw_output["extract_cost_usd"] = extract_cost
-    raw_output["cost_usd"] = total_cost
-    raw_output["cost_per_page_usd"] = total_cost / page_count
+    raw_output[PARSE_COST_USD] = parse_cost
+    raw_output[EXTRACT_COST_USD] = extract_cost
+    raw_output[COST_USD] = total_cost
+    raw_output[COST_PER_PAGE_USD] = total_cost / page_count
     raw_output["datalab_pricing"] = {
         "pricing_basis": "datalab_public_pricing_per_1000_pages",
         "parse_mode": parse_mode,
@@ -484,10 +499,10 @@ def _promote_api_cost_breakdown(raw_output: dict[str, Any]) -> None:
         return
 
     cost_usd = float(final_cents) / 100.0
-    raw_output["cost_usd"] = cost_usd
+    raw_output[COST_USD] = cost_usd
     page_count = _coerce_positive_page_count(raw_output.get("page_count"))
     if page_count is not None:
-        raw_output["cost_per_page_usd"] = cost_usd / page_count
+        raw_output[COST_PER_PAGE_USD] = cost_usd / page_count
 
 
 # ---------------------------------------------------------------------------

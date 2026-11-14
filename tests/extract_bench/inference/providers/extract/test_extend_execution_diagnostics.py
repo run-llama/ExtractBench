@@ -9,6 +9,13 @@ pytest.importorskip("extend_ai", reason="Extend SDK is an optional provider depe
 import httpx
 from extend_ai import Extend
 
+from extract_bench.inference.cost_contract import (
+    COMPLETE,
+    COST_ACCOUNTING,
+    COST_PER_PAGE_USD,
+    COST_USD,
+    KNOWN_COST_USD,
+)
 from extract_bench.inference.providers.base import ProviderPermanentError
 from extract_bench.inference.providers.extract.extend import ExtendProvider
 
@@ -62,8 +69,8 @@ def test_async_run_retains_receipt_and_terminal_payload(monkeypatch: pytest.Monk
         payload = caught.value.debug_payload
         assert payload is not None
         assert payload["processor_run"]["failure_message"] == "diagnostic detail"
-        assert payload["cost_accounting"]["known_cost_usd"] == pytest.approx(0.1125)
-        assert payload["cost_accounting"]["complete"] is True
+        assert payload[COST_ACCOUNTING][KNOWN_COST_USD] == pytest.approx(0.1125)
+        assert payload[COST_ACCOUNTING][COMPLETE] is True
     else:
         payload = provider._run_processor_async("dp_test", "file_test")
     assert payload["processor_run"]["usage"]["credits"] == 7
@@ -84,7 +91,7 @@ def test_extend_cost_uses_configured_credit_rate_without_rebilling_parse() -> No
         }
     }
     _attach_cost_stats(raw, {"usd_per_credit": 0.02})
-    assert raw["cost_usd"] == pytest.approx(0.32)
-    assert raw["cost_per_page_usd"] == pytest.approx(0.16)
+    assert raw[COST_USD] == pytest.approx(0.32)
+    assert raw[COST_PER_PAGE_USD] == pytest.approx(0.16)
     assert raw["parse_credits"] == 4
     assert raw["usd_per_credit"] == 0.02

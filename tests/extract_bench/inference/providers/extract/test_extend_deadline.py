@@ -13,6 +13,12 @@ pytest.importorskip("extend_ai", reason="Extend SDK is optional")
 
 import httpx
 
+from extract_bench.inference.cost_contract import (
+    COMPONENT_ID,
+    COST_ACCOUNTING,
+    COST_COMPONENT_EVENT,
+    KNOWN_COST_USD,
+)
 from extract_bench.inference.events import bind_provider_event_sink
 from extract_bench.inference.limits import ExecutionBudget
 from extract_bench.inference.pipelines import get_pipeline
@@ -110,9 +116,9 @@ def test_cancelled_polling_cannot_return_late_success_or_start_another_run(
     assert caught.value.debug_payload is not None
     execution = caught.value.debug_payload["_extend_execution"]
     assert execution["create_response"]["processor_run"]["id"] == "dpr_test"
-    assert caught.value.debug_payload["cost_accounting"]["known_cost_usd"] == pytest.approx(0.16)
-    charges = [payload for event, payload in events if event == "cost.component"]
-    assert {charge["component_id"] for charge in charges} == {"extend/dpr_test"}
+    assert caught.value.debug_payload[COST_ACCOUNTING][KNOWN_COST_USD] == pytest.approx(0.16)
+    charges = [payload for event, payload in events if event == COST_COMPONENT_EVENT]
+    assert {charge[COMPONENT_ID] for charge in charges} == {"extend/dpr_test"}
     assert (
         "cancel_error" in execution
         if stop_at in ("cancel_error", "trace_failed")

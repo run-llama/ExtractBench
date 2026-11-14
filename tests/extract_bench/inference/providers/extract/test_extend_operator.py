@@ -13,6 +13,14 @@ import httpx
 from extend_ai import Extend
 
 from extract_bench.evaluation.stats import build_operational_stats
+from extract_bench.inference.cost_contract import (
+    COMPLETE,
+    COST_ACCOUNTING,
+    COST_COMPONENT_EVENT,
+    COST_PER_PAGE_USD,
+    COST_USD,
+    KNOWN_COST_USD,
+)
 from extract_bench.inference.pipelines import get_pipeline
 from extract_bench.inference.providers.base import ProviderPermanentError
 from extract_bench.inference.providers.extract.extend_operator import (
@@ -133,17 +141,17 @@ def test_sdk_poll_preserves_full_operator_cost_without_double_counting_parse(mon
     assert result.raw_output["extract_credits"] == 80
     assert result.raw_output["agent_usage_credits"] == 88
     assert result.raw_output["agent_usage_usd"] == 1.10
-    assert result.raw_output["cost_usd"] == 3.10
-    assert result.raw_output["cost_per_page_usd"] == 3.10 / 40
+    assert result.raw_output[COST_USD] == 3.10
+    assert result.raw_output[COST_PER_PAGE_USD] == 3.10 / 40
     stats = {stat.name: stat.value for stat in build_operational_stats(result)}
     assert stats["agent_usage_usd"] == 1.10
-    assert stats["cost_usd"] == 3.10
+    assert stats[COST_USD] == 3.10
 
 
 def test_missing_rollup_does_not_add_parse_estimate_or_invent_agent_cost():
     raw = {"processor_run": {"usage": {"credits": 4}, "file": {"metadata": {"pageCount": 1}}}}
     _attach_operator_cost_stats(raw, {"usd_per_credit": 0.01})
-    assert raw["cost_usd"] == 0.04
+    assert raw[COST_USD] == 0.04
     assert "agent_usage_usd" not in raw
     assert "parse_credits" not in raw
 
@@ -248,8 +256,8 @@ def test_failed_operator_retains_returned_billing(monkeypatch: pytest.MonkeyPatc
             provider._extract_document("unused.pdf", {"type": "object"}, {"usd_per_credit": 0.02})
     assert caught.value.job_id == "exr_failed"
     assert caught.value.debug_payload["processor_run"] == run
-    accounting = caught.value.debug_payload["cost_accounting"]
-    assert accounting["known_cost_usd"] == (None if credits is None else 0.24)
-    assert accounting["complete"] is (credits is not None)
-    charges = [payload for event, payload in events if event == "cost.component"]
+    accounting = caught.value.debug_payload[COST_ACCOUNTING]
+    assert accounting[KNOWN_COST_USD] == (None if credits is None else 0.24)
+    assert accounting[COMPLETE] is (credits is not None)
+    charges = [payload for event, payload in events if event == COST_COMPONENT_EVENT]
     assert len(charges) == (0 if credits is None else 1)

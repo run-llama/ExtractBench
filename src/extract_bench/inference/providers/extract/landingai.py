@@ -10,6 +10,17 @@ from typing import Any
 
 from landingai_ade import LandingAIADE
 
+from extract_bench.inference.cost_contract import (
+    COMPLETE,
+    COMPONENT_ID,
+    COST_ACCOUNTING,
+    COST_COMPONENT_EVENT,
+    COST_PER_PAGE_USD,
+    COST_USD,
+    KNOWN_COST_USD,
+    RAW_COST_COMPLETE,
+    USAGE,
+)
 from extract_bench.inference.events import emit_provider_event
 from extract_bench.inference.limits import execution_budget
 from extract_bench.inference.providers.base import (
@@ -216,7 +227,7 @@ class LandingAIExtractProvider(Provider):
         except TimeoutError:
             raise
         except Exception as e:
-            debug_payload = {"cost_accounting": self._cost_accounting(accounting)}
+            debug_payload = {COST_ACCOUNTING: self._cost_accounting(accounting)}
             # Classify the error: rate limits and transient network errors are
             # retryable; everything else is permanent.
             error_str = str(e).lower()
@@ -251,17 +262,19 @@ class LandingAIExtractProvider(Provider):
             # Both SDK responses require metadata.job_id; scope it by stage so
             # parse and extract charges, and separate invocations, stay distinct.
             emit_provider_event(
-                "cost.component",
-                component_id=f"landingai/{stage}/{metadata.job_id}",
-                cost_usd=credits * self.CREDIT_RATE_USD,
-                usage=_to_plain_data(metadata),
+                COST_COMPONENT_EVENT,
+                **{
+                    COMPONENT_ID: f"landingai/{stage}/{metadata.job_id}",
+                    COST_USD: credits * self.CREDIT_RATE_USD,
+                    USAGE: _to_plain_data(metadata),
+                },
             )
 
     def _cost_accounting(self, result: Mapping[str, Any]) -> dict[str, Any]:
         credits = [result[key] for key in ("parse_credits", "extract_credits") if key in result]
         return {
-            "known_cost_usd": sum(credits) * self.CREDIT_RATE_USD if len(credits) > 0 else None,
-            "complete": len(credits) == 2,
+            KNOWN_COST_USD: sum(credits) * self.CREDIT_RATE_USD if len(credits) > 0 else None,
+            COMPLETE: len(credits) == 2,
         }
 
     def _apply_cost_fields(self, result: dict[str, Any], parse_response: Any, extract_response: Any) -> None:
@@ -276,16 +289,16 @@ class LandingAIExtractProvider(Provider):
         result.update(accounting)
         if "extract_credits" in accounting:
             result["extract_credits_used"] = accounting["extract_credits"]
-        result["cost_usd"] = snapshot["known_cost_usd"]
-        result["_cost_complete"] = snapshot["complete"]
-        if snapshot["known_cost_usd"] is not None:
+        result[COST_USD] = snapshot[KNOWN_COST_USD]
+        result[RAW_COST_COMPLETE] = snapshot[COMPLETE]
+        if snapshot[KNOWN_COST_USD] is not None:
             result["credits_used"] = sum(accounting.values())
         metadata = getattr(parse_response, "metadata", None)
         pages = _coerce_nonnegative(getattr(metadata, "page_count", None))
         if pages is not None and pages > 0:
             result["num_pages"] = pages
-            if snapshot["known_cost_usd"] is not None:
-                result["cost_per_page_usd"] = snapshot["known_cost_usd"] / pages
+            if snapshot[KNOWN_COST_USD] is not None:
+                result[COST_PER_PAGE_USD] = snapshot[KNOWN_COST_USD] / pages
 
     def run_inference(self, pipeline: PipelineSpec, request: InferenceRequest) -> RawInferenceResult:
         """

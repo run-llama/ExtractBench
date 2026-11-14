@@ -17,6 +17,17 @@ from extend_ai import Extend
 from extend_ai.core.api_error import ApiError
 from extend_ai.core.request_options import RequestOptions
 
+from extract_bench.inference.cost_contract import (
+    COMPLETE,
+    COMPONENT_ID,
+    COST_ACCOUNTING,
+    COST_COMPONENT_EVENT,
+    COST_PER_PAGE_USD,
+    COST_USD,
+    KNOWN_COST_USD,
+    RAW_COST_COMPLETE,
+    USAGE,
+)
 from extract_bench.inference.events import emit_provider_event
 from extract_bench.inference.limits import DEFAULT_POLL_INTERVAL_S, ExecutionBudget, execution_budget
 from extract_bench.inference.providers.base import (
@@ -356,7 +367,7 @@ def _attach_cost_stats(raw_output: dict[str, Any], pipeline_config: dict[str, An
     total_credits_from_usage = _coerce_nonnegative_float(usage.get("totalCredits"))
     if total_credits_from_usage is None:
         total_credits_from_usage = _coerce_nonnegative_float(usage.get("total_credits"))
-    raw_output["_cost_complete"] = total_credits_from_usage is not None or (credits_used is not None and num_pages > 0)
+    raw_output[RAW_COST_COMPLETE] = total_credits_from_usage is not None or (credits_used is not None and num_pages > 0)
     if credits_used is None and total_credits_from_usage is None:
         return
     if credits_used is not None:
@@ -377,10 +388,10 @@ def _attach_cost_stats(raw_output: dict[str, Any], pipeline_config: dict[str, An
     rate = float(pipeline_config.get("usd_per_credit", USD_PER_CREDIT))
     raw_output["usd_per_credit"] = rate
     cost_usd = total_credits * rate
-    raw_output["cost_usd"] = cost_usd
+    raw_output[COST_USD] = cost_usd
     if num_pages:
         raw_output["credits_per_page"] = total_credits / num_pages
-        raw_output["cost_per_page_usd"] = cost_usd / num_pages
+        raw_output[COST_PER_PAGE_USD] = cost_usd / num_pages
 
 
 @register_provider("extend")
@@ -751,24 +762,26 @@ class ExtendProvider(Provider):
     ) -> dict[str, Any]:
         self._attach_cost_stats(payload, config)
         run = payload.get("processor_run", {})
-        cost = payload.get("cost_usd")
-        complete = payload.get("_cost_complete", cost is not None) and run.get("status") in (
+        cost = payload.get(COST_USD)
+        complete = payload.get(RAW_COST_COMPLETE, cost is not None) and run.get("status") in (
             "PROCESSED",
             "FAILED",
             "CANCELLED",
         )
         # A response without billing cannot erase charges from an earlier poll.
         if cost is None and previous is not None:
-            cost = previous["known_cost_usd"]
-            payload["cost_usd"] = cost
-        payload["_cost_complete"] = complete
-        snapshot = {"known_cost_usd": cost, "complete": complete}
+            cost = previous[KNOWN_COST_USD]
+            payload[COST_USD] = cost
+        payload[RAW_COST_COMPLETE] = complete
+        snapshot = {KNOWN_COST_USD: cost, COMPLETE: complete}
         if cost is not None:
             emit_provider_event(
-                "cost.component",
-                component_id=f"extend/{run['id']}",
-                cost_usd=cost,
-                usage=run.get("usage"),
+                COST_COMPONENT_EVENT,
+                **{
+                    COMPONENT_ID: f"extend/{run['id']}",
+                    COST_USD: cost,
+                    USAGE: run.get("usage"),
+                },
             )
         return snapshot
 
@@ -864,7 +877,7 @@ class ExtendProvider(Provider):
             "create_response": self._run_response_to_dict(create_response),
             "poll_history": poll_history,
         }
-        execution["cost_accounting"] = self._record_run_cost(execution["create_response"], config)
+        execution[COST_ACCOUNTING] = self._record_run_cost(execution["create_response"], config)
         consecutive_poll_errors = 0
         try:
             while True:
@@ -890,8 +903,8 @@ class ExtendProvider(Provider):
                             job_id=run_id,
                             debug_payload={
                                 "_extend_execution": execution,
-                                "cost_accounting": execution.get(
-                                    "cost_accounting", {"known_cost_usd": None, "complete": False}
+                                COST_ACCOUNTING: execution.get(
+                                    COST_ACCOUNTING, {KNOWN_COST_USD: None, COMPLETE: False}
                                 ),
                             },
                         ) from error
@@ -900,7 +913,7 @@ class ExtendProvider(Provider):
 
                 payload = self._run_response_to_dict(get_response)
                 execution["last_response"] = dict(payload)
-                execution["cost_accounting"] = self._record_run_cost(payload, config, execution["cost_accounting"])
+                execution[COST_ACCOUNTING] = self._record_run_cost(payload, config, execution[COST_ACCOUNTING])
                 # Record returned terminal data even when the scoring deadline has passed.
                 if getattr(getattr(get_response, "processor_run", None), "status", None) == "PROCESSED":
                     emit_provider_event(
@@ -917,7 +930,7 @@ class ExtendProvider(Provider):
                 poll_history.append({"at": datetime.now(UTC).isoformat(), "status": status})
                 if status in ("PROCESSED", "FAILED", "CANCELLED"):
                     terminal_payload = payload
-                    terminal_payload["cost_accounting"] = execution["cost_accounting"]
+                    terminal_payload[COST_ACCOUNTING] = execution[COST_ACCOUNTING]
                     terminal_payload["_extend_execution"] = execution
                     if status == "PROCESSED":
                         return terminal_payload
@@ -943,8 +956,8 @@ class ExtendProvider(Provider):
                 )
                 execution["cancel_response"] = self._run_response_to_dict(response)
                 if execution["cancel_response"].get("processor_run", {}).get("usage") is not None:
-                    execution["cost_accounting"] = self._record_run_cost(
-                        execution["cancel_response"], config, execution["cost_accounting"]
+                    execution[COST_ACCOUNTING] = self._record_run_cost(
+                        execution["cancel_response"], config, execution[COST_ACCOUNTING]
                     )
             except Exception as cancel_error:
                 execution["cancel_error"] = str(cancel_error)
@@ -966,7 +979,7 @@ class ExtendProvider(Provider):
                 job_id=run_id,
                 debug_payload={
                     "_extend_execution": execution,
-                    "cost_accounting": execution.get("cost_accounting", {"known_cost_usd": None, "complete": False}),
+                    COST_ACCOUNTING: execution.get(COST_ACCOUNTING, {KNOWN_COST_USD: None, COMPLETE: False}),
                 },
             ) from error
 

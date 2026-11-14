@@ -12,6 +12,17 @@ from uuid import uuid4
 
 from reducto import Reducto
 
+from extract_bench.inference.cost_contract import (
+    COMPLETE,
+    COMPONENT_ID,
+    COST_ACCOUNTING,
+    COST_COMPONENT_EVENT,
+    COST_PER_PAGE_USD,
+    COST_USD,
+    KNOWN_COST_USD,
+    RAW_COST_COMPLETE,
+    USAGE,
+)
 from extract_bench.inference.events import emit_provider_event
 from extract_bench.inference.limits import execution_budget
 from extract_bench.inference.providers.base import (
@@ -144,10 +155,10 @@ def _attach_cost_stats(
     raw_output["total_credits"] = credits_used
 
     cost_usd = credits_used * REDUCTO_USD_PER_CREDIT
-    raw_output["cost_usd"] = cost_usd
+    raw_output[COST_USD] = cost_usd
     if num_pages is not None:
         raw_output["credits_per_page"] = credits_used / num_pages
-        raw_output["cost_per_page_usd"] = cost_usd / num_pages
+        raw_output[COST_PER_PAGE_USD] = cost_usd / num_pages
 
 
 @register_provider("reducto_extract")
@@ -169,15 +180,17 @@ class ReductoExtractProvider(Provider):
         source_file_path: str | None = None,
     ) -> dict[str, Any]:
         self._attach_cost_stats(raw, config, source_file_path)
-        cost = raw.get("cost_usd")
-        raw["_cost_complete"] = cost is not None
-        snapshot = {"known_cost_usd": cost, "complete": cost is not None}
+        cost = raw.get(COST_USD)
+        raw[RAW_COST_COMPLETE] = cost is not None
+        snapshot = {KNOWN_COST_USD: cost, COMPLETE: cost is not None}
         if cost is not None:
             emit_provider_event(
-                "cost.component",
-                component_id=component_id,
-                cost_usd=cost,
-                usage=raw.get("usage"),
+                COST_COMPONENT_EVENT,
+                **{
+                    COMPONENT_ID: component_id,
+                    COST_USD: cost,
+                    USAGE: raw.get("usage"),
+                },
             )
         return snapshot
 
@@ -253,7 +266,7 @@ class ReductoExtractProvider(Provider):
         :raises ProviderError: For any API errors
         """
         budget = execution_budget()
-        accounting: dict[str, Any] = {"known_cost_usd": None, "complete": False}
+        accounting: dict[str, Any] = {KNOWN_COST_USD: None, COMPLETE: False}
         last_response: dict[str, Any] = {}
         client = Reducto(api_key=self._api_key, timeout=budget.remaining(), max_retries=0)
         try:
@@ -334,7 +347,7 @@ class ReductoExtractProvider(Provider):
                             raise ProviderTransientError(
                                 f"Reducto deep-extract job {job_id} {status}: {reason}",
                                 job_id=job_id,
-                                debug_payload={"response": last_response, "cost_accounting": accounting},
+                                debug_payload={"response": last_response, COST_ACCOUNTING: accounting},
                             )
                         await budget.run_async(asyncio.sleep(self._poll_interval))
                 except (TimeoutError, asyncio.CancelledError):
@@ -423,8 +436,8 @@ class ReductoExtractProvider(Provider):
                             raw_response[attr] = value
 
             # Also store the configuration used for reference
-            raw_response["_cost_complete"] = accounting["complete"]
-            raw_response["cost_usd"] = accounting["known_cost_usd"]
+            raw_response[RAW_COST_COMPLETE] = accounting[COMPLETE]
+            raw_response[COST_USD] = accounting[KNOWN_COST_USD]
             raw_response["_config"] = {
                 "system_prompt": system_prompt,
                 "citations": citations,
@@ -441,7 +454,7 @@ class ReductoExtractProvider(Provider):
             # Check if it's a transient error (network, timeout, etc.)
             if isinstance(e, ProviderTransientError):
                 raise
-            debug_payload = {"response": last_response, "cost_accounting": accounting}
+            debug_payload = {"response": last_response, COST_ACCOUNTING: accounting}
             error_str = str(e).lower()
             # 401 "invalid access token" is a presigned-token expiry on slow
             # (deep) jobs, not a real auth failure — retrying re-uploads with

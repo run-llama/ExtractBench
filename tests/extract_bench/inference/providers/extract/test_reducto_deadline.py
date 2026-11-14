@@ -12,6 +12,11 @@ import pytest
 pytest.importorskip("reducto", reason="dev and runners extras required")
 pytest.importorskip("pypdf", reason="dev and runners extras required")
 
+from extract_bench.inference.cost_contract import (
+    COMPONENT_ID,
+    COST_COMPONENT_EVENT,
+    COST_USD,
+)
 from extract_bench.inference.events import bind_provider_event_sink
 from extract_bench.inference.limits import ExecutionBudget
 from extract_bench.inference.providers.extract import reducto
@@ -167,10 +172,10 @@ def test_terminal_job_usage_is_journaled_even_after_cancellation(
     with budget.activate(), bind_provider_event_sink(lambda event, payload: events.append((event, payload))):
         with pytest.raises(TimeoutError if status == "Completed" else ProviderTransientError):
             asyncio.run(provider._extract_pdf_async("unused.pdf", {}, deep_extract=True))
-    charges = [payload for event, payload in events if event == "cost.component"]
+    charges = [payload for event, payload in events if event == COST_COMPONENT_EVENT]
     assert len(charges) == 1
     # The successful public Deep rate has a minimum; failure uses only returned billing.
-    assert charges[0]["cost_usd"] == pytest.approx(0.48 if status == "Completed" else credits * 0.015)
+    assert charges[0][COST_USD] == pytest.approx(0.48 if status == "Completed" else credits * 0.015)
 
 
 def test_sync_job_ids_keep_distinct_calls_separate_when_optional_id_is_absent(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -184,8 +189,8 @@ def test_sync_job_ids_keep_distinct_calls_separate_when_optional_id_is_absent(mo
     charges = {}
 
     def record(event: str, payload: dict) -> None:
-        if event == "cost.component":
-            charges[payload["component_id"]] = payload["cost_usd"]
+        if event == COST_COMPONENT_EVENT:
+            charges[payload[COMPONENT_ID]] = payload[COST_USD]
 
     with bind_provider_event_sink(record):
         for _ in responses:
