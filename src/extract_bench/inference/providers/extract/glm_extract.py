@@ -10,6 +10,14 @@ from typing import Any
 
 from openai import OpenAI
 
+from extract_bench.inference.cost_accounting import preserve_cost_on_error, record_response_cost
+from extract_bench.inference.cost_contract import (
+    COST_PER_PAGE_USD,
+    COST_USD,
+    EXTRACT_COST_USD,
+    PARSE_COST_USD,
+    USAGE,
+)
 from extract_bench.inference.limits import EXTRACT_HARD_TIMEOUT_S, execution_budget
 from extract_bench.inference.providers.base import (
     Provider,
@@ -127,50 +135,65 @@ class GLMExtractProvider(Provider):
 
         kwargs["timeout"] = min(self._api_timeout_s, execution_budget().remaining())
         response = self._client.chat.completions.create(**kwargs)
-        choice = response.choices[0]
-        finish_reason = getattr(choice, "finish_reason", None)
-        if finish_reason == "length":
-            raise ProviderPermanentError("GLM hit max_tokens before completing the JSON response. Increase max_tokens.")
-
-        content = getattr(choice.message, "content", "") or ""
-        try:
-            data = json.loads(content)
-        except json.JSONDecodeError as e:
-            raise ProviderPermanentError(f"GLM returned non-JSON output despite response_format: {e}") from e
-
         usage = self._extract_usage(response)
-        return {
-            "data": data,
-            "model": self._model,
-            "usage": usage,
-            "_config": {
-                "provider": "glm",
-                "base_url": self._base_url,
-                "input_mode": self._input_mode,
-                "parse_source": self.base_config.get("parse_source") or {},
-                "additional_properties_false": self._additional_properties_false,
-                "reasoning_effort": self._reasoning_effort,
-                "max_tokens": self._max_tokens,
-                "api_timeout_s": self._api_timeout_s,
-                "max_cost_usd": self._max_cost_usd,
-                **self._pricing_snapshot(),
-            },
-        }
+        cost_usd = (
+            self._estimate_extract_cost_usd(usage) if "input_tokens" in usage or "output_tokens" in usage else None
+        )
+        response_id = getattr(response, "id", None)
+        accounting = record_response_cost(
+            cost_usd,
+            usage,
+            complete="input_tokens" in usage and "output_tokens" in usage,
+            component_id=f"{self.provider_name}/{response_id}" if response_id is not None else None,
+        )
+        with preserve_cost_on_error({**accounting, USAGE: usage}):
+            choice = response.choices[0]
+            finish_reason = getattr(choice, "finish_reason", None)
+            if finish_reason == "length":
+                raise ProviderPermanentError(
+                    "GLM hit max_tokens before completing the JSON response. Increase max_tokens."
+                )
+
+            content = getattr(choice.message, "content", "") or ""
+            try:
+                data = json.loads(content)
+            except json.JSONDecodeError as e:
+                raise ProviderPermanentError(f"GLM returned non-JSON output despite response_format: {e}") from e
+
+            return {
+                **accounting,
+                "data": data,
+                "model": self._model,
+                USAGE: usage,
+                "_config": {
+                    "provider": "glm",
+                    "base_url": self._base_url,
+                    "input_mode": self._input_mode,
+                    "parse_source": self.base_config.get("parse_source") or {},
+                    "additional_properties_false": self._additional_properties_false,
+                    "reasoning_effort": self._reasoning_effort,
+                    "max_tokens": self._max_tokens,
+                    "api_timeout_s": self._api_timeout_s,
+                    "max_cost_usd": self._max_cost_usd,
+                    **self._pricing_snapshot(),
+                },
+            }
 
     @staticmethod
     def _extract_usage(response: Any) -> dict[str, int]:
-        usage = getattr(response, "usage", None)
+        usage = getattr(response, USAGE, None)
         if usage is None:
-            return {
-                "input_tokens": 0,
-                "cached_input_tokens": 0,
-                "output_tokens": 0,
-                "total_tokens": 0,
-            }
+            return {}
 
-        input_tokens = getattr(usage, "prompt_tokens", None) or getattr(usage, "input_tokens", None) or 0
-        output_tokens = getattr(usage, "completion_tokens", None) or getattr(usage, "output_tokens", None) or 0
-        total_tokens = getattr(usage, "total_tokens", None) or input_tokens + output_tokens
+        input_tokens = getattr(usage, "prompt_tokens", None)
+        if input_tokens is None:
+            input_tokens = getattr(usage, "input_tokens", None)
+        output_tokens = getattr(usage, "completion_tokens", None)
+        if output_tokens is None:
+            output_tokens = getattr(usage, "output_tokens", None)
+        total_tokens = getattr(usage, "total_tokens", None)
+        if total_tokens is None and input_tokens is not None and output_tokens is not None:
+            total_tokens = input_tokens + output_tokens
         cached_input_tokens = getattr(usage, "prompt_cache_hit_tokens", None) or 0
 
         for details_name in ("prompt_tokens_details", "input_tokens_details"):
@@ -183,12 +206,13 @@ class GLMExtractProvider(Provider):
                 or cached_input_tokens
             )
 
-        return {
-            "input_tokens": int(input_tokens),
+        counters = {
+            "input_tokens": input_tokens,
             "cached_input_tokens": int(cached_input_tokens),
-            "output_tokens": int(output_tokens),
-            "total_tokens": int(total_tokens),
+            "output_tokens": output_tokens,
+            "total_tokens": total_tokens,
         }
+        return {key: value for key, value in counters.items() if value is not None}
 
     def _estimate_extract_cost_usd(self, usage: dict[str, int]) -> float:
         input_tokens = int(usage.get("input_tokens", 0) or 0)
@@ -227,10 +251,13 @@ class GLMExtractProvider(Provider):
 
         schema = self._prepare_schema(request.schema_override)
 
+        parsed_doc: ParsedDocumentText | None = None
         try:
-            parsed_doc: ParsedDocumentText = self._parse_text_source.parse(request)
+            parsed_doc = self._parse_text_source.parse(request)
             raw_output = self._call_api(schema, parsed_doc.text)
-        except (ProviderPermanentError, ProviderTransientError, ProviderConfigError):
+        except (ProviderPermanentError, ProviderTransientError, ProviderConfigError) as error:
+            if parsed_doc is not None:
+                parsed_doc.add_error_cost(error)
             raise
         except Exception as e:
             error_str = str(e).lower()
@@ -251,14 +278,18 @@ class GLMExtractProvider(Provider):
         completed_at = datetime.now()
         latency_ms = int((completed_at - started_at).total_seconds() * 1000)
 
-        extract_cost_usd = self._estimate_extract_cost_usd(raw_output["usage"])
-        cost_usd = extract_cost_usd + parsed_doc.parse_cost_usd
-        raw_output["extract_cost_usd"] = extract_cost_usd
-        raw_output["parse_cost_usd"] = parsed_doc.parse_cost_usd
-        raw_output["cost_usd"] = cost_usd
-        raw_output["cost_exceeded_budget"] = self._max_cost_usd is not None and cost_usd > self._max_cost_usd
+        extract_cost_usd = raw_output[COST_USD]
+        cost_usd = parsed_doc.add_extract_cost(raw_output)
+        raw_output[EXTRACT_COST_USD] = extract_cost_usd
+        raw_output[PARSE_COST_USD] = parsed_doc.parse_cost_usd
+        raw_output[COST_USD] = cost_usd
+        raw_output["cost_exceeded_budget"] = (
+            self._max_cost_usd is not None and cost_usd is not None and cost_usd > self._max_cost_usd
+        )
         raw_output["num_pages"] = parsed_doc.num_pages
-        raw_output["cost_per_page_usd"] = cost_usd / parsed_doc.num_pages if parsed_doc.num_pages > 0 else None
+        raw_output[COST_PER_PAGE_USD] = (
+            cost_usd / parsed_doc.num_pages if parsed_doc.num_pages > 0 and cost_usd is not None else None
+        )
         raw_output["parse_metadata"] = parsed_doc.metadata
         raw_output["parsed_text"] = parsed_doc.text
 
