@@ -10,6 +10,8 @@ from unittest.mock import Mock
 import httpx
 import pytest
 
+pytest.importorskip("pypdf", reason="dev and runners extras required")
+
 from extract_bench.inference.events import bind_provider_event_sink
 from extract_bench.inference.providers.base import ProviderPermanentError, ProviderTransientError
 from extract_bench.inference.providers.extract import azure_content_understanding as azure
@@ -178,19 +180,22 @@ def test_codegen_missing_usage_does_not_erase_prior_observed_usage(monkeypatch: 
     assert result["usage"]["unreported_calls"] == 1
 
 
+@pytest.mark.parametrize("model", ["gpt-unpriced", "gpt-5.4"])
 def test_unpriced_codegen_failure_keeps_usage_under_distinct_invocation_ids(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    model: str,
 ) -> None:
     provider = table_codegen_extract.TableCodegenExtractProvider(
         "table_codegen_extract",
-        {"api_key": "offline", "model": "gpt-unpriced"},
+        {"api_key": "offline", "model": model},
     )
     monkeypatch.setattr(
         provider, "_parse_agentic", lambda request: (SimpleNamespace(tables=lambda: [1]), None, 1, None)
     )
 
     def fail_after_usage(*args: object, **kwargs: object) -> None:
-        kwargs["on_usage"]({"input": 17, "output": 4, "reported_calls": 1})
+        kwargs["on_usage"]({"input": 17, "output": 4, "reported_calls": 1, "unreported_calls": 1})
         raise RuntimeError("next API call failed")
 
     monkeypatch.setattr(table_codegen_extract, "generate_extractor", fail_after_usage)
@@ -216,4 +221,7 @@ def test_unpriced_codegen_failure_keeps_usage_under_distinct_invocation_ids(
     assert len(usage_events) == 2
     assert usage_events[0]["component_id"] != usage_events[1]["component_id"]
     assert usage_events[0]["usage"]["input"] == 17
-    assert not any(name == "cost.component" for name, _ in events)
+    if model == "gpt-unpriced":
+        assert not any(name == "cost.component" for name, _ in events)
+    else:
+        assert all(payload["complete"] is False for name, payload in events if name == "cost.component")

@@ -543,7 +543,12 @@ class LlamaExtractV2Provider(Provider):
                     }
                     emit_provider_event(
                         COST_COMPONENT_EVENT,
-                        **{COMPONENT_ID: f"llamaextract/{job_id}", COST_USD: cost, USAGE: usage},
+                        **{
+                            COMPONENT_ID: f"llamaextract/{job_id}",
+                            COST_USD: cost,
+                            COMPLETE: len(known) == len(credits),
+                            USAGE: usage,
+                        },
                     )
             status = data.get("status", "UNKNOWN")
 

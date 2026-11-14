@@ -430,7 +430,12 @@ class TableCodegenExtractProvider(Provider):
             if cost is not None:
                 emit_provider_event(
                     COST_COMPONENT_EVENT,
-                    **{COMPONENT_ID: codegen_component_id, COST_USD: cost, USAGE: usage},
+                    **{
+                        COMPONENT_ID: codegen_component_id,
+                        COST_USD: cost,
+                        COMPLETE: usage.get(UNREPORTED_CALLS, 0) == 0,
+                        USAGE: usage,
+                    },
                 )
 
         # 2) Agent authors + gates an extractor; run it over the full document.
@@ -464,7 +469,12 @@ class TableCodegenExtractProvider(Provider):
         if codegen_cost is not None:
             emit_provider_event(
                 COST_COMPONENT_EVENT,
-                **{COMPONENT_ID: codegen_component_id, COST_USD: codegen_cost, USAGE: usage},
+                **{
+                    COMPONENT_ID: codegen_component_id,
+                    COST_USD: codegen_cost,
+                    COMPLETE: usage.get(UNREPORTED_CALLS, 0) == 0,
+                    USAGE: usage,
+                },
             )
         raw_output: dict[str, Any] = {
             "data": result.get("output"),
