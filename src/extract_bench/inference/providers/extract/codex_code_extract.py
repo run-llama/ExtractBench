@@ -22,25 +22,18 @@ import shutil
 import subprocess
 import tempfile
 import threading
-import uuid
 from collections.abc import Iterable, Mapping
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from extract_bench.inference.cost_accounting import preserve_cost_on_error, record_response_cost
 from extract_bench.inference.cost_contract import (
-    COMPLETE,
-    COMPONENT_ID,
-    COST_ACCOUNTING,
-    COST_COMPONENT_EVENT,
     COST_PER_PAGE_USD,
     COST_USD,
-    KNOWN_COST_USD,
-    RAW_COST_COMPLETE,
     RAW_COST_USAGE_OBSERVED,
     USAGE,
 )
-from extract_bench.inference.events import emit_provider_event
 from extract_bench.inference.limits import execution_budget
 from extract_bench.inference.providers.base import (
     Provider,
@@ -743,20 +736,15 @@ class CodexCodeExtractProvider(Provider):
             returncode: int | None = None
             stderr_tail = ""
             agent_citations: Any = None
+            accounting: dict[str, Any] | None = None
             try:
                 returncode, stderr_tail = self._run_cli(cmd, prompt, workdir, request.example_id, lines)
                 usage, usage_observed, cost_complete = codex_usage_accounting(self._json_events(lines))
-                # This subtotal covers one CLI invocation. The synthetic ID keeps
-                # repeated Codex stages in the same outer attempt additive.
-                if usage_observed:
-                    emit_provider_event(
-                        COST_COMPONENT_EVENT,
-                        **{
-                            COMPONENT_ID: f"codex:{uuid.uuid4().hex}",
-                            COST_USD: self._estimate_cost_usd(usage),
-                            USAGE: usage,
-                        },
-                    )
+                accounting = record_response_cost(
+                    self._estimate_cost_usd(usage) if usage_observed else None,
+                    usage,
+                    complete=cost_complete and returncode == 0,
+                )
                 self._raise_for_status(returncode, lines, stderr_tail)
                 self._raise_for_sandbox_failures(lines)
                 data = self._read_output_json(output_path)
@@ -774,14 +762,16 @@ class CodexCodeExtractProvider(Provider):
                 )
                 if isinstance(exc.debug_payload, dict):
                     payload.update(exc.debug_payload)
-                usage, usage_observed, cost_complete = codex_usage_accounting(self._json_events(lines))
-                payload[COST_ACCOUNTING] = {
-                    KNOWN_COST_USD: self._estimate_cost_usd(usage) if usage_observed else None,
-                    COMPLETE: cost_complete and returncode == 0,
-                    USAGE: usage,
-                }
                 exc.debug_payload = payload
-                raise
+                if accounting is None:
+                    usage, usage_observed, _ = codex_usage_accounting(self._json_events(lines))
+                    accounting = record_response_cost(
+                        self._estimate_cost_usd(usage) if usage_observed else None,
+                        usage,
+                        complete=False,
+                    )
+                with preserve_cost_on_error({**accounting, USAGE: usage}):
+                    raise
 
         completed_at = datetime.now()
         latency_ms = int((completed_at - started_at).total_seconds() * 1000)
@@ -792,7 +782,7 @@ class CodexCodeExtractProvider(Provider):
             "model": self._model,
             USAGE: usage,
             RAW_COST_USAGE_OBSERVED: usage_observed,
-            RAW_COST_COMPLETE: cost_complete,
+            **accounting,
             "num_pages": num_pages,
             "_config": self._config_snapshot(),
             "_command_execution": self._command_execution_diagnostics(lines),

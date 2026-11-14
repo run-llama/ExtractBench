@@ -31,25 +31,18 @@ import shutil
 import subprocess
 import tempfile
 import threading
-import uuid
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from extract_bench.inference.cost_accounting import preserve_cost_on_error, record_response_cost
 from extract_bench.inference.cost_contract import (
-    COMPLETE,
-    COMPONENT_ID,
-    COST_ACCOUNTING,
-    COST_COMPONENT_EVENT,
     COST_PER_PAGE_USD,
     COST_USD,
-    KNOWN_COST_USD,
-    RAW_COST_COMPLETE,
     USAGE,
 )
-from extract_bench.inference.events import emit_provider_event
 from extract_bench.inference.limits import execution_budget
 from extract_bench.inference.providers.base import (
     Provider,
@@ -547,20 +540,15 @@ class PiExtractProvider(Provider):
             agent_citations: Any = None
             data: dict[str, Any] = {}
             summary: PiEventSummary | None = None
+            accounting: dict[str, Any] | None = None
             try:
                 returncode, stderr_tail = self._run_cli(cmd, workdir, pi_home, request.example_id, lines, prompt)
                 summary = summarize_pi_events(lines)
-                # The summary already adds every reported turn in this CLI invocation.
-                # Give each invocation its own ID so an outer attempt can include several.
-                if summary.cost_observed:
-                    emit_provider_event(
-                        COST_COMPONENT_EVENT,
-                        **{
-                            COMPONENT_ID: f"pi:{uuid.uuid4().hex}",
-                            COST_USD: summary.cost["total"],
-                            USAGE: summary.usage,
-                        },
-                    )
+                accounting = record_response_cost(
+                    summary.cost["total"] if summary.cost_observed else None,
+                    summary.usage,
+                    complete=summary.cost_complete and returncode == 0 and len(summary.error_messages) == 0,
+                )
                 self._raise_for_status(returncode, summary, stderr_tail)
                 data = self._read_output_json(output_path)
                 if self._evidence_mode:
@@ -584,27 +572,28 @@ class PiExtractProvider(Provider):
                         pass
                 if isinstance(exc.debug_payload, dict):
                     payload.update(exc.debug_payload)
-                payload[COST_ACCOUNTING] = {
-                    KNOWN_COST_USD: summary.cost["total"] if summary.cost_observed else None,
-                    COMPLETE: summary.cost_complete and returncode == 0 and len(summary.error_messages) == 0,
-                    USAGE: summary.usage,
-                }
                 exc.debug_payload = payload
-                raise
+                if accounting is None:
+                    accounting = record_response_cost(
+                        summary.cost["total"] if summary.cost_observed else None,
+                        summary.usage,
+                        complete=False,
+                    )
+                with preserve_cost_on_error({**accounting, USAGE: summary.usage}):
+                    raise
 
         completed_at = datetime.now()
         latency_ms = int((completed_at - started_at).total_seconds() * 1000)
 
-        assert summary is not None
-        cost_usd = summary.cost["total"] if summary.cost_observed else None
+        assert summary is not None and accounting is not None
+        cost_usd = accounting[COST_USD]
         raw_output: dict[str, Any] = {
             "data": data,
             "harness": harness,
             "model": self._model,
             USAGE: summary.usage,
             "num_pages": num_pages,
-            COST_USD: cost_usd,
-            RAW_COST_COMPLETE: summary.cost_complete,
+            **accounting,
             COST_PER_PAGE_USD: (cost_usd / num_pages) if cost_usd is not None and num_pages else None,
             "pricing": self._pricing_snapshot(),
             "cost_exceeded_budget": (

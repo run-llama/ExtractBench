@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import sys
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -11,7 +12,8 @@ import pytest
 
 pytest.importorskip("pypdf", reason="dev and runners extras required")
 
-from extract_bench.inference.cost_contract import COST_USD, RAW_COST_COMPLETE
+from extract_bench.inference.cost_contract import COMPLETE, COST_COMPONENT_EVENT, COST_USD, RAW_COST_COMPLETE
+from extract_bench.inference.events import bind_provider_event_sink
 from extract_bench.inference.limits import EXTRACT_HARD_TIMEOUT_S
 from extract_bench.inference.pipelines import get_pipeline
 from extract_bench.inference.providers.base import (
@@ -250,10 +252,16 @@ def test_run_inference_marks_pi_cost_incomplete_when_a_turn_omits_it(tmp_path: P
     script = _fake_pi(tmp_path, [*lines, json.dumps(missing)])
     config = {**_BASE_CONFIG, "pi_bin": str(script)}
 
-    raw = PiExtractProvider("pi_extract", config).run_inference(_spec(config), _request(tmp_path)).raw_output
+    events: list[tuple[str, Mapping[str, Any]]] = []
+    with bind_provider_event_sink(lambda name, payload: events.append((name, payload))):
+        raw = PiExtractProvider("pi_extract", config).run_inference(_spec(config), _request(tmp_path)).raw_output
 
     assert raw[RAW_COST_COMPLETE] is False
     assert raw[COST_USD] == (pytest.approx(0.001105) if prior_charge else None)
+    ((name, component),) = events
+    assert name == COST_COMPONENT_EVENT
+    assert component[COMPLETE] is False
+    assert component[COST_USD] == raw[COST_USD]
 
 
 def test_error_event_fails_with_trace_in_debug_payload(tmp_path: Path) -> None:

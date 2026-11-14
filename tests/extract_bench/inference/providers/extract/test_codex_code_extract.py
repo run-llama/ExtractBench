@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import subprocess
 import time
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -10,7 +11,8 @@ import pytest
 
 pytest.importorskip("pypdf", reason="dev and runners extras required; run: uv sync --extra dev --extra runners")
 
-from extract_bench.inference.cost_contract import COST_USD, RAW_COST_COMPLETE
+from extract_bench.inference.cost_contract import COMPLETE, COST_COMPONENT_EVENT, COST_USD, RAW_COST_COMPLETE
+from extract_bench.inference.events import bind_provider_event_sink
 from extract_bench.inference.providers.base import ProviderTransientError
 from extract_bench.inference.providers.extract import codex_code_extract
 from extract_bench.schemas.pipeline import PipelineSpec
@@ -378,13 +380,20 @@ def test_run_inference_preserves_codex_cost_coverage(
 
     monkeypatch.setattr(Provider, "_run_cli", fake_run)
     provider = Provider("codex_code_extract", {"model": "gpt-5.4", "api_key": "sk-test"})
-    raw = provider.run_inference(_pipeline(), _request(str(_png(tmp_path)))).raw_output
+    events: list[tuple[str, Mapping[str, Any]]] = []
+    with bind_provider_event_sink(lambda name, payload: events.append((name, payload))):
+        raw = provider.run_inference(_pipeline(), _request(str(_png(tmp_path)))).raw_output
 
-    assert raw[RAW_COST_COMPLETE] is (usage_case == "zero")
+    expected_complete = usage_case == "zero"
+    assert raw[RAW_COST_COMPLETE] is expected_complete
     if usage_case == "partial":
         assert raw[COST_USD] > 0
     else:
         assert raw[COST_USD] == (0.0 if usage_case == "zero" else None)
+    ((name, component),) = events
+    assert name == COST_COMPONENT_EVENT
+    assert component[COMPLETE] is expected_complete
+    assert component[COST_USD] == raw[COST_USD]
 
 
 def test_a_run_longer_than_20_minutes_is_not_stopped_by_the_provider(

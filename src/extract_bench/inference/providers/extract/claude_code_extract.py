@@ -34,29 +34,20 @@ import shutil
 import subprocess
 import tempfile
 import threading
-import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from extract_bench.inference.cost_accounting import preserve_cost_on_error, record_response_cost
 from extract_bench.inference.cost_contract import (
-    COMPLETE,
-    COMPONENT_ID,
-    COST_ACCOUNTING,
-    COST_COMPONENT_EVENT,
     COST_PER_PAGE_USD,
-    COST_USD,
-    KNOWN_COST_USD,
-    RAW_COST_COMPLETE,
     TOTAL_COST_USD,
     USAGE,
 )
-from extract_bench.inference.events import emit_provider_event
 from extract_bench.inference.limits import execution_budget
 from extract_bench.inference.providers.base import (
     Provider,
     ProviderConfigError,
-    ProviderError,
     ProviderPermanentError,
     ProviderRateLimitError,
     ProviderTransientError,
@@ -557,25 +548,11 @@ class ClaudeCodeExtractProvider(Provider):
                 and terminal_cost >= 0
                 else None
             )
-            accounting = {KNOWN_COST_USD: cost_usd, COMPLETE: cost_usd is not None, USAGE: usage}
-            # The terminal total covers one CLI invocation. A fresh ID keeps
-            # two Claude invocations in the same outer attempt from overwriting each other.
-            if cost_usd is not None:
-                emit_provider_event(
-                    COST_COMPONENT_EVENT,
-                    **{
-                        COMPONENT_ID: f"claude:{uuid.uuid4().hex}",
-                        COST_USD: cost_usd,
-                        USAGE: usage,
-                    },
-                )
-            try:
+            accounting = record_response_cost(cost_usd, usage)
+            with preserve_cost_on_error({**accounting, USAGE: usage}):
                 self._raise_for_status(returncode, result_event, lines, stderr_tail)
                 data = self._read_output_json(workdir)
                 agent_citations = read_agent_citations_file(workdir / "citations.json") if self._evidence_mode else None
-            except ProviderError as exc:
-                exc.debug_payload = {**(exc.debug_payload or {}), COST_ACCOUNTING: accounting}
-                raise
 
         completed_at = datetime.now()
         latency_ms = int((completed_at - started_at).total_seconds() * 1000)
@@ -587,8 +564,7 @@ class ClaudeCodeExtractProvider(Provider):
             USAGE: usage,
             "num_pages": num_pages,
             "schema_delivery": schema_delivery,
-            COST_USD: cost_usd,
-            RAW_COST_COMPLETE: cost_usd is not None,
+            **accounting,
             COST_PER_PAGE_USD: (cost_usd / num_pages) if cost_usd is not None and num_pages else None,
             "cost_exceeded_budget": (
                 self._max_cost_usd is not None and cost_usd is not None and cost_usd > self._max_cost_usd
