@@ -22,14 +22,11 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+from extract_bench.inference.cost_accounting import preserve_cost_on_error, record_response_cost
 from extract_bench.inference.cost_contract import (
-    COMPLETE,
     COMPONENT_ID,
-    COST_ACCOUNTING,
-    COST_COMPONENT_EVENT,
     COST_PER_PAGE_USD,
     COST_USD,
-    KNOWN_COST_USD,
     MODEL,
     PROVIDER,
     RAW_COST_COMPLETE,
@@ -307,17 +304,19 @@ class TableCodegenExtractProvider(Provider):
         parse_component_id = f"table_codegen/parse/{uuid4()}"
         raw_parse_cost = raw_parse.raw_output.get(COST_USD)
         if raw_parse_cost is not None:
-            emit_provider_event(
-                COST_COMPONENT_EVENT,
-                **{COMPONENT_ID: parse_component_id, COST_USD: raw_parse_cost},
+            record_response_cost(
+                raw_parse_cost,
+                {},
+                component_id=parse_component_id,
             )
         parse_result = parse_provider.normalize(raw_parse)
         parse_cost = raw_parse.raw_output.get(COST_USD)
         parse_job_id = extract_job_id_from_raw_payload(raw_parse.raw_output)
         if parse_cost is not None:
-            emit_provider_event(
-                COST_COMPONENT_EVENT,
-                **{COMPONENT_ID: parse_component_id, COST_USD: parse_cost},
+            record_response_cost(
+                parse_cost,
+                {},
+                component_id=parse_component_id,
             )
         parse_out = parse_result.output
         if not isinstance(parse_out, ParseOutput):
@@ -428,14 +427,11 @@ class TableCodegenExtractProvider(Provider):
             )
             cost = self._codegen_cost(usage) if usage.get(REPORTED_CALLS, 0) > 0 else None
             if cost is not None:
-                emit_provider_event(
-                    COST_COMPONENT_EVENT,
-                    **{
-                        COMPONENT_ID: codegen_component_id,
-                        COST_USD: cost,
-                        COMPLETE: usage.get(UNREPORTED_CALLS, 0) == 0,
-                        USAGE: usage,
-                    },
+                record_response_cost(
+                    cost,
+                    usage,
+                    component_id=codegen_component_id,
+                    complete=usage.get(UNREPORTED_CALLS, 0) == 0,
                 )
 
         # 2) Agent authors + gates an extractor; run it over the full document.
@@ -467,14 +463,11 @@ class TableCodegenExtractProvider(Provider):
         known_costs = [cost for cost in (parse_cost, codegen_cost) if cost is not None]
         cost_usd = round(sum(known_costs), 6) if len(known_costs) > 0 else None
         if codegen_cost is not None:
-            emit_provider_event(
-                COST_COMPONENT_EVENT,
-                **{
-                    COMPONENT_ID: codegen_component_id,
-                    COST_USD: codegen_cost,
-                    COMPLETE: usage.get(UNREPORTED_CALLS, 0) == 0,
-                    USAGE: usage,
-                },
+            record_response_cost(
+                codegen_cost,
+                usage,
+                component_id=codegen_component_id,
+                complete=usage.get(UNREPORTED_CALLS, 0) == 0,
             )
         raw_output: dict[str, Any] = {
             "data": result.get("output"),
@@ -532,22 +525,18 @@ class TableCodegenExtractProvider(Provider):
                 "script": result.get("script", "") or "",
             },
         }
-        raw_output[COST_ACCOUNTING] = {
-            KNOWN_COST_USD: cost_usd,
-            COMPLETE: raw_output[RAW_COST_COMPLETE],
-            USAGE: usage,
-        }
         # Accept a clean submit OR a *_salvaged result (the agent ran out of turns but
         # had produced a viable run — see generate_extractor's salvage). Everything else
         # is transient, not permanent: a gate failure within max_turns is sampling noise
         # (draw-to-draw variance is large) — let the runner's retry take a fresh sample.
         accepted = result["status"] == "done" or str(result["status"]).endswith("_salvaged")
         if not accepted or not isinstance(result.get("output"), dict):
-            raise ProviderTransientError(
-                f"table_codegen_extract: agent did not produce a valid extraction "
-                f"(status={result['status']}, turns={result.get('turns')}).",
-                debug_payload=raw_output,
-            )
+            with preserve_cost_on_error(raw_output):
+                raise ProviderTransientError(
+                    f"table_codegen_extract: agent did not produce a valid extraction "
+                    f"(status={result['status']}, turns={result.get('turns')}).",
+                    debug_payload=raw_output,
+                )
 
         return RawInferenceResult(
             request=request,

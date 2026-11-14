@@ -80,7 +80,7 @@ def test_poll_retains_optional_service_telemetry(monkeypatch, telemetry):
     [
         ({"extract_credits": 800, "parse_credits": 20}, 1.025),
         (None, None),
-        ({"extract_credits": 800, "parse_credits": None}, None),
+        ({"extract_credits": 800, "parse_credits": None}, 1.0),
         ({"extract_credits": 0, "parse_credits": 0}, 0.0),
     ],
 )
@@ -111,6 +111,7 @@ def test_registered_max_request_preserves_billed_model_cost_or_unknown(
                 "extract_result": {"amount": 12},
                 "metadata": {"usage": {"num_pages_extracted": 2, "num_pages_billed": 10}},
                 "usage": usage,
+                "extract_metadata": {"parse_job_id": "parse-1"},
             },
         )
 
@@ -137,3 +138,55 @@ def test_registered_max_request_preserves_billed_model_cost_or_unknown(
     repriced = provider.normalize(raw)
     assert repriced.raw_output.get("cost_usd") is None
     assert repriced.raw_output.get("credits_used") is None
+
+
+@pytest.mark.parametrize(
+    ("usage", "expected_cost", "complete", "source"),
+    [
+        ({"extract_credits": 800, "parse_credits": 20}, 1.025, True, "reported_credits"),
+        ({"extract_credits": 800, "parse_credits": None}, 1.0, False, "partial_reported_credits"),
+        ({"extract_credits": 0, "parse_credits": 0}, 0.0, True, "reported_credits"),
+        (None, 0.1375, True, "page_estimate"),
+    ],
+)
+def test_returned_credits_override_page_estimates_without_filling_missing_charges(
+    usage: dict[str, int | None] | None,
+    expected_cost: float,
+    complete: bool,
+    source: str,
+) -> None:
+    from extract_bench.inference.providers.extract.llamaextract_pricing import apply_pricing_fields
+
+    raw = {
+        "usage": usage,
+        "metadata": {"usage": {"num_pages_extracted": 2, "num_pages_billed": 6}},
+    }
+    apply_pricing_fields(raw, {"tier": "agentic"})
+    assert raw["cost_usd"] == expected_cost
+    assert raw["_cost_complete"] is complete
+    assert raw["cost_source"] == source
+
+
+@pytest.mark.parametrize("id_in_response", [True, False])
+def test_reused_parse_bill_is_counted_once_across_extract_jobs(id_in_response: bool) -> None:
+    from extract_bench.inference.cost_accounting import AttemptCost
+    from extract_bench.inference.events import bind_provider_event_sink
+
+    provider = module.LlamaExtractV2Provider("llamaextract_v2", {"api_key": "offline"})
+    response = {
+        "status": "COMPLETED",
+        "usage": {"extract_credits": 12, "parse_credits": 8},
+        "extract_metadata": {"parse_job_id": "parse-shared"} if id_in_response else {},
+    }
+    accounting = AttemptCost()
+    with (
+        httpx.Client(
+            transport=httpx.MockTransport(lambda _: httpx.Response(200, json=response)),
+            base_url="https://example.test",
+        ) as client,
+        bind_provider_event_sink(accounting.observe),
+    ):
+        for job in ("extract-one", "extract-two"):
+            provider._poll_job(client, job, {}, parse_job_id=None if id_in_response else "parse-shared")
+    assert accounting.known_cost_usd == pytest.approx(0.04)
+    assert len(accounting.components) == 3

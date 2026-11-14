@@ -26,11 +26,9 @@ from typing import Any
 import requests
 from requests.adapters import HTTPAdapter
 
+from extract_bench.inference.cost_accounting import record_response_cost
 from extract_bench.inference.cost_contract import (
-    COMPONENT_ID,
-    COST_COMPONENT_EVENT,
     COST_USD,
-    USAGE,
 )
 from extract_bench.inference.events import emit_provider_event
 from extract_bench.inference.limits import EXTRACT_HARD_TIMEOUT_S
@@ -748,13 +746,10 @@ class ParseurProvider(Provider):
 
         self._attach_cost_stats(raw_output)
         if raw_output.get(COST_USD) is not None:
-            emit_provider_event(
-                COST_COMPONENT_EVENT,
-                **{
-                    COMPONENT_ID: f"parseur/{document_id}",
-                    COST_USD: raw_output[COST_USD],
-                    USAGE: {"credits_used": document.get("credits_used")},
-                },
+            record_response_cost(
+                raw_output[COST_USD],
+                {"credits_used": document.get("credits_used")},
+                component_id=f"parseur/{document_id}",
             )
 
         return RawInferenceResult(

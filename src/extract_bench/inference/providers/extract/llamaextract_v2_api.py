@@ -17,13 +17,11 @@ from typing import Any
 
 import httpx
 
+from extract_bench.inference.cost_accounting import preserve_cost_on_error, record_response_cost
 from extract_bench.inference.cost_contract import (
-    COMPLETE,
-    COMPONENT_ID,
-    COST_ACCOUNTING,
-    COST_COMPONENT_EVENT,
     COST_USD,
-    KNOWN_COST_USD,
+    PARSE_JOB_ID,
+    RAW_COST_COMPLETE,
     USAGE,
 )
 from extract_bench.inference.events import emit_provider_event
@@ -349,7 +347,7 @@ class LlamaExtractV2Provider(Provider):
             logger.info("V2 extract job created: %s", job_id)
 
             # 4. Poll
-            result = self._poll_job(client, job_id, params)
+            result = self._poll_job(client, job_id, params, parse_job_id=parse_job_id)
             emit_provider_event(
                 "stage.completed",
                 provider="llamaextract_v2",
@@ -489,7 +487,14 @@ class LlamaExtractV2Provider(Provider):
         logger.info("File uploaded: %s -> %s", file_path.name, file_id)
         return file_id
 
-    def _poll_job(self, client: httpx.Client, job_id: str, params: dict[str, str]) -> dict[str, Any]:
+    def _poll_job(
+        self,
+        client: httpx.Client,
+        job_id: str,
+        params: dict[str, str],
+        *,
+        parse_job_id: str | None = None,
+    ) -> dict[str, Any]:
         """Poll V2 extract job until terminal state.
 
         Persist a compact status-transition history into the raw result so
@@ -521,36 +526,45 @@ class LlamaExtractV2Provider(Provider):
         while True:
             elapsed = time.monotonic() - start
             if elapsed > self._timeout:
-                raise ProviderTransientError(
-                    f"V2 extract job {job_id} did not complete within {self._timeout}s",
-                    job_id=job_id,
-                    debug_payload=data,
-                )
+                with preserve_cost_on_error(data):
+                    raise ProviderTransientError(
+                        f"V2 extract job {job_id} did not complete within {self._timeout}s",
+                        job_id=job_id,
+                        debug_payload=data,
+                    )
 
             resp = client.get(f"/api/v2/extract/{job_id}", params=poll_params)
             resp.raise_for_status()
             data = resp.json()
+            status = data.get("status", "UNKNOWN")
             usage = data.get(USAGE)
+            extract_metadata = data.get("extract_metadata") or {}
+            response_parse_id = extract_metadata.get("parse_job_id") if isinstance(extract_metadata, dict) else None
+            if isinstance(response_parse_id, str) and response_parse_id != "":
+                parse_job_id = response_parse_id
             if isinstance(usage, dict):
                 credits = [usage.get(key) for key in ("extract_credits", "parse_credits")]
                 known = [value for value in credits if isinstance(value, (int, float))]
                 if len(known) > 0:
-                    cost = sum(known) * USD_PER_CREDIT
-                    data[COST_ACCOUNTING] = {
-                        KNOWN_COST_USD: cost,
-                        COMPLETE: len(known) == len(credits),
-                        USAGE: usage,
-                    }
-                    emit_provider_event(
-                        COST_COMPONENT_EVENT,
-                        **{
-                            COMPONENT_ID: f"llamaextract/{job_id}",
-                            COST_USD: cost,
-                            COMPLETE: len(known) == len(credits),
-                            USAGE: usage,
-                        },
+                    # Several extract jobs can report the same backing parse bill.
+                    # Keep stages keyed by their real jobs so reused parsing counts once.
+                    for stage, stage_id, value in zip(
+                        ("extract", "parse"),
+                        (job_id, parse_job_id),
+                        credits,
+                        strict=True,
+                    ):
+                        if stage_id is not None:
+                            record_response_cost(
+                                value * USD_PER_CREDIT if isinstance(value, (int, float)) else None,
+                                {f"{stage}_credits": value},
+                                component_id=f"llamaextract/{stage}/{stage_id}",
+                                complete=status in _TERMINAL_STATUSES,
+                            )
+                    data[COST_USD] = sum(known) * USD_PER_CREDIT
+                    data[RAW_COST_COMPLETE] = (
+                        status in _TERMINAL_STATUSES and len(known) == len(credits) and parse_job_id is not None
                     )
-            status = data.get("status", "UNKNOWN")
 
             if status != last_recorded_status:
                 poll_history.append(
@@ -576,20 +590,21 @@ class LlamaExtractV2Provider(Provider):
                         }
                     )
 
-                if status == "FAILED":
-                    error_msg = data.get("error_message", "Unknown error")
-                    raise ProviderPermanentError(
-                        f"V2 extract job {job_id} failed: {error_msg}",
-                        job_id=job_id,
-                        debug_payload=data,
-                    )
+                with preserve_cost_on_error(data):
+                    if status == "FAILED":
+                        error_msg = data.get("error_message", "Unknown error")
+                        raise ProviderPermanentError(
+                            f"V2 extract job {job_id} failed: {error_msg}",
+                            job_id=job_id,
+                            debug_payload=data,
+                        )
 
-                if status == "CANCELLED":
-                    raise ProviderPermanentError(
-                        f"V2 extract job {job_id} was cancelled",
-                        job_id=job_id,
-                        debug_payload=data,
-                    )
+                    if status == "CANCELLED":
+                        raise ProviderPermanentError(
+                            f"V2 extract job {job_id} was cancelled",
+                            job_id=job_id,
+                            debug_payload=data,
+                        )
 
                 extract_metadata = data.get("extract_metadata") or {}
                 spawned_parse_job_id = (
@@ -597,8 +612,10 @@ class LlamaExtractV2Provider(Provider):
                 )
 
                 return {
+                    **{key: data[key] for key in (COST_USD, RAW_COST_COMPLETE) if key in data},
                     "data": data.get("extract_result"),
                     "job_id": job_id,
+                    PARSE_JOB_ID: parse_job_id,
                     "extract_metadata": extract_metadata,
                     # Carries ``usage.num_pages_billed`` -- the effective pages
                     # the extract leg is billed on, which a large schema pushes

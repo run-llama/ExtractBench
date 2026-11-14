@@ -14,16 +14,11 @@ from urllib.parse import urlencode, urlparse, urlunparse
 
 import requests
 
+from extract_bench.inference.cost_accounting import preserve_cost_on_error, record_response_cost
 from extract_bench.inference.cost_contract import (
-    COMPLETE,
-    COMPONENT_ID,
-    COST_ACCOUNTING,
-    COST_COMPONENT_EVENT,
     COST_USD,
-    KNOWN_COST_USD,
     USAGE,
 )
-from extract_bench.inference.events import emit_provider_event
 from extract_bench.inference.limits import EXTRACT_HARD_TIMEOUT_S, execution_budget
 from extract_bench.inference.providers.base import (
     Provider,
@@ -230,31 +225,32 @@ class AzureContentUnderstandingProvider(Provider):
             response = self._request("GET", operation_url, context=context)
             body = _response_json(response)
             _apply_usage_cost_fields(body, self.base_config)
-            if body.get(COST_USD) is not None:
-                body[COST_ACCOUNTING] = {
-                    KNOWN_COST_USD: body[COST_USD],
-                    COMPLETE: False,
-                    USAGE: body.get(USAGE),
-                }
-                emit_provider_event(
-                    COST_COMPONENT_EVENT,
-                    **{COMPONENT_ID: f"azure/{operation_url}", COST_USD: body[COST_USD], USAGE: body.get(USAGE)},
-                )
             status = str(body.get("status", "")).lower()
+            if body.get(COST_USD) is not None:
+                body.update(
+                    record_response_cost(
+                        body[COST_USD],
+                        body[USAGE],
+                        component_id=f"azure/{operation_url}",
+                        complete=status == "succeeded",
+                    )
+                )
             if status in _TERMINAL_STATUSES:
                 if status == "succeeded":
                     return body
-                raise ProviderPermanentError(
-                    f"Azure Content Understanding {context} failed: {body}",
-                    job_id=operation_url,
-                    debug_payload=body,
-                )
+                with preserve_cost_on_error(body):
+                    raise ProviderPermanentError(
+                        f"Azure Content Understanding {context} failed: {body}",
+                        job_id=operation_url,
+                        debug_payload=body,
+                    )
             budget.wait(self._poll_interval)
-        raise ProviderTransientError(
-            f"Timed out waiting for Azure Content Understanding {context}",
-            job_id=operation_url,
-            debug_payload=body,
-        )
+        with preserve_cost_on_error(body):
+            raise ProviderTransientError(
+                f"Timed out waiting for Azure Content Understanding {context}",
+                job_id=operation_url,
+                debug_payload=body,
+            )
 
     def _url(self, path: str, extra_params: Mapping[str, str] | None = None) -> str:
         params = {"api-version": self._api_version}
