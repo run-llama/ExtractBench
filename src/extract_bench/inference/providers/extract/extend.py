@@ -780,6 +780,7 @@ class ExtendProvider(Provider):
                 **{
                     COMPONENT_ID: f"extend/{run['id']}",
                     COST_USD: cost,
+                    COMPLETE: complete,
                     USAGE: run.get("usage"),
                 },
             )

@@ -12,10 +12,12 @@ from extend_ai import Extend
 from extract_bench.inference.cost_contract import (
     COMPLETE,
     COST_ACCOUNTING,
+    COST_COMPONENT_EVENT,
     COST_PER_PAGE_USD,
     COST_USD,
     KNOWN_COST_USD,
 )
+from extract_bench.inference.events import bind_provider_event_sink
 from extract_bench.inference.providers.base import ProviderPermanentError
 from extract_bench.inference.providers.extract.extend import ExtendProvider
 
@@ -29,6 +31,7 @@ def test_async_run_retains_receipt_and_terminal_payload(monkeypatch: pytest.Monk
         "processorVersionId": "dpv_test",
         "processorName": "test",
         "status": "PROCESSING",
+        "usage": {"totalCredits": 9},
         "output": {"value": {}, "metadata": {}},
         "reviewed": False,
         "edited": False,
@@ -62,17 +65,22 @@ def test_async_run_retains_receipt_and_terminal_payload(monkeypatch: pytest.Monk
     monkeypatch.setenv("EXTEND_API_KEY", "test")
     provider = ExtendProvider("extend", {"async_poll_interval": 0})
     provider._client = Extend(token="test", httpx_client=httpx.Client(transport=httpx.MockTransport(handle)))
-    if terminal_status == "FAILED":
-        with pytest.raises(ProviderPermanentError) as caught:
-            provider._run_processor_async("dp_test", "file_test")
-        assert caught.value.job_id == "dpr_test"
-        payload = caught.value.debug_payload
-        assert payload is not None
-        assert payload["processor_run"]["failure_message"] == "diagnostic detail"
-        assert payload[COST_ACCOUNTING][KNOWN_COST_USD] == pytest.approx(0.1125)
-        assert payload[COST_ACCOUNTING][COMPLETE] is True
-    else:
-        payload = provider._run_processor_async("dp_test", "file_test")
+    events = []
+    with bind_provider_event_sink(lambda event, payload: events.append((event, payload))):
+        if terminal_status == "FAILED":
+            with pytest.raises(ProviderPermanentError) as caught:
+                provider._run_processor_async("dp_test", "file_test")
+            assert caught.value.job_id == "dpr_test"
+            payload = caught.value.debug_payload
+            assert payload is not None
+            assert payload["processor_run"]["failure_message"] == "diagnostic detail"
+            assert payload[COST_ACCOUNTING][KNOWN_COST_USD] == pytest.approx(0.1125)
+            assert payload[COST_ACCOUNTING][COMPLETE] is True
+        else:
+            payload = provider._run_processor_async("dp_test", "file_test")
+    charges = [payload for event, payload in events if event == COST_COMPONENT_EVENT]
+    assert [charge[COMPLETE] for charge in charges] == [False, True]
+    assert [charge[COST_USD] for charge in charges] == pytest.approx([0.1125, 0.1125])
     assert payload["processor_run"]["usage"]["credits"] == 7
     assert payload["processor_run"]["futureDiagnostic"]["requestId"] == "request-test"
     execution = payload["_extend_execution"]
