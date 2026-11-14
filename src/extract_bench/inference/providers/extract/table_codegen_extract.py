@@ -22,6 +22,22 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+from extract_bench.inference.cost_contract import (
+    COMPLETE,
+    COMPONENT_ID,
+    COST_ACCOUNTING,
+    COST_COMPONENT_EVENT,
+    COST_PER_PAGE_USD,
+    COST_USD,
+    KNOWN_COST_USD,
+    MODEL,
+    PROVIDER,
+    RAW_COST_COMPLETE,
+    REPORTED_CALLS,
+    UNREPORTED_CALLS,
+    USAGE,
+    VENDOR_USAGE_EVENT,
+)
 from extract_bench.inference.events import emit_provider_event
 from extract_bench.inference.providers.base import (
     Provider,
@@ -285,18 +301,23 @@ class TableCodegenExtractProvider(Provider):
             product_type=ProductType.PARSE,
         )
         raw_parse = parse_provider.run_inference(parse_pipeline, parse_request)
+        # A parse call may return cost before normalization exposes a job ID.
+        # Separate invocations must add within one attempt; raw and normalized
+        # price updates reuse this component so the same bill is counted once.
         parse_component_id = f"table_codegen/parse/{uuid4()}"
-        raw_parse_cost = raw_parse.raw_output.get("cost_usd")
+        raw_parse_cost = raw_parse.raw_output.get(COST_USD)
         if raw_parse_cost is not None:
-            emit_provider_event("cost.component", component_id=parse_component_id, cost_usd=raw_parse_cost)
+            emit_provider_event(
+                COST_COMPONENT_EVENT,
+                **{COMPONENT_ID: parse_component_id, COST_USD: raw_parse_cost},
+            )
         parse_result = parse_provider.normalize(raw_parse)
-        parse_cost = raw_parse.raw_output.get("cost_usd")
+        parse_cost = raw_parse.raw_output.get(COST_USD)
         parse_job_id = extract_job_id_from_raw_payload(raw_parse.raw_output)
         if parse_cost is not None:
             emit_provider_event(
-                "cost.component",
-                component_id=parse_component_id,
-                cost_usd=parse_cost,
+                COST_COMPONENT_EVENT,
+                **{COMPONENT_ID: parse_component_id, COST_USD: parse_cost},
             )
         parse_out = parse_result.output
         if not isinstance(parse_out, ParseOutput):
@@ -317,7 +338,7 @@ class TableCodegenExtractProvider(Provider):
             pages = [{"page_num": p.page_index + 1, "text": p.markdown} for p in parse_out.pages]
             document = Document(pages)
             n_pages = len(pages)
-        parse_cost = raw_parse.raw_output.get("cost_usd")
+        parse_cost = raw_parse.raw_output.get(COST_USD)
         num_pages = int(raw_parse.raw_output.get("num_pages") or n_pages)
         parse_job_id = extract_job_id_from_raw_payload(raw_parse.raw_output)
         return document, parse_cost, num_pages, parse_job_id
@@ -395,13 +416,22 @@ class TableCodegenExtractProvider(Provider):
                 request.example_id,
             )
 
+        # The multi-call agent has no single vendor job ID. Each invocation gets
+        # its own component so nested calls add; cumulative response updates
+        # reuse it so earlier turns are not counted again.
         codegen_component_id = f"table_codegen/agent/{uuid4()}"
 
         def record_codegen_usage(usage: dict[str, int]) -> None:
-            emit_provider_event("vendor.usage", provider="table_codegen", model=self._model, usage=usage)
-            cost = self._codegen_cost(usage) if usage.get("reported_calls", 0) > 0 else None
+            emit_provider_event(
+                VENDOR_USAGE_EVENT,
+                **{COMPONENT_ID: codegen_component_id, PROVIDER: "table_codegen", MODEL: self._model, USAGE: usage},
+            )
+            cost = self._codegen_cost(usage) if usage.get(REPORTED_CALLS, 0) > 0 else None
             if cost is not None:
-                emit_provider_event("cost.component", component_id=codegen_component_id, cost_usd=cost, usage=usage)
+                emit_provider_event(
+                    COST_COMPONENT_EVENT,
+                    **{COMPONENT_ID: codegen_component_id, COST_USD: cost, USAGE: usage},
+                )
 
         # 2) Agent authors + gates an extractor; run it over the full document.
         result = generate_extractor(
@@ -428,15 +458,13 @@ class TableCodegenExtractProvider(Provider):
         )
         completed_at = datetime.now()
         usage = result.get("usage") or {}
-        codegen_cost = self._codegen_cost(usage) if usage.get("reported_calls", 0) > 0 else None
+        codegen_cost = self._codegen_cost(usage) if usage.get(REPORTED_CALLS, 0) > 0 else None
         known_costs = [cost for cost in (parse_cost, codegen_cost) if cost is not None]
         cost_usd = round(sum(known_costs), 6) if len(known_costs) > 0 else None
         if codegen_cost is not None:
             emit_provider_event(
-                "cost.component",
-                component_id=codegen_component_id,
-                cost_usd=codegen_cost,
-                usage=usage,
+                COST_COMPONENT_EVENT,
+                **{COMPONENT_ID: codegen_component_id, COST_USD: codegen_cost, USAGE: usage},
             )
         raw_output: dict[str, Any] = {
             "data": result.get("output"),
@@ -444,10 +472,10 @@ class TableCodegenExtractProvider(Provider):
             "usage": usage,
             "num_pages": num_pages,
             "cost_usd": cost_usd,
-            "_cost_complete": parse_cost is not None
+            RAW_COST_COMPLETE: parse_cost is not None
             and codegen_cost is not None
-            and usage.get("unreported_calls", 0) == 0,
-            "cost_per_page_usd": (cost_usd / num_pages) if num_pages and cost_usd is not None else None,
+            and usage.get(UNREPORTED_CALLS, 0) == 0,
+            COST_PER_PAGE_USD: (cost_usd / num_pages) if num_pages and cost_usd is not None else None,
             "parse_cost_usd": parse_cost,
             "codegen_cost_usd": codegen_cost,
             # The evaluator copies parse_job_id into the report. parse_pages is the
@@ -494,10 +522,10 @@ class TableCodegenExtractProvider(Provider):
                 "script": result.get("script", "") or "",
             },
         }
-        raw_output["cost_accounting"] = {
-            "known_cost_usd": cost_usd,
-            "complete": raw_output["_cost_complete"],
-            "usage": usage,
+        raw_output[COST_ACCOUNTING] = {
+            KNOWN_COST_USD: cost_usd,
+            COMPLETE: raw_output[RAW_COST_COMPLETE],
+            USAGE: usage,
         }
         # Accept a clean submit OR a *_salvaged result (the agent ran out of turns but
         # had produced a viable run — see generate_extractor's salvage). Everything else

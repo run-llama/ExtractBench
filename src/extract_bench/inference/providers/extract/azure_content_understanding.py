@@ -14,6 +14,15 @@ from urllib.parse import urlencode, urlparse, urlunparse
 
 import requests
 
+from extract_bench.inference.cost_contract import (
+    COMPLETE,
+    COMPONENT_ID,
+    COST_ACCOUNTING,
+    COST_COMPONENT_EVENT,
+    COST_USD,
+    KNOWN_COST_USD,
+    USAGE,
+)
 from extract_bench.inference.events import emit_provider_event
 from extract_bench.inference.limits import EXTRACT_HARD_TIMEOUT_S, execution_budget
 from extract_bench.inference.providers.base import (
@@ -221,17 +230,15 @@ class AzureContentUnderstandingProvider(Provider):
             response = self._request("GET", operation_url, context=context)
             body = _response_json(response)
             _apply_usage_cost_fields(body, self.base_config)
-            if body.get("cost_usd") is not None:
-                body["cost_accounting"] = {
-                    "known_cost_usd": body["cost_usd"],
-                    "complete": False,
-                    "usage": body.get("usage"),
+            if body.get(COST_USD) is not None:
+                body[COST_ACCOUNTING] = {
+                    KNOWN_COST_USD: body[COST_USD],
+                    COMPLETE: False,
+                    USAGE: body.get(USAGE),
                 }
                 emit_provider_event(
-                    "cost.component",
-                    component_id=f"azure/{operation_url}",
-                    cost_usd=body["cost_usd"],
-                    usage=body.get("usage"),
+                    COST_COMPONENT_EVENT,
+                    **{COMPONENT_ID: f"azure/{operation_url}", COST_USD: body[COST_USD], USAGE: body.get(USAGE)},
                 )
             status = str(body.get("status", "")).lower()
             if status in _TERMINAL_STATUSES:

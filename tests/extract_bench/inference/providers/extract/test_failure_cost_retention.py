@@ -176,3 +176,44 @@ def test_codegen_missing_usage_does_not_erase_prior_observed_usage(monkeypatch: 
     assert result["usage"]["input"] == 17
     assert result["usage"]["reported_calls"] == 1
     assert result["usage"]["unreported_calls"] == 1
+
+
+def test_unpriced_codegen_failure_keeps_usage_under_distinct_invocation_ids(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    provider = table_codegen_extract.TableCodegenExtractProvider(
+        "table_codegen_extract",
+        {"api_key": "offline", "model": "gpt-unpriced"},
+    )
+    monkeypatch.setattr(
+        provider, "_parse_agentic", lambda request: (SimpleNamespace(tables=lambda: [1]), None, 1, None)
+    )
+
+    def fail_after_usage(*args: object, **kwargs: object) -> None:
+        kwargs["on_usage"]({"input": 17, "output": 4, "reported_calls": 1})
+        raise RuntimeError("next API call failed")
+
+    monkeypatch.setattr(table_codegen_extract, "generate_extractor", fail_after_usage)
+    source = tmp_path / "one.pdf"
+    source.write_bytes(b"not parsed")
+    request = InferenceRequest.model_validate(
+        {
+            "example_id": "one",
+            "source_file_path": str(source),
+            "product_type": "extract",
+            "schema_override": {"type": "object"},
+        }
+    )
+    pipeline = PipelineSpec.model_validate(
+        {"pipeline_name": "fixture", "provider_name": "table_codegen_extract", "product_type": "extract"}
+    )
+    events = []
+    with bind_provider_event_sink(lambda name, payload: events.append((name, payload))):
+        for _ in range(2):
+            with pytest.raises(RuntimeError, match="next API call failed"):
+                provider.run_inference(pipeline, request)
+    usage_events = [payload for name, payload in events if name == "vendor.usage"]
+    assert len(usage_events) == 2
+    assert usage_events[0]["component_id"] != usage_events[1]["component_id"]
+    assert usage_events[0]["usage"]["input"] == 17
+    assert not any(name == "cost.component" for name, _ in events)

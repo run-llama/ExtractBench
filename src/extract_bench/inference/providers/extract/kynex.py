@@ -25,6 +25,9 @@ from typing import Any
 
 from filelock import FileLock, Timeout
 
+from extract_bench.inference.cost_contract import (
+    VENDOR_LOGS_EVENT,
+)
 from extract_bench.inference.events import emit_provider_event
 from extract_bench.inference.limits import EXTRACT_HARD_TIMEOUT_S
 from extract_bench.inference.providers.base import (
@@ -174,10 +177,16 @@ async def _extract_async(
                     "stderr": exc.stderr.decode(errors="replace") if isinstance(exc.stderr, bytes) else exc.stderr,
                     "harness_revision": HARNESS_REVISION,
                 }
-                emit_provider_event("vendor.logs", **logs)
+                emit_provider_event(
+                    VENDOR_LOGS_EVENT,
+                    **logs,
+                )
                 raise ProviderPermanentError("harness extraction timed out", debug_payload=logs) from exc
             logs = {"stdout": proc.stdout, "stderr": proc.stderr, "harness_revision": HARNESS_REVISION}
-            emit_provider_event("vendor.logs", **logs)
+            emit_provider_event(
+                VENDOR_LOGS_EVENT,
+                **logs,
+            )
             if proc.returncode != 0:
                 raise ProviderPermanentError(
                     f"harness extraction failed (exit {proc.returncode}): {(proc.stderr or proc.stdout)[-400:]}",

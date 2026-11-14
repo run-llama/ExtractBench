@@ -17,6 +17,15 @@ from typing import Any
 
 import httpx
 
+from extract_bench.inference.cost_contract import (
+    COMPLETE,
+    COMPONENT_ID,
+    COST_ACCOUNTING,
+    COST_COMPONENT_EVENT,
+    COST_USD,
+    KNOWN_COST_USD,
+    USAGE,
+)
 from extract_bench.inference.events import emit_provider_event
 from extract_bench.inference.limits import EXTRACT_HARD_TIMEOUT_S
 from extract_bench.inference.providers.base import (
@@ -521,22 +530,20 @@ class LlamaExtractV2Provider(Provider):
             resp = client.get(f"/api/v2/extract/{job_id}", params=poll_params)
             resp.raise_for_status()
             data = resp.json()
-            usage = data.get("usage")
+            usage = data.get(USAGE)
             if isinstance(usage, dict):
                 credits = [usage.get(key) for key in ("extract_credits", "parse_credits")]
                 known = [value for value in credits if isinstance(value, (int, float))]
                 if len(known) > 0:
                     cost = sum(known) * USD_PER_CREDIT
-                    data["cost_accounting"] = {
-                        "known_cost_usd": cost,
-                        "complete": len(known) == len(credits),
-                        "usage": usage,
+                    data[COST_ACCOUNTING] = {
+                        KNOWN_COST_USD: cost,
+                        COMPLETE: len(known) == len(credits),
+                        USAGE: usage,
                     }
                     emit_provider_event(
-                        "cost.component",
-                        component_id=f"llamaextract/{job_id}",
-                        cost_usd=cost,
-                        usage=usage,
+                        COST_COMPONENT_EVENT,
+                        **{COMPONENT_ID: f"llamaextract/{job_id}", COST_USD: cost, USAGE: usage},
                     )
             status = data.get("status", "UNKNOWN")
 
