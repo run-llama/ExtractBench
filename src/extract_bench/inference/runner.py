@@ -445,7 +445,10 @@ class InferenceRunner:
                         COST_ATTEMPT_EVENT,
                         {KNOWN_COST_USD: raw.get(COST_USD), COMPLETE: raw.get(RAW_COST_COMPLETE, True)},
                     )
-                attempt.outcome = "cancelled" if attempt.outcome == "cancelling" else "success"
+                if attempt.outcome == "cancelling":
+                    # Settle the bill in the error path without publishing the late prediction.
+                    raise ProviderPermanentError("Document execution deadline exceeded")
+                attempt.outcome = "success"
                 snapshot = self._persist_costs(request.example_id)
                 raw.update(
                     {

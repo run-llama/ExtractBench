@@ -313,8 +313,10 @@ def test_restarted_runner_keeps_paid_attempts_and_does_not_complete_interrupted_
         restarted.shutdown()
 
 
-@pytest.mark.parametrize("contradictory", [False, True])
-def test_cancellation_hook_costs_are_captured_from_controller_thread(tmp_path: Path, contradictory: bool) -> None:
+@pytest.mark.parametrize("contradictory,late_success", [(False, False), (True, False), (False, True)])
+def test_cancellation_hook_costs_are_captured_from_controller_thread(
+    tmp_path: Path, contradictory: bool, late_success: bool
+) -> None:
     import threading
 
     started = threading.Event()
@@ -323,6 +325,8 @@ def test_cancellation_hook_costs_are_captured_from_controller_thread(tmp_path: P
     def wait_for_cancel() -> dict[str, Any]:
         started.set()
         assert release.wait(timeout=10)
+        if late_success:
+            return {COST_USD: 8}
         raise ProviderPermanentError("cancelled", debug_payload={COST_ACCOUNTING: {KNOWN_COST_USD: 7, COMPLETE: True}})
 
     runner = _runner(tmp_path, [wait_for_cancel])
@@ -342,13 +346,16 @@ def test_cancellation_hook_costs_are_captured_from_controller_thread(tmp_path: P
         assert saved[KNOWN_COST_USD] == 7
         assert saved[COST_COMPLETE] is False
         release.set()
-        _, _, error = future.result(timeout=10)
+        raw, normalized, error = future.result(timeout=10)
         assert error is not None
+        assert raw is None and normalized is None
+        assert not any(path.exists() for path in runner._get_result_paths("doc"))
         if contradictory:
             assert "below recorded component charges" in error[0]
         settled = runner._cost_snapshot("doc")
-        assert settled[KNOWN_COST_USD] == 7
-        assert settled[TOTAL_COST_USD] == (None if contradictory else 7)
+        expected_bill = 8 if late_success else 7
+        assert settled[KNOWN_COST_USD] == expected_bill
+        assert settled[TOTAL_COST_USD] == (None if contradictory else expected_bill)
         assert settled[ATTEMPTS][0][OUTCOME] == "cancelled"
     finally:
         release.set()
