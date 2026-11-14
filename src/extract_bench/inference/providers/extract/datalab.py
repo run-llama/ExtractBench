@@ -27,18 +27,16 @@ from datalab_sdk import AsyncDatalabClient
 from datalab_sdk.models import ExtractOptions
 from pypdf import PdfReader
 
+from extract_bench.inference.cost_accounting import record_response_cost
 from extract_bench.inference.cost_contract import (
     COMPLETE,
-    COMPONENT_ID,
     COST_ACCOUNTING,
-    COST_COMPONENT_EVENT,
     COST_PER_PAGE_USD,
     COST_USD,
     EXTRACT_COST_USD,
     KNOWN_COST_USD,
     PARSE_COST_USD,
     RAW_COST_COMPLETE,
-    USAGE,
 )
 from extract_bench.inference.events import emit_provider_event
 from extract_bench.inference.limits import execution_budget
@@ -254,13 +252,11 @@ class DatalabExtractProvider(Provider):
         cost = raw_response.get(COST_USD)
         raw_response[RAW_COST_COMPLETE] = cost is not None
         if cost is not None:
-            emit_provider_event(
-                COST_COMPONENT_EVENT,
-                **{
-                    COMPONENT_ID: component_id,
-                    COST_USD: cost,
-                    USAGE: raw_response.get("cost_breakdown"),
-                },
+            usage = raw_response.get("cost_breakdown")
+            record_response_cost(
+                cost,
+                usage if usage is not None else {},
+                component_id=component_id,
             )
 
     async def _wait_for_confidence(

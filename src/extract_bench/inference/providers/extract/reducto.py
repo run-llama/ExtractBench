@@ -12,16 +12,14 @@ from uuid import uuid4
 
 from reducto import Reducto
 
+from extract_bench.inference.cost_accounting import record_response_cost
 from extract_bench.inference.cost_contract import (
     COMPLETE,
-    COMPONENT_ID,
     COST_ACCOUNTING,
-    COST_COMPONENT_EVENT,
     COST_PER_PAGE_USD,
     COST_USD,
     KNOWN_COST_USD,
     RAW_COST_COMPLETE,
-    USAGE,
 )
 from extract_bench.inference.events import emit_provider_event
 from extract_bench.inference.limits import execution_budget
@@ -184,13 +182,11 @@ class ReductoExtractProvider(Provider):
         raw[RAW_COST_COMPLETE] = cost is not None
         snapshot = {KNOWN_COST_USD: cost, COMPLETE: cost is not None}
         if cost is not None:
-            emit_provider_event(
-                COST_COMPONENT_EVENT,
-                **{
-                    COMPONENT_ID: component_id,
-                    COST_USD: cost,
-                    USAGE: raw.get("usage"),
-                },
+            usage = raw.get("usage")
+            record_response_cost(
+                cost,
+                usage if usage is not None else {},
+                component_id=component_id,
             )
         return snapshot
 

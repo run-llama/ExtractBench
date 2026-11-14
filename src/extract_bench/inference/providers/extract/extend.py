@@ -17,16 +17,14 @@ from extend_ai import Extend
 from extend_ai.core.api_error import ApiError
 from extend_ai.core.request_options import RequestOptions
 
+from extract_bench.inference.cost_accounting import record_response_cost
 from extract_bench.inference.cost_contract import (
     COMPLETE,
-    COMPONENT_ID,
     COST_ACCOUNTING,
-    COST_COMPONENT_EVENT,
     COST_PER_PAGE_USD,
     COST_USD,
     KNOWN_COST_USD,
     RAW_COST_COMPLETE,
-    USAGE,
 )
 from extract_bench.inference.events import emit_provider_event
 from extract_bench.inference.limits import DEFAULT_POLL_INTERVAL_S, ExecutionBudget, execution_budget
@@ -775,14 +773,12 @@ class ExtendProvider(Provider):
         payload[RAW_COST_COMPLETE] = complete
         snapshot = {KNOWN_COST_USD: cost, COMPLETE: complete}
         if cost is not None:
-            emit_provider_event(
-                COST_COMPONENT_EVENT,
-                **{
-                    COMPONENT_ID: f"extend/{run['id']}",
-                    COST_USD: cost,
-                    COMPLETE: complete,
-                    USAGE: run.get("usage"),
-                },
+            usage = run.get("usage")
+            record_response_cost(
+                cost,
+                usage if usage is not None else {},
+                complete=complete,
+                component_id=f"extend/{run['id']}",
             )
         return snapshot
 

@@ -8,6 +8,9 @@ import pytest
 
 pytest.importorskip("landingai_ade")
 
+from landingai_ade.types.extract_response import Metadata
+from landingai_ade.types.shared.parse_metadata import ParseMetadata
+
 from extract_bench.inference.cost_contract import (
     COMPLETE,
     COMPONENT_ID,
@@ -30,11 +33,11 @@ def test_parse_cost_survives_missing_or_failed_extraction(extract_credits: float
     provider._client = Mock()
     provider._client.parse.return_value = SimpleNamespace(
         markdown="text",
-        metadata=SimpleNamespace(credit_usage=12, page_count=2, job_id="parse-1"),
+        metadata=ParseMetadata.model_construct(credit_usage=12, page_count=2, job_id="parse-1"),
     )
     provider._client.extract.return_value = SimpleNamespace(
         extraction={},
-        metadata=SimpleNamespace(credit_usage=extract_credits, job_id="extract-1"),
+        metadata=Metadata.model_construct(credit_usage=extract_credits, job_id="extract-1"),
     )
     events = []
     if extract_credits == "failure":
@@ -60,11 +63,14 @@ def test_multiple_invocations_do_not_replace_each_others_charges() -> None:
     provider._model = None
     provider._client = Mock()
     provider._client.parse.side_effect = [
-        SimpleNamespace(markdown="text", metadata=SimpleNamespace(credit_usage=12, job_id=f"parse-{index}"))
+        SimpleNamespace(
+            markdown="text",
+            metadata=ParseMetadata.model_construct(credit_usage=12, job_id=f"parse-{index}"),
+        )
         for index in range(2)
     ]
     provider._client.extract.side_effect = [
-        SimpleNamespace(extraction={}, metadata=SimpleNamespace(credit_usage=5, job_id=f"extract-{index}"))
+        SimpleNamespace(extraction={}, metadata=Metadata.model_construct(credit_usage=5, job_id=f"extract-{index}"))
         for index in range(2)
     ]
     charges = {}

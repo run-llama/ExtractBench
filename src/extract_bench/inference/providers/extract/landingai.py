@@ -10,16 +10,14 @@ from typing import Any
 
 from landingai_ade import LandingAIADE
 
+from extract_bench.inference.cost_accounting import record_response_cost
 from extract_bench.inference.cost_contract import (
     COMPLETE,
-    COMPONENT_ID,
     COST_ACCOUNTING,
-    COST_COMPONENT_EVENT,
     COST_PER_PAGE_USD,
     COST_USD,
     KNOWN_COST_USD,
     RAW_COST_COMPLETE,
-    USAGE,
 )
 from extract_bench.inference.events import emit_provider_event
 from extract_bench.inference.limits import execution_budget
@@ -261,13 +259,10 @@ class LandingAIExtractProvider(Provider):
             # Repeated component IDs replace cumulative charges within an attempt.
             # Both SDK responses require metadata.job_id; scope it by stage so
             # parse and extract charges, and separate invocations, stay distinct.
-            emit_provider_event(
-                COST_COMPONENT_EVENT,
-                **{
-                    COMPONENT_ID: f"landingai/{stage}/{metadata.job_id}",
-                    COST_USD: credits * self.CREDIT_RATE_USD,
-                    USAGE: _to_plain_data(metadata),
-                },
+            record_response_cost(
+                credits * self.CREDIT_RATE_USD,
+                _to_plain_data(metadata),
+                component_id=f"landingai/{stage}/{metadata.job_id}",
             )
 
     def _cost_accounting(self, result: Mapping[str, Any]) -> dict[str, Any]:
