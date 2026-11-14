@@ -20,12 +20,24 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Literal
 from urllib.parse import quote
+from uuid import uuid4
 
 import aiohttp
 from datalab_sdk import AsyncDatalabClient
 from datalab_sdk.models import ExtractOptions
 from pypdf import PdfReader
 
+from extract_bench.inference.cost_accounting import record_response_cost
+from extract_bench.inference.cost_contract import (
+    COMPLETE,
+    COST_ACCOUNTING,
+    COST_PER_PAGE_USD,
+    COST_USD,
+    EXTRACT_COST_USD,
+    KNOWN_COST_USD,
+    PARSE_COST_USD,
+    RAW_COST_COMPLETE,
+)
 from extract_bench.inference.events import emit_provider_event
 from extract_bench.inference.limits import execution_budget
 from extract_bench.inference.providers.base import (
@@ -138,6 +150,7 @@ class DatalabExtractProvider(Provider):
 
     async def _extract_pdf_async(self, pdf_path: str, schema: dict[str, Any]) -> dict[str, Any]:
         """Call Datalab Extract and return the full response as a plain dict."""
+        raw_response: dict[str, Any] = {}
         try:
             extraction_started = time.perf_counter()
             pdf_page_count = _read_pdf_page_count(pdf_path)
@@ -166,7 +179,23 @@ class DatalabExtractProvider(Provider):
                 )
 
             extraction_latency_ms = (time.perf_counter() - extraction_started) * 1000
-            raw_response: dict[str, Any] = dataclasses.asdict(result)
+            raw_response = dataclasses.asdict(result)
+            # Repeated component IDs replace cumulative charges within an attempt.
+            # The SDK's request_id is optional; a local ID keeps separate calls
+            # distinct when absent. Choose once and reuse through confidence polls.
+            request_id = raw_response.get("request_id")
+            component_id = f"datalab/{request_id if request_id is not None else uuid4().hex}"
+            page_count = _coerce_positive_page_count(raw_response.get("page_count")) or pdf_page_count
+            if page_count is not None:
+                raw_response["page_count"] = page_count
+            if self._extraction_mode is not None:
+                _attach_datalab_extract_pricing(
+                    raw_response,
+                    page_count=page_count,
+                    parse_mode=self._parse_mode,
+                    extraction_mode=self._extraction_mode,
+                )
+            self._record_cost(raw_response, component_id)
             emit_provider_event(
                 "stage.completed",
                 provider="datalab",
@@ -174,7 +203,11 @@ class DatalabExtractProvider(Provider):
                 raw_output=raw_response,
             )
             if self._extraction_mode == "fast":
-                raw_response = await self._wait_for_confidence(raw_response, base_url=client.base_url)
+                raw_response = await self._wait_for_confidence(
+                    raw_response,
+                    base_url=client.base_url,
+                    component_id=component_id,
+                )
 
             # Client-observed time includes upload, parsing, and extraction.
             # Confidence waiting is measured separately; neither is server compute time.
@@ -190,30 +223,49 @@ class DatalabExtractProvider(Provider):
                 "skip_cache": self._skip_cache,
             }
 
-            page_count = _coerce_positive_page_count(raw_response.get("page_count")) or pdf_page_count
-            if page_count is not None:
-                raw_response["page_count"] = page_count
-            if self._extraction_mode is not None:
-                _attach_datalab_extract_pricing(
-                    raw_response,
-                    page_count=page_count,
-                    parse_mode=self._parse_mode,
-                    extraction_mode=self._extraction_mode,
-                )
-            _promote_api_cost_breakdown(raw_response)
-
             return raw_response
 
         except (ProviderTransientError, ProviderPermanentError):
             raise
         except Exception as e:
+            debug_payload = {
+                "raw_response": raw_response,
+                COST_ACCOUNTING: {
+                    KNOWN_COST_USD: raw_response.get(COST_USD),
+                    COMPLETE: raw_response.get(RAW_COST_COMPLETE, False),
+                },
+            }
             error_str = str(e).lower()
             transient_keywords = ["timeout", "network", "connection", "503", "502", "504", "429", "rate limit"]
             if any(keyword in error_str for keyword in transient_keywords):
-                raise ProviderTransientError(f"Transient error during extraction: {e}") from e
-            raise ProviderPermanentError(f"Error during extraction: {e}") from e
+                raise ProviderTransientError(
+                    f"Transient error during extraction: {e}",
+                    debug_payload=debug_payload,
+                ) from e
+            raise ProviderPermanentError(
+                f"Error during extraction: {e}",
+                debug_payload=debug_payload,
+            ) from e
 
-    async def _wait_for_confidence(self, completed: dict[str, Any], *, base_url: str) -> dict[str, Any]:
+    def _record_cost(self, raw_response: dict[str, Any], component_id: str) -> None:
+        _promote_api_cost_breakdown(raw_response)
+        cost = raw_response.get(COST_USD)
+        raw_response[RAW_COST_COMPLETE] = cost is not None
+        if cost is not None:
+            usage = raw_response.get("cost_breakdown")
+            record_response_cost(
+                cost,
+                usage if usage is not None else {},
+                component_id=component_id,
+            )
+
+    async def _wait_for_confidence(
+        self,
+        completed: dict[str, Any],
+        *,
+        base_url: str,
+        component_id: str,
+    ) -> dict[str, Any]:
         """Refresh the completed job through the documented REST result endpoint.
 
         Fast scores arrive after extraction. A failed or interrupted score wait
@@ -278,6 +330,7 @@ class DatalabExtractProvider(Provider):
                             **completed,
                             **{key: value for key, value in refreshed.items() if value is not None},
                         }
+                        self._record_cost(completed, component_id)
                         if completed.get("extraction_score_average") is not None:
                             status = ConfidencePollingStatusValues.SCORES_READY
                             break
@@ -416,10 +469,10 @@ def _attach_datalab_extract_pricing(
     total_cost = parse_cost + extract_cost
 
     raw_output.setdefault("page_count", page_count)
-    raw_output["parse_cost_usd"] = parse_cost
-    raw_output["extract_cost_usd"] = extract_cost
-    raw_output["cost_usd"] = total_cost
-    raw_output["cost_per_page_usd"] = total_cost / page_count
+    raw_output[PARSE_COST_USD] = parse_cost
+    raw_output[EXTRACT_COST_USD] = extract_cost
+    raw_output[COST_USD] = total_cost
+    raw_output[COST_PER_PAGE_USD] = total_cost / page_count
     raw_output["datalab_pricing"] = {
         "pricing_basis": "datalab_public_pricing_per_1000_pages",
         "parse_mode": parse_mode,
@@ -442,10 +495,10 @@ def _promote_api_cost_breakdown(raw_output: dict[str, Any]) -> None:
         return
 
     cost_usd = float(final_cents) / 100.0
-    raw_output["cost_usd"] = cost_usd
+    raw_output[COST_USD] = cost_usd
     page_count = _coerce_positive_page_count(raw_output.get("page_count"))
     if page_count is not None:
-        raw_output["cost_per_page_usd"] = cost_usd / page_count
+        raw_output[COST_PER_PAGE_USD] = cost_usd / page_count
 
 
 # ---------------------------------------------------------------------------

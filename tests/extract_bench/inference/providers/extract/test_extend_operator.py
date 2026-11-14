@@ -13,6 +13,14 @@ import httpx
 from extend_ai import Extend
 
 from extract_bench.evaluation.stats import build_operational_stats
+from extract_bench.inference.cost_contract import (
+    COMPLETE,
+    COST_ACCOUNTING,
+    COST_COMPONENT_EVENT,
+    COST_PER_PAGE_USD,
+    COST_USD,
+    KNOWN_COST_USD,
+)
 from extract_bench.inference.pipelines import get_pipeline
 from extract_bench.inference.providers.base import ProviderPermanentError
 from extract_bench.inference.providers.extract.extend_operator import (
@@ -133,17 +141,17 @@ def test_sdk_poll_preserves_full_operator_cost_without_double_counting_parse(mon
     assert result.raw_output["extract_credits"] == 80
     assert result.raw_output["agent_usage_credits"] == 88
     assert result.raw_output["agent_usage_usd"] == 1.10
-    assert result.raw_output["cost_usd"] == 3.10
-    assert result.raw_output["cost_per_page_usd"] == 3.10 / 40
+    assert result.raw_output[COST_USD] == 3.10
+    assert result.raw_output[COST_PER_PAGE_USD] == 3.10 / 40
     stats = {stat.name: stat.value for stat in build_operational_stats(result)}
     assert stats["agent_usage_usd"] == 1.10
-    assert stats["cost_usd"] == 3.10
+    assert stats[COST_USD] == 3.10
 
 
 def test_missing_rollup_does_not_add_parse_estimate_or_invent_agent_cost():
     raw = {"processor_run": {"usage": {"credits": 4}, "file": {"metadata": {"pageCount": 1}}}}
     _attach_operator_cost_stats(raw, {"usd_per_credit": 0.01})
-    assert raw["cost_usd"] == 0.04
+    assert raw[COST_USD] == 0.04
     assert "agent_usage_usd" not in raw
     assert "parse_credits" not in raw
 
@@ -218,7 +226,8 @@ def test_cancel_stops_only_the_requested_operator_worker(monkeypatch, tmp_path: 
             with pytest.raises(ProviderPermanentError, match="exr_first") as error:
                 futures["first"].result(timeout=5)
             assert error.value.job_id == "exr_first"
-            assert error.value.debug_payload == {"operator_run_id": "exr_first"}
+            assert error.value.debug_payload["operator_run_id"] == "exr_first"
+            assert error.value.debug_payload["processor_run"]["status"] == "PROCESSING"
             assert not futures["second"].done()
             assert not provider.cancel("first")
         finally:
@@ -226,3 +235,29 @@ def test_cancel_stops_only_the_requested_operator_worker(monkeypatch, tmp_path: 
             for name in started:
                 provider.cancel(name)
     assert not provider.cancel("second")
+
+
+@pytest.mark.parametrize("credits", [None, 12])
+def test_failed_operator_retains_returned_billing(monkeypatch: pytest.MonkeyPatch, credits: int | None) -> None:
+    from types import SimpleNamespace
+    from unittest.mock import Mock
+
+    from extract_bench.inference.events import bind_provider_event_sink
+
+    provider = ExtendOperatorProvider("extend_operator", {"api_key": "test"})
+    monkeypatch.setattr(provider, "_upload_file", lambda path: "file_test")
+    provider._cancel_event.set(threading.Event())
+    run = {"id": "exr_failed", "status": "FAILED", "usage": {"totalCredits": credits}}
+    provider._client = Mock()
+    provider._client.extract_runs.create.return_value = SimpleNamespace(model_dump=lambda **kwargs: run)
+    events = []
+    with bind_provider_event_sink(lambda event, payload: events.append((event, payload))):
+        with pytest.raises(ProviderPermanentError) as caught:
+            provider._extract_document("unused.pdf", {"type": "object"}, {"usd_per_credit": 0.02})
+    assert caught.value.job_id == "exr_failed"
+    assert caught.value.debug_payload["processor_run"] == run
+    accounting = caught.value.debug_payload[COST_ACCOUNTING]
+    assert accounting[KNOWN_COST_USD] == (None if credits is None else 0.24)
+    assert accounting[COMPLETE] is (credits is not None)
+    charges = [payload for event, payload in events if event == COST_COMPONENT_EVENT]
+    assert len(charges) == (0 if credits is None else 1)
