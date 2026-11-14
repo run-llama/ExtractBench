@@ -1,7 +1,9 @@
 """Paid attempts remain visible even when extraction or a later retry fails."""
 
+import asyncio
 import concurrent.futures
 import json
+import threading
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
@@ -40,7 +42,7 @@ from extract_bench.inference.providers.base import Provider, ProviderPermanentEr
 from extract_bench.inference.runner import InferenceRunner, RunSummary
 from extract_bench.schemas.extract_output import ExtractOutput
 from extract_bench.schemas.pipeline import PipelineSpec
-from extract_bench.schemas.pipeline_io import InferenceRequest, InferenceResult, RawInferenceResult
+from extract_bench.schemas.pipeline_io import EXECUTION_TIMEOUT_S, InferenceRequest, InferenceResult, RawInferenceResult
 from extract_bench.schemas.product import ProductType
 from extract_bench.test_cases.schema import ExtractTestCase
 
@@ -70,7 +72,9 @@ class _Provider(Provider):
             {
                 **raw_result.model_dump(),
                 "output": ExtractOutput(
-                    example_id=raw_result.request.example_id, pipeline_name=raw_result.pipeline_name, extracted_data={}
+                    example_id=raw_result.request.example_id,
+                    pipeline_name=raw_result.pipeline_name,
+                    extracted_data=raw_result.raw_output.get("data", {}),
                 ),
             }
         )
@@ -317,8 +321,6 @@ def test_restarted_runner_keeps_paid_attempts_and_does_not_complete_interrupted_
 def test_cancellation_hook_costs_are_captured_from_controller_thread(
     tmp_path: Path, contradictory: bool, late_success: bool
 ) -> None:
-    import threading
-
     started = threading.Event()
     release = threading.Event()
 
@@ -348,8 +350,11 @@ def test_cancellation_hook_costs_are_captured_from_controller_thread(
         release.set()
         raw, normalized, error = future.result(timeout=10)
         assert error is not None
-        assert raw is None and normalized is None
-        assert not any(path.exists() for path in runner._get_result_paths("doc"))
+        if late_success:
+            assert raw is not None and normalized is not None
+        else:
+            assert raw is None and normalized is None
+            assert not any(path.exists() for path in runner._get_result_paths("doc"))
         if contradictory:
             assert "below recorded component charges" in error[0]
         settled = runner._cost_snapshot("doc")
@@ -360,6 +365,83 @@ def test_cancellation_hook_costs_are_captured_from_controller_thread(
     finally:
         release.set()
         runner.shutdown()
+
+
+@pytest.mark.parametrize("timing", ["on_time", "provider", "normalization"])
+def test_saved_prediction_keeps_observed_output_and_scores_zero_after_deadline(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, timing: str
+) -> None:
+    expected = {"answer": 42}
+    data = tmp_path / "dataset"
+    source = data / "g" / "doc.pdf"
+    source.parent.mkdir(parents=True)
+    source.write_bytes(b"pdf")
+    source.with_suffix(".test.json").write_text(
+        json.dumps({"data_schema": {"type": "object"}, "expected_output": expected}), encoding="utf-8"
+    )
+    case = ExtractTestCase(
+        test_id="g/doc", group="g", file_path=source, schema={"type": "object"}, expected_output=expected
+    )
+
+    def complete() -> dict[str, Any]:
+        if timing == "provider":
+            runner._execution_budgets[case.test_id].deadline = 0
+        return {COST_USD: 8, "data": expected}
+
+    runner = _runner(tmp_path, [complete])
+    runner.max_concurrent = 1
+    normalize = runner.provider.normalize
+
+    def normalize_response(raw: RawInferenceResult) -> InferenceResult:
+        if timing == "normalization":
+            runner._execution_budgets[case.test_id].deadline = 0
+        if timing == "provider":
+            assert runner._get_result_paths(case.test_id)[0].is_file()
+        return normalize(raw)
+
+    monkeypatch.setattr(runner.provider, "normalize", normalize_response)
+    try:
+        live = asyncio.run(runner.run_test_cases([case], ProductType.EXTRACT, data))
+    finally:
+        runner.shutdown()
+
+    late = timing != "on_time"
+    assert (live.successful, live.failed) == ((0, 1) if late else (1, 0))
+    raw_path, result_path = runner._get_result_paths(case.test_id)
+    raw = json.loads(raw_path.read_text(encoding="utf-8"))
+    result = json.loads(result_path.read_text(encoding="utf-8"))
+    assert raw["raw_output"]["data"] == result["output"]["extracted_data"] == expected
+    for payload in (raw, result):
+        assert payload["latency_in_ms"] == 1
+        assert payload["raw_output"].get(EXECUTION_TIMEOUT_S) == (runner.per_file_timeout if late else None)
+        accounting = payload["raw_output"][ATTEMPT_ACCOUNTING]
+        assert accounting[TOTAL_COST_USD] == 8
+        assert accounting[ATTEMPTS][0][OUTCOME] == ("cancelled" if late else "success")
+
+    evaluator = EvaluationRunner(runner.output_dir, data)
+    report = evaluator.run_evaluation(product_type="extract", max_workers=1)
+    assert (report.successful, report.failed) == ((0, 1) if late else (1, 0))
+    (runner.output_dir / "_errors.json").unlink(missing_ok=True)
+    (runner.output_dir / f"{case.test_id}.cost.json").unlink()
+    replay = evaluator.run_evaluation(product_type="extract", max_workers=1)
+    (row,) = replay.per_example_results
+    assert {metric.metric_name: metric.value for metric in row.metrics}["extract_unified_value_f1"] == float(not late)
+    assert replay.aggregate_metrics == report.aggregate_metrics
+    stats = {stat.name: stat.value for stat in row.stats}
+    assert stats[COST_USD] == 8
+    assert stats["latency_ms"] == 1
+    assert (row.error is not None) == late
+
+    def unexpected_retry() -> dict[str, Any]:
+        pytest.fail("resume called the provider for a saved attempt")
+
+    resumed_runner = _runner(tmp_path, [unexpected_retry])
+    try:
+        resumed = asyncio.run(resumed_runner.run_test_cases([case], ProductType.EXTRACT, data))
+        assert resumed.skipped == 1
+        assert json.loads(result_path.read_text(encoding="utf-8")) == result
+    finally:
+        resumed_runner.shutdown()
 
 
 @pytest.mark.parametrize("content", ["{", "{}", '{"known_cost_usd": 2, "cost_complete": "yes"}'])

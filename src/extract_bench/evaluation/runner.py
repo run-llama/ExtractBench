@@ -51,7 +51,7 @@ from extract_bench.inference.cost_contract import (
 )
 from extract_bench.schemas.evaluation import EvaluationResult, EvaluationSummary, MetricValue
 from extract_bench.schemas.layout_detection_output import LayoutOutput
-from extract_bench.schemas.pipeline_io import InferenceRequest, InferenceResult
+from extract_bench.schemas.pipeline_io import EXECUTION_TIMEOUT_S, InferenceRequest, InferenceResult
 from extract_bench.schemas.product import ProductType
 from extract_bench.test_cases import load_test_cases
 from extract_bench.test_cases.parse_rule_schemas import get_rule_type
@@ -881,6 +881,7 @@ class EvaluationRunner:
         # established the metric set, so a document the evaluator could not score
         # still counts against the pipeline instead of vanishing.
         evaluation_failures: dict[tuple[str, str], tuple[str, dict[str, Any]]] = {}
+        late_predictions: dict[tuple[str, str], InferenceResult] = {}
 
         # Separate QA and non-QA evaluations
         qa_evaluation_tasks: list[tuple[InferenceResult, ParseTestCase, QAEvaluator]] = []
@@ -949,6 +950,17 @@ class EvaluationRunner:
                         f"(example_id: {inference_result.request.example_id})"
                     )
                 continue
+
+            if inference_result.product_type == ProductType.EXTRACT:
+                timeout = inference_result.raw_output.get(EXECUTION_TIMEOUT_S)
+                if timeout is not None:
+                    key = (inference_result.pipeline_name, test_case.test_id)
+                    evaluation_failures[key] = (
+                        f"Per-file timeout ({timeout:g}s) exceeded; prediction retained",
+                        {"inference_failed": True, "error_type": "TimeoutError", "timeout_seconds": timeout},
+                    )
+                    late_predictions[key] = inference_result
+                    continue
 
             # Get appropriate evaluator
             # Expand qa_configs (plural) into per-question QA evaluation tasks
@@ -1440,6 +1452,7 @@ class EvaluationRunner:
                     "_pipeline_dir": failure_pipeline,
                     "error": error,
                     "_failure_metadata": metadata,
+                    "_late_prediction": late_predictions.get((failure_pipeline, test_id)),
                 }
                 for (failure_pipeline, test_id), (error, metadata) in evaluation_failures.items()
             ]
@@ -1704,6 +1717,8 @@ class EvaluationRunner:
                 continue
             penalized_result_keys.add(result_key)
 
+            late_prediction = entry.get("_late_prediction")
+            row_product_type = ProductType.EXTRACT.value if late_prediction is not None else product_type or ""
             metric_names = set(per_pipeline_metrics.get(failure_pipeline, set()))
             diagnostic_metric_names = set(per_pipeline_diagnostic_metrics.get(failure_pipeline, set()))
             if not metric_names and not diagnostic_metric_names:
@@ -1712,7 +1727,7 @@ class EvaluationRunner:
                 # to the always-emitted headline metrics for the product type so
                 # a pipeline that fails on every document scores 0.0 instead of
                 # vanishing from the report.
-                metric_names = set(_FALLBACK_METRIC_NAMES.get(product_type or "", ()))
+                metric_names = set(_FALLBACK_METRIC_NAMES.get(row_product_type, ()))
                 if not metric_names:
                     continue
 
@@ -1730,7 +1745,7 @@ class EvaluationRunner:
                     test_id=test_case.test_id,
                     example_id=example_id,
                     pipeline_name=failure_pipeline,
-                    product_type=product_type or "",
+                    product_type=row_product_type,
                     success=True,
                     metrics=[
                         MetricValue(
@@ -1748,9 +1763,20 @@ class EvaluationRunner:
                         )
                         for name in sorted(diagnostic_metric_names)
                     ],
-                    stats=build_cost_stats(entry) if product_type == "extract" else [],
+                    stats=(
+                        build_operational_stats(late_prediction)
+                        if late_prediction is not None
+                        else build_cost_stats(entry)
+                        if row_product_type == "extract"
+                        else []
+                    ),
                     error=rendered_error,
-                    job_id=entry.get("job_id"),
+                    job_id=late_prediction.raw_output.get("job_id")
+                    if late_prediction is not None
+                    else entry.get("job_id"),
+                    parse_job_id=late_prediction.raw_output.get("parse_job_id")
+                    if late_prediction is not None
+                    else None,
                     tags=list(test_case.tags),
                 )
             )

@@ -64,6 +64,7 @@ from extract_bench.inference.providers.base import (
 )
 from extract_bench.schemas.pipeline import PipelineSpec
 from extract_bench.schemas.pipeline_io import (
+    EXECUTION_TIMEOUT_S,
     InferenceRequest,
     InferenceResult,
     RawInferenceResult,
@@ -445,10 +446,10 @@ class InferenceRunner:
                         COST_ATTEMPT_EVENT,
                         {KNOWN_COST_USD: raw.get(COST_USD), COMPLETE: raw.get(RAW_COST_COMPLETE, True)},
                     )
-                if attempt.outcome == "cancelling":
-                    # Settle the bill in the error path without publishing the late prediction.
-                    raise ProviderPermanentError("Document execution deadline exceeded")
-                attempt.outcome = "success"
+                late = self._extract_deadline_exceeded(request.example_id)
+                if late:
+                    raw[EXECUTION_TIMEOUT_S] = self.per_file_timeout
+                attempt.outcome = "cancelled" if late else "success"
                 snapshot = self._persist_costs(request.example_id)
                 raw.update(
                     {
@@ -683,6 +684,41 @@ class InferenceRunner:
             normalized_path.parent.mkdir(parents=True, exist_ok=True)
             normalized_path.write_text(normalized_result.model_dump_json(indent=2))
 
+    def _extract_deadline_exceeded(self, example_id: str) -> bool:
+        budget = self._execution_budgets[example_id]
+        return example_id in self._cancelled_examples or time.monotonic() >= budget.deadline
+
+    def _mark_late_result(self, raw: RawInferenceResult, example_id: str) -> None:
+        if raw.product_type != ProductType.EXTRACT or EXECUTION_TIMEOUT_S in raw.raw_output:
+            return
+        with self._cost_lock:
+            if self._extract_deadline_exceeded(example_id):
+                raw.raw_output[EXECUTION_TIMEOUT_S] = self.per_file_timeout
+                self._cost_attempts[example_id][-1].outcome = "cancelled"
+                raw.raw_output[ATTEMPT_ACCOUNTING] = self._persist_costs(example_id)
+
+    def _normalize_and_save_result(
+        self, raw: RawInferenceResult, example_id: str
+    ) -> tuple[InferenceResult, tuple[str, str, str] | None]:
+        self._mark_late_result(raw, example_id)
+        raw_preserved = EXECUTION_TIMEOUT_S in raw.raw_output
+        if raw_preserved:
+            # Preserve the response before normalization or a network fetch.
+            self._save_result(raw, None)
+        else:
+            self._fetch_parse_job_logs(raw, example_id)
+        normalized = self.provider.normalize(raw)
+        self._mark_late_result(raw, example_id)
+        timeout = raw.raw_output.get(EXECUTION_TIMEOUT_S)
+        if timeout is not None:
+            normalized.raw_output.update(
+                {EXECUTION_TIMEOUT_S: timeout, ATTEMPT_ACCOUNTING: raw.raw_output[ATTEMPT_ACCOUNTING]}
+            )
+            self._save_result(None if raw_preserved else raw, normalized)
+            return normalized, (f"Per-file timeout ({timeout:g}s) exceeded; prediction retained", "", "TimeoutError")
+        self._save_result(raw, normalized)
+        return normalized, None
+
     def _save_error_debug_payload(self, example_id: str, payload: dict[str, Any]) -> str | None:
         """Save provider-supplied debug payload for a failed example."""
         try:
@@ -863,7 +899,7 @@ class InferenceRunner:
 
     def _process_document(
         self, pdf_path: Path, example_id: str, product_type: ProductType
-    ) -> tuple[RawInferenceResult | None, InferenceResult | None, str | None]:
+    ) -> tuple[RawInferenceResult | None, InferenceResult | None, tuple[str, str, str] | None]:
         """
         Process a single document (synchronous).
 
@@ -904,26 +940,16 @@ class InferenceRunner:
             else:
                 raise last_error  # type: ignore[misc]
 
-            # Fetch parse jobLogs + extract token usage BEFORE normalize, so that
-            # token fields land in the InferenceResult that evaluation reads.
-            self._fetch_parse_job_logs(raw_result, example_id)
+            normalized_result, deadline_error = self._normalize_and_save_result(raw_result, example_id)
 
-            # Normalize (phase 2: convert to structured output)
-            normalized_result = self.provider.normalize(raw_result)
-
-            # Save results
-            self._save_result(raw_result, normalized_result)
-
-            # Update job status
             if self.use_rich and example_id in self.job_statuses:
-                self.job_statuses[example_id].status = "completed"
-                self.job_statuses[example_id].completed_at = datetime.now()
-                if normalized_result:
-                    self.job_statuses[example_id].latency_ms = normalized_result.latency_in_ms
-                elif raw_result:
-                    self.job_statuses[example_id].latency_ms = raw_result.latency_in_ms
+                status = self.job_statuses[example_id]
+                status.status = "failed" if deadline_error is not None else "completed"
+                status.error = deadline_error[0] if deadline_error is not None else None
+                status.completed_at = datetime.now()
+                status.latency_ms = normalized_result.latency_in_ms
 
-            return raw_result, normalized_result, None
+            return raw_result, normalized_result, deadline_error
 
         except ProviderError as e:
             import traceback
@@ -936,7 +962,7 @@ class InferenceRunner:
                 self.job_statuses[example_id].status = "failed"
                 self.job_statuses[example_id].error = error_msg
                 self.job_statuses[example_id].completed_at = datetime.now()
-            return None, None, (error_msg, error_traceback, type(e).__name__)  # type: ignore[return-value]
+            return None, None, (error_msg, error_traceback, type(e).__name__)
         except Exception as e:
             import traceback
 
@@ -948,11 +974,11 @@ class InferenceRunner:
                 self.job_statuses[example_id].status = "failed"
                 self.job_statuses[example_id].error = error_msg
                 self.job_statuses[example_id].completed_at = datetime.now()
-            return None, None, (error_msg, error_traceback, type(e).__name__)  # type: ignore[return-value]
+            return None, None, (error_msg, error_traceback, type(e).__name__)
 
     def _process_test_case(
         self, test_case: TestCase, product_type: ProductType
-    ) -> tuple[RawInferenceResult | None, InferenceResult | None, str | None]:
+    ) -> tuple[RawInferenceResult | None, InferenceResult | None, tuple[str, str, str] | None]:
         """
         Process a single test case (synchronous).
 
@@ -1000,26 +1026,16 @@ class InferenceRunner:
             else:
                 raise last_error  # type: ignore[misc]
 
-            # Fetch parse jobLogs + extract token usage BEFORE normalize, so that
-            # token fields land in the InferenceResult that evaluation reads.
-            self._fetch_parse_job_logs(raw_result, test_case.test_id)
+            normalized_result, deadline_error = self._normalize_and_save_result(raw_result, test_case.test_id)
 
-            # Normalize (phase 2: convert to structured output)
-            normalized_result = self.provider.normalize(raw_result)
-
-            # Save results
-            self._save_result(raw_result, normalized_result)
-
-            # Update job status
             if self.use_rich and test_case.test_id in self.job_statuses:
-                self.job_statuses[test_case.test_id].status = "completed"
-                self.job_statuses[test_case.test_id].completed_at = datetime.now()
-                if normalized_result:
-                    self.job_statuses[test_case.test_id].latency_ms = normalized_result.latency_in_ms
-                elif raw_result:
-                    self.job_statuses[test_case.test_id].latency_ms = raw_result.latency_in_ms
+                status = self.job_statuses[test_case.test_id]
+                status.status = "failed" if deadline_error is not None else "completed"
+                status.error = deadline_error[0] if deadline_error is not None else None
+                status.completed_at = datetime.now()
+                status.latency_ms = normalized_result.latency_in_ms
 
-            return raw_result, normalized_result, None
+            return raw_result, normalized_result, deadline_error
 
         except ProviderError as e:
             import traceback
@@ -1038,7 +1054,7 @@ class InferenceRunner:
                 self.job_statuses[test_case.test_id].status = "failed"
                 self.job_statuses[test_case.test_id].error = error_msg
                 self.job_statuses[test_case.test_id].completed_at = datetime.now()
-            return None, None, (error_msg, error_traceback, type(e).__name__)  # type: ignore[return-value]
+            return None, None, (error_msg, error_traceback, type(e).__name__)
         except Exception as e:
             import traceback
 
@@ -1050,7 +1066,7 @@ class InferenceRunner:
                 self.job_statuses[test_case.test_id].status = "failed"
                 self.job_statuses[test_case.test_id].error = error_msg
                 self.job_statuses[test_case.test_id].completed_at = datetime.now()
-            return None, None, (error_msg, error_traceback, type(e).__name__)  # type: ignore[return-value]
+            return None, None, (error_msg, error_traceback, type(e).__name__)
 
     def _run_files_sync(
         self,
