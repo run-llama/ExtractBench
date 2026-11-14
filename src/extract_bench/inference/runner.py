@@ -97,7 +97,7 @@ class _AttemptCost:
     reported_cost_usd: float | None = None
     complete: bool = False
 
-    def observe(self, payload: Mapping[str, Any], *, component: bool = False) -> None:
+    def observe(self, payload: Mapping[str, Any], *, component: bool = False, usage_only: bool = False) -> None:
         value = payload.get(COST_USD if component else KNOWN_COST_USD)
         if value is not None and (
             isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value < 0
@@ -108,10 +108,14 @@ class _AttemptCost:
             previous = self.components.get(component_id, {})
             # A vendor can replace an estimate with a smaller final bill. Missing
             # prices retain observed usage and any previously reported charge.
+            component_complete = (
+                previous.get(COMPLETE, previous.get(COST_USD) is not None) if usage_only else value is not None
+            )
             self.components[component_id] = {
                 **previous,
                 **{key: item for key, item in payload.items() if key not in {COMPONENT_ID, COST_USD}},
                 COST_USD: value if value is not None else previous.get(COST_USD),
+                COMPLETE: payload.get(COMPLETE, component_complete),
             }
             if self.components[component_id] != previous:
                 self.complete = False
@@ -126,10 +130,14 @@ class _AttemptCost:
         candidates = [item for item in (self.reported_cost_usd, component_total) if item is not None]
         self.known_cost_usd = max(candidates) if len(candidates) > 0 else None
         if self.complete:
-            self.complete = self.reported_cost_usd is not None and math.isclose(
-                self.reported_cost_usd,
-                self.known_cost_usd,
-                rel_tol=1e-12,
+            self.complete = (
+                all(item.get(COMPLETE, True) is True for item in self.components.values())
+                and self.reported_cost_usd is not None
+                and math.isclose(
+                    self.reported_cost_usd,
+                    self.known_cost_usd,
+                    rel_tol=1e-12,
+                )
             )
 
     def snapshot(self) -> dict[str, Any]:
@@ -432,7 +440,7 @@ class InferenceRunner:
         if event not in {COST_COMPONENT_EVENT, COST_ATTEMPT_EVENT, VENDOR_USAGE_EVENT}:
             return
         with self._cost_lock:
-            attempt.observe(payload, component=event != COST_ATTEMPT_EVENT)
+            attempt.observe(payload, component=event != COST_ATTEMPT_EVENT, usage_only=event == VENDOR_USAGE_EVENT)
             self._persist_costs(example_id)
 
     def _run_provider_inference(self, request: InferenceRequest) -> RawInferenceResult:

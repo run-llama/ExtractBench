@@ -31,6 +31,7 @@ from extract_bench.inference.cost_contract import (
     RAW_COST_COMPLETE,
     SUCCESSFUL_ATTEMPT_COST_USD,
     TOTAL_COST_USD,
+    UNREPORTED_CALLS,
     USAGE,
     VENDOR_USAGE_EVENT,
 )
@@ -150,8 +151,8 @@ def test_component_snapshots_and_final_bill_are_not_added_twice(
         assert stats.get(COST_USD) == (pytest.approx(expected_total) if expected_total is not None else None)
         persisted = json.loads((runner.output_dir / "doc.cost.json").read_text(encoding="utf-8"))
         assert persisted[ATTEMPTS][0][COMPONENTS] == {
-            "parse": {COST_USD: parse, USAGE: {"pages": 4}},
-            "extract": {COST_USD: extraction, USAGE: {"tokens": 500}},
+            "parse": {COST_USD: parse, COMPLETE: True, USAGE: {"pages": 4}},
+            "extract": {COST_USD: extraction, COMPLETE: True, USAGE: {"tokens": 500}},
         }
     finally:
         runner.shutdown()
@@ -408,9 +409,51 @@ def test_unpriced_usage_survives_later_failure_without_inventing_a_zero_bill(tmp
         runner._process_document(source, "doc", ProductType.EXTRACT)
         accounting = json.loads((runner.output_dir / "doc.cost.json").read_text(encoding="utf-8"))
         component = accounting[ATTEMPTS][0][COMPONENTS]["codegen"]
-        assert component == {PROVIDER: "test_vendor", MODEL: "unpriced", COST_USD: None, USAGE: {"input_tokens": 15}}
+        assert component == {
+            PROVIDER: "test_vendor",
+            MODEL: "unpriced",
+            COST_USD: None,
+            COMPLETE: False,
+            USAGE: {"input_tokens": 15},
+        }
         assert accounting[KNOWN_COST_USD] is None
         assert accounting[TOTAL_COST_USD] is None
         assert accounting[COST_COMPLETE] is False
+    finally:
+        runner.shutdown()
+
+
+@pytest.mark.parametrize("usage_first", [False, True])
+@pytest.mark.parametrize("resolved_bill", [False, True])
+def test_partial_component_coverage_survives_usage_order_and_terminal_failure(
+    tmp_path: Path,
+    usage_first: bool,
+    resolved_bill: bool,
+) -> None:
+    def failed() -> dict[str, Any]:
+        events = [
+            (VENDOR_USAGE_EVENT, {COMPONENT_ID: "codegen", USAGE: {UNREPORTED_CALLS: 1}}),
+            (COST_COMPONENT_EVENT, {COMPONENT_ID: "codegen", COST_USD: 2, COMPLETE: False}),
+        ]
+        for event, payload in events if usage_first else reversed(events):
+            emit_provider_event(event, **payload)
+        if resolved_bill:
+            # A subsequent full bill resolves unknown pricing; the omitted flag defaults to complete.
+            emit_provider_event(COST_COMPONENT_EVENT, **{COMPONENT_ID: "codegen", COST_USD: 3})
+        raise ProviderPermanentError(
+            "later API failure",
+            debug_payload={COST_ACCOUNTING: {KNOWN_COST_USD: 3 if resolved_bill else 2, COMPLETE: True}},
+        )
+
+    runner = _runner(tmp_path, [failed])
+    source = tmp_path / "doc.pdf"
+    source.write_bytes(b"pdf")
+    try:
+        runner._process_document(source, "doc", ProductType.EXTRACT)
+        accounting = runner._cost_snapshot("doc")
+        assert accounting[KNOWN_COST_USD] == (3 if resolved_bill else 2)
+        assert accounting[COST_COMPLETE] is resolved_bill
+        assert accounting[TOTAL_COST_USD] == (3 if resolved_bill else None)
+        assert accounting[ATTEMPTS][0][COMPONENTS]["codegen"][USAGE][UNREPORTED_CALLS] == 1
     finally:
         runner.shutdown()
