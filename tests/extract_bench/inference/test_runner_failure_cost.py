@@ -120,15 +120,12 @@ def test_retry_cost_includes_failed_attempt_without_assuming_unknown_bill_is_zer
         runner.shutdown()
 
 
-@pytest.mark.parametrize(
-    "parse,extraction,snapshot,expected_total", [(2.0, 3.0, 5.0, 5.0), (2.0, 3.0, 4.0, None), (0.1, 0.2, 0.3, 0.3)]
-)
+@pytest.mark.parametrize("parse,extraction,snapshot", [(2.0, 3.0, 5.0), (0.1, 0.2, 0.3)])
 def test_component_snapshots_and_final_bill_are_not_added_twice(
     tmp_path: Path,
     parse: float,
     extraction: float,
     snapshot: float,
-    expected_total: float | None,
 ) -> None:
     def paid() -> dict[str, Any]:
         emit_provider_event(COST_COMPONENT_EVENT, **{COMPONENT_ID: "parse", COST_USD: parse / 2})
@@ -148,7 +145,7 @@ def test_component_snapshots_and_final_bill_are_not_added_twice(
         raw = runner._run_provider_inference(request)
         stats = {stat.name: stat.value for stat in build_cost_stats(raw.raw_output)}
         assert stats[KNOWN_COST_USD] == pytest.approx(parse + extraction)
-        assert stats.get(COST_USD) == (pytest.approx(expected_total) if expected_total is not None else None)
+        assert stats[COST_USD] == pytest.approx(snapshot)
         persisted = json.loads((runner.output_dir / "doc.cost.json").read_text(encoding="utf-8"))
         assert persisted[ATTEMPTS][0][COMPONENTS] == {
             "parse": {COST_USD: parse, COMPLETE: True, USAGE: {"pages": 4}},
@@ -192,6 +189,40 @@ def test_failure_report_retains_known_cost_and_distinguishes_unbilled_from_free(
         assert stats.get(KNOWN_COST_USD) == bill
         assert stats.get(COST_USD) == bill
         assert stats[COST_COMPLETE] == float(bill is not None)
+    finally:
+        runner.shutdown()
+
+
+@pytest.mark.parametrize("bill_source", ["result", "error", "event"])
+def test_contradictory_final_bill_preserves_charges_without_retry(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, bill_source: str
+) -> None:
+    monkeypatch.setattr(runner_module, "INITIAL_BACKOFF_S", 0)
+    calls = 0
+
+    def contradictory_bill() -> dict[str, Any]:
+        nonlocal calls
+        calls += 1
+        emit_provider_event(COST_COMPONENT_EVENT, **{COMPONENT_ID: "extract", COST_USD: 2})
+        final = {KNOWN_COST_USD: 1, COMPLETE: True}
+        if bill_source == "error":
+            raise ProviderTransientError("provider failed", debug_payload={COST_ACCOUNTING: final})
+        if bill_source == "event":
+            emit_provider_event(COST_ATTEMPT_EVENT, **final)
+        return {COST_USD: 1}
+
+    runner = _runner(tmp_path, [contradictory_bill, contradictory_bill])
+    source = tmp_path / "doc.pdf"
+    source.write_bytes(b"pdf")
+    try:
+        raw, normalized, error = runner._process_document(source, "doc", ProductType.EXTRACT)
+        assert raw is None and normalized is None
+        assert error is not None and "below recorded component charges" in error[0]
+        assert calls == 1
+        saved = json.loads((runner.output_dir / "doc.cost.json").read_text(encoding="utf-8"))
+        assert saved[ATTEMPTS][0][OUTCOME] == "error"
+        assert saved[KNOWN_COST_USD] == 2
+        assert saved[TOTAL_COST_USD] is None
     finally:
         runner.shutdown()
 
@@ -282,7 +313,8 @@ def test_restarted_runner_keeps_paid_attempts_and_does_not_complete_interrupted_
         restarted.shutdown()
 
 
-def test_cancellation_hook_costs_are_captured_from_controller_thread(tmp_path: Path) -> None:
+@pytest.mark.parametrize("contradictory", [False, True])
+def test_cancellation_hook_costs_are_captured_from_controller_thread(tmp_path: Path, contradictory: bool) -> None:
     import threading
 
     started = threading.Event()
@@ -291,13 +323,13 @@ def test_cancellation_hook_costs_are_captured_from_controller_thread(tmp_path: P
     def wait_for_cancel() -> dict[str, Any]:
         started.set()
         assert release.wait(timeout=10)
-        raise ProviderPermanentError("cancelled")
+        raise ProviderPermanentError("cancelled", debug_payload={COST_ACCOUNTING: {KNOWN_COST_USD: 7, COMPLETE: True}})
 
     runner = _runner(tmp_path, [wait_for_cancel])
 
     def cancel(example_id: str) -> None:
         emit_provider_event(COST_COMPONENT_EVENT, **{COMPONENT_ID: "cancelled_job", COST_USD: 7})
-        emit_provider_event(COST_ATTEMPT_EVENT, **{KNOWN_COST_USD: 7, COMPLETE: True})
+        emit_provider_event(COST_ATTEMPT_EVENT, **{KNOWN_COST_USD: 6 if contradictory else 7, COMPLETE: True})
 
     runner.provider.cancel = cancel
     source = tmp_path / "doc.pdf"
@@ -310,8 +342,14 @@ def test_cancellation_hook_costs_are_captured_from_controller_thread(tmp_path: P
         assert saved[KNOWN_COST_USD] == 7
         assert saved[COST_COMPLETE] is False
         release.set()
-        future.result(timeout=10)
-        assert runner._cost_snapshot("doc")[TOTAL_COST_USD] == 7
+        _, _, error = future.result(timeout=10)
+        assert error is not None
+        if contradictory:
+            assert "below recorded component charges" in error[0]
+        settled = runner._cost_snapshot("doc")
+        assert settled[KNOWN_COST_USD] == 7
+        assert settled[TOTAL_COST_USD] == (None if contradictory else 7)
+        assert settled[ATTEMPTS][0][OUTCOME] == "cancelled"
     finally:
         release.set()
         runner.shutdown()
