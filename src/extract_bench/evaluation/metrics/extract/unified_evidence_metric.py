@@ -188,9 +188,9 @@ type TargetIndex = dict[str, Sequence[EvidenceTarget]]
 
 
 @dataclass(frozen=True)
-class ValueEvidence:
+class _ValueEvidence:
     value: Any
-    pages: set[int]
+    pages: frozenset[int]
     targets: Sequence[EvidenceTarget]
 
 
@@ -245,8 +245,10 @@ class GradedCell:
 # ``envelope``: OR of ANDs -- a coarse evidence entry is the envelope of the
 # precise entries it encloses and a citation must cover all of it (default).
 # ``any``: the original flat OR -- any citation box against any evidence box.
-BBOX_MATCH_MODES: frozenset[str] = frozenset({"envelope", "any"})
-DEFAULT_BBOX_MATCH_MODE = "envelope"
+BBOX_MATCH_MODE_ENVELOPE = "envelope"
+BBOX_MATCH_MODE_ANY = "any"
+BBOX_MATCH_MODES = frozenset({BBOX_MATCH_MODE_ENVELOPE, BBOX_MATCH_MODE_ANY})
+DEFAULT_BBOX_MATCH_MODE = BBOX_MATCH_MODE_ENVELOPE
 # A precise entry is a part of a coarse entry on the same page when it lies
 # inside it. Envelopes are the union of their lines, so containment is 1.0 up
 # to 5-decimal rounding on stored boxes. 0.99 admits that rounding without
@@ -689,7 +691,7 @@ class Scorer:
         fuzzy: dict[str, float],
         iou_threshold: float,
         evidence_targets: TargetIndex | None = None,
-        value_evidence: Mapping[str, Sequence[ValueEvidence]] | None = None,
+        value_evidence: Mapping[str, Sequence[_ValueEvidence]] | None = None,
         bbox_match_mode: str = DEFAULT_BBOX_MATCH_MODE,
         graded_cells: list[GradedCell] | None = None,
         value_cells: MutableSequence[ValueCell] | None = None,
@@ -871,14 +873,14 @@ class Scorer:
     def _gt_targets(self, gt_path: str) -> Sequence[EvidenceTarget] | None:
         return self._ev_targets.get(gt_path)
 
-    def _target_hit(self, target: EvidenceTarget, pred: list[PageBBox]) -> bool:
+    def _target_hit(self, target: EvidenceTarget, pred: Sequence[PageBBox]) -> bool:
         return evidence_target_hit(target, pred, iou_threshold=self._iou)
 
     def _box_match(self, gt_path: str, pred_path: str) -> bool:
         pred = self._pred_boxes.get(pred_path)
         if pred is None:
             return False
-        if self._mode == "envelope":
+        if self._mode == BBOX_MATCH_MODE_ENVELOPE:
             targets = self._gt_targets(gt_path)
             if targets is None:
                 return False
@@ -914,15 +916,16 @@ class Scorer:
         if value_evidence is None:
             return self._box_match(gt_path, pred_path), self._page_match(gt_path, pred_path)
 
-        pred_boxes = self._pred_boxes.get(pred_path, [])
-        pred_pages = self._pred_pages.get(pred_path, set())
+        pred_boxes = self._pred_boxes.get(pred_path)
+        pred_pages = self._pred_pages.get(pred_path)
         page_correct = False
         for evidence in value_evidence:
             if evidence.value is not None and not self._configured_cell_match(gt_path, evidence.value, actual, field):
                 continue
-            if len(pred_boxes) > 0 and any(self._target_hit(target, pred_boxes) for target in evidence.targets):
+            if pred_boxes is not None and any(self._target_hit(target, pred_boxes) for target in evidence.targets):
                 return True, True
-            page_correct |= not evidence.pages.isdisjoint(pred_pages)
+            if pred_pages is not None and not evidence.pages.isdisjoint(pred_pages):
+                page_correct = True
         return False, page_correct
 
     def _score_cell(
@@ -1456,58 +1459,61 @@ def build_evidence_targets(field_rules: Sequence[ExtractFieldTestRule]) -> Targe
 
 
 def _build_value_evidence(
-    field_rules: Sequence[ExtractFieldTestRule], *, normalize_dates: bool, bbox_match_mode: str
-) -> dict[str, list[ValueEvidence]]:
+    field_rules: Sequence[ExtractFieldTestRule],
+    *,
+    normalize_dates: bool,
+    bbox_match_mode: str,
+) -> Mapping[str, Sequence[_ValueEvidence]]:
     """Use explicit value locations when the field locates at least two different answers.
 
     Older rules give some alternatives no page or box. Keep field-wide grounding
     when there is only one located answer. Entries with a location and no value
     are shared, including lines of a value represented by a coarse box.
     """
-    result: dict[str, list[ValueEvidence]] = {}
+    result: dict[str, Sequence[_ValueEvidence]] = {}
     for rule in field_rules:
         entries = iter_rule_evidence(rule)
         if len(entries) < 2:
             continue
 
-        groups: list[tuple[Any, list[FieldEvidence]]] = []
-        shared: list[FieldEvidence] = []
+        entries_by_value: list[tuple[Any, list[tuple[int, FieldEvidence]]]] = []
+        shared_entries: list[tuple[int, FieldEvidence]] = []
         for entry in entries:
-            if entry.page is None:
+            page = entry.page
+            if page is None:
                 continue
             if entry.value is None:
-                shared.append(entry)
+                shared_entries.append((page, entry))
                 continue
             value = normalize_dates_deep(entry.value) if normalize_dates else entry.value
-            for group_value, group in groups:
+            for group_value, group_entries in entries_by_value:
                 if group_value == value:
-                    group.append(entry)
+                    group_entries.append((page, entry))
                     break
             else:
-                groups.append((value, [entry]))
-        if len(groups) < 2:
+                entries_by_value.append((value, [(page, entry)]))
+        if len(entries_by_value) < 2:
             continue
 
-        if len(shared) > 0:
-            groups.append((None, []))
-        targets: list[ValueEvidence] = []
-        for value, group in groups:
-            pages: set[int] = set()
+        if len(shared_entries) > 0:
+            entries_by_value.append((None, []))
+        value_targets: list[_ValueEvidence] = []
+        for value, value_entries in entries_by_value:
+            located_entries = (*value_entries, *shared_entries)
+            pages = frozenset(page for page, _ in located_entries)
             boxes: list[tuple[int, BBox, bool]] = []
-            for entry in (*group, *shared):
-                if entry.page is None:
+            for page, entry in located_entries:
+                if entry.bbox is None:
                     continue
-                pages.add(entry.page)
-                box = _validated_bbox(entry.bbox) if entry.bbox is not None else None
+                box = _validated_bbox(entry.bbox)
                 if box is not None:
-                    boxes.append((entry.page, box, entry.coarse))
-            grouped = (
-                group_evidence_targets(boxes)
-                if bbox_match_mode == "envelope"
-                else [(page, box, ()) for page, box, _ in boxes]
-            )
-            targets.append(ValueEvidence(value, pages, grouped))
-        result[rule.field_path] = targets
+                    boxes.append((page, box, entry.coarse))
+            if bbox_match_mode == BBOX_MATCH_MODE_ENVELOPE:
+                targets = group_evidence_targets(boxes)
+            else:
+                targets = tuple((page, box, ()) for page, box, _ in boxes)
+            value_targets.append(_ValueEvidence(value=value, pages=pages, targets=targets))
+        result[rule.field_path] = tuple(value_targets)
     return result
 
 
@@ -1641,7 +1647,7 @@ def compute_unified_evidence_metrics(
 
     fuzzy = dict(DEFAULT_FUZZY_FIELD_THRESHOLDS if fuzzy_field_thresholds is None else fuzzy_field_thresholds)
     alt, ev_boxes, ev_pages, normalizers = build_rule_indexes(field_rules)
-    ev_targets = build_evidence_targets(field_rules) if bbox_match_mode == "envelope" else {}
+    ev_targets = build_evidence_targets(field_rules) if bbox_match_mode == BBOX_MATCH_MODE_ENVELOPE else {}
     if normalize_dates:
         alt = {p: normalize_dates_deep(v) for p, v in alt.items()}
     pred_boxes, pred_pages = index_citations(field_citations or [])
@@ -1660,9 +1666,11 @@ def compute_unified_evidence_metrics(
         iou_threshold=bbox_iou_threshold,
         graded_cells=graded_cells,
         value_cells=value_cells,
-        evidence_targets=ev_targets if bbox_match_mode == "envelope" else None,
+        evidence_targets=ev_targets if bbox_match_mode == BBOX_MATCH_MODE_ENVELOPE else None,
         value_evidence=_build_value_evidence(
-            field_rules, normalize_dates=normalize_dates, bbox_match_mode=bbox_match_mode
+            field_rules,
+            normalize_dates=normalize_dates,
+            bbox_match_mode=bbox_match_mode,
         ),
         bbox_match_mode=bbox_match_mode,
     ).score_root(expected, actual, schema_props)

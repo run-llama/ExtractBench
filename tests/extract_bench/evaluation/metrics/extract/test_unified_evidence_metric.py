@@ -2147,18 +2147,25 @@ def test_geometry_helpers_are_nan_safe() -> None:
     assert unified_evidence_metric.union_xywh([]) is None
 
 
-@pytest.mark.parametrize("bbox_match_mode", ["envelope", "any"])
+@pytest.mark.parametrize(
+    "bbox_match_mode",
+    [unified_evidence_metric.BBOX_MATCH_MODE_ENVELOPE, unified_evidence_metric.BBOX_MATCH_MODE_ANY],
+)
 @pytest.mark.parametrize(
     ("value", "slide", "correct"),
     [(7700, 5, True), (7681, 39, True), (7700, 39, False), (7681, 5, False)],
 )
 def test_alternate_values_require_their_own_citations(
-    bbox_match_mode: str, value: int, slide: int, correct: bool
+    bbox_match_mode: str,
+    value: int,
+    slide: int,
+    correct: bool,
 ) -> None:
+    field = "adjusted_ebitda"
     box = [0.2, 0.3, 0.1, 0.07]
     rules = [
         ExtractFieldTestRule(
-            field_path="adjusted_ebitda",
+            field_path=field,
             evidence=[
                 FieldEvidence(page=39, bbox=box, value=7681),
                 FieldEvidence(page=5, bbox=box, value=7700),
@@ -2166,10 +2173,10 @@ def test_alternate_values_require_their_own_citations(
         ),
     ]
     metrics = compute_unified_evidence_metrics(
-        {"adjusted_ebitda": 7681},
-        {"adjusted_ebitda": value},
+        {field: 7681},
+        {field: value},
         rules,
-        [{"field_path": "adjusted_ebitda", "page": slide, "bbox": box}],
+        [{"field_path": field, "page": slide, "bbox": box}],
         bbox_match_mode=bbox_match_mode,
     )
     assert _val(metrics, "extract_unified_value_f1") == 1.0
