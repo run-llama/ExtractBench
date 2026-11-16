@@ -99,38 +99,66 @@ network_mode = "no-network"
 """
 
 
+def _strip_reviewer_attribution(row: dict[str, Any]) -> bool:
+    """Remove reviewer attribution from current and legacy field rules."""
+    column = "field_rules"
+    encoded_rules = row.get(column)
+    if encoded_rules is None or encoded_rules == "":
+        return False
+    rules = json.loads(encoded_rules)
+    if not isinstance(rules, (dict, list)):
+        return False
+    entries = rules.values() if isinstance(rules, dict) else rules
+    absent = object()
+    changed = False
+    for rule in entries:
+        if rule.pop("verified_by", absent) is not absent:
+            changed = True
+    if changed:
+        row[column] = json.dumps(rules, ensure_ascii=False)
+    return changed
+
+
 def export_snapshot(snapshot: Path, output: Path, dataset: str, revision: str, scorer_revision: str) -> dict[str, Any]:
     """Export a pinned HF snapshot; reruns repair partial tasks deterministically.
 
-    ``output`` is a staging directory for additions to the same HF repository.
-    Existing non-generated data is never deleted or rewritten. A source-case
-    removal is refused so stale tasks cannot silently survive a refresh.
+    ``output`` stages tasks and sanitized splits for the same HF repository.
+    A source-case removal is refused so stale tasks cannot survive a refresh.
     """
     for name, value in (("revision", revision), ("scorer_revision", scorer_revision)):
         if re.fullmatch(r"[0-9a-f]{40}", value) is None:
             raise ValueError(f"{name} must be a full commit SHA")
     config = dataset_config(dataset)
     rows: list[dict[str, Any]] = []
+    sanitized_lines: dict[str, dict[int, str]] = {}
     task_ids: set[str] = set()
     for split in config.splits:
-        for line in (snapshot / f"{split}.jsonl").read_text(encoding="utf-8").splitlines():
-            if len(line.strip()) == 0:
-                continue
-            row = json.loads(line)
-            case_id = row["id"]
-            if row["category"] != split or not case_id.startswith(split + "/"):
-                raise ValueError(f"Case {case_id!r} does not belong to {split}")
-            # A flat task directory supports Harbor's default tasks/ discovery.
-            task_id = _task_id(case_id, dataset)
-            if task_id in task_ids:
-                raise ValueError(f"Colliding case ID: {case_id!r}")
-            task_ids.add(task_id)
-            rows.append(row)
+        filename = f"{split}.jsonl"
+        with (snapshot / filename).open(encoding="utf-8", newline="") as source:
+            for index, line in enumerate(source):
+                if len(line.strip()) == 0:
+                    continue
+                row = json.loads(line)
+                if _strip_reviewer_attribution(row):
+                    ending = line[len(line.rstrip("\r\n")) :]
+                    sanitized_lines.setdefault(filename, {})[index] = json.dumps(row, ensure_ascii=False) + ending
+                case_id = row["id"]
+                if row["category"] != split or not case_id.startswith(split + "/"):
+                    raise ValueError(f"Case {case_id!r} does not belong to {split}")
+                # A flat task directory supports Harbor's default tasks/ discovery.
+                task_id = _task_id(case_id, dataset)
+                if task_id in task_ids:
+                    raise ValueError(f"Colliding case ID: {case_id!r}")
+                task_ids.add(task_id)
+                rows.append(row)
     tasks = output / "tasks"
     if tasks.exists():
         stale = {path.name for path in tasks.iterdir()} - task_ids
         if len(stale) > 0:
             raise ValueError(f"Output contains stale tasks; use a new staging directory: {sorted(stale)}")
+    for filename in sanitized_lines:
+        if (snapshot / filename).resolve() == (output / filename).resolve():
+            raise ValueError("Use a separate staging directory to sanitize the source JSONL")
     output.mkdir(parents=True, exist_ok=True)
     manifest_path = output / "harbor-manifest.json"
     manifest_path.unlink(missing_ok=True)
@@ -142,15 +170,26 @@ def export_snapshot(snapshot: Path, output: Path, dataset: str, revision: str, s
         "reward": "extract_unified_value_f1",
         "agent_timeout_sec": 1800,
         "source_files": {},
+        "sanitized_files": {},
         "tasks": {},
     }
     # Retain the ordinary datasets loading contract in the staged repo too.
     for split in config.splits:
         source = snapshot / f"{split}.jsonl"
         target = output / source.name
-        if source.resolve() != target.resolve():
-            shutil.copyfile(source, target)
         manifest["source_files"][source.name] = _sha256(source)
+        changes = sanitized_lines.get(source.name)
+        if changes is not None:
+            # Preserve every unaffected row and the original line endings.
+            with (
+                source.open(encoding="utf-8", newline="") as input_file,
+                target.open("w", encoding="utf-8", newline="") as output_file,
+            ):
+                for index, line in enumerate(input_file):
+                    output_file.write(changes.get(index, line))
+            manifest["sanitized_files"][source.name] = _sha256(target)
+        elif source.resolve() != target.resolve():
+            shutil.copyfile(source, target)
     card = (snapshot / "README.md").read_text(encoding="utf-8")
     if "\n- harbor\n" not in card:
         card = card.replace("tags:\n", "tags:\n- rl-environment\n- harbor\n", 1)
@@ -183,8 +222,9 @@ not change the reward or assign credit to reasoning steps.
 This prompt does not request citations, so this lane does not measure grounding.
 The agent timeout is {manifest["agent_timeout_sec"]} seconds per document.
 
-The JSONL files and ordinary Hugging Face dataset configuration are preserved.
-`harbor-manifest.json` records source revisions and hashes for reproducibility.
+The ordinary Hugging Face dataset configuration is preserved. Reviewer attribution
+is removed from JSONL field rules and Harbor references. `harbor-manifest.json`
+records source revisions and hashes for reproducibility.
 For a no-inference packaging smoke test, use `-a oracle -l 1` instead of `-a codex -m MODEL`.
 The oracle copies the reference output; it checks packaging and grading, not extraction ability.
 """
