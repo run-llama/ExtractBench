@@ -122,7 +122,7 @@ from extract_bench.inference.providers.extract.table_codegen.schema_utils import
     schema_properties,
 )
 from extract_bench.schemas.evaluation import MetricValue
-from extract_bench.test_cases.schema import ExtractFieldTestRule, FieldEvidence, iter_rule_evidence
+from extract_bench.test_cases.schema import ExtractFieldTestRule, iter_rule_evidence
 
 # Opt-in per-field normalizers (``_field_rules[path].normalizers``). Each is a
 # fail->pass-only fallback applied after the exact cell match misses, so setting
@@ -185,6 +185,7 @@ type BoxIndex = dict[str, list[PageBBox]]
 # plain single-box IoU target.
 type EvidenceTarget = tuple[int, BBox, tuple[BBox, ...]]
 type TargetIndex = dict[str, Sequence[EvidenceTarget]]
+type _EvidenceBox = tuple[int, BBox, bool]
 
 
 @dataclass(frozen=True)
@@ -1467,57 +1468,64 @@ def _build_value_evidence(
     """Use explicit value locations when the field locates at least two different answers.
 
     Older rules give some alternatives no page or box. Keep field-wide grounding
-    when there is only one located answer. Entries with a location and no value
-    are shared, including lines of a value represented by a coarse box.
+    when there is only one located answer. Untagged locations can provide shared
+    evidence or lines for the tagged envelopes that contain them.
     """
     result: dict[str, Sequence[_ValueEvidence]] = {}
     for rule in field_rules:
         entries = iter_rule_evidence(rule)
         if len(entries) < 2:
             continue
-
-        entries_by_value: list[tuple[Any, list[tuple[int, FieldEvidence]]]] = []
-        shared_entries: list[tuple[int, FieldEvidence]] = []
+        entries_by_value: list[tuple[Any, set[int], list[_EvidenceBox]]] = []
         for entry in entries:
             page = entry.page
             if page is None:
                 continue
-            if entry.value is None:
-                shared_entries.append((page, entry))
-                continue
             value = normalize_dates_deep(entry.value) if normalize_dates else entry.value
-            for group_value, group_entries in entries_by_value:
+            for group_value, group_pages, group_boxes in entries_by_value:
                 if group_value == value:
-                    group_entries.append((page, entry))
+                    pages, boxes = group_pages, group_boxes
                     break
             else:
-                entries_by_value.append((value, [(page, entry)]))
-        if len(entries_by_value) < 2:
+                pages, boxes = set(), []
+                entries_by_value.append((value, pages, boxes))
+            box = _validated_bbox(entry.bbox) if entry.bbox is not None else None
+            if box is None:
+                pages.add(page)
+            else:
+                boxes.append((page, box, entry.coarse))
+        if sum(value is not None for value, _, _ in entries_by_value) < 2:
             continue
 
-        if len(shared_entries) > 0:
-            entries_by_value.append((None, []))
+        shared_boxes = next((boxes for value, _, boxes in entries_by_value if value is None), [])
         value_targets: list[_ValueEvidence] = []
-        for value, value_entries in entries_by_value:
-            located_entries = (*value_entries, *shared_entries)
-            pages = frozenset(page for page, _ in located_entries)
-            boxes: list[tuple[int, BBox, bool]] = []
-            for page, entry in located_entries:
-                if entry.bbox is None:
-                    continue
-                box = _validated_bbox(entry.bbox)
-                if box is not None:
-                    boxes.append((page, box, entry.coarse))
-            if bbox_match_mode == BBOX_MATCH_MODE_ENVELOPE:
-                targets = group_evidence_targets(boxes)
-            else:
+        for value, pages, boxes in entries_by_value:
+            if bbox_match_mode == BBOX_MATCH_MODE_ANY:
                 targets = tuple((page, box, ()) for page, box, _ in boxes)
-            value_targets.append(_ValueEvidence(value=value, pages=pages, targets=targets))
+            elif value is None:
+                # Group both sets to detect shared lines inside tagged envelopes
+                # and shared envelopes that would absorb tagged lines. Keep only
+                # the shared targets whose geometry is independent.
+                all_boxes = [box for _, _, group_boxes in entries_by_value for box in group_boxes]
+                all_targets = {(page, box, frozenset(parts)) for page, box, parts in group_evidence_targets(all_boxes)}
+                targets = tuple(
+                    (page, box, parts)
+                    for page, box, parts in group_evidence_targets(boxes)
+                    if (page, box, frozenset(parts)) in all_targets
+                )
+            else:
+                targets = tuple(group_evidence_targets(boxes, parts_only=shared_boxes))
+            target_pages = pages | {page for page, _, _ in targets}
+            value_targets.append(_ValueEvidence(value=value, pages=frozenset(target_pages), targets=targets))
         result[rule.field_path] = tuple(value_targets)
     return result
 
 
-def group_evidence_targets(entries: Sequence[tuple[int, BBox, bool]]) -> Sequence[EvidenceTarget]:
+def group_evidence_targets(
+    entries: Sequence[_EvidenceBox],
+    *,
+    parts_only: Sequence[_EvidenceBox] = (),
+) -> Sequence[EvidenceTarget]:
     """Group coarse/precise evidence boxes on a page into envelope targets.
 
     Per page, a ``coarse`` entry is an envelope whose parts are the precise
@@ -1529,12 +1537,13 @@ def group_evidence_targets(entries: Sequence[tuple[int, BBox, bool]]) -> Sequenc
     out: list[EvidenceTarget] = []
     for page in dict.fromkeys(p for p, _, _ in entries):
         precise = [b for p, b, coarse in entries if p == page and not coarse]
+        parts_candidates = [*precise, *(b for p, b, coarse in parts_only if p == page and not coarse)]
         enclosed: set[int] = set()
         for p, box, coarse in entries:
             if p != page or not coarse:
                 continue
             parts: list[BBox] = []
-            for i, pb in enumerate(precise):
+            for i, pb in enumerate(parts_candidates):
                 if contained_fraction_xywh(pb, box) < ENVELOPE_PART_CONTAINMENT:
                     continue
                 enclosed.add(i)
