@@ -43,7 +43,9 @@ three additions:
    -- the coarser **page** check (no IoU), emitted as ``*_page_*``. Page is a
    per-cell superset of bbox (a box match requires equal pages, and page
    evidence/claims are supersets of bbox evidence/claims), so the three F1s nest:
-   ``value_f1 >= page_f1 >= grounded_f1``. Together ``*_grounded_*`` and
+   ``value_f1 >= page_f1 >= grounded_f1``. When a field locates multiple
+   alternative values, grounding uses the locations for the matched value
+   and any shared evidence. Together ``*_grounded_*`` and
    ``*_page_*`` are one nested precision/recall/F1 trio.
    Grounding is only defined where the GT carries the corresponding annotation
    (a page for ``*_page_*``, a bbox for ``*_grounded_*``), on
@@ -120,7 +122,7 @@ from extract_bench.inference.providers.extract.table_codegen.schema_utils import
     schema_properties,
 )
 from extract_bench.schemas.evaluation import MetricValue
-from extract_bench.test_cases.schema import ExtractFieldTestRule, iter_rule_evidence
+from extract_bench.test_cases.schema import ExtractFieldTestRule, FieldEvidence, iter_rule_evidence
 
 # Opt-in per-field normalizers (``_field_rules[path].normalizers``). Each is a
 # fail->pass-only fallback applied after the exact cell match misses, so setting
@@ -183,6 +185,13 @@ type BoxIndex = dict[str, list[PageBBox]]
 # plain single-box IoU target.
 type EvidenceTarget = tuple[int, BBox, tuple[BBox, ...]]
 type TargetIndex = dict[str, Sequence[EvidenceTarget]]
+
+
+@dataclass(frozen=True)
+class ValueEvidence:
+    value: Any
+    pages: set[int]
+    targets: Sequence[EvidenceTarget]
 
 
 @dataclass(frozen=True)
@@ -680,6 +689,7 @@ class Scorer:
         fuzzy: dict[str, float],
         iou_threshold: float,
         evidence_targets: TargetIndex | None = None,
+        value_evidence: Mapping[str, Sequence[ValueEvidence]] | None = None,
         bbox_match_mode: str = DEFAULT_BBOX_MATCH_MODE,
         graded_cells: list[GradedCell] | None = None,
         value_cells: MutableSequence[ValueCell] | None = None,
@@ -693,6 +703,7 @@ class Scorer:
         self._ev_pages = evidence_pages
         self._ev_targets = _flat_targets(evidence_boxes) if evidence_targets is None else evidence_targets
         self._mode = bbox_match_mode
+        self._value_evidence = {} if value_evidence is None else value_evidence
         self._normalizers = normalizers
         self._pred_boxes = pred_boxes
         self._pred_pages = pred_pages
@@ -898,6 +909,22 @@ class Scorer:
             return False
         return not gt_pages.isdisjoint(pred_pages)
 
+    def _match_grounding(self, gt_path: str, pred_path: str, actual: Any, field: str) -> tuple[bool, bool]:
+        value_evidence = self._value_evidence.get(gt_path)
+        if value_evidence is None:
+            return self._box_match(gt_path, pred_path), self._page_match(gt_path, pred_path)
+
+        pred_boxes = self._pred_boxes.get(pred_path, [])
+        pred_pages = self._pred_pages.get(pred_path, set())
+        page_correct = False
+        for evidence in value_evidence:
+            if evidence.value is not None and not self._configured_cell_match(gt_path, evidence.value, actual, field):
+                continue
+            if len(pred_boxes) > 0 and any(self._target_hit(target, pred_boxes) for target in evidence.targets):
+                return True, True
+            page_correct |= not evidence.pages.isdisjoint(pred_pages)
+        return False, page_correct
+
     def _score_cell(
         self, gt_path: str, pred_path: str, canonical: Any, actual: Any, field: str, c: _Counts, ground: bool = True
     ) -> bool:
@@ -915,12 +942,9 @@ class Scorer:
         if matched:
             c.v_correct += 1
             if ground:
-                if self._box_match(gt_path, pred_path):
-                    boxed = True
-                    c.g_correct += 1
-                if self._page_match(gt_path, pred_path):
-                    paged = True
-                    c.p_correct += 1
+                boxed, paged = self._match_grounding(gt_path, pred_path, actual, field)
+                c.g_correct += int(boxed)
+                c.p_correct += int(paged)
         if self._cells is not None and ground:
             cell = self._graded_cell(gt_path, pred_path, field, matched, paged, boxed)
             if cell is not None:
@@ -1431,6 +1455,62 @@ def build_evidence_targets(field_rules: Sequence[ExtractFieldTestRule]) -> Targe
     return {path: group_evidence_targets(entries) for path, entries in items.items()}
 
 
+def _build_value_evidence(
+    field_rules: Sequence[ExtractFieldTestRule], *, normalize_dates: bool, bbox_match_mode: str
+) -> dict[str, list[ValueEvidence]]:
+    """Use explicit value locations when the field locates at least two different answers.
+
+    Older rules give some alternatives no page or box. Keep field-wide grounding
+    when there is only one located answer. Entries with a location and no value
+    are shared, including lines of a value represented by a coarse box.
+    """
+    result: dict[str, list[ValueEvidence]] = {}
+    for rule in field_rules:
+        entries = iter_rule_evidence(rule)
+        if len(entries) < 2:
+            continue
+
+        groups: list[tuple[Any, list[FieldEvidence]]] = []
+        shared: list[FieldEvidence] = []
+        for entry in entries:
+            if entry.page is None:
+                continue
+            if entry.value is None:
+                shared.append(entry)
+                continue
+            value = normalize_dates_deep(entry.value) if normalize_dates else entry.value
+            for group_value, group in groups:
+                if group_value == value:
+                    group.append(entry)
+                    break
+            else:
+                groups.append((value, [entry]))
+        if len(groups) < 2:
+            continue
+
+        if len(shared) > 0:
+            groups.append((None, []))
+        targets: list[ValueEvidence] = []
+        for value, group in groups:
+            pages: set[int] = set()
+            boxes: list[tuple[int, BBox, bool]] = []
+            for entry in (*group, *shared):
+                if entry.page is None:
+                    continue
+                pages.add(entry.page)
+                box = _validated_bbox(entry.bbox) if entry.bbox is not None else None
+                if box is not None:
+                    boxes.append((entry.page, box, entry.coarse))
+            grouped = (
+                group_evidence_targets(boxes)
+                if bbox_match_mode == "envelope"
+                else [(page, box, ()) for page, box, _ in boxes]
+            )
+            targets.append(ValueEvidence(value, pages, grouped))
+        result[rule.field_path] = targets
+    return result
+
+
 def group_evidence_targets(entries: Sequence[tuple[int, BBox, bool]]) -> Sequence[EvidenceTarget]:
     """Group coarse/precise evidence boxes on a page into envelope targets.
 
@@ -1581,6 +1661,9 @@ def compute_unified_evidence_metrics(
         graded_cells=graded_cells,
         value_cells=value_cells,
         evidence_targets=ev_targets if bbox_match_mode == "envelope" else None,
+        value_evidence=_build_value_evidence(
+            field_rules, normalize_dates=normalize_dates, bbox_match_mode=bbox_match_mode
+        ),
         bbox_match_mode=bbox_match_mode,
     ).score_root(expected, actual, schema_props)
     if c.expected == 0 and c.predicted == 0:

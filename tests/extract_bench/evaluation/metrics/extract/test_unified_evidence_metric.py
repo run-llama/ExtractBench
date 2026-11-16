@@ -2145,3 +2145,65 @@ def test_geometry_helpers_are_nan_safe() -> None:
     assert union is not None and all(abs(u - g) < 1e-12 for u, g in zip(union, good, strict=True))
     assert unified_evidence_metric.union_xywh([bad]) is None
     assert unified_evidence_metric.union_xywh([]) is None
+
+
+@pytest.mark.parametrize("bbox_match_mode", ["envelope", "any"])
+@pytest.mark.parametrize(
+    ("value", "slide", "correct"),
+    [(7700, 5, True), (7681, 39, True), (7700, 39, False), (7681, 5, False)],
+)
+def test_alternate_values_require_their_own_citations(
+    bbox_match_mode: str, value: int, slide: int, correct: bool
+) -> None:
+    box = [0.2, 0.3, 0.1, 0.07]
+    rules = [
+        ExtractFieldTestRule(
+            field_path="adjusted_ebitda",
+            evidence=[
+                FieldEvidence(page=39, bbox=box, value=7681),
+                FieldEvidence(page=5, bbox=box, value=7700),
+            ],
+        ),
+    ]
+    metrics = compute_unified_evidence_metrics(
+        {"adjusted_ebitda": 7681},
+        {"adjusted_ebitda": value},
+        rules,
+        [{"field_path": "adjusted_ebitda", "page": slide, "bbox": box}],
+        bbox_match_mode=bbox_match_mode,
+    )
+    assert _val(metrics, "extract_unified_value_f1") == 1.0
+    assert _val(metrics, "extract_unified_page_f1") == float(correct)
+    assert _val(metrics, "extract_unified_grounded_f1") == float(correct)
+
+
+def test_alternate_values_on_same_page_keep_separate_envelopes() -> None:
+    rules = _wrapped_rules(
+        FieldEvidence(page=1, bbox=_L1, value="n"),
+        FieldEvidence(page=1, bbox=_L2, value="n"),
+        FieldEvidence(page=1, bbox=_ENV3, value="n", coarse=True),
+        FieldEvidence(page=1, bbox=_L3, value="alternate"),
+    )
+    metrics = compute_unified_evidence_metrics(
+        {"as_of": "n"},
+        {"as_of": "n"},
+        rules,
+        [{"field_path": "as_of", "page": 1, "bbox": box} for box in (_L1, _L2)],
+        _schema(),
+    )
+    assert _val(metrics, "extract_unified_grounded_f1") == 1.0
+
+
+def test_value_only_alternate_retains_existing_grounding() -> None:
+    rules = _wrapped_rules(
+        FieldEvidence(page=1, bbox=_L1, value="canonical"),
+        FieldEvidence(value="alternate"),
+    )
+    metrics = compute_unified_evidence_metrics(
+        {"as_of": "canonical"},
+        {"as_of": "alternate"},
+        rules,
+        [{"field_path": "as_of", "page": 1, "bbox": _L1}],
+        _schema(),
+    )
+    assert _val(metrics, "extract_unified_grounded_f1") == 1.0
