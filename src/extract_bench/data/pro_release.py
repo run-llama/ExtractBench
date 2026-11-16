@@ -13,6 +13,7 @@ import shutil
 from pathlib import Path
 
 from extract_bench.data.pro_names import LEGACY_PRO_SPLITS, canonical_pro_path, canonical_pro_split, canonical_pro_tag
+from extract_bench.data.release_annotations import sanitize_release_row
 
 
 def stage_pro_snapshot(source: Path, output: Path, revision: str) -> dict:
@@ -56,6 +57,7 @@ def stage_pro_snapshot(source: Path, output: Path, revision: str) -> dict:
                     "pdf_sha256": digest,
                 }
             )
+            sanitize_release_row(row)
             rows.append(json.dumps(row, ensure_ascii=False))
         (output / f"{new}.jsonl").write_text("\n".join(rows) + "\n", encoding="utf-8")
     if len({case["id"] for case in migration["cases"]}) != len(migration["cases"]):
