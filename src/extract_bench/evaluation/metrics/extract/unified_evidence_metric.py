@@ -172,6 +172,7 @@ _MONTH_ORDINAL_DAY_RE = re.compile(
 # appears before the pair -- "June 19 44" is a day 19 plus a 2-digit year,
 # not a split 1944.
 _SPLIT_YEAR_RE = re.compile(r"\b(19|20)\s+(\d{2})\b")
+_DATE_HYPHEN_WHITESPACE_RE = re.compile(r"(?<=\d)\s*-\s*(?=\d)")
 _TRAILING_2DIGIT_YEAR_RE = re.compile(r"^(.*[ ,/-])(\d{2})\s*$")
 _ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
@@ -270,8 +271,8 @@ def _validated_bbox(raw: Sequence[SupportsFloat]) -> BBox | None:
 
 @lru_cache(maxsize=8192)
 def _lenient_date_probes(value: str) -> frozenset[str]:
-    """Date readings of a scanned-form value: ordinal day suffixes removed,
-    split years joined, and 2-digit years expanded ("June 17, 43" -> 1943/2043).
+    """Normalize date transcriptions with spaced hyphens, ordinal days,
+    split years, or two-digit years ("June 17, 43" -> 1943/2043).
 
     Guardrails against equating different values:
     - The year rewrites require a digit (a day) before the year token, so a lone
@@ -290,6 +291,7 @@ def _lenient_date_probes(value: str) -> frozenset[str]:
         m = _TRAILING_2DIGIT_YEAR_RE.match(base)
         if m and _DIGIT_RE.search(m.group(1)):
             rewrites += [f"{m.group(1)}19{m.group(2)}", f"{m.group(1)}20{m.group(2)}"]
+    rewrites.append(_DATE_HYPHEN_WHITESPACE_RE.sub("-", value))
     for rewrite in rewrites:
         normalized = normalize_date_string(rewrite)
         if _ISO_DATE_RE.match(normalized):

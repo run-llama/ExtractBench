@@ -1612,6 +1612,32 @@ def test_lenient_date_normalizer_parses_ordinal_days(
     assert _val(metrics, "extract_unified_value_f1") == score
 
 
+@pytest.mark.parametrize(
+    ("prediction", "normalizers", "score"),
+    [
+        ("4 - 3 - 98", ["lenient_date"], 1.0),
+        ("4 - 3 - 98", None, 0.0),
+        ("4 - 4 - 98", ["lenient_date"], 0.0),
+    ],
+)
+def test_lenient_date_normalizer_accepts_spaces_around_numeric_hyphens(
+    prediction: str,
+    normalizers: list[str] | None,
+    score: float,
+) -> None:
+    field = "date"
+    expected = "4-3-98"
+    metrics = compute_unified_evidence_metrics(
+        {field: expected},
+        {field: prediction},
+        [_rule(field, expected, normalizers=normalizers)],
+        [],
+        _scalar_schema(field),
+    )
+
+    assert _val(metrics, "extract_unified_value_f1") == score
+
+
 def test_lenient_date_normalizer_does_not_equate_different_values() -> None:
     """Rewrites are guarded: no century expansion without a day, no split-year
     join without a preceding day, and unparseable rewrites never match."""
