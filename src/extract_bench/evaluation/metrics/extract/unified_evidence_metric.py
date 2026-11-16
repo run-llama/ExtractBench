@@ -691,22 +691,16 @@ class Scorer:
         pred_pages: dict[str, set[int]],
         fuzzy: dict[str, float],
         iou_threshold: float,
-        evidence_targets: TargetIndex | None = None,
-        value_evidence: Mapping[str, Sequence[_ValueEvidence]] | None = None,
-        bbox_match_mode: str = DEFAULT_BBOX_MATCH_MODE,
+        evidence_targets: Mapping[str, Sequence[_ValueEvidence]],
         graded_cells: list[GradedCell] | None = None,
         value_cells: MutableSequence[ValueCell] | None = None,
     ) -> None:
-        if bbox_match_mode not in BBOX_MATCH_MODES:
-            raise ValueError(f"unknown bbox_match_mode {bbox_match_mode!r}; supported: {sorted(BBOX_MATCH_MODES)}")
         self._alt = alt_values
         self._cells = graded_cells
         self._value_cells = value_cells
         self._ev_boxes = evidence_boxes
         self._ev_pages = evidence_pages
-        self._ev_targets = _flat_targets(evidence_boxes) if evidence_targets is None else evidence_targets
-        self._mode = bbox_match_mode
-        self._value_evidence = {} if value_evidence is None else value_evidence
+        self._ev_targets = evidence_targets
         self._normalizers = normalizers
         self._pred_boxes = pred_boxes
         self._pred_pages = pred_pages
@@ -871,26 +865,6 @@ class Scorer:
                 return True
         return False
 
-    def _gt_targets(self, gt_path: str) -> Sequence[EvidenceTarget] | None:
-        return self._ev_targets.get(gt_path)
-
-    def _target_hit(self, target: EvidenceTarget, pred: Sequence[PageBBox]) -> bool:
-        return evidence_target_hit(target, pred, iou_threshold=self._iou)
-
-    def _box_match(self, gt_path: str, pred_path: str) -> bool:
-        pred = self._pred_boxes.get(pred_path)
-        if pred is None:
-            return False
-        if self._mode == BBOX_MATCH_MODE_ENVELOPE:
-            targets = self._gt_targets(gt_path)
-            if targets is None:
-                return False
-            return any(self._target_hit(t, pred) for t in targets)
-        gt_boxes = self._ev_boxes.get(gt_path)
-        if gt_boxes is None:
-            return False
-        return any(gp == pp and iou_xywh(gb, pb) >= self._iou for gp, gb in gt_boxes for pp, pb in pred)
-
     def _note_grounded_expected(self, path: str, c: _Counts) -> None:
         if self._ev_boxes.get(path):
             c.g_expected += 1
@@ -901,29 +875,16 @@ class Scorer:
         if self._ev_boxes.get(gt_path):
             c.g_claims += 1
 
-    def _page_match(self, gt_path: str, pred_path: str) -> bool:
-        """A cited page for pred_path lands in the GT evidence's page set for
-        gt_path. Coarser than ``_box_match`` (no IoU) and implied by it: a box
-        match requires the pages to be equal, so every box match is a page
-        match."""
-        gt_pages = self._ev_pages.get(gt_path)
-        pred_pages = self._pred_pages.get(pred_path)
-        if not gt_pages or not pred_pages:
-            return False
-        return not gt_pages.isdisjoint(pred_pages)
-
     def _match_grounding(self, gt_path: str, pred_path: str, actual: Any, field: str) -> tuple[bool, bool]:
-        value_evidence = self._value_evidence.get(gt_path)
-        if value_evidence is None:
-            return self._box_match(gt_path, pred_path), self._page_match(gt_path, pred_path)
-
         pred_boxes = self._pred_boxes.get(pred_path)
         pred_pages = self._pred_pages.get(pred_path)
         page_correct = False
-        for evidence in value_evidence:
+        for evidence in self._ev_targets.get(gt_path, ()):
             if evidence.value is not None and not self._configured_cell_match(gt_path, evidence.value, actual, field):
                 continue
-            if pred_boxes is not None and any(self._target_hit(target, pred_boxes) for target in evidence.targets):
+            if pred_boxes is not None and any(
+                evidence_target_hit(target, pred_boxes, iou_threshold=self._iou) for target in evidence.targets
+            ):
                 return True, True
             if pred_pages is not None and not evidence.pages.isdisjoint(pred_pages):
                 page_correct = True
@@ -1464,7 +1425,7 @@ def _build_value_evidence(
     *,
     normalize_dates: bool,
     bbox_match_mode: str,
-) -> Mapping[str, Sequence[_ValueEvidence]]:
+) -> dict[str, Sequence[_ValueEvidence]]:
     """Use explicit value locations when the field locates at least two different answers.
 
     Older rules give some alternatives no page or box. Keep field-wide grounding
@@ -1656,7 +1617,24 @@ def compute_unified_evidence_metrics(
 
     fuzzy = dict(DEFAULT_FUZZY_FIELD_THRESHOLDS if fuzzy_field_thresholds is None else fuzzy_field_thresholds)
     alt, ev_boxes, ev_pages, normalizers = build_rule_indexes(field_rules)
-    ev_targets = build_evidence_targets(field_rules) if bbox_match_mode == BBOX_MATCH_MODE_ENVELOPE else {}
+    ev_targets = _build_value_evidence(
+        field_rules,
+        normalize_dates=normalize_dates,
+        bbox_match_mode=bbox_match_mode,
+    )
+    if bbox_match_mode == BBOX_MATCH_MODE_ENVELOPE:
+        field_targets = build_evidence_targets([rule for rule in field_rules if rule.field_path not in ev_targets])
+    else:
+        field_targets = _flat_targets(ev_boxes)
+    for path, pages in ev_pages.items():
+        if path not in ev_targets:
+            ev_targets[path] = (
+                _ValueEvidence(
+                    value=None,
+                    pages=frozenset(pages),
+                    targets=field_targets.get(path, ()),
+                ),
+            )
     if normalize_dates:
         alt = {p: normalize_dates_deep(v) for p, v in alt.items()}
     pred_boxes, pred_pages = index_citations(field_citations or [])
@@ -1675,13 +1653,7 @@ def compute_unified_evidence_metrics(
         iou_threshold=bbox_iou_threshold,
         graded_cells=graded_cells,
         value_cells=value_cells,
-        evidence_targets=ev_targets if bbox_match_mode == BBOX_MATCH_MODE_ENVELOPE else None,
-        value_evidence=_build_value_evidence(
-            field_rules,
-            normalize_dates=normalize_dates,
-            bbox_match_mode=bbox_match_mode,
-        ),
-        bbox_match_mode=bbox_match_mode,
+        evidence_targets=ev_targets,
     ).score_root(expected, actual, schema_props)
     if c.expected == 0 and c.predicted == 0:
         return []
