@@ -1577,6 +1577,35 @@ def test_lenient_date_normalizer_joins_split_preprinted_years() -> None:
     assert _val(wrong_day, "extract_unified_value_f1") == 0.0
 
 
+@pytest.mark.parametrize(
+    ("expected", "prediction", "lenient", "score"),
+    [
+        ("July 13th, 1955", "July 13th 1955", True, 1.0),
+        ("July 13th, 1955", "July 13th, 19 55", True, 1.0),
+        ("July 13th, 1955", "July 14th, 1955", True, 0.0),
+        ("July 13th, 1955", "July 13th", True, 0.0),
+        ("Permit 13th, 1955", "Permit 13, 1955", True, 0.0),
+        ("July 13th, 1955", "July 13th 1955", False, 0.0),
+    ],
+)
+def test_lenient_date_normalizer_parses_ordinal_days(
+    expected: str,
+    prediction: str,
+    lenient: bool,
+    score: float,
+) -> None:
+    rules = [_rule("date", expected, normalizers=["lenient_date"] if lenient else None)]
+    metrics = compute_unified_evidence_metrics(
+        {"date": expected},
+        {"date": prediction},
+        rules,
+        [],
+        _scalar_schema("date"),
+    )
+
+    assert _val(metrics, "extract_unified_value_f1") == score
+
+
 def test_lenient_date_normalizer_does_not_equate_different_values() -> None:
     """Rewrites are guarded: no century expansion without a day, no split-year
     join without a preceding day, and unparseable rewrites never match."""

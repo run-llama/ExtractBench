@@ -161,6 +161,7 @@ _TERMINAL_PUNCT_RE = re.compile(r"\s*[.,;:]\s*$")
 _PUNCT_SPACING_RE = re.compile(r"\s*([,.;:])\s*", re.U)
 _NON_DIGIT_RE = re.compile(r"\D+")
 _DIGIT_RE = re.compile(r"\d")
+_MONTH_ORDINAL_DAY_RE = re.compile(r"\b([A-Za-z]+ \d{1,2})(?:st|nd|rd|th)\b", re.IGNORECASE)
 # Preprinted decade split: a filer types "55" after the printed "19", so
 # transcriptions render "19 55". Only joined when a digit (a day) already
 # appears before the pair -- "June 19 44" is a day 19 plus a 2-digit year,
@@ -264,22 +265,23 @@ def _validated_bbox(raw: Sequence[SupportsFloat]) -> BBox | None:
 
 @lru_cache(maxsize=8192)
 def _lenient_date_probes(value: str) -> frozenset[str]:
-    """Date readings of a scanned-form value: split-year joined, and 2-digit
-    trailing years expanded into both centuries ("June 17, 43" -> 1943/2043).
+    """Date readings of a scanned-form value: ordinal day suffixes removed,
+    split years joined, and 2-digit years expanded ("June 17, 43" -> 1943/2043).
 
     Guardrails against equating different values:
-    - Both rewrites require a digit (a day) before the year token, so a lone
+    - The year rewrites require a digit (a day) before the year token, so a lone
       trailing pair ("May 11") is never century-expanded.
     - A rewritten probe only counts when it parses to an ISO date; unparseable
       rewrites are discarded rather than matched as raw strings ("Permit 12-34"
       vs "Permit 12-19 34" must not intersect on a fabricated "Permit 12-1934").
     """
     probes = {normalize_date_string(value)}
-    rewrites: list[str] = []
-    m = _SPLIT_YEAR_RE.search(value)
-    if m and _DIGIT_RE.search(value[: m.start()]):
-        rewrites.append(_SPLIT_YEAR_RE.sub(r"\1\2", value))
-    for base in (value, *rewrites):
+    plain_day = _MONTH_ORDINAL_DAY_RE.sub(r"\1", value)
+    rewrites = [plain_day]
+    m = _SPLIT_YEAR_RE.search(plain_day)
+    if m and _DIGIT_RE.search(plain_day[: m.start()]):
+        rewrites.append(_SPLIT_YEAR_RE.sub(r"\1\2", plain_day))
+    for base in tuple(rewrites):
         m = _TRAILING_2DIGIT_YEAR_RE.match(base)
         if m and _DIGIT_RE.search(m.group(1)):
             rewrites += [f"{m.group(1)}19{m.group(2)}", f"{m.group(1)}20{m.group(2)}"]
