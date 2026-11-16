@@ -173,10 +173,9 @@ _ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 type BBox = tuple[float, float, float, float]
 type PageBBox = tuple[int, BBox]
 type BoxIndex = dict[str, list[PageBBox]]
-# One gradeable location: the page, the box
-# a citation must cover, and the precise boxes it encloses (the lines of a value
-# printed on several lines) that the citation must all touch. Empty parts = a
-# plain single-box IoU target.
+# An evidence target contains the page, the box a citation must cover,
+# and any enclosed line boxes the citation must touch. An empty tuple
+# of line boxes denotes a single-box IoU target.
 type EvidenceTarget = tuple[int, BBox, tuple[BBox, ...]]
 type TargetIndex = dict[str, Sequence[EvidenceTarget]]
 type _EvidenceBox = tuple[int, BBox, bool]
@@ -1496,14 +1495,10 @@ def group_evidence_targets(
 def evidence_target_hit(target: EvidenceTarget, pred: Sequence[PageBBox], *, iou_threshold: float) -> bool:
     """Match one evidence target against citation boxes.
 
-    A target with no parts (a single-line value; a coarse box enclosing no
-    precise entry) is hit by one citation box at IoU >= threshold. An
-    envelope with parts is hit when the citation
-    covers it -- one box at IoU >= threshold, or several boxes (one per
-    line) whose union is -- AND every part is touched by some citation box
-    (>= ENVELOPE_PART_COVERAGE of the part's area). A citation of one line
-    of a value printed on several lines therefore never hits its envelope,
-    even when that line alone reaches IoU 0.5 (two equally wide rows).
+    A target with no parts matches one citation box at IoU >= threshold.
+    For an envelope with parts, one citation box or the union of several
+    boxes must meet the IoU threshold. Each part must also have at least
+    ENVELOPE_PART_COVERAGE of its area covered by some citation box.
     """
     page, box, parts = target
     boxes = [pb for pp, pb in pred if pp == page]
