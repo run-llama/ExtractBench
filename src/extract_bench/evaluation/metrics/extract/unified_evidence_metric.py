@@ -61,18 +61,12 @@ three additions:
    metric (excluded from the dataset average), rather than a 0.0 that would
    punish a document that simply cannot be graded for grounding.
 
-   How a citation is matched against a cell's evidence boxes is selected by
-   ``bbox_match_mode``. The default ``"envelope"`` reads the entries as an OR
-   of ANDs: a ``coarse`` entry is the envelope of the precise entries it
-   encloses on its page (a value printed on several lines carries one entry
-   per line plus their union, flagged coarse), and a citation matches the
-   envelope only when it covers it -- one box at IoU >= threshold, or several
-   boxes (one per line) whose union is -- AND touches every enclosed line. A
-   citation of one line of a paragraph-long value is not grounded. A precise
-   entry outside every envelope, and a coarse entry enclosing no precise
-   entry, is matched by one citation box at IoU >= threshold, so GT without
-   coarse envelopes grades exactly as before. ``"any"`` is that original flat
-   OR for every entry (any citation box against any evidence box).
+   Grounding treats each occurrence of a value as an alternative location.
+   A ``coarse`` entry is the envelope of the precise entries it encloses on
+   its page. A citation must cover the envelope at the required IoU and touch
+   every enclosed line. It can use one box or the union of several boxes.
+   A precise entry outside every envelope, or a coarse entry enclosing no
+   precise entries, is matched by one citation box at the required IoU.
 
 On a document with no object-array subfields, no object-valued cells, no
 alternate evidence values, and no omit/default split, the ``*_value_*``
@@ -179,7 +173,7 @@ _ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 type BBox = tuple[float, float, float, float]
 type PageBBox = tuple[int, BBox]
 type BoxIndex = dict[str, list[PageBBox]]
-# One gradeable location under ``bbox_match_mode="envelope"``: the page, the box
+# One gradeable location: the page, the box
 # a citation must cover, and the precise boxes it encloses (the lines of a value
 # printed on several lines) that the citation must all touch. Empty parts = a
 # plain single-box IoU target.
@@ -243,13 +237,6 @@ class GradedCell:
     pred_pages: tuple[int, ...]
 
 
-# ``envelope``: OR of ANDs -- a coarse evidence entry is the envelope of the
-# precise entries it encloses and a citation must cover all of it (default).
-# ``any``: the original flat OR -- any citation box against any evidence box.
-BBOX_MATCH_MODE_ENVELOPE = "envelope"
-BBOX_MATCH_MODE_ANY = "any"
-BBOX_MATCH_MODES = frozenset({BBOX_MATCH_MODE_ENVELOPE, BBOX_MATCH_MODE_ANY})
-DEFAULT_BBOX_MATCH_MODE = BBOX_MATCH_MODE_ENVELOPE
 # A precise entry is a part of a coarse entry on the same page when it lies
 # inside it. Envelopes are the union of their lines, so containment is 1.0 up
 # to 5-decimal rounding on stored boxes. 0.99 admits that rounding without
@@ -672,11 +659,6 @@ def union_xywh(boxes: Sequence[BBox]) -> BBox | None:
     x1 = max(b[0] + b[2] for b in finite)
     y1 = max(b[1] + b[3] for b in finite)
     return (x0, y0, x1 - x0, y1 - y0)
-
-
-def _flat_targets(boxes: BoxIndex) -> TargetIndex:
-    """Every box a target of its own (no envelope structure): ``envelope`` mode then equals ``any``."""
-    return {path: [(page, box, ()) for page, box in entries] for path, entries in boxes.items()}
 
 
 class Scorer:
@@ -1397,7 +1379,7 @@ def build_rule_indexes(
 
 
 def build_evidence_targets(field_rules: Sequence[ExtractFieldTestRule]) -> TargetIndex:
-    """field_path -> evidence targets for ``bbox_match_mode="envelope"``.
+    """Map field paths to their evidence targets.
 
     Per rule and page, a ``coarse`` entry is an envelope whose parts are the
     precise entries with at least ENVELOPE_PART_CONTAINMENT of their area
@@ -1405,8 +1387,7 @@ def build_evidence_targets(field_rules: Sequence[ExtractFieldTestRule]) -> Targe
     entry enclosed by no envelope is a target of its own with no parts. A
     precise entry that is essentially the envelope itself (IoU >=
     ENVELOPE_DUPLICATE_IOU) is folded into it. Every path indexed by
-    ``build_rule_indexes`` gets at least one target, so the grounded
-    denominators do not depend on the mode.
+    ``build_rule_indexes`` with box evidence gets at least one target.
     """
     items: dict[str, list[tuple[int, BBox, bool]]] = {}
     for rule in field_rules:
@@ -1424,7 +1405,6 @@ def _build_value_evidence(
     field_rules: Sequence[ExtractFieldTestRule],
     *,
     normalize_dates: bool,
-    bbox_match_mode: str,
 ) -> dict[str, Sequence[_ValueEvidence]]:
     """Use explicit value locations when the field locates at least two different answers.
 
@@ -1461,9 +1441,7 @@ def _build_value_evidence(
         shared_boxes = next((boxes for value, _, boxes in entries_by_value if value is None), [])
         value_targets: list[_ValueEvidence] = []
         for value, pages, boxes in entries_by_value:
-            if bbox_match_mode == BBOX_MATCH_MODE_ANY:
-                targets = tuple((page, box, ()) for page, box, _ in boxes)
-            elif value is None:
+            if value is None:
                 # Group both sets to detect shared lines inside tagged envelopes
                 # and shared envelopes that would absorb tagged lines. Keep only
                 # the shared targets whose geometry is independent.
@@ -1516,11 +1494,11 @@ def group_evidence_targets(
 
 
 def evidence_target_hit(target: EvidenceTarget, pred: Sequence[PageBBox], *, iou_threshold: float) -> bool:
-    """One evidence target against citation boxes (``envelope`` mode).
+    """Match one evidence target against citation boxes.
 
     A target with no parts (a single-line value; a coarse box enclosing no
-    precise entry) is hit by one citation box at IoU >= threshold, exactly
-    as in ``any`` mode. An envelope with parts is hit when the citation
+    precise entry) is hit by one citation box at IoU >= threshold. An
+    envelope with parts is hit when the citation
     covers it -- one box at IoU >= threshold, or several boxes (one per
     line) whose union is -- AND every part is touched by some citation box
     (>= ENVELOPE_PART_COVERAGE of the part's area). A citation of one line
@@ -1585,15 +1563,10 @@ def compute_unified_evidence_metrics(
     fuzzy_field_thresholds: Mapping[str, float] | None = None,
     normalize_dates: bool = True,
     bbox_iou_threshold: float = 0.5,
-    bbox_match_mode: str = DEFAULT_BBOX_MATCH_MODE,
     graded_cells: list[GradedCell] | None = None,
     value_cells: MutableSequence[ValueCell] | None = None,
 ) -> list[MetricValue]:
     """Value + grounded precision/recall/F1 under keyless Hungarian alignment.
-
-    ``bbox_match_mode`` selects how a citation is graded against a cell's
-    evidence boxes: ``"envelope"`` (default; a coarse entry must be covered
-    whole, see the module docstring) or ``"any"`` (any box against any box).
 
     Returns an empty list when either side is not a dict (no array structure to
     score), matching ``array_record``'s ``counts is None`` guard.
@@ -1605,8 +1578,6 @@ def compute_unified_evidence_metrics(
     ``value_cells`` collects every Value-F1 leaf, including one-sided misses
     and cells with no citations. Paths address the normalized scoring inputs.
     """
-    if bbox_match_mode not in BBOX_MATCH_MODES:
-        raise ValueError(f"unknown bbox_match_mode {bbox_match_mode!r}; supported: {sorted(BBOX_MATCH_MODES)}")
     expected = unwrap_value(expected_output)
     actual = unwrap_value(extracted_data)
     if not isinstance(expected, Mapping) or not isinstance(actual, Mapping):
@@ -1620,12 +1591,8 @@ def compute_unified_evidence_metrics(
     ev_targets = _build_value_evidence(
         field_rules,
         normalize_dates=normalize_dates,
-        bbox_match_mode=bbox_match_mode,
     )
-    if bbox_match_mode == BBOX_MATCH_MODE_ENVELOPE:
-        field_targets = build_evidence_targets([rule for rule in field_rules if rule.field_path not in ev_targets])
-    else:
-        field_targets = _flat_targets(ev_boxes)
+    field_targets = build_evidence_targets([rule for rule in field_rules if rule.field_path not in ev_targets])
     for path, pages in ev_pages.items():
         if path not in ev_targets:
             ev_targets[path] = (
@@ -1672,7 +1639,6 @@ def compute_unified_evidence_metrics(
         "expected_rows": c.expected_rows,
         "predicted_rows": c.predicted_rows,
         "bbox_iou_threshold": bbox_iou_threshold,
-        "bbox_match_mode": bbox_match_mode,
         "grounded_incomplete": c.grounded_incomplete,
         "value_incomplete": c.value_incomplete,
     }

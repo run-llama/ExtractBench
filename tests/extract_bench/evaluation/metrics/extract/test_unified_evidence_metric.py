@@ -1973,7 +1973,7 @@ def _is_headline_unified(name: str) -> bool:
     return name.startswith(_HEADLINE_UNIFIED_PREFIXES) and "_word_" not in name and "_structural_" not in name
 
 
-# --- bbox_match_mode="envelope": a value printed on several lines ---------------
+# --- Grounding for values printed on several lines --------------------------
 
 _L1 = [0.1, 0.10, 0.5, 0.02]
 _L2 = [0.1, 0.12, 0.5, 0.02]
@@ -1985,11 +1985,11 @@ def _wrapped_rules(*entries: FieldEvidence) -> list[ExtractFieldTestRule]:
     return [ExtractFieldTestRule(field_path="as_of", evidence=list(entries))]
 
 
-def _grounded(rules: list[ExtractFieldTestRule], boxes: list[list[float]], mode: str, page: int = 1) -> float | None:
+def _grounded(rules: list[ExtractFieldTestRule], boxes: list[list[float]], page: int = 1) -> float | None:
     expected = {"as_of": "n", "holdings": []}
     cits = [{"field_path": "as_of", "page": page, "bbox": b} for b in boxes]
     return _val(
-        compute_unified_evidence_metrics(expected, expected, rules, cits, _schema(), bbox_match_mode=mode),
+        compute_unified_evidence_metrics(expected, expected, rules, cits, _schema()),
         "extract_unified_grounded_recall",
     )
 
@@ -2003,30 +2003,19 @@ def _three_line_rules() -> list[ExtractFieldTestRule]:
     )
 
 
-def test_envelope_mode_requires_the_whole_wrapped_value() -> None:
+def test_envelope_requires_the_whole_wrapped_value() -> None:
     """Per-line entries plus a coarse envelope are an AND: a citation of one
     line, or of two of three lines, is not grounded; one box around the value
     or one box per line is."""
     rules = _three_line_rules()
-    assert _grounded(rules, [_L1], "envelope") == 0.0
-    assert _grounded(rules, [[0.1, 0.10, 0.5, 0.04]], "envelope") == 0.0  # lines 1-2 (IoU 2/3 with the envelope)
-    assert _grounded(rules, [_ENV3], "envelope") == 1.0
-    assert _grounded(rules, [_L1, _L2, _L3], "envelope") == 1.0
-    assert _grounded(rules, [[0.1, 0.10, 0.5, 0.04], _L3], "envelope") == 1.0  # lines 1-2 merged, line 3 alone
-    assert _grounded(rules, [_L1], "any") == 1.0
-    assert _grounded(rules, [[0.1, 0.10, 0.5, 0.04]], "any") == 1.0
+    assert _grounded(rules, [_L1]) == 0.0
+    assert _grounded(rules, [[0.1, 0.10, 0.5, 0.04]]) == 0.0  # lines 1-2 (IoU 2/3 with the envelope)
+    assert _grounded(rules, [_ENV3]) == 1.0
+    assert _grounded(rules, [_L1, _L2, _L3]) == 1.0
+    assert _grounded(rules, [[0.1, 0.10, 0.5, 0.04], _L3]) == 1.0  # lines 1-2 merged, line 3 alone
 
 
-def test_envelope_mode_is_the_default_and_recorded_in_metadata() -> None:
-    expected = {"as_of": "n", "holdings": []}
-    cits = [{"field_path": "as_of", "page": 1, "bbox": _L1}]
-    metrics = compute_unified_evidence_metrics(expected, expected, _three_line_rules(), cits, _schema())
-    assert _val(metrics, "extract_unified_grounded_recall") == 0.0
-    f1 = next(m for m in metrics if m.metric_name == "extract_unified_grounded_f1")
-    assert f1.metadata["bbox_match_mode"] == "envelope"
-
-
-def test_envelope_mode_rejects_a_single_row_even_at_iou_one_half() -> None:
+def test_envelope_rejects_a_single_row_even_at_iou_one_half() -> None:
     """Two equally wide rows: the first row alone has IoU exactly 0.5 with the
     envelope, which the threshold would accept. The uncovered second line
     still fails it."""
@@ -2036,12 +2025,11 @@ def test_envelope_mode_rejects_a_single_row_even_at_iou_one_half() -> None:
         FieldEvidence(page=1, bbox=[0.1, 0.10, 0.5, 0.04], value="n", coarse=True),
     )
     assert abs(unified_evidence_metric.iou_xywh(tuple(_L1), (0.1, 0.10, 0.5, 0.04)) - 0.5) < 1e-9  # type: ignore[arg-type]
-    assert _grounded(rules, [_L1], "envelope") == 0.0
-    assert _grounded(rules, [_L1], "any") == 1.0
-    assert _grounded(rules, [_L1, _L2], "envelope") == 1.0
+    assert _grounded(rules, [_L1]) == 0.0
+    assert _grounded(rules, [_L1, _L2]) == 1.0
 
 
-def test_envelope_mode_keeps_a_separate_occurrence_as_its_own_alternative() -> None:
+def test_envelope_keeps_a_separate_occurrence_as_its_own_alternative() -> None:
     """A precise entry outside every envelope on its page is still an OR
     alternative: the same value printed once more as a single line."""
     solo = [0.1, 0.50, 0.5, 0.02]
@@ -2051,35 +2039,30 @@ def test_envelope_mode_keeps_a_separate_occurrence_as_its_own_alternative() -> N
         FieldEvidence(page=1, bbox=[0.1, 0.10, 0.5, 0.04], value="n", coarse=True),
         FieldEvidence(page=1, bbox=solo, value="n"),
     )
-    assert _grounded(rules, [solo], "envelope") == 1.0
-    assert _grounded(rules, [_L1], "envelope") == 0.0
+    assert _grounded(rules, [solo]) == 1.0
+    assert _grounded(rules, [_L1]) == 0.0
 
 
-def test_envelope_mode_equals_any_mode_without_coarse_entries() -> None:
-    """GT with no coarse entry grades identically under both modes: any line is
-    an accepted alternative."""
+def test_precise_entries_without_an_envelope_are_alternative_locations() -> None:
     rules = _wrapped_rules(
         FieldEvidence(page=1, bbox=_L1, value="n"),
         FieldEvidence(page=1, bbox=_L2, value="n"),
         FieldEvidence(page=1, bbox=_L3, value="n"),
     )
-    for boxes in ([_L1], [_L2], [_ENV3], [[0.1, 0.10, 0.5, 0.04]]):
-        assert _grounded(rules, boxes, "envelope") == _grounded(rules, boxes, "any")
-    assert _grounded(rules, [_L2], "envelope") == 1.0
-    assert _grounded(rules, [_ENV3], "envelope") == 0.0  # IoU 1/3 with every line, in both modes
+    assert _grounded(rules, [_L2]) == 1.0
+    assert _grounded(rules, [_ENV3]) == 0.0  # IoU 1/3 with every line
 
 
-def test_envelope_mode_coarse_entry_without_parts_is_a_plain_iou_target() -> None:
+def test_envelope_coarse_entry_without_parts_is_a_plain_iou_target() -> None:
     """A coarse box enclosing no precise entry (a block-level or row-level
-    cite) matches one citation box at IoU >= threshold, as in ``any`` mode."""
+    cite) matches one citation box at IoU >= threshold."""
     rules = _wrapped_rules(FieldEvidence(page=1, bbox=_ENV3, value="n", coarse=True))
-    assert _grounded(rules, [_ENV3], "envelope") == 1.0
-    assert _grounded(rules, [_L1], "envelope") == 0.0
-    assert _grounded(rules, [_L1, _L2, _L3], "envelope") == 0.0  # no parts: no union of boxes either
-    assert _grounded(rules, [_L1], "any") == 0.0
+    assert _grounded(rules, [_ENV3]) == 1.0
+    assert _grounded(rules, [_L1]) == 0.0
+    assert _grounded(rules, [_L1, _L2, _L3]) == 0.0  # no parts: no union of boxes either
 
 
-def test_envelope_mode_folds_a_precise_duplicate_of_the_envelope() -> None:
+def test_envelope_folds_a_precise_duplicate_of_the_envelope() -> None:
     """The envelope annotated twice (precise and coarse) is one target whose
     parts are the lines, not a part that a per-line citation could never cover."""
     rules = _wrapped_rules(
@@ -2089,12 +2072,12 @@ def test_envelope_mode_folds_a_precise_duplicate_of_the_envelope() -> None:
         FieldEvidence(page=1, bbox=_ENV3, value="n"),
         FieldEvidence(page=1, bbox=_ENV3, value="n", coarse=True),
     )
-    assert _grounded(rules, [_L1, _L2, _L3], "envelope") == 1.0
-    assert _grounded(rules, [_ENV3], "envelope") == 1.0
-    assert _grounded(rules, [_L1], "envelope") == 0.0
+    assert _grounded(rules, [_L1, _L2, _L3]) == 1.0
+    assert _grounded(rules, [_ENV3]) == 1.0
+    assert _grounded(rules, [_L1]) == 0.0
 
 
-def test_envelope_mode_cross_page_value_accepts_each_page_envelope() -> None:
+def test_envelope_cross_page_value_accepts_each_page_envelope() -> None:
     """A value that continues on the next page carries one envelope per page;
     each is an alternative, and each demands its own lines."""
     p2_l1 = [0.1, 0.10, 0.5, 0.02]
@@ -2107,8 +2090,8 @@ def test_envelope_mode_cross_page_value_accepts_each_page_envelope() -> None:
         FieldEvidence(page=2, bbox=p2_l2, value="n"),
         FieldEvidence(page=2, bbox=[0.1, 0.10, 0.5, 0.04], value="n", coarse=True),
     )
-    assert _grounded(rules, [[0.1, 0.10, 0.5, 0.04]], "envelope", page=2) == 1.0
-    assert _grounded(rules, [p2_l1], "envelope", page=2) == 0.0
+    assert _grounded(rules, [[0.1, 0.10, 0.5, 0.04]], page=2) == 1.0
+    assert _grounded(rules, [p2_l1], page=2) == 0.0
 
 
 def test_build_evidence_targets_groups_lines_under_their_envelope() -> None:
@@ -2126,14 +2109,6 @@ def test_build_evidence_targets_groups_lines_under_their_envelope() -> None:
     assert targets["as_of"][0][2] == (tuple(_L1), tuple(_L2))
 
 
-def test_unknown_bbox_match_mode_is_rejected_even_when_nothing_is_scored() -> None:
-    expected = {"as_of": "n", "holdings": []}
-    with pytest.raises(ValueError, match="bbox_match_mode"):
-        compute_unified_evidence_metrics(expected, expected, _three_line_rules(), [], _schema(), bbox_match_mode="all")
-    with pytest.raises(ValueError, match="bbox_match_mode"):
-        compute_unified_evidence_metrics("not a dict", expected, [], [], _schema(), bbox_match_mode="all")
-
-
 def test_geometry_helpers_are_nan_safe() -> None:
     nan = float("nan")
     good = (0.1, 0.1, 0.5, 0.02)
@@ -2148,15 +2123,10 @@ def test_geometry_helpers_are_nan_safe() -> None:
 
 
 @pytest.mark.parametrize(
-    "bbox_match_mode",
-    [unified_evidence_metric.BBOX_MATCH_MODE_ENVELOPE, unified_evidence_metric.BBOX_MATCH_MODE_ANY],
-)
-@pytest.mark.parametrize(
     ("value", "slide", "correct"),
     [(7700, 5, True), (7681, 39, True), (7700, 39, False), (7681, 5, False)],
 )
 def test_alternate_values_require_their_own_citations(
-    bbox_match_mode: str,
     value: int,
     slide: int,
     correct: bool,
@@ -2177,7 +2147,6 @@ def test_alternate_values_require_their_own_citations(
         {field: value},
         rules,
         [{"field_path": field, "page": slide, "bbox": box}],
-        bbox_match_mode=bbox_match_mode,
     )
     assert _val(metrics, "extract_unified_value_f1") == 1.0
     assert _val(metrics, "extract_unified_page_f1") == float(correct)
