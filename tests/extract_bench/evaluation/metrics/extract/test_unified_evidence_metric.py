@@ -1582,6 +1582,12 @@ def test_lenient_date_normalizer_joins_split_preprinted_years() -> None:
     [
         ("July 13th, 1955", "July 13th 1955", True, 1.0),
         ("July 13th, 1955", "July 13th, 19 55", True, 1.0),
+        ("July 1, 1955", "July 1th, 1955", True, 0.0),
+        ("July 2, 1955", "July 2th, 1955", True, 0.0),
+        ("July 3, 1955", "July 3th, 1955", True, 0.0),
+        ("July 4, 1955", "July 4rd, 1955", True, 0.0),
+        ("July 11, 1955", "July 11th, 1955", True, 1.0),
+        ("July 21, 1955", "July 21st, 1955", True, 1.0),
         ("July 13th, 1955", "July 14th, 1955", True, 0.0),
         ("July 13th, 1955", "July 13th", True, 0.0),
         ("Permit 13th, 1955", "Permit 13, 1955", True, 0.0),

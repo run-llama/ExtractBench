@@ -161,7 +161,12 @@ _TERMINAL_PUNCT_RE = re.compile(r"\s*[.,;:]\s*$")
 _PUNCT_SPACING_RE = re.compile(r"\s*([,.;:])\s*", re.U)
 _NON_DIGIT_RE = re.compile(r"\D+")
 _DIGIT_RE = re.compile(r"\d")
-_MONTH_ORDINAL_DAY_RE = re.compile(r"\b([A-Za-z]+ \d{1,2})(?:st|nd|rd|th)\b", re.IGNORECASE)
+# Capture the month and day, then check the full ordinal against the calendar days.
+_MONTH_ORDINAL_DAY_RE = re.compile(
+    r"\b(?=([A-Za-z]+ [0-9]{1,2}))[A-Za-z]+ "
+    r"(?:(?:1|21|31)st|(?:2|22)nd|(?:3|23)rd|(?:[4-9]|1[0-9]|20|2[4-9]|30)th)\b",
+    re.IGNORECASE,
+)
 # Preprinted decade split: a filer types "55" after the printed "19", so
 # transcriptions render "19 55". Only joined when a digit (a day) already
 # appears before the pair -- "June 19 44" is a day 19 plus a 2-digit year,
