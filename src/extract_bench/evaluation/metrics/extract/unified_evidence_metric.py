@@ -42,45 +42,45 @@ three additions:
    when the value matches AND the citation's page is in the evidence's page set
    -- the coarser **page** check (no IoU), emitted as ``*_page_*``. Page is a
    per-cell superset of bbox (a box match requires equal pages, and page
-   evidence/claims are supersets of bbox evidence/claims), so the three F1s nest:
-   ``value_f1 >= page_f1 >= grounded_f1``. When a field locates multiple
-   alternative values, grounding uses the locations for the matched value
-   and any shared evidence. Together ``*_grounded_*`` and
-   ``*_page_*`` are one nested precision/recall/F1 trio.
-   Grounding is only defined where the GT carries the corresponding annotation
-   (a page for ``*_page_*``, a bbox for ``*_grounded_*``), on
-   BOTH sides of the P/R pair: recall's denominator is the GT cells that carry
-   an evidence bbox, and precision's denominator is the predicted citation-bbox
-   claims on cells *aligned to such a GT cell*. A claim on a cell whose GT has
-   no bbox (or on an extra predicted row with no GT counterpart) is ungradeable
-   -- it can never be verified right or wrong -- so it is excluded from the
-   denominator rather than counted as a miss. Without this, a sparsely
-   annotated document (e.g. one bbox-bearing cover field among 30k value-only
-   cells) pins precision to ~0 for every pipeline that cites everything. A
-   document whose GT has no evidence bbox at all emits **no** ``*_grounded_*``
-   metric (excluded from the dataset average), rather than a 0.0 that would
-   punish a document that simply cannot be graded for grounding.
+   evidence/claims are supersets of bbox evidence/claims), so the three F1s
+   nest: ``value_f1 >= page_f1 >= grounded_f1``. When a field locates multiple
+   alternative values, grounding uses the locations for the matched value and
+   any shared evidence. Together ``*_grounded_*`` and ``*_page_*`` are one
+   nested precision/recall/F1 trio.
 
-   Grounding treats each occurrence of a value as an alternative location.
-   A ``coarse`` entry is the envelope of the precise entries it encloses on
-   its page. A citation must cover the envelope at the required IoU and touch
-   every enclosed line. It can use one box or the union of several boxes.
-   A precise entry outside every envelope, or a coarse entry enclosing no
-   precise entries, is matched by one citation box at the required IoU.
+   Grounding is only defined where the GT carries the corresponding annotation
+   (a page for ``*_page_*``, a bbox for ``*_grounded_*``), on BOTH sides of the
+   P/R pair: recall's denominator is the GT cells that carry an evidence bbox,
+   and precision's denominator is the predicted citation-bbox claims on cells
+   *aligned to such a GT cell*. A claim on a cell whose GT has no bbox (or on
+   an extra predicted row with no GT counterpart) is ungradeable -- it can
+   never be verified right or wrong -- so it is excluded from the denominator
+   rather than counted as a miss. Without this, a sparsely annotated document
+   (e.g. one bbox-bearing cover field among 30k value-only cells) pins
+   precision to ~0 for every pipeline that cites everything. A document whose
+   GT has no evidence bbox at all emits **no** ``*_grounded_*`` metric
+   (excluded from the dataset average), rather than a 0.0 that would punish a
+   document that simply cannot be graded for grounding.
+
+   Grounding treats each occurrence of a value as an alternative location. A
+   ``coarse`` entry is the envelope of the precise entries it encloses on its
+   page. A citation must cover the envelope at the required IoU and touch every
+   enclosed line. It can use one box or the union of several boxes. A precise
+   entry outside every envelope, or a coarse entry enclosing no precise
+   entries, is matched by one citation box at the required IoU.
 
 On a document with no object-array subfields, no object-valued cells, no
-alternate evidence values, and no omit/default split, the ``*_value_*``
-metrics match ``array_record_*`` alignment. ``array_record`` reads
-omitted keys with ``.get`` (implicit ``null``); this scorer uses ``lookup``.
-Object-array subfields and objects recursed as child cells make the value
-metrics diverge from array_record (per-child credit); the
-``*_grounded_*`` metrics
-are the other new signal (0 for pipelines that emit no citations *on documents
-whose GT carries bboxes*; omitted entirely on documents whose GT has none).
-Truncation
-drops recall exactly as in ``array_record``: an unaligned ground-truth row
-contributes 0 correct against a full denominator, so there is no vacuous null
-pass.
+alternate evidence values, and no omit/default split, the ``*_value_*`` metrics
+match ``array_record_*`` alignment. ``array_record`` reads omitted keys with
+``.get`` (implicit ``null``); this scorer uses ``lookup``. Object-array
+subfields and objects recursed as child cells make the value metrics diverge
+from array_record (per-child credit); the ``*_grounded_*`` metrics are the
+other new signal (0 for pipelines that emit no citations *on documents whose GT
+carries bboxes*; omitted entirely on documents whose GT has none).
+
+Truncation drops recall exactly as in ``array_record``: an unaligned
+ground-truth row contributes 0 correct against a full denominator, so there is
+no vacuous null pass.
 """
 
 from __future__ import annotations
