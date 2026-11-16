@@ -264,12 +264,17 @@ def test_publish_opens_pr_without_overwriting_source_data_and_refuses_modified_t
 
 
 @pytest.mark.parametrize("legacy_rules", [False, True])
-def test_release_strips_reviewer_attribution_from_jsonl_and_harbor(
-    tmp_path: Path, snapshot: Path, legacy_rules: bool
-) -> None:
+def test_release_strips_unknown_keys_from_jsonl_and_harbor(tmp_path: Path, snapshot: Path, legacy_rules: bool) -> None:
     split = snapshot / "short.jsonl"
     row = json.loads(split.read_text(encoding="utf-8"))
-    rule = {"verified": True, "verified_by": "internal reviewer label", "evidence": [{"value": 7}]}
+    row["internal_note"] = "private"
+    box = {"page": 1, "bbox": [0, 0, 1, 1]}
+    rule = {
+        "verified": True,
+        "verified_by": "internal reviewer label",
+        "evidence": [{"value": 7, "_adjudication": "private"}],
+        "bboxes": [box | {"internal_note": "private"}],
+    }
     if legacy_rules:
         rule |= {"type": "extract_field", "field_path": "rows[0].value"}
         row["field_rules"] = json.dumps([rule])
@@ -282,7 +287,12 @@ def test_release_strips_reviewer_attribution_from_jsonl_and_harbor(
     published_split = output / split.name
     published_row = json.loads(published_split.read_text(encoding="utf-8"))
     rules = json.loads(published_row["field_rules"])
-    expected_rule = {key: value for key, value in rule.items() if key != "verified_by"}
+    expected_rule = {"verified": True, "evidence": [{"value": 7}], "bboxes": [box]}
+    if legacy_rules:
+        expected_rule |= {"type": "extract_field", "field_path": "rows[0].value"}
+    assert published_row == {key: value for key, value in row.items() if key != "internal_note"} | {
+        "field_rules": published_row["field_rules"],
+    }
     assert rules == ([expected_rule] if legacy_rules else {"rows[0].value": expected_rule})
     assert json.loads(split.read_text(encoding="utf-8")) == row
     task = next((output / "tasks").glob("short--*"))

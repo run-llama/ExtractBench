@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from extract_bench.data.download import _write_sidecar, dataset_config
+from extract_bench.data.release_annotations import sanitize_release_row
 from extract_bench.evaluation.score_case import load_extract_test_case
 
 PAPER_URL = "https://arxiv.org/html/2607.29677v1#A3.SS1"
@@ -99,26 +100,6 @@ network_mode = "no-network"
 """
 
 
-def _strip_reviewer_attribution(row: dict[str, Any]) -> bool:
-    """Remove reviewer attribution from current and legacy field rules."""
-    column = "field_rules"
-    encoded_rules = row.get(column)
-    if encoded_rules is None or encoded_rules == "":
-        return False
-    rules = json.loads(encoded_rules)
-    if not isinstance(rules, (dict, list)):
-        return False
-    entries = rules.values() if isinstance(rules, dict) else rules
-    absent = object()
-    changed = False
-    for rule in entries:
-        if rule.pop("verified_by", absent) is not absent:
-            changed = True
-    if changed:
-        row[column] = json.dumps(rules, ensure_ascii=False)
-    return changed
-
-
 def export_snapshot(snapshot: Path, output: Path, dataset: str, revision: str, scorer_revision: str) -> dict[str, Any]:
     """Export a pinned HF snapshot; reruns repair partial tasks deterministically.
 
@@ -139,7 +120,7 @@ def export_snapshot(snapshot: Path, output: Path, dataset: str, revision: str, s
                 if len(line.strip()) == 0:
                     continue
                 row = json.loads(line)
-                if _strip_reviewer_attribution(row):
+                if sanitize_release_row(row):
                     ending = line[len(line.rstrip("\r\n")) :]
                     sanitized_lines.setdefault(filename, {})[index] = json.dumps(row, ensure_ascii=False) + ending
                 case_id = row["id"]
@@ -222,9 +203,8 @@ not change the reward or assign credit to reasoning steps.
 This prompt does not request citations, so this lane does not measure grounding.
 The agent timeout is {manifest["agent_timeout_sec"]} seconds per document.
 
-The ordinary Hugging Face dataset configuration is preserved. Reviewer attribution
-is removed from JSONL field rules and Harbor references. `harbor-manifest.json`
-records source revisions and hashes for reproducibility.
+The JSONL files and ordinary Hugging Face dataset configuration are preserved.
+`harbor-manifest.json` records source revisions and hashes for reproducibility.
 For a no-inference packaging smoke test, use `-a oracle -l 1` instead of `-a codex -m MODEL`.
 The oracle copies the reference output; it checks packaging and grading, not extraction ability.
 """
