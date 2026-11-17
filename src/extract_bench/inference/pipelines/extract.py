@@ -299,7 +299,7 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
         _pipeline_spec(
             pipeline_name="gemini_cli_extract_gemini_4_hydrogen_high_thinking_vision_evidence",
             provider_name="gemini_cli_extract",
-            config={"model": "gemini-4-hydrogen", "thinking_level": "high", "evidence_mode": True, "max_cost_usd": 5.0},
+            config={"model": "gemini-4-hydrogen", "thinking_level": "high", "evidence_mode": True},
         )
     )
     # Antigravity CLI (`agy`), Google's other coding agent, on the Gemini API through
@@ -308,7 +308,7 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
         _pipeline_spec(
             pipeline_name="agy_extract_gemini_4_hydrogen_high_thinking_vision_evidence",
             provider_name="agy_extract",
-            config={"model": "gemini-4-hydrogen-high", "evidence_mode": True, "max_cost_usd": 5.0},
+            config={"model": "gemini-4-hydrogen-high", "evidence_mode": True},
         )
     )
     register_fn(

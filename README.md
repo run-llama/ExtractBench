@@ -102,7 +102,7 @@ Rows are ordered by % Perfect, then Value F1, then lower cost.
 | 1 | Codex GPT-6 Astra | Coding Agents | **58** | **94.53** | **70.97** | 95.20¢ |
 | 2 | LlamaExtract Agentic Plus (Max Effort) | LlamaExtract | <u>56</u> | <u>92.71</u> | <u>66.20</u> | 36.60¢ |
 | 3 | Claude Code Opus 5.5 | Coding Agents | 51 | 74.87 | 45.29 | 41.20¢ |
-| 4 | Gemini CLI (Gemini 4 Hydrogen) | Coding Agents | 42 | 63.88 | 43.88 | 39.50¢ |
+| 4 | Gemini CLI (Gemini 4 Hydrogen) | Coding Agents | 42 | 63.88 | 43.88 | 43.89¢ |
 | 5 | LlamaExtract Agentic Plus | LlamaExtract | 38 | 77.70 | 60.39 | 7.50¢ |
 | 6 | Extend Operator | Specialized APIs | 34 | 73.87 | 57.75 | 9.88¢ |
 | 7 | Claude Code Sonnet 5.5 | Coding Agents | 32 | 73.62 | 40.47 | 19.98¢ |
