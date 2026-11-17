@@ -6,9 +6,8 @@ from typing import Any
 
 from extract_bench.test_cases.schema import ExtractFieldBbox, ExtractFieldTestRule, FieldEvidence
 
-IDENTITY_HINTS_KEY = "_identity_hints"
-
 _FIELD_RULES = "field_rules"
+IDENTITY_HINTS_KEY = "_identity_hints"
 _DATASET_COLUMNS = frozenset(
     {
         "id",
