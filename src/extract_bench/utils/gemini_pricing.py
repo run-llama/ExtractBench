@@ -87,6 +87,8 @@ def cost_from_request_usage(model: str, usage: Mapping[str, Any]) -> float | Non
         return None
     if model.startswith("gemini-4-argon"):
         input_rate, output_rate, cache_rate = (4.0, 20.0, 0.2)
+    elif model.startswith("gemini-4-hydrogen"):
+        input_rate, output_rate, cache_rate = (1.5, 7.5, 0.075)
     elif model.startswith(("gemini-3-flash-preview", "gemini-3.1-pro-preview")):
         input_rate, output_rate = gemini_pricing_per_million(model)
         cache_rate, _ = gemini_context_cache_pricing_per_million(model)

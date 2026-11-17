@@ -297,6 +297,22 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
     )
     register_fn(
         _pipeline_spec(
+            pipeline_name="gemini_cli_extract_gemini_4_hydrogen_high_thinking_vision_evidence",
+            provider_name="gemini_cli_extract",
+            config={"model": "gemini-4-hydrogen", "thinking_level": "high", "evidence_mode": True},
+        )
+    )
+    # Antigravity CLI (`agy`), Google's other coding agent, on the Gemini API through
+    # the same recorder and prompt as Gemini CLI. agy's model ID carries the thinking level.
+    register_fn(
+        _pipeline_spec(
+            pipeline_name="agy_extract_gemini_4_hydrogen_high_thinking_vision_evidence",
+            provider_name="agy_extract",
+            config={"model": "gemini-4-hydrogen-high", "evidence_mode": True},
+        )
+    )
+    register_fn(
+        _pipeline_spec(
             pipeline_name="claude_code_extract_opus_4_8",
             provider_name="claude_code_extract",
             config={"model": "claude-opus-4-8", "bare": True},

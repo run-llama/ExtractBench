@@ -188,6 +188,22 @@ class GeminiCliExtractProvider(Provider):
             "",
         ]
 
+    def _cli_env(self, home: Path, base_url: str) -> dict[str, str]:
+        """Point the CLI at its private home and the recorder; the real key stays in the recorder."""
+        return {"GEMINI_CLI_HOME": str(home), "GEMINI_API_KEY": "local-recorder", "GOOGLE_GEMINI_BASE_URL": base_url}
+
+    def _stdin_payload(self, prompt: str) -> str:
+        return prompt
+
+    def _prepare_home(self, home: Path) -> None:
+        (home / ".gemini").mkdir(parents=True)
+        (home / ".gemini" / "settings.json").write_text(json.dumps(self._build_settings()), encoding="utf-8")
+
+    @staticmethod
+    def _result_event(events: Sequence[dict[str, Any]]) -> dict[str, Any] | None:
+        """The terminal event as ``{"status": "success" | ..., "error": ..., "stats": ...}``."""
+        return next((e for e in reversed(events) if e.get("type") == "result"), None)
+
     def _run_cli(
         self,
         cmd: list[str],
@@ -215,9 +231,7 @@ class GeminiCliExtractProvider(Provider):
             "GEMINI_API_KEY_AUTH_MECHANISM",
         }
         env = {k: v for k, v in os.environ.items() if k not in excluded}
-        env.update(
-            {"GEMINI_CLI_HOME": str(home), "GEMINI_API_KEY": "local-recorder", "GOOGLE_GEMINI_BASE_URL": base_url}
-        )
+        env.update(self._cli_env(home, base_url))
 
         for name in ("NO_PROXY", "no_proxy"):
             env[name] = ",".join(filter(None, [env.get(name), "127.0.0.1", "localhost"]))
@@ -250,7 +264,7 @@ class GeminiCliExtractProvider(Provider):
             try:
                 assert proc.stdin is not None and proc.stdout is not None
                 try:
-                    proc.stdin.write(prompt)
+                    proc.stdin.write(self._stdin_payload(prompt))
                 except BrokenPipeError:
                     pass  # the CLI died early; the exit code reports it
                 finally:
@@ -436,9 +450,8 @@ class GeminiCliExtractProvider(Provider):
         with tempfile.TemporaryDirectory() as tmp:
             workdir = Path(tmp) / "work"
             home = Path(tmp) / "home"
-            (home / ".gemini").mkdir(parents=True)
+            self._prepare_home(home)
             workdir.mkdir()
-            (home / ".gemini" / "settings.json").write_text(json.dumps(self._build_settings()), encoding="utf-8")
             staged_name = f"input{ext}"
             shutil.copy2(src, workdir / staged_name)
 
@@ -476,7 +489,7 @@ class GeminiCliExtractProvider(Provider):
                     with (home / "gemini_stderr.log").open(encoding="utf-8", errors="replace") as stderr:
                         request_retry_observed = any(_REQUEST_RETRY_PATTERN.search(line) is not None for line in stderr)
                     events = self._events(lines)
-                    result_event = next((e for e in reversed(events) if e.get("type") == "result"), None)
+                    result_event = self._result_event(events)
                     self._raise_for_status(returncode, result_event, stderr_tail)
                     data = self._read_output_json(workdir)
                     if self._evidence_mode:
