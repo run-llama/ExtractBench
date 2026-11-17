@@ -6,9 +6,23 @@ from typing import Any
 
 from extract_bench.test_cases.schema import ExtractFieldBbox, ExtractFieldTestRule, FieldEvidence
 
+OPTIONAL_SIDECAR_FIELDS = {
+    "repeated_structure": "_eval_row_identity",
+    "_identity_hints": "_identity_hints",
+}
+
 _FIELD_RULES = "field_rules"
 _DATASET_COLUMNS = frozenset(
-    {"id", "category", "pdf", "data_schema", "expected_output", _FIELD_RULES, "repeated_structure", "tags"}
+    {
+        "id",
+        "category",
+        "pdf",
+        "data_schema",
+        "expected_output",
+        _FIELD_RULES,
+        "tags",
+        *OPTIONAL_SIDECAR_FIELDS,
+    }
 )
 _RULE_LIST_ITEMS = {
     "evidence": FieldEvidence.model_fields.keys(),
