@@ -55,7 +55,6 @@ from extract_bench.inference.providers.extract.direct_model_utils import (
     force_all_properties_required,
     normalize_extract_result,
     page_count,
-    promote_repeated_structure,
 )
 from extract_bench.inference.providers.registry import register_provider
 from extract_bench.schemas.pipeline import PipelineSpec
@@ -194,7 +193,6 @@ class CodexCodeExtractProvider(Provider):
         # tell a model whether this environment can display images to it.
         self._extra_instructions: str = str(self.base_config.get("extra_instructions") or "").strip()
 
-        self._promote_repeated: bool = bool(self.base_config.get("promote_repeated_structure", True))
         self._additional_properties_false: bool = bool(self.base_config.get("additional_properties_false", True))
         # Match claude_code_extract by default: preserve the benchmark schema's
         # own required fields instead of forcing every nullable/optional field
@@ -240,8 +238,6 @@ class CodexCodeExtractProvider(Provider):
         return input_tokens > _LONG_CONTEXT_THRESHOLD_TOKENS
 
     def _prepare_schema(self, schema: dict[str, Any]) -> dict[str, Any]:
-        if self._promote_repeated:
-            schema = promote_repeated_structure(schema)
         if self._additional_properties_false:
             schema = add_additional_properties_false(schema)
         if self._all_properties_required:
@@ -676,7 +672,6 @@ class CodexCodeExtractProvider(Provider):
             "ignore_user_config": self._ignore_user_config,
             "ignore_rules": self._ignore_rules,
             "attach_images": self._attach_images,
-            "promote_repeated_structure": self._promote_repeated,
             "additional_properties_false": self._additional_properties_false,
             "all_properties_required": self._all_properties_required,
             "evidence_mode": self._evidence_mode,

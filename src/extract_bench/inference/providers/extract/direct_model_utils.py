@@ -38,31 +38,6 @@ DEFAULT_USER_INSTRUCTION = (
 )
 
 
-def promote_repeated_structure(schema: dict[str, Any]) -> dict[str, Any]:
-    """Promote ``repeated_structure[name]`` entries into ``properties[name]``.
-
-    LlamaExtract schemas declare repeated array nodes under a top-level
-    ``repeated_structure`` key. Standard JSON Schema consumers (Anthropic,
-    OpenAI, Gemini) either reject the unknown key or silently ignore it,
-    which drops the repeated fields. This adapter rewrites the schema into
-    plain JSON Schema by copying each entry into ``properties`` and
-    dropping the ``repeated_structure`` key.
-    """
-    if not isinstance(schema, dict):
-        return schema
-    repeated_structure = schema.get("repeated_structure")
-    if not isinstance(repeated_structure, dict) or not repeated_structure:
-        return schema
-    out = dict(schema)
-    properties = dict(out.get("properties") or {})
-    for name, definition in repeated_structure.items():
-        if isinstance(definition, dict) and name not in properties:
-            properties[name] = definition
-    out["properties"] = properties
-    out.pop("repeated_structure", None)
-    return out
-
-
 def add_additional_properties_false(schema: dict[str, Any]) -> dict[str, Any]:
     """Return a schema with every object closed via ``additionalProperties: false``."""
     out = copy.deepcopy(schema)

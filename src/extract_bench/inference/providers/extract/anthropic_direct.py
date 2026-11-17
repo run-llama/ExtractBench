@@ -38,7 +38,6 @@ from extract_bench.inference.providers.extract.direct_model_utils import (
     normalize_extract_result,
     page_count,
     pricing_for_model,
-    promote_repeated_structure,
 )
 from extract_bench.inference.providers.extract.parsed_text_source import (
     ParsedDocumentText,
@@ -190,7 +189,6 @@ class AnthropicDirectExtractProvider(Provider):
         return pricing_for_model(model, _ANTHROPIC_EXTRACT_PRICING_PER_M)
 
     def _prepare_schema(self, schema: dict[str, Any]) -> dict[str, Any]:
-        schema = promote_repeated_structure(schema)
         if self._all_properties_required:
             schema = force_all_properties_required(schema)
         if self._additional_properties_false:

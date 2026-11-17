@@ -27,7 +27,6 @@ def pro_snapshot(tmp_path):
             "data_schema": json.dumps(schema),
             "expected_output": json.dumps({"answer": 42}),
             "field_rules": "{}",
-            "repeated_structure": "{}",
             "tags": [split],
         }
         (snapshot / f"{split}.jsonl").write_text(json.dumps(row) + "\n")

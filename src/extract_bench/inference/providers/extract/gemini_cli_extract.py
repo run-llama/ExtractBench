@@ -54,7 +54,6 @@ from extract_bench.inference.providers.extract.direct_model_utils import (
     add_additional_properties_false,
     normalize_extract_result,
     page_count,
-    promote_repeated_structure,
 )
 from extract_bench.inference.providers.extract.gemini_cli_trace import GeminiCliTrace
 from extract_bench.inference.providers.extract.gemini_cli_transport import GeminiCliTransport
@@ -90,7 +89,6 @@ class GeminiCliExtractProvider(Provider):
         self._max_cost_usd: float | None = self.base_config.get("max_cost_usd")
         self._gemini_bin: str = self.base_config.get("gemini_bin", "gemini")
         self._harness = CliHarness("gemini_cli_extract", self._gemini_bin, self.base_config.get(HARNESS_VERSION))
-        self._promote_repeated: bool = bool(self.base_config.get("promote_repeated_structure", True))
         self._additional_properties_false: bool = bool(self.base_config.get("additional_properties_false", True))
         self._evidence_mode: bool = bool(self.base_config.get("evidence_mode", False))
         self._base_url = os.environ.get("GOOGLE_GEMINI_BASE_URL", "https://generativelanguage.googleapis.com").rstrip(
@@ -131,8 +129,6 @@ class GeminiCliExtractProvider(Provider):
         self._procs_lock = threading.Lock()
 
     def _prepare_schema(self, schema: dict[str, Any]) -> dict[str, Any]:
-        if self._promote_repeated:
-            schema = promote_repeated_structure(schema)
         if self._additional_properties_false:
             schema = add_additional_properties_false(schema)
         return schema
@@ -379,7 +375,6 @@ class GeminiCliExtractProvider(Provider):
             "base_url": self._base_url,
             "thinking_level": self._thinking_level,
             "max_cost_usd": self._max_cost_usd,
-            "promote_repeated_structure": self._promote_repeated,
             "additional_properties_false": self._additional_properties_false,
             "evidence_mode": self._evidence_mode,
         }

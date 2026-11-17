@@ -39,7 +39,6 @@ from extract_bench.inference.providers.extract.direct_model_utils import (
     add_additional_properties_false,
     normalize_extract_result,
     page_count,
-    promote_repeated_structure,
 )
 from extract_bench.inference.providers.registry import register_provider
 from extract_bench.schemas.pipeline import PipelineSpec
@@ -271,7 +270,6 @@ class VLLMExtractProvider(Provider):
     # -- internals ----------------------------------------------------------
 
     def _prepare_schema(self, schema: dict[str, Any]) -> dict[str, Any]:
-        schema = promote_repeated_structure(schema)
         if self._additional_properties_false:
             return add_additional_properties_false(schema)
         return schema

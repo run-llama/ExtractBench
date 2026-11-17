@@ -147,9 +147,6 @@ def test_gemini_direct_schema_preparation() -> None:
     schema = {
         "type": "object",
         "properties": {"items": {"type": "array"}},
-        "repeated_structure": {"line_items": {"type": "array"}},
     }
     prepared = provider._prepare_schema(schema)
-    assert "repeated_structure" not in prepared
-    assert "line_items" in prepared["properties"]
     assert prepared["additionalProperties"] is False
