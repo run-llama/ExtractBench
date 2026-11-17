@@ -1,8 +1,9 @@
-"""Offline wire-level regressions: a local client and a mocked Bifrost upstream."""
+"""Offline wire-level regressions: a local client and a mocked Gemini API upstream."""
 
 import base64
 import concurrent.futures
 import json
+import re
 import threading
 from pathlib import Path
 
@@ -237,19 +238,30 @@ def test_error_frame_after_usage_does_not_claim_complete_cost(tmp_path: Path) ->
     assert proxy.summary()["requests"][0]["outcome"] == "response_error"
 
 
-@pytest.mark.parametrize("stage", ["headers", "body"])
+@pytest.mark.parametrize("stage", ["headers", "body", "write"])
 @pytest.mark.parametrize("tls", [False, True])
-def test_cli_disconnect_aborts_gateway_socket_before_headers_or_while_streaming(tmp_path: Path, stage, tls) -> None:
-    """The recorder must not leave paid requests running after the CLI drops its local connection."""
+def test_cli_disconnect_aborts_gateway_socket_before_headers_or_while_streaming(
+    tmp_path: Path, stage, tls, monkeypatch
+) -> None:
+    """The recorder must not leave paid requests running after the CLI drops its local connection.
+
+    "write" blinds the disconnect watcher, so only the failed relay write sees the drop; it was
+    labelled "error" when that write beat the watcher's 0.1 s poll.
+    """
     import socket
+    import struct
     from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-    entered, disconnected, finished, usage_seen = (threading.Event() for _ in range(4))
+    from extract_bench.inference.providers.extract import gemini_cli_transport
+
+    entered, disconnected, finished, usage_seen, client_closed = (threading.Event() for _ in range(5))
+    if stage == "write":
+        monkeypatch.setattr(gemini_cli_transport, "select", type("S", (), {"select": lambda *_: ([], [], [])}))
 
     class Handler(BaseHTTPRequestHandler):
         def do_POST(self):
             self.rfile.read(int(self.headers["content-length"]))
-            if stage == "body":
+            if stage != "headers":
                 self.send_response(200)
                 self.send_header("content-type", "text/event-stream")
                 self.end_headers()
@@ -304,6 +316,8 @@ def test_cli_disconnect_aborts_gateway_socket_before_headers_or_while_streaming(
             finished.set()
         if event == "attempt.accounting" and payload["cost_usd"] is not None:
             usage_seen.set()
+            if stage == "write":
+                client_closed.wait(5)
 
     trace.emit = emit
     try:
@@ -326,9 +340,13 @@ def test_cli_disconnect_aborts_gateway_socket_before_headers_or_while_streaming(
                     b"Host: localhost\r\nContent-Length: 2\r\n\r\n{}"
                 )
                 assert entered.wait(5)
-                if stage == "body":
+                if stage != "headers":
                     assert usage_seen.wait(5)
-                client.shutdown(socket.SHUT_RDWR)
+                if stage == "write":
+                    client.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack("ii", 1, 0))
+                else:
+                    client.shutdown(socket.SHUT_RDWR)
+            client_closed.set()
             assert disconnected.wait(5)
             assert finished.wait(5)
             assert proxy.summary()["requests"][0]["outcome"] == "client_disconnected"
@@ -358,7 +376,8 @@ def test_gateway_error_with_closed_cli_is_not_mislabeled_as_capture_failure(tmp_
     monkeypatch.setattr(BaseHTTPRequestHandler, "send_error", closed_client)
     trace, proxy = recorder(tmp_path, upstream, cancelled.set)
     with proxy, httpx.Client(trust_env=False) as client:
-        url = proxy.cli_base_url + "/v1beta/models/gemini-4-argon:streamGenerateContent"
+        # Non-streaming: streaming calls already hold early 200 headers and report errors in-band.
+        url = proxy.cli_base_url + "/v1beta/models/gemini-4-argon:generateContent"
         with pytest.raises(httpx.RemoteProtocolError):
             client.post(url, json={})
         assert client.post(url, json={}).status_code == 200
@@ -369,3 +388,83 @@ def test_gateway_error_with_closed_cli_is_not_mislabeled_as_capture_failure(tmp_
     assert summary["known_cost_usd"] == pytest.approx(0.00648)
     assert summary["total_cost_usd"] is None
     assert sum(e["event"] == "model.request.finished" for e in journal(trace)) == 2
+
+
+# The Gemini CLI SDK's own SSE frame pattern (genai responseLineRE).
+SDK_SSE_FRAME = re.compile(rb"^\s*data: (.*)(?:\n\n|\r\r|\r\n\r\n)")
+
+
+def test_slow_gateway_stream_reaches_cli_headers_and_heartbeats_before_its_header_timeout(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """Gemini CLI aborts a request whose headers take over 60 s ("fetch failed sending request").
+
+    A large multi-image upload plus long thinking can keep the upstream silent past that limit,
+    so every retry of the turn failed. Headers must reach the CLI before the upstream answers.
+    """
+    from extract_bench.inference.providers.extract import gemini_cli_transport
+
+    monkeypatch.setattr(gemini_cli_transport, "HEARTBEAT_INTERVAL_S", 0.05)
+    release = threading.Event()
+    frame = native_frame()
+
+    def upstream(request):
+        assert release.wait(5)
+        return httpx.Response(200, headers={"content-type": "text/event-stream"}, content=frame)
+
+    trace, proxy = recorder(tmp_path, upstream)
+    url = proxy.cli_base_url + "/v1beta/models/gemini-4-argon:streamGenerateContent?alt=sse"
+    with proxy, httpx.Client(trust_env=False, timeout=httpx.Timeout(2)) as client:
+        with client.stream("POST", url, json={}) as response:
+            assert response.status_code == 200
+            chunks = response.iter_raw()
+            first = next(chunks)
+            release.set()
+            body = first + b"".join(chunks)
+    assert first.strip() == b""
+    match = SDK_SSE_FRAME.match(body)
+    assert match is not None and json.loads(match.group(1))["usageMetadata"]["totalTokenCount"] == 1200
+    assert body[match.end() :].strip() == b""
+    assert proxy.summary()["requests"][0]["outcome"] == "success"
+
+
+@pytest.mark.parametrize(
+    ("failure", "code", "message"),
+    [
+        (lambda: httpx.Response(429, json={"error": {"message": "quota exhausted"}}), 429, "quota exhausted"),
+        (lambda: httpx.Response(413, text="Request body exceeds 100 MB"), 413, "Request body exceeds 100 MB"),
+        (lambda: (_ for _ in ()).throw(httpx.WriteTimeout("timed out")), 502, "WriteTimeout"),
+    ],
+)
+def test_gateway_failure_after_early_headers_reaches_cli_as_native_error_status(
+    tmp_path: Path, failure, code, message
+) -> None:
+    """After the early 200 the upstream status must still drive the CLI's retry rules (429/5xx vs 4xx)."""
+    trace, proxy = recorder(tmp_path, lambda request: failure())
+    with proxy, httpx.Client(trust_env=False) as client:
+        response = client.post(proxy.cli_base_url + "/v1beta/models/gemini-4-argon:streamGenerateContent", json={})
+    error = json.loads(response.content)["error"]
+    assert error["code"] == code
+    assert message in error["message"]
+    assert proxy.summary()["requests"][0]["outcome"] in {"response_error", "error"}
+    assert proxy.summary()["total_cost_usd"] is None
+
+
+def test_stream_without_early_headers_relays_gateway_bytes_unmodified(tmp_path: Path, monkeypatch) -> None:
+    """Some CLI stream parsers fail a turn on a chunk that starts with the heartbeat newline,
+    so with early headers off the CLI must get only the upstream bytes and status."""
+    from extract_bench.inference.providers.extract import gemini_cli_transport
+
+    monkeypatch.setattr(gemini_cli_transport, "HEARTBEAT_INTERVAL_S", 0.01)
+    frame = native_frame()
+
+    def upstream(request):
+        threading.Event().wait(0.2)  # long enough for several heartbeat intervals
+        return httpx.Response(200, headers={"content-type": "text/event-stream"}, content=frame)
+
+    trace, proxy = recorder(tmp_path, upstream)
+    proxy.early_stream_headers = False
+    with proxy, httpx.Client(trust_env=False) as client:
+        response = client.post(proxy.cli_base_url + "/v1beta/models/gemini-4-argon:streamGenerateContent", json={})
+    assert response.content == frame
+    assert proxy.summary()["requests"][0]["outcome"] == "success"
