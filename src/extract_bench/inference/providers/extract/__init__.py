@@ -11,6 +11,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 _PROVIDER_MODULES = [
+    "agy_extract",
     "anthropic_direct",
     "azure_content_understanding",
     "claude_code_extract",
