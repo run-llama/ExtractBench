@@ -12,14 +12,13 @@ from bisect import bisect_left
 from collections.abc import Sequence
 from typing import Any
 
-from extract_bench.evaluation.metrics.extract.array_record_match_metric import unwrap_value
 from extract_bench.evaluation.metrics.extract.unified_evidence_metric import ValueCell
 from extract_bench.schemas.evaluation import MetricValue
 from extract_bench.schemas.extract_output import FieldCitation
 from extract_bench.test_cases.schema import ExtractFieldTestRule
 
-from .paths import iter_leaf_values
-from .scoring import build_confidence_field_rows, clamp_confidence
+from .paths import iter_field_values
+from .scoring import build_confidence_field_rows, clamp_confidence, value_path_prefix
 from .types import ConfidenceFieldRow
 
 DEFAULT_CONFIDENCE_THRESHOLDS: tuple[float, ...] = (
@@ -219,28 +218,22 @@ def _f1(precision: float, recall: float) -> float:
 def _full_gt_metrics(
     rows: list[Any],
     *,
-    expected_output: Any | None = None,
+    value_cells: Sequence[ValueCell] = (),
     full_gt_totals: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Compute GT-denominator metrics alongside confidence-scoped metrics."""
     full_gt_totals = full_gt_totals or {}
-    expected_leaf_paths = (
-        {path for path, _ in iter_leaf_values(unwrap_value(expected_output))} if expected_output is not None else set()
+    expected_leaf_total = (
+        int(full_gt_totals["expected_leaf_total"])
+        if "expected_leaf_total" in full_gt_totals
+        else sum(cell.gt_path is not None for cell in value_cells)
     )
-    if "expected_leaf_total" in full_gt_totals:
-        expected_leaf_total = int(full_gt_totals["expected_leaf_total"])
-    else:
-        expected_leaf_total = len(expected_leaf_paths)
 
     if "unique_expected_leaf_covered" in full_gt_totals:
         unique_expected_leaf_covered = int(full_gt_totals["unique_expected_leaf_covered"])
     else:
         unique_expected_leaf_covered = len(
-            {
-                gt_path
-                for row in rows
-                if _row_value(row, "correct", False) and (gt_path := _row_gt_path(row)) in expected_leaf_paths
-            }
+            {gt_path for row in rows if _row_value(row, "correct", False) and len(gt_path := _row_gt_path(row)) > 0}
         )
 
     invalid_schema_fields = int(
@@ -279,14 +272,14 @@ def summarize_confidence_rows(
     thresholds: tuple[float, ...] = DEFAULT_CONFIDENCE_THRESHOLDS,
     precision_coverage_target: float = 0.8,
     coverage_precision_target: float = 0.95,
-    expected_output: Any | None = None,
+    value_cells: Sequence[ValueCell] = (),
     full_gt_totals: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     threshold_rows = compute_confidence_threshold_rows(rows, thresholds)
     curve_thresholds = _thresholds_with_observed_confidences(rows, thresholds)
     curve_threshold_rows = compute_confidence_threshold_rows(rows, curve_thresholds)
     curve_points = coverage_precision_curve_points(curve_threshold_rows)
-    full_gt = _full_gt_metrics(rows, expected_output=expected_output, full_gt_totals=full_gt_totals)
+    full_gt = _full_gt_metrics(rows, value_cells=value_cells, full_gt_totals=full_gt_totals)
     roc_auc = _confidence_scoped_roc_auc(rows)
     if not rows:
         return {
@@ -393,12 +386,22 @@ def _threshold_metric_values(threshold_rows: list[dict[str, Any]]) -> list[Metri
 def confidence_signal_coverage_summary(
     extracted_data: Any,
     field_citations: Sequence[FieldCitation],
+    value_cells: Sequence[ValueCell],
 ) -> dict[str, Any]:
-    emitted_paths = {path for path, _ in iter_leaf_values(unwrap_value(extracted_data))}
+    prefix = value_path_prefix(extracted_data)
+    if len(value_cells) > 0:
+        scored_cell_paths = {prefix + cell.pred_path for cell in value_cells if cell.pred_path is not None}
+        emitted_paths = scored_cell_paths.intersection(
+            path for path, _ in iter_field_values(extracted_data, include_containers=True)
+        )
+        coverage_scope = "emitted_value_f1_cells"
+    else:
+        emitted_paths = {path for path, _ in iter_field_values(extracted_data)}
+        coverage_scope = "emitted_scalar_leaves"
     scored_paths: set[str] = set()
     signal_semantics: set[str] = set()
     for citation in field_citations:
-        field_path = citation.field_path
+        field_path = prefix + citation.field_path.removeprefix(prefix)
         if field_path not in emitted_paths or clamp_confidence(citation.confidence) is None:
             continue
         scored_paths.add(field_path)
@@ -416,15 +419,16 @@ def confidence_signal_coverage_summary(
         "confidence_signal_missing_leaf_count": len(missing_paths),
         "missing_confidence_paths_sample": missing_paths[:25],
         "confidence_semantics": sorted(signal_semantics),
-        "coverage_scope": "emitted_scalar_leaves",
+        "coverage_scope": coverage_scope,
     }
 
 
 def _confidence_signal_coverage_metric(
     extracted_data: Any,
     field_citations: Sequence[FieldCitation],
+    value_cells: Sequence[ValueCell],
 ) -> MetricValue:
-    coverage = confidence_signal_coverage_summary(extracted_data, field_citations)
+    coverage = confidence_signal_coverage_summary(extracted_data, field_citations, value_cells)
     return MetricValue(
         metric_name="confidence_signal_coverage",
         value=coverage["confidence_signal_coverage"],
@@ -464,9 +468,9 @@ def compute_confidence_scoped_metrics(
         thresholds=thresholds,
         precision_coverage_target=precision_coverage_target,
         coverage_precision_target=coverage_precision_target,
-        expected_output=expected_output,
+        value_cells=value_cells,
     )
-    signal_coverage_metric = _confidence_signal_coverage_metric(extracted_data, field_citations)
+    signal_coverage_metric = _confidence_signal_coverage_metric(extracted_data, field_citations, value_cells)
     if (
         not rows
         and not summary["confidence_full_gt_expected_leaf_count"]

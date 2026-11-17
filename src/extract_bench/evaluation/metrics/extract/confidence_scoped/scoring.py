@@ -9,7 +9,7 @@ from extract_bench.evaluation.metrics.extract.unified_evidence_metric import Val
 from extract_bench.schemas.extract_output import FieldCitation
 from extract_bench.test_cases.schema import ExtractFieldTestRule
 
-from .paths import iter_leaf_values, path_without_indices, schema_path_exists
+from .paths import iter_field_values, path_without_indices, schema_path_exists
 from .types import ConfidenceFieldRow
 
 
@@ -34,6 +34,11 @@ def _citation_reference_text(citation: FieldCitation) -> str:
     return ""
 
 
+def value_path_prefix(data: Any) -> str:
+    """Translate Value F1 cell paths back to the corresponding input paths."""
+    return "value." if unwrap_value(data) is not data else ""
+
+
 def build_confidence_field_rows(
     *,
     extracted_data: Any,
@@ -43,28 +48,29 @@ def build_confidence_field_rows(
     data_schema: dict[str, Any] | None,
     value_cells: Sequence[ValueCell],
 ) -> list[ConfidenceFieldRow]:
-    """Join scalar confidence signals to the verdicts already emitted by Value F1.
-
-    A prediction-only cell is incorrect. A scalar without a cell, such as an
-    element of an array that F1 scores as a unit, has no correctness label.
-    """
-    if len(value_cells) == 0:
+    """Join confidence signals to the cells Value F1 actually graded."""
+    if len(value_cells) == 0 or not any(clamp_confidence(c.confidence) is not None for c in field_citations):
         return []
-    predictions = dict(iter_leaf_values(unwrap_value(extracted_data)))
-    expected = dict(iter_leaf_values(unwrap_value(expected_output)))
+    pred_prefix = value_path_prefix(extracted_data)
+    gt_prefix = value_path_prefix(expected_output)
     by_path = {cell.pred_path: cell for cell in value_cells if cell.pred_path is not None}
     verified = {rule.field_path for rule in field_rules if rule.verified}
+    predictions = dict(iter_field_values(extracted_data, include_containers=True))
+    expected = dict(iter_field_values(expected_output, include_containers=True))
     rows: dict[str, ConfidenceFieldRow] = {}
     for citation in field_citations:
-        path = citation.field_path
         score = clamp_confidence(citation.confidence)
-        if score is None or path not in predictions or path not in by_path:
+        cell_path = citation.field_path.removeprefix(pred_prefix)
+        cell = by_path.get(cell_path)
+        if score is None or cell is None:
+            continue
+        path = pred_prefix + cell_path
+        if path not in predictions:
             continue
         current = rows.get(path)
         if current is not None and current.confidence is not None and current.confidence >= score:
             continue
-        cell = by_path[path]
-        gt_path = cell.gt_path
+        gt_path = gt_prefix + cell.gt_path if cell.gt_path is not None else None
         field_path = path if gt_path is None else gt_path
         rows[path] = ConfidenceFieldRow(
             field_path=field_path,

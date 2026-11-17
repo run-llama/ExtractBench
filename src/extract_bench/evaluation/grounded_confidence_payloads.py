@@ -18,6 +18,7 @@ from extract_bench.evaluation.evaluators.extract import is_extract_test_case, pr
 from extract_bench.evaluation.metrics.extract.confidence_scoped.scoring import (
     build_confidence_field_rows,
     clamp_confidence,
+    value_path_prefix,
 )
 from extract_bench.evaluation.metrics.extract.confidence_scoped.summary import (
     DEFAULT_CONFIDENCE_THRESHOLDS,
@@ -402,7 +403,7 @@ def serialize_citation(citation: Any) -> dict[str, Any]:
     return {}
 
 
-def field_citation_lookup(citations: list[Any]) -> dict[str, dict[str, Any]]:
+def field_citation_lookup(citations: list[Any], path_prefix: str = "") -> dict[str, dict[str, Any]]:
     """Highest-confidence citation per field path.
 
     Row confidence is the max citation confidence for the path, so the
@@ -414,6 +415,7 @@ def field_citation_lookup(citations: list[Any]) -> dict[str, dict[str, Any]]:
         field_path = data.get("field_path")
         if not isinstance(field_path, str):
             continue
+        field_path = path_prefix + field_path.removeprefix(path_prefix)
         current = out.get(field_path)
         confidence = clamp_confidence(data.get("confidence"))
         current_confidence = clamp_confidence(current.get("confidence")) if current is not None else None
@@ -486,16 +488,16 @@ def build_doc_payload(
         data_schema=test_case.data_schema,
         value_cells=value_cells,
     )
-    citations_by_path = field_citation_lookup(field_citations)
+    citations_by_path = field_citation_lookup(field_citations, value_path_prefix(inputs.extracted_data))
     serialized_rows: list[SerializedConfidenceRow] = [
         serialize_confidence_row(record["id"], index, row, citations_by_path) for index, row in enumerate(rows)
     ]
     summary = summarize_confidence_rows(
         rows,
         thresholds=DEFAULT_CONFIDENCE_THRESHOLDS,
-        expected_output=inputs.expected_output,
+        value_cells=value_cells,
     )
-    signal_coverage = confidence_signal_coverage_summary(inputs.extracted_data, inputs.field_citations)
+    signal_coverage = confidence_signal_coverage_summary(inputs.extracted_data, inputs.field_citations, value_cells)
     signal_coverage_metrics = {
         key: signal_coverage[key]
         for key in (

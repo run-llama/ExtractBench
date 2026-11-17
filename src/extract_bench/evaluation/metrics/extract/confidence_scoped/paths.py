@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Iterator
 from typing import Any
 
 
@@ -17,22 +18,22 @@ def path_tokens(path: str) -> list[str | int]:
     return tokens
 
 
-def iter_leaf_values(value: Any, prefix: str = "") -> list[tuple[str, Any]]:
+def iter_field_values(
+    value: Any,
+    prefix: str = "",
+    *,
+    include_containers: bool = False,
+) -> Iterator[tuple[str, Any]]:
+    if len(prefix) > 0 and (include_containers or not isinstance(value, (dict, list))):
+        yield prefix, value
     if isinstance(value, dict):
-        leaves: list[tuple[str, Any]] = []
         for key, child in value.items():
-            if not isinstance(key, str) or not key:
-                continue
-            child_prefix = f"{prefix}.{key}" if prefix else key
-            leaves.extend(iter_leaf_values(child, child_prefix))
-        return leaves
-    if isinstance(value, list):
-        leaves = []
+            if isinstance(key, str) and len(key) > 0:
+                child_path = f"{prefix}.{key}" if len(prefix) > 0 else key
+                yield from iter_field_values(child, child_path, include_containers=include_containers)
+    elif isinstance(value, list):
         for index, child in enumerate(value):
-            child_prefix = f"{prefix}[{index}]"
-            leaves.extend(iter_leaf_values(child, child_prefix))
-        return leaves
-    return [(prefix, value)] if prefix else []
+            yield from iter_field_values(child, f"{prefix}[{index}]", include_containers=include_containers)
 
 
 def resolve_schema_ref(root: Any, node: Any) -> Any:

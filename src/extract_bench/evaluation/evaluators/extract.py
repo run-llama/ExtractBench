@@ -15,7 +15,6 @@ from extract_bench.evaluation.evaluators.base import BaseEvaluator
 from extract_bench.evaluation.metrics.extract.array_record_match_metric import (
     ArrayRecordMatchMetric,
 )
-from extract_bench.evaluation.metrics.extract.confidence_scoped.scoring import clamp_confidence
 from extract_bench.evaluation.metrics.extract.confidence_scoped.summary import (
     compute_confidence_scoped_metrics,
 )
@@ -319,10 +318,7 @@ class ExtractEvaluator(BaseEvaluator):
                 )
             )
 
-            needs_cells = value_cells is not None or any(
-                clamp_confidence(citation.confidence) is not None for citation in inputs.field_citations
-            )
-            metrics.extend(inputs.compute_unified_metrics(scored_cells if needs_cells else None))
+            metrics.extend(inputs.compute_unified_metrics(scored_cells))
             if value_cells is not None:
                 value_cells.extend(scored_cells)
 

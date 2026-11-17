@@ -1,4 +1,4 @@
-"""Confidence summaries label scored scalar cells using Value F1."""
+"""Confidence summaries use the cells scored by Value F1."""
 
 from typing import Any
 
@@ -40,7 +40,7 @@ def _confidence_metrics(
     }
 
 
-def test_parent_and_scalar_array_citations_have_no_cell_verdict() -> None:
+def test_confidence_uses_the_array_verdict_and_counts_it_once() -> None:
     expected = {"record": {"amount": 10}, "labels": ["A", "B"]}
     extracted = {"record": {"amount": 9}, "labels": ["A", "B"]}
     schema = {
@@ -61,9 +61,39 @@ def test_parent_and_scalar_array_citations_have_no_cell_verdict() -> None:
     )
 
     carrier = metrics["confidence_scoped_auc"]
-    assert carrier.metadata["correct_fields"] == 0
-    assert [row["predicted_path"] for row in carrier.metadata["field_rows_sample"]] == ["record.amount"]
-    assert metrics["confidence_signal_coverage"].metadata["scored_leaf_count"] == 3
+    assert {row["predicted_path"]: row["correct"] for row in carrier.metadata["field_rows_sample"]} == {
+        "record.amount": False,
+        "labels": True,
+    }
+    assert carrier.metadata["full_gt"]["expected_leaf_count"] == 2
+    assert metrics["confidence_full_gt_recall"].value == 0.5
+    assert metrics["confidence_signal_coverage"].value == 1.0
+
+
+def test_empty_array_can_have_a_confidence_verdict() -> None:
+    extracted = {"labels": []}
+    metrics = _confidence_metrics(
+        extracted,
+        extracted,
+        [FieldCitation(field_path="labels", page=1, confidence=0.9)],
+        {"properties": {"labels": {"type": "array", "items": {"type": "string"}}}},
+    )
+    assert metrics["confidence_full_gt_recall"].value == 1.0
+
+
+def test_confidence_rejoins_citations_on_the_original_wrapped_path() -> None:
+    extracted = {"value": {"amount": 10}}
+    metrics = _confidence_metrics(
+        extracted,
+        extracted,
+        [FieldCitation(field_path="value.amount", page=1, confidence=0.9)],
+        {"properties": {"value": {"properties": {"amount": {"type": "number"}}}}},
+    )
+    (row,) = metrics["confidence_scoped_auc"].metadata["field_rows_sample"]
+    assert row["predicted_path"] == row["matched_gt_path"] == "value.amount"
+    assert row["correct"]
+    assert metrics["confidence_full_gt_recall"].value == 1.0
+    assert metrics["confidence_signal_coverage"].value == 1.0
 
 
 def test_parent_only_confidence_does_not_score_uncited_children() -> None:
