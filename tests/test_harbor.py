@@ -269,7 +269,7 @@ def test_release_strips_unknown_keys_from_jsonl_and_harbor(tmp_path: Path, snaps
     row = json.loads(split.read_text(encoding="utf-8"))
     row["internal_note"] = "private"
     hints = {"rows": ["id"]}
-    row["identity_hints"] = json.dumps(hints)
+    row["_identity_hints"] = json.dumps(hints)
     box = {"page": 1, "bbox": [0, 0, 1, 1]}
     rule = {
         "verified": True,

@@ -6,7 +6,7 @@ from typing import Any
 
 from extract_bench.test_cases.schema import ExtractFieldBbox, ExtractFieldTestRule, FieldEvidence
 
-IDENTITY_HINTS_COLUMN = "identity_hints"
+IDENTITY_HINTS_KEY = "_identity_hints"
 
 _FIELD_RULES = "field_rules"
 _DATASET_COLUMNS = frozenset(
@@ -19,7 +19,7 @@ _DATASET_COLUMNS = frozenset(
         _FIELD_RULES,
         "repeated_structure",
         "tags",
-        IDENTITY_HINTS_COLUMN,
+        IDENTITY_HINTS_KEY,
     }
 )
 _RULE_LIST_ITEMS = {
