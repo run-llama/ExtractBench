@@ -48,35 +48,6 @@ REDUCTO_DEEP_MIN_CREDITS_PER_DOCUMENT = 30.0
 REDUCTO_PARSE_CREDITS_PER_PAGE = 1.0
 
 
-def _adapt_schema_for_reducto(schema: dict[str, Any]) -> dict[str, Any]:
-    """Promote `repeated_structure[name]` entries into `properties[name]`.
-
-    Some benchmark schemas declare repeated array nodes (e.g. claims,
-    payment_details) under a top-level `repeated_structure` annotation that
-    LlamaExtract reads as authoritative. Reducto follows standard JSON
-    Schema and ignores unknown top-level keys, so when the
-    schema's `properties` dict is missing those arrays Reducto silently
-    skips them and returns an empty extraction for those fields.
-
-    This adapter is a pure shape transform: copy each `repeated_structure`
-    entry into `properties` if not already there, and drop the
-    `repeated_structure` key so the wire payload is plain JSON Schema.
-    """
-    if not isinstance(schema, dict):
-        return schema
-    rs = schema.get("repeated_structure")
-    if not isinstance(rs, dict) or not rs:
-        return schema
-    out = dict(schema)
-    props = dict(out.get("properties") or {})
-    for name, defn in rs.items():
-        if isinstance(defn, dict) and name not in props:
-            props[name] = defn
-    out["properties"] = props
-    out.pop("repeated_structure", None)
-    return out
-
-
 def _unwrap_citation_values(value: Any) -> Any:
     if isinstance(value, dict):
         if "value" in value and "citations" in value:
@@ -271,7 +242,7 @@ class ReductoExtractProvider(Provider):
             upload = await budget.run_async(
                 asyncio.to_thread(client.upload, file=Path(pdf_path), timeout=budget.remaining()),
             )
-            instructions: dict[str, Any] = {"schema": _adapt_schema_for_reducto(schema)}
+            instructions: dict[str, Any] = {"schema": schema}
             if system_prompt:
                 instructions["system_prompt"] = system_prompt
             settings: dict[str, Any] = {

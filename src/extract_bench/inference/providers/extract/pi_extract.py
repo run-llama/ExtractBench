@@ -63,7 +63,6 @@ from extract_bench.inference.providers.extract.direct_model_utils import (
     force_all_properties_required,
     normalize_extract_result,
     page_count,
-    promote_repeated_structure,
 )
 from extract_bench.inference.providers.registry import register_provider
 from extract_bench.schemas.pipeline import PipelineSpec
@@ -252,7 +251,6 @@ class PiExtractProvider(Provider):
         self._pi_bin: str = self.base_config.get("pi_bin", "pi")
         self._harness = CliHarness("pi_extract", self._pi_bin, self.base_config.get(HARNESS_VERSION))
 
-        self._promote_repeated: bool = bool(self.base_config.get("promote_repeated_structure", True))
         self._additional_properties_false: bool = bool(self.base_config.get("additional_properties_false", True))
         self._all_properties_required: bool = bool(self.base_config.get("all_properties_required", False))
         # Evidence mode: ask the agent to also write ./citations.json with a page
@@ -278,8 +276,6 @@ class PiExtractProvider(Provider):
         self._procs_lock = threading.Lock()
 
     def _prepare_schema(self, schema: dict[str, Any]) -> dict[str, Any]:
-        if self._promote_repeated:
-            schema = promote_repeated_structure(schema)
         if self._additional_properties_false:
             schema = add_additional_properties_false(schema)
         if self._all_properties_required:
@@ -483,7 +479,6 @@ class PiExtractProvider(Provider):
             "max_cost_usd": self._max_cost_usd,
             "max_tokens": self._max_tokens,
             "context_window": self._context_window,
-            "promote_repeated_structure": self._promote_repeated,
             "additional_properties_false": self._additional_properties_false,
             "all_properties_required": self._all_properties_required,
             "evidence_mode": self._evidence_mode,

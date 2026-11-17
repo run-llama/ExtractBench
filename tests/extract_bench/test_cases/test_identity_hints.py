@@ -46,7 +46,6 @@ def test_loaded_hints_reach_array_matcher(
     (case,) = load_test_cases(str(tmp_path), product_type="extract")
     assert case.identity_hints == {"rows": hint}
     assert case.data_schema == SCHEMA
-    assert case.eval_data_schema == SCHEMA
     monkeypatch.setattr(array_record_match_metric, "_MAX_RESIDUAL_ASSIGNMENT_CELLS", cap)
     now = datetime.now()
     result = InferenceResult(

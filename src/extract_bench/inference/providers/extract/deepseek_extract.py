@@ -34,7 +34,6 @@ from extract_bench.inference.providers.extract.direct_model_utils import (
     DEFAULT_USER_INSTRUCTION,
     add_additional_properties_false,
     normalize_extract_result,
-    promote_repeated_structure,
 )
 from extract_bench.inference.providers.extract.parsed_text_source import (
     ParsedDocumentText,
@@ -119,7 +118,6 @@ class DeepSeekExtractProvider(Provider):
         return max(matches, key=lambda item: len(item[0]))[1] if matches else (0.0, 0.0, 0.0)
 
     def _prepare_schema(self, schema: dict[str, Any]) -> dict[str, Any]:
-        schema = promote_repeated_structure(schema)
         if self._additional_properties_false:
             return add_additional_properties_false(schema)
         return schema

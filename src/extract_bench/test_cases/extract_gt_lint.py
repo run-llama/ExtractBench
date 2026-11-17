@@ -19,9 +19,6 @@ A payload passes when:
    field path. Every entry validates as an ``ExtractFieldTestRule`` and its path
    resolves in both the schema and the ground truth (a null ancestor in the
    ground truth counts as resolved: the leaf is vacuously absent).
-3. Row identity rides beside the schema as ``_eval_row_identity``. It must not
-   sit inside ``data_schema`` (that object reaches every provider) and must not
-   use the inert legacy spelling ``_repeated_structure`` (nothing reads it).
 
 The lint is pure — parsed payload in, findings out — so the same function gates
 a writer (refuse the file), a tree (``extract-bench dataset lint``) and an export.
@@ -48,23 +45,13 @@ from extract_bench.test_cases.schema import ExtractFieldTestRule
 
 __all__ = [
     "FIELD_RULES_KEY",
-    "LEGACY_ROW_IDENTITY_KEY",
     "LEGACY_RULES_KEY",
-    "ROW_IDENTITY_KEY",
-    "SCHEMA_IDENTITY_KEY",
     "LintFinding",
     "lint_extract_sidecar",
 ]
 
 FIELD_RULES_KEY = "_field_rules"
 LEGACY_RULES_KEY = "test_rules"
-ROW_IDENTITY_KEY = "_eval_row_identity"
-LEGACY_ROW_IDENTITY_KEY = "_repeated_structure"
-SCHEMA_IDENTITY_KEY = "repeated_structure"
-
-# Schema keys whose *children* are user-named maps (property names, $defs
-# names), not schema nodes — a ``repeated_structure`` key there is a field name.
-_NAME_MAP_KEYS = frozenset({"properties", "$defs", "definitions"})
 
 
 @dataclass(frozen=True)
@@ -91,7 +78,6 @@ def lint_extract_sidecar(payload: dict[str, Any], *, allow_legacy_rules: bool = 
     resolved: dict[str, Any] = resolve_refs(schema)
 
     findings: list[LintFinding] = []
-    _scan_schema_identity(schema, "data_schema", False, findings)
 
     output = payload.get("expected_output")
     if not isinstance(output, dict):
@@ -109,7 +95,6 @@ def lint_extract_sidecar(payload: dict[str, Any], *, allow_legacy_rules: bool = 
     rules, container_findings = _rules_container(payload, allow_legacy_rules)
     findings.extend(container_findings)
     findings.extend(_lint_rules(rules, resolved, output))
-    findings.extend(_lint_row_identity(payload, resolved))
     return findings
 
 
@@ -236,11 +221,6 @@ def _output_has_path(output: dict[str, Any], tokens: list[str | int]) -> bool:
 # schema navigation
 
 
-def _schema_types(node: dict[str, Any]) -> list[str]:
-    raw = node.get("type")
-    return [t for t in (raw if isinstance(raw, list) else [raw]) if isinstance(t, str)]
-
-
 def _schema_node_at(resolved_schema: dict[str, Any], tokens: list[str | int]) -> dict[str, Any] | None:
     """The effective schema node a field path lands on, or None when the schema
     declares nothing there. Integer tokens descend into ``items``; string tokens
@@ -261,75 +241,3 @@ def _schema_node_at(resolved_schema: dict[str, Any], tokens: list[str | int]) ->
         else:
             return None
     return node
-
-
-# ---------------------------------------------------------------------------
-# row identity
-
-
-def _scan_schema_identity(node: Any, pointer: str, inside_name_map: bool, findings: list[LintFinding]) -> None:
-    """Flag a ``repeated_structure`` block anywhere in the schema tree, skipping
-    the user-named maps where that string would be a field name."""
-    if isinstance(node, dict):
-        for key, value in node.items():
-            child = f"{pointer}.{key}"
-            if not inside_name_map and key == SCHEMA_IDENTITY_KEY:
-                findings.append(
-                    LintFinding(
-                        "identity.in_schema",
-                        child,
-                        f"row identity must ship beside the schema as {ROW_IDENTITY_KEY}, not inside data_schema",
-                    )
-                )
-                continue
-            _scan_schema_identity(value, child, not inside_name_map and key in _NAME_MAP_KEYS, findings)
-    elif isinstance(node, list):
-        for index, value in enumerate(node):
-            _scan_schema_identity(value, f"{pointer}[{index}]", False, findings)
-
-
-def _lint_row_identity(payload: dict[str, Any], resolved_schema: dict[str, Any]) -> list[LintFinding]:
-    findings: list[LintFinding] = []
-    if LEGACY_ROW_IDENTITY_KEY in payload:
-        findings.append(
-            LintFinding(
-                "identity.legacy_key",
-                LEGACY_ROW_IDENTITY_KEY,
-                f"inert legacy key that no consumer reads; move the block to {ROW_IDENTITY_KEY} or drop it",
-            )
-        )
-    block = payload.get(ROW_IDENTITY_KEY)
-    if block is None:
-        return findings
-    if not isinstance(block, dict):
-        findings.append(LintFinding("identity.not_object", ROW_IDENTITY_KEY, f"got {type(block).__name__}"))
-        return findings
-    for array_path, spec in block.items():
-        where = f"{ROW_IDENTITY_KEY}[{array_path!r}]"
-        if not isinstance(spec, dict):
-            findings.append(LintFinding("identity.entry_not_object", where, f"got {type(spec).__name__}"))
-            continue
-        try:
-            node = _schema_node_at(resolved_schema, parse_field_path(array_path))
-        except ValueError as exc:
-            findings.append(LintFinding("identity.path_invalid", where, str(exc)))
-            continue
-        if node is None:
-            findings.append(LintFinding("identity.array_missing", where, "path does not resolve in data_schema"))
-            continue
-        if "array" not in _schema_types(node):
-            findings.append(LintFinding("identity.not_array", where, "path is not an array in data_schema"))
-            continue
-        keys = spec.get("identity_key")
-        if keys is None:
-            continue
-        items = node.get("items")
-        row_properties = (effective_schema(items).get("properties") or {}) if isinstance(items, dict) else {}
-        for key in [keys] if isinstance(keys, str) else list(keys):
-            if key not in row_properties:
-                findings.append(
-                    LintFinding(
-                        "identity.key_missing", where, f"identity_key {key!r} is not a property of the row object"
-                    )
-                )
-    return findings

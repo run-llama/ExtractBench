@@ -421,25 +421,6 @@ class ExtractTestCase(BaseTestCase):
         alias="_schema_version",
         description="v0.2 schema version tag (e.g. 'sample/v0.2'); informational only.",
     )
-    row_identity: dict[str, Any] | None = Field(
-        default=None,
-        alias="_eval_row_identity",
-        description=(
-            "Authoritative row-identity declarations, keyed by array path "
-            "({'holdings': {'identity_key': 'cusip'}}). EVALUATION-ONLY: it rides "
-            "beside data_schema rather than inside it, because a "
-            "``repeated_structure`` block within the schema is a LlamaExtract-only "
-            "annotation that every other provider has to strip back out of its "
-            "request payload. Read it via ``eval_data_schema``; never send it to a "
-            "provider.\n\n"
-            "Deliberately NOT spelled ``_repeated_structure``: many existing "
-            "sidecars carry an inert ``_repeated_structure`` block that nothing "
-            "has ever read. Honoring that name would silently activate all of "
-            "them and move their scores, so a file must opt in under a name no "
-            "legacy file uses."
-        ),
-    )
-
     identity_hints: dict[str, Any] | None = Field(
         default=None,
         alias="_identity_hints",
@@ -455,19 +436,6 @@ class ExtractTestCase(BaseTestCase):
     def validate_identity_hints(cls, value: Any) -> Any:
         top_level_identity_fields(value)
         return value
-
-    @property
-    def eval_data_schema(self) -> dict[str, Any]:
-        """``data_schema`` with row identity re-attached, for scoring only.
-
-        Inference must keep using ``data_schema`` (plain, provider-agnostic JSON
-        Schema). Alignment code that honors a schema-declared ``identity_key``
-        treats it as authoritative, so it has to see the same block it saw when
-        the declaration still lived inside the schema.
-        """
-        if not self.row_identity:
-            return self.data_schema
-        return {**self.data_schema, "repeated_structure": self.row_identity}
 
     @field_validator("test_rules", mode="before")
     @classmethod

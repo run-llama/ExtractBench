@@ -152,7 +152,6 @@ class ForeignExtractTestCase(BaseModel):
 
     test_id: str
     data_schema: dict[str, Any]
-    eval_data_schema: dict[str, Any]
     expected_output: dict[str, Any] | None
     test_rules: list[dict[str, Any]] | None
 
@@ -165,7 +164,6 @@ def test_structural_guard_accepts_a_foreign_test_case() -> None:
     test_case = ForeignExtractTestCase(
         test_id="group/doc",
         data_schema=schema,
-        eval_data_schema=schema,
         expected_output={"po_number": "PO-1"},
         test_rules=[
             {

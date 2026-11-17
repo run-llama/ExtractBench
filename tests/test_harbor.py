@@ -41,7 +41,6 @@ def snapshot(tmp_path):
             "data_schema": json.dumps(schema),
             "expected_output": json.dumps({"rows": [{"id": "A", "value": 1}, {"id": "B", "value": 2}]}),
             "field_rules": json.dumps({"rows[0].value": {"evidence": [{"value": 7}]}}),
-            "repeated_structure": "{}",
             "tags": ["public"],
         }
         (root / f"{split}.jsonl").write_text(json.dumps(row) + "\n")
