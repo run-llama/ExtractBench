@@ -81,6 +81,9 @@ class GeminiCliExtractProvider(Provider):
 
     DEFAULT_MODEL = "gemini-4-argon"
     retries_transient_errors = False  # one run per document, like claude_code_extract
+    # Gemini CLI on Node 22 aborts a request whose headers take over 60 s (see gemini_cli_transport).
+    # Subclasses whose CLI stream parser rejects the heartbeat newline set this to False.
+    EARLY_STREAM_HEADERS = True
 
     def __init__(self, provider_name: str, base_config: dict[str, Any] | None = None):
         super().__init__(provider_name, base_config)
@@ -472,6 +475,7 @@ class GeminiCliExtractProvider(Provider):
                 lambda: self.cancel(request.example_id),
                 api_key=self._api_key,
                 headers=self._headers,
+                early_stream_headers=self.EARLY_STREAM_HEADERS,
             ) as transport:
                 try:
                     returncode, stderr_tail = self._run_cli(

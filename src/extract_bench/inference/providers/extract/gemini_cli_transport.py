@@ -3,6 +3,16 @@
 The CLI's final stats omit failed streams. This loopback adapter performs no
 model/protocol translation and never retries: each CLI request gets its own ID,
 fsynced request/response events, and independently reconciled usage.
+
+Streaming calls answer the CLI with ``200 text/event-stream`` headers at once and
+send whitespace heartbeats until the upstream bytes arrive. Gemini CLI installs a
+global undici dispatcher with a 60 s ``headersTimeout`` that API-key auth cannot
+raise. Uploading a large multi-image turn on a slow uplink plus a long thinking
+pass can exceed it, and the CLI then aborts every attempt of that turn with
+"fetch failed sending request". The SDK's SSE parser skips whitespace before
+``data:``, and an upstream error status after the early 200 is relayed as a native
+``{"error": {"code": ...}}`` chunk, which the SDK raises as an ``ApiError`` with
+that status, so the CLI's retry rules still see 429/5xx versus 4xx.
 """
 
 from __future__ import annotations
@@ -22,6 +32,52 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 import httpx
 
 from extract_bench.inference.providers.extract.gemini_cli_trace import GeminiCliTrace
+
+# Well under the CLI's 300 s undici bodyTimeout (max silence between body bytes).
+HEARTBEAT_INTERVAL_S = 15.0
+_STREAM_SUFFIX = ":streamGenerateContent"
+_SSE_FRAME_ENDS = (b"\n\n", b"\r\r", b"\r\n\r\n")
+_MAX_ERROR_MESSAGE_CHARS = 2000
+
+
+def native_error_chunk(status: int, body: bytes) -> bytes:
+    """Gemini-shaped error the SDK raises as ``ApiError(status)``; keeps the upstream message."""
+    text = body.decode("utf-8", errors="replace")
+    message = text
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError:
+        parsed = None
+    if isinstance(parsed, dict) and isinstance(parsed.get("error"), dict):
+        message = str(parsed["error"].get("message") or text)
+    error = {"code": status, "message": message[:_MAX_ERROR_MESSAGE_CHARS], "status": f"HTTP_{status}"}
+    return json.dumps({"error": error}).encode() + b"\n\n"
+
+
+class _CliStream:
+    """Serializes relay writes and heartbeats to the CLI socket.
+
+    A heartbeat goes out only before the first relayed byte or right after a
+    complete SSE frame, so it never lands inside a JSON payload.
+    """
+
+    def __init__(self, wfile: Any) -> None:
+        self._wfile = wfile
+        self._lock = threading.Lock()
+        self._tail = b""
+
+    def write(self, chunk: bytes) -> None:
+        with self._lock:
+            self._wfile.write(chunk)
+            self._wfile.flush()
+            self._tail = (self._tail + chunk)[-4:]
+
+    def heartbeat(self) -> None:
+        with self._lock:
+            if len(self._tail) > 0 and not self._tail.endswith(_SSE_FRAME_ENDS):
+                return
+            self._wfile.write(b"\n")
+            self._wfile.flush()
 
 
 class _UsageReader:
@@ -80,8 +136,13 @@ class GeminiCliTransport:
         *,
         api_key: str,
         headers: Mapping[str, str] | None = None,
+        early_stream_headers: bool = True,
     ) -> None:
+        """``early_stream_headers`` turns on the early-200 + whitespace-heartbeat relay for streaming
+        calls (module docstring). Clients whose SSE parser rejects a bare newline turn it off.
+        """
         self.base_url = base_url.rstrip("/")
+        self.early_stream_headers = early_stream_headers
         self.trace = trace
         self.price = price
         self.cancel_cli = cancel_cli
@@ -95,8 +156,10 @@ class GeminiCliTransport:
         self._closed = False
         # A fresh connection exposes its socket via HTTPX's trace extension, so
         # a CLI disconnect can abort an upstream request even before headers arrive.
+        # No write timeout: on a slow uplink a single write of a large multi-image
+        # request can stall longer than any fixed limit while still progressing.
         self._client = httpx.Client(
-            timeout=httpx.Timeout(10, read=None),
+            timeout=httpx.Timeout(10, read=None, write=None),
             follow_redirects=False,
             limits=httpx.Limits(max_keepalive_connections=0),
         )
@@ -236,7 +299,21 @@ class GeminiCliTransport:
                         self._shutdown(upstream_socket)
                     return
 
+        cli = _CliStream(handler.wfile)
+
+        def send_heartbeats() -> None:
+            while not done.wait(HEARTBEAT_INTERVAL_S):
+                try:
+                    cli.heartbeat()
+                except OSError:
+                    disconnected.set()
+                    if upstream_socket is not None:
+                        self._shutdown(upstream_socket)
+                    return
+
         watcher = threading.Thread(target=watch_disconnect, daemon=True)
+        heartbeats = threading.Thread(target=send_heartbeats, daemon=True)
+        streaming = False
         try:
             path = urlsplit(handler.path)
             # The SDK uses model endpoints only. Never accept an absolute forwarding URL.
@@ -277,6 +354,14 @@ class GeminiCliTransport:
             headers["x-bf-lh-bench-request-id"] = request_id
             headers["x-bf-lh-bench-attempt"] = self.trace.path.name
             watcher.start()
+            streaming = self.early_stream_headers and path.path.endswith(_STREAM_SUFFIX)
+            if streaming:
+                handler.send_response(200)
+                handler.send_header("content-type", "text/event-stream")
+                handler.send_header("Connection", "close")
+                handler.end_headers()
+                headers_sent = True
+                heartbeats.start()
             with self._client.stream(
                 handler.command,
                 self.base_url + relative,
@@ -306,13 +391,17 @@ class GeminiCliTransport:
                     },
                     time_to_headers_s=time.monotonic() - started,
                 )
-                handler.send_response(status)
-                for name in ("content-type", "retry-after"):
-                    if name in response.headers:
-                        handler.send_header(name, response.headers[name])
-                handler.send_header("Connection", "close")
-                handler.end_headers()
-                headers_sent = True
+                if not headers_sent:
+                    handler.send_response(status)
+                    for name in ("content-type", "retry-after"):
+                        if name in response.headers:
+                            handler.send_header(name, response.headers[name])
+                    handler.send_header("Connection", "close")
+                    handler.end_headers()
+                    headers_sent = True
+                # After the early 200, an error status can only reach the CLI as a native error chunk.
+                relay = response.is_success or not streaming
+                error_body = b""
                 reader = _UsageReader(
                     "text/event-stream" in response.headers.get("content-type", ""),
                     lambda value: self._observe(request_id, value),
@@ -322,24 +411,37 @@ class GeminiCliTransport:
                         "model.response.chunk", request_id=request_id, data_base64=base64.b64encode(chunk).decode()
                     )
                     reader.feed(chunk)
-                    handler.wfile.write(chunk)
-                    handler.wfile.flush()
+                    if relay:
+                        cli.write(chunk)
+                    else:
+                        error_body += chunk
                 reader.finish()
                 error = reader.error
+                if not relay:
+                    cli.write(native_error_chunk(status, error_body))
+                    error = error or f"HTTP {status}"
                 outcome = "success" if response.is_success and error is None else "response_error"
         except (httpx.HTTPError, ConnectionError) as exc:
             error = f"{type(exc).__name__}: {exc}"
-            if not headers_sent:
+            if isinstance(exc, ConnectionError):
+                # httpx wraps upstream failures, so a bare ConnectionError is the CLI
+                # socket failing a read or relay write before the watcher's next poll.
+                disconnected.set()
+            else:
                 try:
-                    handler.send_error(502, "Gemini gateway request failed; see attempt trace")
+                    if not headers_sent:
+                        handler.send_error(502, "Gemini gateway request failed; see attempt trace")
+                    elif streaming:
+                        cli.write(native_error_chunk(502, f"Gemini gateway request failed: {error}".encode()))
                 except ConnectionError:
                     # The CLI may already have abandoned this request. Preserve
                     # its transport outcome without treating it as a journal failure.
                     disconnected.set()
         finally:
             done.set()
-            if watcher.ident is not None:
-                watcher.join()
+            for thread in (watcher, heartbeats):
+                if thread.ident is not None:
+                    thread.join()
             if upstream_socket is not None:
                 with self._lock:
                     self._sockets.discard(upstream_socket)
