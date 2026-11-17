@@ -1,82 +1,107 @@
-"""Confidence summaries score returned scalar fields, not their containers."""
+"""Confidence summaries label scored scalar cells using Value F1."""
+
+from typing import Any
 
 from extract_bench.evaluation.metrics.extract.confidence_scoped.summary import compute_confidence_scoped_metrics
+from extract_bench.evaluation.metrics.extract.unified_evidence_metric import ValueCell, compute_unified_evidence_metrics
+from extract_bench.schemas.evaluation import MetricValue
+from extract_bench.schemas.extract_output import FieldCitation
+
+ROW_SCHEMA = {
+    "type": "object",
+    "properties": {"name": {"type": "string"}, "address": {"type": "string"}},
+}
 
 
-def test_parent_citations_do_not_change_scalar_confidence_metrics() -> None:
-    extracted = {
-        "record": {"amount": 9, "note": None},
-        "active": False,
-        "labels": ["A", "B"],
-        "empty_object": {},
-        "empty_array": [],
-    }
-    expected = {**extracted, "record": {"amount": 10, "note": None}}
-    citations = [
-        {"field_path": path, "confidence": score}
-        for path, score in [
-            ("record.amount", 0.25),
-            ("record.note", 1.0),
-            ("active", 1.0),
-            ("labels[0]", 1.0),
-            ("labels[1]", 1.0),
-        ]
-    ]
-    baseline = compute_confidence_scoped_metrics(
-        extracted_data=extracted, expected_output=expected, field_rules=[], field_citations=citations
+def _confidence_metrics(
+    expected: dict[str, Any],
+    extracted: dict[str, Any],
+    citations: list[FieldCitation],
+    schema: dict[str, Any],
+) -> dict[str, MetricValue]:
+    cells: list[ValueCell] = []
+    compute_unified_evidence_metrics(
+        expected,
+        extracted,
+        [],
+        data_schema=schema,
+        value_cells=cells,
     )
-    with_parents = compute_confidence_scoped_metrics(
-        extracted_data=extracted,
-        expected_output=expected,
-        field_rules=[],
-        field_citations=citations
-        + [{"field_path": path, "confidence": 1.0} for path in ["record", "labels", "empty_object", "empty_array"]],
+    return {
+        metric.metric_name: metric
+        for metric in compute_confidence_scoped_metrics(
+            extracted_data=extracted,
+            expected_output=expected,
+            field_rules=[],
+            field_citations=citations,
+            data_schema=schema,
+            value_cells=cells,
+        )
+    }
+
+
+def test_parent_and_scalar_array_citations_have_no_cell_verdict() -> None:
+    expected = {"record": {"amount": 10}, "labels": ["A", "B"]}
+    extracted = {"record": {"amount": 9}, "labels": ["A", "B"]}
+    schema = {
+        "type": "object",
+        "properties": {
+            "record": {"type": "object", "properties": {"amount": {"type": "number"}}},
+            "labels": {"type": "array", "items": {"type": "string"}},
+        },
+    }
+    metrics = _confidence_metrics(
+        expected,
+        extracted,
+        [
+            FieldCitation(field_path=path, page=1, confidence=0.9)
+            for path in ("record", "record.amount", "labels", "labels[0]", "labels[1]")
+        ],
+        schema,
     )
 
-    assert with_parents == baseline
-    carrier = next(metric for metric in with_parents if metric.metric_name == "confidence_scoped_auc")
-    assert carrier.metadata["total_fields"] == 5
-    assert carrier.metadata["correct_fields"] == 4
-    assert {row["predicted_path"] for row in carrier.metadata["field_rows_sample"]} == {
-        citation["field_path"] for citation in citations
-    }
-    threshold = next(row for row in carrier.metadata["thresholds"] if row["threshold"] == 0.8)
-    assert threshold["selected"] == threshold["correct_selected"] == 4
+    carrier = metrics["confidence_scoped_auc"]
+    assert carrier.metadata["correct_fields"] == 0
+    assert [row["predicted_path"] for row in carrier.metadata["field_rows_sample"]] == ["record.amount"]
+    assert metrics["confidence_signal_coverage"].metadata["scored_leaf_count"] == 3
 
 
 def test_parent_only_confidence_does_not_score_uncited_children() -> None:
     extracted = {"record": {"amount": 10}}
-    metrics = compute_confidence_scoped_metrics(
-        extracted_data=extracted,
-        expected_output=extracted,
-        field_rules=[],
-        field_citations=[{"field_path": "record", "confidence": 1.0}],
+    metrics = _confidence_metrics(
+        extracted,
+        extracted,
+        [FieldCitation(field_path="record", page=1, confidence=1.0)],
+        {"properties": {"record": {"properties": {"amount": {"type": "number"}}}}},
     )
-    carrier = next(metric for metric in metrics if metric.metric_name == "confidence_scoped_auc")
-    coverage = next(metric for metric in metrics if metric.metric_name == "confidence_signal_coverage")
-    assert carrier.metadata["total_fields"] == 0
-    assert carrier.metadata["field_rows_sample"] == []
-    assert coverage.value == 0
+    assert metrics["confidence_scoped_auc"].metadata["total_fields"] == 0
+    assert metrics["confidence_signal_coverage"].value == 0
 
 
-def test_sparse_alignment_matches_repeated_identical_rows_once_each() -> None:
-    # Frequent redacted rows have no rare feature for sparse candidate lookup.
-    # Two distinct anchors make the partial alignment nonempty, exposing misses.
+def test_duplicate_rows_keep_value_f1_assignments_when_confidence_changes() -> None:
     repeated = {"name": "NAME ON FILE", "address": "ADDRESS ON FILE"}
     anchors = [{"name": "ALPHA", "address": "1 A STREET"}, {"name": "BETA", "address": "2 B STREET"}]
     expected = {"rows": [repeated] * 201 + anchors}
-    extracted = {"rows": anchors[::-1] + [{"address": "ADDRESS ON FILE", "name": "NAME ON FILE"}] * 202}
-    metrics = compute_confidence_scoped_metrics(
-        extracted_data=extracted,
-        expected_output=expected,
-        field_rules=[],
-        field_citations=[
-            {"field_path": f"rows[{index}].{key}", "confidence": 1.0}
-            for index in range(len(extracted["rows"]))
-            for key in ("name", "address")
-        ],
-    )
-    carrier = next(metric for metric in metrics if metric.metric_name == "confidence_scoped_auc")
-    assert carrier.metadata["total_fields"] == 408
-    assert carrier.metadata["correct_fields"] == 406
-    assert carrier.metadata["full_gt"]["unique_leaf_covered"] == 406
+    extracted = {"rows": anchors[::-1] + [repeated] * 202}
+    schema = {"properties": {"rows": {"type": "array", "items": ROW_SCHEMA}}}
+
+    verdicts = []
+    for scores in (range(len(extracted["rows"])), reversed(range(len(extracted["rows"])))):
+        metrics = _confidence_metrics(
+            expected,
+            extracted,
+            [
+                FieldCitation(field_path=f"rows[{index}].{key}", page=1, confidence=score / len(extracted["rows"]))
+                for index, score in enumerate(scores)
+                for key in ("name", "address")
+            ],
+            schema,
+        )
+        metadata = metrics["confidence_scoped_auc"].metadata
+        assert metadata["total_fields"] == 408
+        assert metadata["correct_fields"] == 406
+        assert metadata["full_gt"]["unique_leaf_covered"] == 406
+        verdicts.append(
+            {row["predicted_path"]: (row["matched_gt_path"], row["correct"]) for row in metadata["field_rows_sample"]}
+        )
+    assert verdicts[0] == verdicts[1]

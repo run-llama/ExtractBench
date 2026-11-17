@@ -12,10 +12,10 @@ from dataclasses import dataclass, field
 from typing import Any, TypeGuard
 
 from extract_bench.evaluation.evaluators.base import BaseEvaluator
-from extract_bench.evaluation.grounded_confidence_payloads import confidence_field_rules
 from extract_bench.evaluation.metrics.extract.array_record_match_metric import (
     ArrayRecordMatchMetric,
 )
+from extract_bench.evaluation.metrics.extract.confidence_scoped.scoring import clamp_confidence
 from extract_bench.evaluation.metrics.extract.confidence_scoped.summary import (
     compute_confidence_scoped_metrics,
 )
@@ -35,7 +35,7 @@ from extract_bench.evaluation.metrics.field_grounding.extract_adapter import (
 )
 from extract_bench.evaluation.stats import build_operational_stats
 from extract_bench.schemas.evaluation import EvaluationResult, MetricValue
-from extract_bench.schemas.extract_output import ExtractOutput
+from extract_bench.schemas.extract_output import ExtractOutput, FieldCitation
 from extract_bench.schemas.pipeline_io import InferenceResult
 from extract_bench.schemas.product import ProductType
 from extract_bench.test_cases.extract_field_paths import parse_field_path
@@ -136,10 +136,46 @@ class ExtractScoringInputs:
     test_case: ExtractTestCase
     extracted_data: Any
     expected_output: dict[str, Any] | None
-    field_citations: list[Any]
+    field_citations: list[FieldCitation]
     identity_keys_by_path: dict[tuple[str, ...], list[str]]
     skip_field_paths: list[str]
     field_rules: list[ExtractFieldTestRule]
+
+    def compute_unified_metrics(
+        self,
+        value_cells: MutableSequence[ValueCell] | None,
+    ) -> list[MetricValue]:
+        return compute_unified_evidence_metrics(
+            expected_output=self.expected_output,
+            extracted_data=self.extracted_data,
+            field_rules=self.field_rules,
+            field_citations=self.field_citations,
+            data_schema=self.test_case.data_schema,
+            value_cells=value_cells,
+        )
+
+
+def prepare_extract_scoring_inputs(
+    test_case: ExtractTestCase,
+    extracted_data: Any,
+    field_citations: list[FieldCitation],
+) -> ExtractScoringInputs:
+    field_rules = test_case.get_extract_field_rules()
+    normalization = normalize_list_prediction(
+        extracted_data,
+        field_rules,
+        data_schema=test_case.data_schema,
+    )
+    extracted_data, expected_output = _normalize_eob_layouts(normalization.extracted_data, test_case.expected_output)
+    return ExtractScoringInputs(
+        test_case=test_case,
+        extracted_data=extracted_data,
+        expected_output=expected_output,
+        field_citations=field_citations,
+        identity_keys_by_path=_identity_keys_by_path(field_rules),
+        skip_field_paths=[*normalization.skipped_field_paths, *normalization.alias_skipped_field_paths],
+        field_rules=field_rules,
+    )
 
 
 @dataclass
@@ -252,53 +288,19 @@ class ExtractEvaluator(BaseEvaluator):
         if not is_extract_test_case(test_case):
             raise ValueError("Test case must carry extract ground truth for EXTRACT evaluation")
 
-        raw_extracted_data = inference_result.output.extracted_data
+        inputs = prepare_extract_scoring_inputs(
+            test_case,
+            inference_result.output.extracted_data,
+            list(inference_result.output.field_citations),
+        )
+        extracted_data = inputs.extracted_data
+        expected_output = inputs.expected_output
+        identity_keys_by_path = inputs.identity_keys_by_path
         metrics: list[MetricValue] = []
         diagnostic_metrics: list[MetricValue] = []
-        # The expected output actually scored, i.e. after EOB layout
-        # reconciliation. ``None`` when the case is rule-only.
-        scored_expected_output: dict[str, Any] | None = None
+        scored_cells: list[ValueCell] = []
 
-        # Normalize per_table_row list projections back into the per-doc shape
-        # used by extract_field rules. The adapter is a pure shape transform:
-        # skipped scalar paths are recorded on v0.2 evidence-metric metadata.
-        field_rules_for_unwrap = (
-            test_case.get_extract_field_rules() if hasattr(test_case, "get_extract_field_rules") else []
-        )
-        normalization = normalize_list_prediction(
-            raw_extracted_data,
-            field_rules_for_unwrap,
-            data_schema=test_case.data_schema,
-        )
-        extracted_data = normalization.extracted_data
-        unwrap_skipped = [
-            *normalization.skipped_field_paths,
-            *normalization.alias_skipped_field_paths,
-        ]
-
-        # Annotation-based evaluation.
-        #
-        # Note: the accuracy metric is computed against the *unwrapped*
-        # extracted_data vs the full expected_output. On per_table_row runs
-        # this honestly drops accuracy because scalar fields the prediction
-        # doesn't emit (e.g. ``client_id``) still appear in expected_output.
-        # That drop is a correct signal, not noise — if scalar coverage
-        # matters, run a per_doc pipeline instead. See list_unwrap.py.
-        # TODO: remove this legacy M0 path after the v0.2 migration drops
-        # expected_output from all extract test cases.
-        # Dataset-declared identity keys (match_by structural rules) let the
-        # JSON subset match pair array rows by identity instead of by index,
-        # so a reordered or dropped row doesn't cascade into every later row.
-        identity_keys_by_path = _identity_keys_by_path(field_rules_for_unwrap)
-
-        if test_case.expected_output is not None:
-            expected_output = test_case.expected_output
-
-            # Reconcile flat vs nested EOB claims layouts so the JSON subset
-            # match metric does not score zero when only the nesting differs.
-            extracted_data, expected_output = _normalize_eob_layouts(extracted_data, expected_output)
-            scored_expected_output = expected_output
-
+        if expected_output is not None:
             # Calculate overall accuracy using the metric
             accuracy_metric = self._accuracy_metric.compute(
                 expected=expected_output,
@@ -317,21 +319,12 @@ class ExtractEvaluator(BaseEvaluator):
                 )
             )
 
-            # Unified evidence metric: array_record's keyless Hungarian alignment
-            # (no match_by cascade) plus OR-acceptable evidence values and
-            # page/bbox grounding. The *_value_* metrics equal array_record_*
-            # when evidence adds no acceptable value; the *_grounded_* metrics
-            # are 0 for pipelines that emit no citations.
-            metrics.extend(
-                compute_unified_evidence_metrics(
-                    expected_output=expected_output,
-                    extracted_data=extracted_data,
-                    field_rules=test_case.get_extract_field_rules(),
-                    field_citations=getattr(inference_result.output, "field_citations", []),
-                    data_schema=test_case.data_schema,
-                    value_cells=value_cells,
-                )
+            needs_cells = value_cells is not None or any(
+                clamp_confidence(citation.confidence) is not None for citation in inputs.field_citations
             )
+            metrics.extend(inputs.compute_unified_metrics(scored_cells if needs_cells else None))
+            if value_cells is not None:
+                value_cells.extend(scored_cells)
 
             # Calculate field-level accuracy if both are dicts
             if isinstance(expected_output, dict) and isinstance(extracted_data, dict):
@@ -363,39 +356,23 @@ class ExtractEvaluator(BaseEvaluator):
         metrics.extend(
             compute_extract_field_grounding_metrics(
                 extracted_data=extracted_data,
-                field_rules=test_case.get_extract_field_rules(),
-                field_citations=getattr(inference_result.output, "field_citations", []),
-                skip_field_paths=unwrap_skipped,
+                field_rules=inputs.field_rules,
+                field_citations=inputs.field_citations,
+                skip_field_paths=inputs.skip_field_paths,
             )
         )
         metrics.extend(
             compute_confidence_scoped_metrics(
                 extracted_data=extracted_data,
-                field_rules=confidence_field_rules(test_case),
-                field_citations=getattr(inference_result.output, "field_citations", []),
-                # eval-side view: row identity re-attached from `_eval_row_identity`.
-                # Alignment treats a schema-declared identity_key as authoritative,
-                # unlike the gated `match_by:` rule path, so the block has to be
-                # visible here even though it never ships to a provider.
-                data_schema=test_case.eval_data_schema,
-                skip_field_paths=set(unwrap_skipped),
-                expected_output=getattr(test_case, "expected_output", None),
+                expected_output=expected_output,
+                field_rules=inputs.field_rules,
+                field_citations=inputs.field_citations,
+                data_schema=test_case.data_schema,
+                value_cells=scored_cells,
             )
         )
 
-        return ExtractMetricBundle(
-            metrics=metrics,
-            diagnostic_metrics=diagnostic_metrics,
-            inputs=ExtractScoringInputs(
-                test_case=test_case,
-                extracted_data=extracted_data,
-                expected_output=scored_expected_output,
-                field_citations=list(getattr(inference_result.output, "field_citations", [])),
-                identity_keys_by_path=identity_keys_by_path,
-                skip_field_paths=unwrap_skipped,
-                field_rules=field_rules_for_unwrap,
-            ),
-        )
+        return ExtractMetricBundle(metrics=metrics, diagnostic_metrics=diagnostic_metrics, inputs=inputs)
 
 
 def _identity_keys_by_path(field_rules: list[ExtractFieldTestRule]) -> dict[tuple[str, ...], list[str]]:

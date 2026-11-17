@@ -8,15 +8,18 @@ instead.
 
 from __future__ import annotations
 
-import math
 from bisect import bisect_left
+from collections.abc import Sequence
 from typing import Any
 
+from extract_bench.evaluation.metrics.extract.array_record_match_metric import unwrap_value
+from extract_bench.evaluation.metrics.extract.unified_evidence_metric import ValueCell
 from extract_bench.schemas.evaluation import MetricValue
+from extract_bench.schemas.extract_output import FieldCitation
+from extract_bench.test_cases.schema import ExtractFieldTestRule
 
-from .gt_normalization import lift_repeated_structure_gt, lift_repeated_structure_schema
 from .paths import iter_leaf_values
-from .scoring import build_confidence_field_rows, expected_doc_from_rules
+from .scoring import build_confidence_field_rows, clamp_confidence
 from .types import ConfidenceFieldRow
 
 DEFAULT_CONFIDENCE_THRESHOLDS: tuple[float, ...] = (
@@ -188,15 +191,6 @@ def _best_coverage_at_min_precision(threshold_rows: list[dict[str, Any]], target
     return (max(candidates), True) if candidates else (0.0, False)
 
 
-def _schema_extra_granted_count(rows: list[Any]) -> int:
-    """Rows counted correct only because a citation supports a GT-absent value.
-
-    These ``schema_extra_*`` grants inflate emitted-field precision relative to
-    strict GT matching, so their count is surfaced next to the headline numbers.
-    """
-    return sum(1 for row in rows if str(_row_value(row, "comparison_mode", "") or "").startswith("schema_extra_"))
-
-
 def _row_metadata(row: ConfidenceFieldRow) -> dict[str, Any]:
     return {
         "field_path": row.field_path,
@@ -231,7 +225,7 @@ def _full_gt_metrics(
     """Compute GT-denominator metrics alongside confidence-scoped metrics."""
     full_gt_totals = full_gt_totals or {}
     expected_leaf_paths = (
-        {path for path, _ in iter_leaf_values(expected_output)} if expected_output is not None else set()
+        {path for path, _ in iter_leaf_values(unwrap_value(expected_output))} if expected_output is not None else set()
     )
     if "expected_leaf_total" in full_gt_totals:
         expected_leaf_total = int(full_gt_totals["expected_leaf_total"])
@@ -287,11 +281,7 @@ def summarize_confidence_rows(
     coverage_precision_target: float = 0.95,
     expected_output: Any | None = None,
     full_gt_totals: dict[str, Any] | None = None,
-    data_schema: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    # Rows are matched against the lifted GT shape; the full-GT denominator
-    # must count that same shape, whichever caller we came from.
-    expected_output = lift_repeated_structure_gt(expected_output, lift_repeated_structure_schema(data_schema or {}))
     threshold_rows = compute_confidence_threshold_rows(rows, thresholds)
     curve_thresholds = _thresholds_with_observed_confidences(rows, thresholds)
     curve_threshold_rows = compute_confidence_threshold_rows(rows, curve_thresholds)
@@ -314,7 +304,6 @@ def summarize_confidence_rows(
             f"confidence_scoped_precision_at_{int(precision_coverage_target * 100)}pct_coverage_reached": False,
             f"confidence_scoped_coverage_at_{int(coverage_precision_target * 100)}pct_precision": 0.0,
             f"confidence_scoped_coverage_at_{int(coverage_precision_target * 100)}pct_precision_reached": False,
-            "confidence_scoped_schema_extra_granted": 0,
             "thresholds": threshold_rows,
             "curve_points": curve_points,
             "scoring_scope": "emitted_fields_with_confidence",
@@ -357,7 +346,6 @@ def summarize_confidence_rows(
         f"confidence_scoped_coverage_at_{int(coverage_precision_target * 100)}pct_precision_reached": (
             precision_target_reached
         ),
-        "confidence_scoped_schema_extra_granted": _schema_extra_granted_count(rows),
         "thresholds": threshold_rows,
         "curve_points": curve_points,
         "scoring_scope": "emitted_fields_with_confidence",
@@ -404,26 +392,19 @@ def _threshold_metric_values(threshold_rows: list[dict[str, Any]]) -> list[Metri
 
 def confidence_signal_coverage_summary(
     extracted_data: Any,
-    field_citations: list[Any],
+    field_citations: Sequence[FieldCitation],
 ) -> dict[str, Any]:
-    emitted_paths = {path for path, _ in iter_leaf_values(extracted_data)}
+    emitted_paths = {path for path, _ in iter_leaf_values(unwrap_value(extracted_data))}
     scored_paths: set[str] = set()
     signal_semantics: set[str] = set()
     for citation in field_citations:
-        field_path = str(_row_value(citation, "field_path", "") or "")
-        confidence = _row_value(citation, "confidence")
-        if field_path not in emitted_paths or isinstance(confidence, bool):
-            continue
-        try:
-            numeric_confidence = float(confidence)
-        except (TypeError, ValueError):
-            continue
-        if not math.isfinite(numeric_confidence):
+        field_path = citation.field_path
+        if field_path not in emitted_paths or clamp_confidence(citation.confidence) is None:
             continue
         scored_paths.add(field_path)
-        metadata = _row_value(citation, "metadata", {}) or {}
-        if isinstance(metadata, dict) and isinstance(metadata.get("confidence_semantics"), str):
-            signal_semantics.add(metadata["confidence_semantics"])
+        metadata = citation.metadata
+        if metadata is not None and isinstance(semantics := metadata.get("confidence_semantics"), str):
+            signal_semantics.add(semantics)
 
     missing_paths = sorted(emitted_paths - scored_paths)
     emitted_count = len(emitted_paths)
@@ -441,7 +422,7 @@ def confidence_signal_coverage_summary(
 
 def _confidence_signal_coverage_metric(
     extracted_data: Any,
-    field_citations: list[Any],
+    field_citations: Sequence[FieldCitation],
 ) -> MetricValue:
     coverage = confidence_signal_coverage_summary(extracted_data, field_citations)
     return MetricValue(
@@ -461,38 +442,29 @@ def _confidence_signal_coverage_metric(
 def compute_confidence_scoped_metrics(
     *,
     extracted_data: Any,
-    field_rules: list[Any],
-    field_citations: list[Any],
+    field_rules: Sequence[ExtractFieldTestRule],
+    value_cells: Sequence[ValueCell],
+    field_citations: Sequence[FieldCitation],
     data_schema: dict[str, Any] | None = None,
-    skip_field_paths: set[str] | None = None,
     thresholds: tuple[float, ...] = DEFAULT_CONFIDENCE_THRESHOLDS,
     precision_coverage_target: float = 0.8,
     coverage_precision_target: float = 0.95,
     expected_output: Any | None = None,
 ) -> list[MetricValue]:
-    expected_doc = (
-        expected_output
-        if expected_output is not None
-        else expected_doc_from_rules(
-            field_rules,
-            skip_field_paths or set(),
-        )
-    )
     rows = build_confidence_field_rows(
         extracted_data=extracted_data,
+        expected_output=expected_output,
         field_rules=field_rules,
         field_citations=field_citations,
         data_schema=data_schema,
-        skip_field_paths=skip_field_paths,
-        expected_output=expected_doc,
+        value_cells=value_cells,
     )
     summary = summarize_confidence_rows(
         rows,
         thresholds=thresholds,
         precision_coverage_target=precision_coverage_target,
         coverage_precision_target=coverage_precision_target,
-        expected_output=expected_doc,
-        data_schema=data_schema,
+        expected_output=expected_output,
     )
     signal_coverage_metric = _confidence_signal_coverage_metric(extracted_data, field_citations)
     if (
@@ -515,14 +487,13 @@ def compute_confidence_scoped_metrics(
     base_metadata = {
         # Bumped when scoring semantics change enough that series are not
         # comparable across the boundary.
-        "scorer_version": "2026-11-10",
+        "scorer_version": "value-f1",
         "total_fields": len(rows),
         "correct_fields": summary["correct_fields"],
         "scoped_accuracy": summary["confidence_scoped_accuracy"],
         "output_keyed_precision": summary["confidence_scoped_output_keyed_precision"],
         "fields_with_confidence": len(scored_rows),
         "unique_confidence_count": len(unique_confidences),
-        "schema_extra_granted_count": summary["confidence_scoped_schema_extra_granted"],
         "confidence_source": "ExtractOutput.field_citations[*].confidence",
         "scoring_scope": "emitted_fields_with_confidence",
         "full_gt": {
