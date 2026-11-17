@@ -12,8 +12,8 @@ into the sidecar layout the test-case loader consumes natively:
     ├── medium/<stem>.pdf + <stem>.test.json
     └── long/<stem>.pdf + <stem>.test.json
 
-Row columns ``data_schema`` / ``expected_output`` / ``field_rules`` /
-``repeated_structure`` are JSON-encoded strings (schemas differ per document).
+Row columns ``data_schema``, ``expected_output``, ``field_rules``,
+``repeated_structure``, and ``identity_hints`` are JSON-encoded strings.
 ``field_rules`` holds either the ``_field_rules`` dict shape or the
 ``test_rules`` list shape; it is written back to the matching sidecar key
 based on its JSON type.
@@ -28,6 +28,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from extract_bench.data.pro_names import LEGACY_PRO_SPLITS, PRO_SPLITS, canonical_pro_tag, repair_pro_layout
+from extract_bench.data.release_annotations import IDENTITY_HINTS_COLUMN
 
 DATASET_REPO = "llamaindex/ExtractBench"
 DATASET_REPO_TYPE = "dataset"
@@ -200,6 +201,10 @@ def _write_sidecar(row: dict, split_dir: Path, snapshot_dir: Path, force: bool =
     repeated = json.loads(row.get("repeated_structure") or "{}")
     if repeated:
         sidecar["_eval_row_identity"] = repeated
+
+    hints = json.loads(row.get(IDENTITY_HINTS_COLUMN, "{}"))
+    if len(hints) > 0:
+        sidecar["_identity_hints"] = hints
 
     dest_sidecar = dest_dir / f"{stem}.test.json"
     dest_sidecar.write_text(json.dumps(sidecar, ensure_ascii=False), encoding="utf-8")

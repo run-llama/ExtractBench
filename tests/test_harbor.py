@@ -268,6 +268,8 @@ def test_release_strips_unknown_keys_from_jsonl_and_harbor(tmp_path: Path, snaps
     split = snapshot / "short.jsonl"
     row = json.loads(split.read_text(encoding="utf-8"))
     row["internal_note"] = "private"
+    hints = {"rows": ["id"]}
+    row["identity_hints"] = json.dumps(hints)
     box = {"page": 1, "bbox": [0, 0, 1, 1]}
     rule = {
         "verified": True,
@@ -298,6 +300,7 @@ def test_release_strips_unknown_keys_from_jsonl_and_harbor(tmp_path: Path, snaps
     task = next((output / "tasks").glob("short--*"))
     reference = json.loads((task / "tests/reference.test.json").read_text(encoding="utf-8"))
     assert reference["test_rules" if legacy_rules else "_field_rules"] == rules
+    assert reference["_identity_hints"] == hints
 
     with patch("extract_bench.harbor.publish.HfApi") as api:
         api.return_value.upload_folder.return_value = SimpleNamespace(pr_url="https://hf.example/pr/1")
