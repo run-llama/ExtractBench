@@ -37,6 +37,8 @@ class AgyExtractProvider(GeminiCliExtractProvider):
     """Agentic extraction by shelling out to Antigravity CLI (`agy`)."""
 
     DEFAULT_MODEL = "gemini-4-hydrogen-high"
+    # agy's stream parser rejects the recorder's newline heartbeat ("invalid stream chunk").
+    EARLY_STREAM_HEADERS = False
 
     def __init__(self, provider_name: str, base_config: dict[str, Any] | None = None):
         super().__init__(provider_name, base_config)
