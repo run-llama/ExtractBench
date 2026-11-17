@@ -2,14 +2,25 @@
 
 import asyncio
 import logging
+import math
 import os
 import threading
 from datetime import datetime
 from pathlib import Path
 from typing import Any, cast
+from uuid import uuid4
 
 from reducto import Reducto
 
+from extract_bench.inference.cost_accounting import record_response_cost
+from extract_bench.inference.cost_contract import (
+    COMPLETE,
+    COST_ACCOUNTING,
+    COST_PER_PAGE_USD,
+    COST_USD,
+    KNOWN_COST_USD,
+    RAW_COST_COMPLETE,
+)
 from extract_bench.inference.events import emit_provider_event
 from extract_bench.inference.limits import execution_budget
 from extract_bench.inference.providers.base import (
@@ -82,6 +93,12 @@ def _coerce_positive_float(value: Any) -> float | None:
     return None
 
 
+def _coerce_nonnegative_float(value: Any) -> float | None:
+    if isinstance(value, (int, float)) and math.isfinite(value) and value >= 0:
+        return float(value)
+    return None
+
+
 def _attach_cost_stats(
     raw_output: dict[str, Any],
     pipeline_config: dict[str, Any],
@@ -108,7 +125,7 @@ def _attach_cost_stats(
     if num_pages is not None:
         raw_output["num_pages"] = num_pages
 
-    reported_credits = _coerce_positive_float(usage_dict.get("credits"))
+    reported_credits = _coerce_nonnegative_float(usage_dict.get("credits"))
     if reported_credits is not None:
         raw_output["reported_credits"] = reported_credits
     credits_used = reported_credits
@@ -136,10 +153,10 @@ def _attach_cost_stats(
     raw_output["total_credits"] = credits_used
 
     cost_usd = credits_used * REDUCTO_USD_PER_CREDIT
-    raw_output["cost_usd"] = cost_usd
+    raw_output[COST_USD] = cost_usd
     if num_pages is not None:
         raw_output["credits_per_page"] = credits_used / num_pages
-        raw_output["cost_per_page_usd"] = cost_usd / num_pages
+        raw_output[COST_PER_PAGE_USD] = cost_usd / num_pages
 
 
 @register_provider("reducto_extract")
@@ -150,6 +167,28 @@ class ReductoExtractProvider(Provider):
     This provider uses the Reducto API for extraction tasks.
     According to https://docs.reducto.ai/extraction/extract-overview
     """
+
+    _attach_cost_stats = staticmethod(_attach_cost_stats)
+
+    def _record_cost(
+        self,
+        raw: dict[str, Any],
+        config: dict[str, Any],
+        component_id: str,
+        source_file_path: str | None = None,
+    ) -> dict[str, Any]:
+        self._attach_cost_stats(raw, config, source_file_path)
+        cost = raw.get(COST_USD)
+        raw[RAW_COST_COMPLETE] = cost is not None
+        snapshot = {KNOWN_COST_USD: cost, COMPLETE: cost is not None}
+        if cost is not None:
+            usage = raw.get("usage")
+            record_response_cost(
+                cost,
+                usage if usage is not None else {},
+                component_id=component_id,
+            )
+        return snapshot
 
     def __init__(self, provider_name: str, base_config: dict[str, Any] | None = None):
         """
@@ -223,6 +262,8 @@ class ReductoExtractProvider(Provider):
         :raises ProviderError: For any API errors
         """
         budget = execution_budget()
+        accounting: dict[str, Any] = {KNOWN_COST_USD: None, COMPLETE: False}
+        last_response: dict[str, Any] = {}
         client = Reducto(api_key=self._api_key, timeout=budget.remaining(), max_retries=0)
         try:
             if cancel_event is not None and cancel_event.is_set():
@@ -270,14 +311,25 @@ class ReductoExtractProvider(Provider):
                             budget.cancel()
 
                         def poll_job() -> Any:
+                            nonlocal accounting, last_response
                             job = client.job.get(job_id, timeout=budget.remaining())
+                            last_response = job.model_dump()
+                            if job.status in ("Completed", "Failed", "Cancelled"):
+                                result_payload = last_response.get("result")
+                                cost_payload = result_payload if isinstance(result_payload, dict) else last_response
+                                accounting = self._record_cost(
+                                    cost_payload,
+                                    {"deep_extract": deep_extract and job.status == "Completed"},
+                                    f"reducto/{job_id}",
+                                    pdf_path if job.status == "Completed" else None,
+                                )
                             if job.status == "Completed":
                                 emit_provider_event(
                                     "stage.completed",
                                     provider="reducto",
                                     stage="extract",
                                     job_id=job_id,
-                                    raw_output=job.model_dump(),
+                                    raw_output=last_response,
                                 )
                             return job
 
@@ -288,14 +340,29 @@ class ReductoExtractProvider(Provider):
                             break
                         if status in ("Failed", "Cancelled"):
                             reason = getattr(job, "reason", None) or "unknown"
-                            raise ProviderTransientError(f"Reducto deep-extract job {job_id} {status}: {reason}")
+                            raise ProviderTransientError(
+                                f"Reducto deep-extract job {job_id} {status}: {reason}",
+                                job_id=job_id,
+                                debug_payload={"response": last_response, COST_ACCOUNTING: accounting},
+                            )
                         await budget.run_async(asyncio.sleep(self._poll_interval))
                 except (TimeoutError, asyncio.CancelledError):
                     # Cancellation is cleanup: give it a bounded request after
                     # extraction time is exhausted, without submitting new work.
                     emit_provider_event("vendor.cancellation_requested", provider="reducto", job_id=job_id)
                     try:
-                        await asyncio.to_thread(client.job.cancel, job_id, timeout=10)
+                        cancellation = await asyncio.to_thread(client.job.cancel, job_id, timeout=10)
+                        emit_provider_event(
+                            "vendor.cancellation_response",
+                            provider="reducto",
+                            job_id=job_id,
+                            response=cancellation,
+                        )
+                        if isinstance(cancellation, dict):
+                            result_payload = cancellation.get("result")
+                            cost_payload = result_payload if isinstance(result_payload, dict) else cancellation
+                            if isinstance(cost_payload.get("usage"), dict):
+                                accounting = self._record_cost(cost_payload, {}, f"reducto/{job_id}")
                     except Exception as cancel_error:
                         logging.getLogger(__name__).warning("Reducto job cancellation failed", exc_info=True)
                         emit_provider_event(
@@ -310,17 +377,25 @@ class ReductoExtractProvider(Provider):
             else:
 
                 def extract_sync() -> Any:
+                    nonlocal accounting, last_response
                     result = cast(Any, client.extract.run)(
                         input=upload,
                         instructions=instructions,
                         settings=settings,
                         timeout=budget.remaining(),
                     )
+                    last_response = result.model_dump()
+                    # Repeated component IDs replace cumulative charges within an attempt.
+                    # The synchronous SDK result has an optional job_id. Use it when
+                    # present; a local ID keeps separate calls distinct when absent.
+                    response_id = last_response.get("job_id")
+                    component_id = f"reducto/{response_id if response_id is not None else uuid4().hex}"
+                    accounting = self._record_cost(last_response, {}, component_id, pdf_path)
                     emit_provider_event(
                         "stage.completed",
                         provider="reducto",
                         stage="extract",
-                        raw_output=result.model_dump(),
+                        raw_output=last_response,
                     )
                     return result
 
@@ -357,6 +432,8 @@ class ReductoExtractProvider(Provider):
                             raw_response[attr] = value
 
             # Also store the configuration used for reference
+            raw_response[RAW_COST_COMPLETE] = accounting[COMPLETE]
+            raw_response[COST_USD] = accounting[KNOWN_COST_USD]
             raw_response["_config"] = {
                 "system_prompt": system_prompt,
                 "citations": citations,
@@ -373,6 +450,7 @@ class ReductoExtractProvider(Provider):
             # Check if it's a transient error (network, timeout, etc.)
             if isinstance(e, ProviderTransientError):
                 raise
+            debug_payload = {"response": last_response, COST_ACCOUNTING: accounting}
             error_str = str(e).lower()
             # 401 "invalid access token" is a presigned-token expiry on slow
             # (deep) jobs, not a real auth failure — retrying re-uploads with
@@ -389,9 +467,15 @@ class ReductoExtractProvider(Provider):
                 "invalid access token",
             ]
             if any(keyword in error_str for keyword in transient_keywords):
-                raise ProviderTransientError(f"Transient error during extraction: {e}") from e
+                raise ProviderTransientError(
+                    f"Transient error during extraction: {e}",
+                    debug_payload=debug_payload,
+                ) from e
             else:
-                raise ProviderPermanentError(f"Error during extraction: {e}") from e
+                raise ProviderPermanentError(
+                    f"Error during extraction: {e}",
+                    debug_payload=debug_payload,
+                ) from e
         finally:
             client.close()
 
@@ -468,7 +552,7 @@ class ReductoExtractProvider(Provider):
             completed_at = datetime.now()
             latency_ms = int((completed_at - started_at).total_seconds() * 1000)
 
-            _attach_cost_stats(
+            self._attach_cost_stats(
                 raw_output,
                 extract_config,
                 str(file_path),
@@ -521,7 +605,7 @@ class ReductoExtractProvider(Provider):
         if raw_result.request.config_override:
             extract_config.update(raw_result.request.config_override)
 
-        _attach_cost_stats(
+        self._attach_cost_stats(
             raw_result.raw_output,
             extract_config,
             raw_result.request.source_file_path,

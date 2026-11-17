@@ -28,6 +28,7 @@ spend backstop, so the loop is bounded by dollars rather than turn count.
 from __future__ import annotations
 
 import json
+import math
 import os
 import shutil
 import subprocess
@@ -37,6 +38,12 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from extract_bench.inference.cost_accounting import preserve_cost_on_error, record_response_cost
+from extract_bench.inference.cost_contract import (
+    COST_PER_PAGE_USD,
+    TOTAL_COST_USD,
+    USAGE,
+)
 from extract_bench.inference.limits import execution_budget
 from extract_bench.inference.providers.base import (
     Provider,
@@ -367,7 +374,7 @@ class ClaudeCodeExtractProvider(Provider):
             return None, None
         event_type = event.get("type")
         event_type = event_type if isinstance(event_type, str) else None
-        cost = event.get("total_cost_usd")
+        cost = event.get(TOTAL_COST_USD)
         if isinstance(cost, (int, float)):
             return float(cost), event_type
         return None, event_type
@@ -529,24 +536,36 @@ class ClaudeCodeExtractProvider(Provider):
             lines: list[str] = []
             returncode, stderr_tail = self._run_cli(cmd, workdir, request.example_id, lines)
             result_event = self._parse_result_event(lines)
-            self._raise_for_status(returncode, result_event, lines, stderr_tail)
-            data = self._read_output_json(workdir)
-            agent_citations = read_agent_citations_file(workdir / "citations.json") if self._evidence_mode else None
+            usage = result_event.get(USAGE, {}) if result_event is not None else {}
+            if not isinstance(usage, dict):
+                usage = {}
+            terminal_cost = result_event.get(TOTAL_COST_USD) if result_event is not None else None
+            cost_usd = (
+                float(terminal_cost)
+                if isinstance(terminal_cost, (int, float))
+                and not isinstance(terminal_cost, bool)
+                and math.isfinite(terminal_cost)
+                and terminal_cost >= 0
+                else None
+            )
+            accounting = record_response_cost(cost_usd, usage)
+            with preserve_cost_on_error({**accounting, USAGE: usage}):
+                self._raise_for_status(returncode, result_event, lines, stderr_tail)
+                data = self._read_output_json(workdir)
+                agent_citations = read_agent_citations_file(workdir / "citations.json") if self._evidence_mode else None
 
         completed_at = datetime.now()
         latency_ms = int((completed_at - started_at).total_seconds() * 1000)
 
-        usage = (result_event or {}).get("usage", {}) or {}
-        cost_usd = (result_event or {}).get("total_cost_usd")
         raw_output: dict[str, Any] = {
             "data": data,
             "harness": harness,
             "model": self._model,
-            "usage": usage,
+            USAGE: usage,
             "num_pages": num_pages,
             "schema_delivery": schema_delivery,
-            "cost_usd": cost_usd,
-            "cost_per_page_usd": (cost_usd / num_pages) if (cost_usd and num_pages) else None,
+            **accounting,
+            COST_PER_PAGE_USD: (cost_usd / num_pages) if cost_usd is not None and num_pages else None,
             "cost_exceeded_budget": (
                 self._max_cost_usd is not None and cost_usd is not None and cost_usd > self._max_cost_usd
             ),

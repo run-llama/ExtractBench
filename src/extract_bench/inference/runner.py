@@ -6,9 +6,10 @@ import json
 import secrets
 import shutil
 import tempfile
+import threading
 import time
-from collections.abc import Callable, Generator, Iterator
-from contextlib import contextmanager
+from collections.abc import Callable, Generator, Iterator, Mapping
+from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -30,6 +31,28 @@ from rich.progress import (
 )
 from rich.table import Table
 
+from extract_bench.inference.cost_accounting import AttemptCost, summarize_attempts
+from extract_bench.inference.cost_contract import (
+    ATTEMPT_ACCOUNTING,
+    ATTEMPTS,
+    COMPLETE,
+    COMPONENTS,
+    COST_ACCOUNTING,
+    COST_ATTEMPT_EVENT,
+    COST_COMPLETE,
+    COST_COMPONENT_EVENT,
+    COST_PER_PAGE_USD,
+    COST_USD,
+    KNOWN_COST_USD,
+    MODEL,
+    ORDINAL,
+    OUTCOME,
+    RAW_COST_COMPLETE,
+    TOTAL_COST_USD,
+    USAGE,
+    VENDOR_USAGE_EVENT,
+)
+from extract_bench.inference.events import ProviderEventError, bind_provider_event_sink
 from extract_bench.inference.limits import EXTRACT_HARD_TIMEOUT_S, ExecutionBudget
 from extract_bench.inference.page_budget import PageBudget
 from extract_bench.inference.providers.base import (
@@ -41,6 +64,7 @@ from extract_bench.inference.providers.base import (
 )
 from extract_bench.schemas.pipeline import PipelineSpec
 from extract_bench.schemas.pipeline_io import (
+    EXECUTION_TIMEOUT_S,
     InferenceRequest,
     InferenceResult,
     RawInferenceResult,
@@ -58,6 +82,37 @@ DEFAULT_PER_FILE_TIMEOUT_S = 1800.0  # Other products retain their execution def
 DEFAULT_TIMEOUT_RETRIES = 0  # do not retry timed-out files by default
 
 LOCAL_ARTIFACT_PROVIDER_NAMES: set[str] = set()
+
+
+class _BillingError(ProviderPermanentError):
+    """Invalid billing telemetry cannot be repaired by another paid attempt."""
+
+
+@dataclass
+class _RunAttempt:
+    ordinal: int
+    outcome: str = "running"
+    billing: AttemptCost = field(default_factory=AttemptCost)
+    billing_error: _BillingError | None = None
+
+    def observe(self, event: str, payload: Mapping[str, Any]) -> None:
+        try:
+            self.billing.observe(event, payload)
+        except (KeyError, ValueError) as error:
+            if self.billing_error is None:
+                self.billing_error = _BillingError(f"Invalid attempt billing: {error}")
+            raise self.billing_error from error
+
+    def snapshot(self) -> dict[str, Any]:
+        billing = self.billing.snapshot()
+        return {
+            **billing,
+            ORDINAL: self.ordinal,
+            OUTCOME: self.outcome,
+            COST_COMPLETE: (
+                self.billing_error is None and billing[COST_COMPLETE] and self.outcome not in {"running", "cancelling"}
+            ),
+        }
 
 
 @dataclass
@@ -227,6 +282,8 @@ class InferenceRunner:
                 raise ValueError("Extract timeouts are terminal; timeout_retries must be 0")
         self._cancelled_examples: set[str] = set()
         self._execution_budgets: dict[str, ExecutionBudget] = {}
+        self._cost_attempts: dict[str, list[_RunAttempt]] = {}
+        self._cost_lock = threading.RLock()
         self.timeout_retries = timeout_retries
         self.console = Console() if use_rich else None
 
@@ -301,15 +358,131 @@ class InferenceRunner:
         with budget.activate():
             yield
 
-    def _run_provider_inference(self, request: InferenceRequest) -> RawInferenceResult:
-        """Run inference, rewriting the stored request back to the benchmark source path."""
-        if request.example_id in self._cancelled_examples:
-            raise ProviderPermanentError("Document execution deadline exceeded")
+    def _cost_snapshot(self, example_id: str) -> dict[str, Any]:
+        attempts = self._cost_attempts.get(example_id, [])
+        return summarize_attempts([attempt.snapshot() for attempt in attempts])
+
+    def _persist_costs(self, example_id: str) -> dict[str, Any]:
+        # Callers hold the lock so late worker events cannot overwrite a newer bill.
+        snapshot = self._cost_snapshot(example_id)
+        path = self.output_dir / f"{example_id}.cost.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = path.with_suffix(".json.tmp")
+        temporary.write_text(json.dumps(snapshot, indent=2), encoding="utf-8")
+        temporary.replace(path)
+        return snapshot
+
+    def _attach_error_costs(self, summary: RunSummary) -> None:
+        if self.pipeline.product_type != ProductType.EXTRACT:
+            return
+        with self._cost_lock:
+            for entry in summary.errors:
+                example_id = entry["example_id"]
+                entry[ATTEMPT_ACCOUNTING] = self._cost_snapshot(example_id)
+
+    def _call_provider(self, request: InferenceRequest) -> RawInferenceResult:
         with self._execution_budget_context(request), self._provider_request_context(request) as provider_request:
             provider_request = provider_request.model_copy(update={"artifact_dir": str(self.output_dir / "traces")})
             raw_result = self.provider.run_inference(self.pipeline, provider_request)
         if raw_result.request != request:
             raw_result = raw_result.model_copy(update={"request": request})
+        return raw_result
+
+    def _record_cost(self, example_id: str, attempt: _RunAttempt, event: str, payload: Mapping[str, Any]) -> None:
+        if event not in {COST_COMPONENT_EVENT, COST_ATTEMPT_EVENT, VENDOR_USAGE_EVENT}:
+            return
+        with self._cost_lock:
+            try:
+                attempt.observe(event, payload)
+            finally:
+                self._persist_costs(example_id)
+
+    def _run_provider_inference(self, request: InferenceRequest) -> RawInferenceResult:
+        """Persist each attempt's costs before returning or propagating its error."""
+        if request.product_type != ProductType.EXTRACT:
+            return self._call_provider(request)
+        if request.example_id in self._cancelled_examples:
+            raise ProviderPermanentError("Document execution deadline exceeded")
+        with self._cost_lock:
+            if request.example_id not in self._cost_attempts:
+                path = self.output_dir / f"{request.example_id}.cost.json"
+                restored = []
+                if path.exists():
+                    # A restart retains previous paid attempts. Invalid history fails
+                    # before another vendor call, rather than overwriting that bill.
+                    previous = json.loads(path.read_text(encoding="utf-8"))
+                    for entry in previous[ATTEMPTS]:
+                        prior = _RunAttempt(
+                            ordinal=entry[ORDINAL],
+                            outcome=entry[OUTCOME],
+                            billing=AttemptCost(components=entry.get(COMPONENTS, {}), usage=entry.get(USAGE)),
+                        )
+                        prior.observe(
+                            COST_ATTEMPT_EVENT, {KNOWN_COST_USD: entry[COST_USD], COMPLETE: entry[COST_COMPLETE]}
+                        )
+                        if prior.outcome in {"running", "cancelling"}:
+                            prior.outcome = "interrupted"
+                            prior.billing.complete = False
+                        restored.append(prior)
+                self._cost_attempts[request.example_id] = restored
+            attempts = self._cost_attempts[request.example_id]
+            attempt = _RunAttempt(ordinal=len(attempts) + 1)
+            attempts.append(attempt)
+            self._persist_costs(request.example_id)
+
+        def record(event: str, payload: Mapping[str, Any]) -> None:
+            self._record_cost(request.example_id, attempt, event, payload)
+
+        capture = None
+        try:
+            with bind_provider_event_sink(record) as capture:
+                raw_result = self._call_provider(request)
+            with self._cost_lock:
+                if attempt.billing_error is not None:
+                    raise attempt.billing_error
+                raw = raw_result.raw_output
+                if COST_USD in raw or RAW_COST_COMPLETE in raw:
+                    attempt.observe(
+                        COST_ATTEMPT_EVENT,
+                        {KNOWN_COST_USD: raw.get(COST_USD), COMPLETE: raw.get(RAW_COST_COMPLETE, True)},
+                    )
+                late = self._extract_deadline_exceeded(request.example_id)
+                if late:
+                    raw[EXECUTION_TIMEOUT_S] = self.per_file_timeout
+                attempt.outcome = "cancelled" if late else "success"
+                snapshot = self._persist_costs(request.example_id)
+                raw.update(
+                    {
+                        COST_USD: snapshot[KNOWN_COST_USD],
+                        RAW_COST_COMPLETE: snapshot[COST_COMPLETE],
+                        ATTEMPT_ACCOUNTING: snapshot,
+                    }
+                )
+                pages = raw.get("num_pages")
+                if isinstance(pages, (int, float)) and pages > 0 and snapshot[TOTAL_COST_USD] is not None:
+                    raw[COST_PER_PAGE_USD] = snapshot[TOTAL_COST_USD] / pages
+                elif not snapshot[COST_COMPLETE]:
+                    raw.pop(COST_PER_PAGE_USD, None)
+        except BaseException as error:
+            event_failure = capture.failure if capture is not None else None
+            with self._cost_lock:
+                failure = event_failure or attempt.billing_error or error
+                if isinstance(failure, (_BillingError, ProviderEventError)):
+                    attempt.billing.complete = False
+                else:
+                    payload = getattr(error, "debug_payload", None)
+                    if isinstance(payload, dict) and isinstance(accounting := payload.get(COST_ACCOUNTING), dict):
+                        try:
+                            attempt.observe(COST_ATTEMPT_EVENT, accounting)
+                        except _BillingError as billing_error:
+                            failure = billing_error
+                attempt.outcome = "cancelled" if attempt.outcome == "cancelling" else "error"
+                snapshot = self._persist_costs(request.example_id)
+                if isinstance(failure, ProviderError):
+                    failure.debug_payload = {**(failure.debug_payload or {}), ATTEMPT_ACCOUNTING: snapshot}
+            if failure is not error:
+                raise failure from error
+            raise
         return raw_result
 
     def shutdown(self) -> None:
@@ -347,6 +520,7 @@ class InferenceRunner:
         if self._current_summary is None:
             return
 
+        self._attach_error_costs(self._current_summary)
         self._current_summary.completed_at = datetime.now()
 
         # Save summary
@@ -375,13 +549,39 @@ class InferenceRunner:
             budget = self._execution_budgets.get(example_id)
             if budget is not None:
                 budget.cancel()
+        with self._cost_lock:
+            active = next(
+                (
+                    attempt
+                    for attempt in reversed(self._cost_attempts.get(example_id, []))
+                    if attempt.outcome == "running"
+                ),
+                None,
+            )
+            if active is not None:
+                active.outcome = "cancelling"
+                active.billing.complete = False
+
+        def record(event: str, payload: Mapping[str, Any]) -> None:
+            if active is not None:
+                self._record_cost(example_id, active, event, payload)
+
         cancel_fn = getattr(self.provider, "cancel", None)
-        if callable(cancel_fn):
-            try:
-                cancel_fn(example_id)
-            except Exception as exc:  # pragma: no cover - defensive
-                print(f"  Warning: provider.cancel({example_id}) raised: {exc}")
-        future.cancel()
+        try:
+            if callable(cancel_fn):
+                with (
+                    bind_provider_event_sink(record)
+                    if self.pipeline.product_type == ProductType.EXTRACT
+                    else nullcontext()
+                ):
+                    cancel_fn(example_id)
+        except Exception as exc:  # Cancellation still proceeds if the remote hook fails.
+            print(f"  Warning: provider.cancel({example_id}) raised: {exc}")
+        finally:
+            future.cancel()
+            if self.pipeline.product_type == ProductType.EXTRACT:
+                with self._cost_lock:
+                    self._persist_costs(example_id)
 
     def _cancel_inflight_and_drain(
         self,
@@ -484,6 +684,41 @@ class InferenceRunner:
             normalized_path.parent.mkdir(parents=True, exist_ok=True)
             normalized_path.write_text(normalized_result.model_dump_json(indent=2))
 
+    def _extract_deadline_exceeded(self, example_id: str) -> bool:
+        budget = self._execution_budgets[example_id]
+        return example_id in self._cancelled_examples or time.monotonic() >= budget.deadline
+
+    def _mark_late_result(self, raw: RawInferenceResult, example_id: str) -> None:
+        if raw.product_type != ProductType.EXTRACT or EXECUTION_TIMEOUT_S in raw.raw_output:
+            return
+        with self._cost_lock:
+            if self._extract_deadline_exceeded(example_id):
+                raw.raw_output[EXECUTION_TIMEOUT_S] = self.per_file_timeout
+                self._cost_attempts[example_id][-1].outcome = "cancelled"
+                raw.raw_output[ATTEMPT_ACCOUNTING] = self._persist_costs(example_id)
+
+    def _normalize_and_save_result(
+        self, raw: RawInferenceResult, example_id: str
+    ) -> tuple[InferenceResult, tuple[str, str, str] | None]:
+        self._mark_late_result(raw, example_id)
+        raw_preserved = EXECUTION_TIMEOUT_S in raw.raw_output
+        if raw_preserved:
+            # Preserve the response before normalization or a network fetch.
+            self._save_result(raw, None)
+        else:
+            self._fetch_parse_job_logs(raw, example_id)
+        normalized = self.provider.normalize(raw)
+        self._mark_late_result(raw, example_id)
+        timeout = raw.raw_output.get(EXECUTION_TIMEOUT_S)
+        if timeout is not None:
+            normalized.raw_output.update(
+                {EXECUTION_TIMEOUT_S: timeout, ATTEMPT_ACCOUNTING: raw.raw_output[ATTEMPT_ACCOUNTING]}
+            )
+            self._save_result(None if raw_preserved else raw, normalized)
+            return normalized, (f"Per-file timeout ({timeout:g}s) exceeded; prediction retained", "", "TimeoutError")
+        self._save_result(raw, normalized)
+        return normalized, None
+
     def _save_error_debug_payload(self, example_id: str, payload: dict[str, Any]) -> str | None:
         """Save provider-supplied debug payload for a failed example."""
         try:
@@ -554,7 +789,7 @@ class InferenceRunner:
             input_tok = content.get("inputTokens", 0) or 0
             output_tok = content.get("outputTokens", 0) or 0
             thinking_tok = content.get("thinkingTokens", 0) or 0
-            model = content.get("model", "unknown")
+            model = content.get(MODEL, "unknown")
 
             total_input += input_tok
             total_output += output_tok
@@ -664,7 +899,7 @@ class InferenceRunner:
 
     def _process_document(
         self, pdf_path: Path, example_id: str, product_type: ProductType
-    ) -> tuple[RawInferenceResult | None, InferenceResult | None, str | None]:
+    ) -> tuple[RawInferenceResult | None, InferenceResult | None, tuple[str, str, str] | None]:
         """
         Process a single document (synchronous).
 
@@ -705,26 +940,16 @@ class InferenceRunner:
             else:
                 raise last_error  # type: ignore[misc]
 
-            # Fetch parse jobLogs + extract token usage BEFORE normalize, so that
-            # token fields land in the InferenceResult that evaluation reads.
-            self._fetch_parse_job_logs(raw_result, example_id)
+            normalized_result, deadline_error = self._normalize_and_save_result(raw_result, example_id)
 
-            # Normalize (phase 2: convert to structured output)
-            normalized_result = self.provider.normalize(raw_result)
-
-            # Save results
-            self._save_result(raw_result, normalized_result)
-
-            # Update job status
             if self.use_rich and example_id in self.job_statuses:
-                self.job_statuses[example_id].status = "completed"
-                self.job_statuses[example_id].completed_at = datetime.now()
-                if normalized_result:
-                    self.job_statuses[example_id].latency_ms = normalized_result.latency_in_ms
-                elif raw_result:
-                    self.job_statuses[example_id].latency_ms = raw_result.latency_in_ms
+                status = self.job_statuses[example_id]
+                status.status = "failed" if deadline_error is not None else "completed"
+                status.error = deadline_error[0] if deadline_error is not None else None
+                status.completed_at = datetime.now()
+                status.latency_ms = normalized_result.latency_in_ms
 
-            return raw_result, normalized_result, None
+            return raw_result, normalized_result, deadline_error
 
         except ProviderError as e:
             import traceback
@@ -737,7 +962,7 @@ class InferenceRunner:
                 self.job_statuses[example_id].status = "failed"
                 self.job_statuses[example_id].error = error_msg
                 self.job_statuses[example_id].completed_at = datetime.now()
-            return None, None, (error_msg, error_traceback, type(e).__name__)  # type: ignore[return-value]
+            return None, None, (error_msg, error_traceback, type(e).__name__)
         except Exception as e:
             import traceback
 
@@ -749,11 +974,11 @@ class InferenceRunner:
                 self.job_statuses[example_id].status = "failed"
                 self.job_statuses[example_id].error = error_msg
                 self.job_statuses[example_id].completed_at = datetime.now()
-            return None, None, (error_msg, error_traceback, type(e).__name__)  # type: ignore[return-value]
+            return None, None, (error_msg, error_traceback, type(e).__name__)
 
     def _process_test_case(
         self, test_case: TestCase, product_type: ProductType
-    ) -> tuple[RawInferenceResult | None, InferenceResult | None, str | None]:
+    ) -> tuple[RawInferenceResult | None, InferenceResult | None, tuple[str, str, str] | None]:
         """
         Process a single test case (synchronous).
 
@@ -801,26 +1026,16 @@ class InferenceRunner:
             else:
                 raise last_error  # type: ignore[misc]
 
-            # Fetch parse jobLogs + extract token usage BEFORE normalize, so that
-            # token fields land in the InferenceResult that evaluation reads.
-            self._fetch_parse_job_logs(raw_result, test_case.test_id)
+            normalized_result, deadline_error = self._normalize_and_save_result(raw_result, test_case.test_id)
 
-            # Normalize (phase 2: convert to structured output)
-            normalized_result = self.provider.normalize(raw_result)
-
-            # Save results
-            self._save_result(raw_result, normalized_result)
-
-            # Update job status
             if self.use_rich and test_case.test_id in self.job_statuses:
-                self.job_statuses[test_case.test_id].status = "completed"
-                self.job_statuses[test_case.test_id].completed_at = datetime.now()
-                if normalized_result:
-                    self.job_statuses[test_case.test_id].latency_ms = normalized_result.latency_in_ms
-                elif raw_result:
-                    self.job_statuses[test_case.test_id].latency_ms = raw_result.latency_in_ms
+                status = self.job_statuses[test_case.test_id]
+                status.status = "failed" if deadline_error is not None else "completed"
+                status.error = deadline_error[0] if deadline_error is not None else None
+                status.completed_at = datetime.now()
+                status.latency_ms = normalized_result.latency_in_ms
 
-            return raw_result, normalized_result, None
+            return raw_result, normalized_result, deadline_error
 
         except ProviderError as e:
             import traceback
@@ -839,7 +1054,7 @@ class InferenceRunner:
                 self.job_statuses[test_case.test_id].status = "failed"
                 self.job_statuses[test_case.test_id].error = error_msg
                 self.job_statuses[test_case.test_id].completed_at = datetime.now()
-            return None, None, (error_msg, error_traceback, type(e).__name__)  # type: ignore[return-value]
+            return None, None, (error_msg, error_traceback, type(e).__name__)
         except Exception as e:
             import traceback
 
@@ -851,7 +1066,7 @@ class InferenceRunner:
                 self.job_statuses[test_case.test_id].status = "failed"
                 self.job_statuses[test_case.test_id].error = error_msg
                 self.job_statuses[test_case.test_id].completed_at = datetime.now()
-            return None, None, (error_msg, error_traceback, type(e).__name__)  # type: ignore[return-value]
+            return None, None, (error_msg, error_traceback, type(e).__name__)
 
     def _run_files_sync(
         self,
@@ -958,6 +1173,7 @@ class InferenceRunner:
 
         # Save summary
         summary_path = self.output_dir / "_summary.json"
+        self._attach_error_costs(summary)
         summary_path.write_text(json.dumps(summary.to_dict(), indent=2))
 
         # Save errors if any
@@ -1148,6 +1364,7 @@ class InferenceRunner:
 
         # Save summary
         summary_path = self.output_dir / "_summary.json"
+        self._attach_error_costs(summary)
         summary_path.write_text(json.dumps(summary.to_dict(), indent=2))
 
         # Save errors if any
@@ -1722,6 +1939,7 @@ class InferenceRunner:
 
         # Save summary
         summary_path = self.output_dir / "_summary.json"
+        self._attach_error_costs(summary)
         summary_path.write_text(json.dumps(summary.to_dict(), indent=2))
 
         # Save errors if any
@@ -2024,6 +2242,7 @@ class InferenceRunner:
 
         # Save summary
         summary_path = self.output_dir / "_summary.json"
+        self._attach_error_costs(summary)
         summary_path.write_text(json.dumps(summary.to_dict(), indent=2))
 
         # Save errors if any

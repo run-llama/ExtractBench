@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import sys
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -11,6 +12,8 @@ import pytest
 
 pytest.importorskip("pypdf", reason="dev and runners extras required")
 
+from extract_bench.inference.cost_contract import COMPLETE, COST_COMPONENT_EVENT, COST_USD, RAW_COST_COMPLETE
+from extract_bench.inference.events import bind_provider_event_sink
 from extract_bench.inference.limits import EXTRACT_HARD_TIMEOUT_S
 from extract_bench.inference.pipelines import get_pipeline
 from extract_bench.inference.providers.base import (
@@ -20,7 +23,7 @@ from extract_bench.inference.providers.base import (
     ProviderTransientError,
 )
 from extract_bench.inference.providers.extract.agent_evidence import agent_evidence_instruction
-from extract_bench.inference.providers.extract.pi_extract import PiExtractProvider
+from extract_bench.inference.providers.extract.pi_extract import PiExtractProvider, summarize_pi_events
 from extract_bench.inference.providers.registry import create_provider
 from extract_bench.schemas.pipeline import PipelineSpec
 from extract_bench.schemas.pipeline_io import InferenceRequest
@@ -149,7 +152,7 @@ def test_summarize_events_sums_assistant_turns_and_tool_failures() -> None:
         json.dumps({"type": "tool_execution_end", "toolName": "bash", "isError": True, "args": {}, "result": "x"}),
         _error_message_end("404: model not found"),
     ]
-    summary = PiExtractProvider._summarize_events(lines)
+    summary = summarize_pi_events(lines)
     assert summary.usage == {
         "input_tokens": 17,
         "cached_input_tokens": 3,
@@ -173,7 +176,7 @@ def test_summarize_events_sums_assistant_turns_and_tool_failures() -> None:
     ],
 )
 def test_error_events_fail_even_when_pi_exits_zero(error_message: str, expected: type[Exception], match: str) -> None:
-    summary = PiExtractProvider._summarize_events([_error_message_end(error_message)])
+    summary = summarize_pi_events([_error_message_end(error_message)])
     with pytest.raises(expected, match=match):
         _provider()._raise_for_status(0, summary)
 
@@ -239,6 +242,26 @@ def test_run_inference_reads_output_cost_citations_and_harness(tmp_path: Path) -
     assert not Path(seen["home"]).is_relative_to(seen["cwd"])
     assert seen["cwd_entries"] == ["input.pdf"]
     assert seen["models"]["providers"]["openai-compatible"]["baseUrl"] == "https://example.invalid/v1"
+
+
+@pytest.mark.parametrize("prior_charge", [False, True])
+def test_run_inference_marks_pi_cost_incomplete_when_a_turn_omits_it(tmp_path: Path, prior_charge: bool) -> None:
+    missing = json.loads(_assistant_message_end())
+    del missing["message"]["usage"]["cost"]
+    lines = [_assistant_message_end()] if prior_charge else []
+    script = _fake_pi(tmp_path, [*lines, json.dumps(missing)])
+    config = {**_BASE_CONFIG, "pi_bin": str(script)}
+
+    events: list[tuple[str, Mapping[str, Any]]] = []
+    with bind_provider_event_sink(lambda name, payload: events.append((name, payload))):
+        raw = PiExtractProvider("pi_extract", config).run_inference(_spec(config), _request(tmp_path)).raw_output
+
+    assert raw[RAW_COST_COMPLETE] is False
+    assert raw[COST_USD] == (pytest.approx(0.001105) if prior_charge else None)
+    ((name, component),) = events
+    assert name == COST_COMPONENT_EVENT
+    assert component[COMPLETE] is False
+    assert component[COST_USD] == raw[COST_USD]
 
 
 def test_error_event_fails_with_trace_in_debug_payload(tmp_path: Path) -> None:

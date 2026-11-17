@@ -13,6 +13,15 @@ pytest.importorskip("pypdf")
 from aiohttp import web
 from datalab_sdk import AsyncDatalabClient
 
+from extract_bench.inference.cost_contract import (
+    COMPLETE,
+    COMPONENT_ID,
+    COST_ACCOUNTING,
+    COST_COMPONENT_EVENT,
+    COST_PER_PAGE_USD,
+    COST_USD,
+    KNOWN_COST_USD,
+)
 from extract_bench.inference.limits import ExecutionBudget
 from extract_bench.inference.pipelines import get_pipeline
 from extract_bench.inference.providers.extract import datalab
@@ -140,8 +149,9 @@ def test_extraction_survives_optional_scoring_with_separate_timing(
         )
         try:
             if outcome in ("invalid", "invalid_url"):
-                with budget.activate(), pytest.raises(datalab.ProviderPermanentError):
+                with budget.activate(), pytest.raises(datalab.ProviderPermanentError) as caught:
                     await budget.run_async(provider._extract_pdf_async(str(source), {"type": "object"}))
+                assert caught.value.debug_payload[COST_ACCOUNTING] == {KNOWN_COST_USD: 0.017, COMPLETE: True}
                 return
             with budget.activate():
                 result = await budget.run_async(provider._extract_pdf_async(str(source), {"type": "object"}))
@@ -153,13 +163,13 @@ def test_extraction_survives_optional_scoring_with_separate_timing(
             )
             assert calls["poll"] == expected_polls
             if outcome == "no_cost":
-                assert "cost_usd" not in result
+                assert COST_USD not in result
             elif outcome == "turbo":
                 assert result["parse_cost_usd"] == 0
-                assert result["cost_usd"] == pytest.approx(0.006)
+                assert result[COST_USD] == pytest.approx(0.006)
             else:
-                assert result["cost_usd"] == pytest.approx(0.017)
-                assert result["cost_per_page_usd"] == pytest.approx(0.017)
+                assert result[COST_USD] == pytest.approx(0.017)
+                assert result[COST_PER_PAGE_USD] == pytest.approx(0.017)
             if outcome not in ("turbo", "override"):
                 assert "datalab_pricing" not in result
             if extraction_mode != "fast":
@@ -201,3 +211,35 @@ def test_score_survives_unknown_citation_and_parent_scores_are_ignored() -> None
     assert [(citation.field_path, citation.confidence, citation.page) for citation in citations] == [
         ("items.0.total", 0.75, None)
     ]
+
+
+def test_missing_request_ids_do_not_merge_separate_extraction_charges(monkeypatch: pytest.MonkeyPatch) -> None:
+    from datalab_sdk.models import ConversionResult
+
+    from extract_bench.inference.events import bind_provider_event_sink
+
+    class Client:
+        base_url = "https://unused.invalid"
+
+        async def __aenter__(self) -> "Client":
+            return self
+
+        async def __aexit__(self, *args: object) -> None:
+            return None
+
+        async def extract(self, *args: object, **kwargs: object) -> ConversionResult:
+            return ConversionResult(success=True, output_format="json", cost_breakdown={"final_cost_cents": 2})
+
+    monkeypatch.setattr(datalab, "AsyncDatalabClient", lambda **kwargs: Client())
+    monkeypatch.setattr(datalab, "_read_pdf_page_count", lambda path: 1)
+    provider = datalab.DatalabExtractProvider("datalab_extract", {"api_key": "unused", "extraction_mode": "balanced"})
+    charges = {}
+
+    def record(event: str, payload: dict) -> None:
+        if event == COST_COMPONENT_EVENT:
+            charges[payload[COMPONENT_ID]] = payload[COST_USD]
+
+    with bind_provider_event_sink(record):
+        asyncio.run(provider._extract_pdf_async("unused.pdf", {}))
+        asyncio.run(provider._extract_pdf_async("unused.pdf", {}))
+    assert sum(charges.values()) == pytest.approx(0.04)

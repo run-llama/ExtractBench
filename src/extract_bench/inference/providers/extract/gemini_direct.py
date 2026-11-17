@@ -4,10 +4,20 @@ from __future__ import annotations
 
 import json
 import os
+from collections.abc import Mapping
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from extract_bench.inference.cost_accounting import preserve_cost_on_error, record_response_cost
+from extract_bench.inference.cost_contract import (
+    COST_PER_PAGE_USD,
+    COST_USD,
+    EXTRACT_COST_USD,
+    PARSE_COST_USD,
+    RAW_COST_COMPLETE,
+    USAGE,
+)
 from extract_bench.inference.limits import EXTRACT_HARD_TIMEOUT_S, execution_budget
 from extract_bench.inference.providers.base import (
     Provider,
@@ -150,13 +160,25 @@ class GeminiDirectExtractProvider(Provider):
     def _extract_usage(response: Any) -> dict[str, int]:
         meta = getattr(response, "usage_metadata", None)
         if meta is None:
-            return {"input_tokens": 0, "output_tokens": 0, "thinking_tokens": 0, "total_tokens": 0}
-        return {
-            "input_tokens": getattr(meta, "prompt_token_count", 0) or 0,
-            "output_tokens": getattr(meta, "candidates_token_count", 0) or 0,
+            return {}
+        counters = {
+            "input_tokens": getattr(meta, "prompt_token_count", None),
+            "output_tokens": getattr(meta, "candidates_token_count", None),
             "thinking_tokens": getattr(meta, "thoughts_token_count", 0) or 0,
-            "total_tokens": getattr(meta, "total_token_count", 0) or 0,
+            "total_tokens": getattr(meta, "total_token_count", None),
         }
+        return {key: value for key, value in counters.items() if value is not None}
+
+    def _estimate_extract_cost_usd(self, usage: Mapping[str, int]) -> float | None:
+        return (
+            (
+                usage.get("input_tokens", 0) * self._input_price_per_1m
+                + (usage.get("output_tokens", 0) + usage.get("thinking_tokens", 0)) * self._output_price_per_1m
+            )
+            / 1_000_000
+            if "input_tokens" in usage or "output_tokens" in usage
+            else None
+        )
 
     def _call_api(
         self,
@@ -201,35 +223,47 @@ class GeminiDirectExtractProvider(Provider):
             config=types.GenerateContentConfig(**config_kwargs),
         )
 
-        finish_reason = self._finish_reason(response)
-        if finish_reason == "MAX_TOKENS":
-            raise ProviderPermanentError(
-                "Gemini hit the provider/model output-token ceiling before completing the JSON response."
-            )
+        usage = self._extract_usage(response)
+        cost_usd = self._estimate_extract_cost_usd(usage)
+        response_id = getattr(response, "response_id", None)
+        accounting = record_response_cost(
+            cost_usd,
+            usage,
+            complete="input_tokens" in usage and "output_tokens" in usage,
+            component_id=f"{self.provider_name}/{response_id}" if response_id is not None else None,
+        )
+        with preserve_cost_on_error({**accounting, USAGE: usage}):
+            finish_reason = self._finish_reason(response)
+            if finish_reason == "MAX_TOKENS":
+                raise ProviderPermanentError(
+                    "Gemini hit the provider/model output-token ceiling before completing the JSON response."
+                )
 
-        raw_text = self._extract_text(response)
-        try:
-            data = json.loads(raw_text)
-        except json.JSONDecodeError as e:
-            raise ProviderPermanentError(
-                f"Model returned non-JSON output despite structured-output request (finish_reason={finish_reason}): {e}"
-            ) from e
+            raw_text = self._extract_text(response)
+            try:
+                data = json.loads(raw_text)
+            except json.JSONDecodeError as e:
+                raise ProviderPermanentError(
+                    "Model returned non-JSON output despite structured-output request "
+                    f"(finish_reason={finish_reason}): {e}"
+                ) from e
 
-        return {
-            "data": data,
-            "model": self._model,
-            "usage": self._extract_usage(response),
-            "_config": {
-                "additional_properties_false": self._additional_properties_false,
-                "strict": self._strict,
-                "schema_name": self._schema_name,
-                "max_tokens": self._max_tokens,
-                "thinking_level": self._thinking_level,
-                "max_cost_usd": self._max_cost_usd,
-                "input_price_per_1m": self._input_price_per_1m,
-                "output_price_per_1m": self._output_price_per_1m,
-            },
-        }
+            return {
+                **accounting,
+                "data": data,
+                "model": self._model,
+                USAGE: usage,
+                "_config": {
+                    "additional_properties_false": self._additional_properties_false,
+                    "strict": self._strict,
+                    "schema_name": self._schema_name,
+                    "max_tokens": self._max_tokens,
+                    "thinking_level": self._thinking_level,
+                    "max_cost_usd": self._max_cost_usd,
+                    "input_price_per_1m": self._input_price_per_1m,
+                    "output_price_per_1m": self._output_price_per_1m,
+                },
+            }
 
     def run_inference(self, pipeline: PipelineSpec, request: InferenceRequest) -> RawInferenceResult:
         if request.product_type != ProductType.EXTRACT:
@@ -256,7 +290,9 @@ class GeminiDirectExtractProvider(Provider):
                 raw_output = self._call_api(schema, document_text=parsed_doc.text)
             else:
                 raw_output = self._call_api(schema, source_path=file_path)
-        except (ProviderPermanentError, ProviderTransientError, ProviderConfigError):
+        except (ProviderPermanentError, ProviderTransientError, ProviderConfigError) as error:
+            if parsed_doc is not None:
+                parsed_doc.add_error_cost(error)
             raise
         except Exception as e:
             error_str = str(e).lower()
@@ -279,29 +315,26 @@ class GeminiDirectExtractProvider(Provider):
         completed_at = datetime.now()
         latency_ms = int((completed_at - started_at).total_seconds() * 1000)
 
-        usage = raw_output["usage"]
-        input_tokens = int(usage.get("input_tokens", 0) or 0)
-        output_tokens = int(usage.get("output_tokens", 0) or 0)
-        thinking_tokens = int(usage.get("thinking_tokens", 0) or 0)
-        extract_cost_usd = (
-            input_tokens / 1_000_000 * self._input_price_per_1m
-            + (output_tokens + thinking_tokens) / 1_000_000 * self._output_price_per_1m
-        )
+        usage = raw_output[USAGE]
+        extract_cost_usd = self._estimate_extract_cost_usd(usage)
+        raw_output[RAW_COST_COMPLETE] = "input_tokens" in usage and "output_tokens" in usage
         cost_usd = extract_cost_usd
         num_pages = parsed_doc.num_pages if parsed_doc and parsed_doc.num_pages > 0 else page_count(file_path)
         if parsed_doc is not None:
-            cost_usd += parsed_doc.parse_cost_usd
-            raw_output["extract_cost_usd"] = extract_cost_usd
-            raw_output["parse_cost_usd"] = parsed_doc.parse_cost_usd
+            cost_usd = parsed_doc.add_extract_cost(raw_output)
+            raw_output[EXTRACT_COST_USD] = extract_cost_usd
+            raw_output[PARSE_COST_USD] = parsed_doc.parse_cost_usd
             raw_output["parse_metadata"] = parsed_doc.metadata
             raw_output["parsed_text"] = parsed_doc.text
             raw_output["_config"]["input_mode"] = self._input_mode
             raw_output["_config"]["parse_source"] = self.base_config.get("parse_source") or {}
         raw_output["num_pages"] = num_pages
-        raw_output["cost_usd"] = cost_usd
-        raw_output["cost_exceeded_budget"] = self._max_cost_usd is not None and cost_usd > self._max_cost_usd
-        if num_pages > 0:
-            raw_output["cost_per_page_usd"] = cost_usd / num_pages
+        raw_output[COST_USD] = cost_usd
+        raw_output["cost_exceeded_budget"] = (
+            self._max_cost_usd is not None and cost_usd is not None and cost_usd > self._max_cost_usd
+        )
+        if num_pages > 0 and cost_usd is not None:
+            raw_output[COST_PER_PAGE_USD] = cost_usd / num_pages
 
         return RawInferenceResult(
             request=request,
