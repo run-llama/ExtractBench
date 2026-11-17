@@ -162,7 +162,7 @@ uv run extract-bench run agy_extract_gemini_4_hydrogen_high_thinking_vision_evid
   --max_concurrent 1 --harness_version X.Y.Z
 ```
 
-The pipeline reuses the Gemini CLI prompt, recorder, citations, journals and cost accounting. agy runs in Gemini API-key mode (`--settings '{"modelProvider": "gemini"}'`) with a private `HOME`, receives the prompt on stdin as one stream-json message, and selects high thinking through its model ID (`gemini-4-hydrogen-high`). Its requests are priced as `gemini-4-hydrogen`.
+The pipeline reuses the Gemini CLI prompt, recorder, citations, journals and cost accounting. agy runs in Gemini API-key mode (`--settings '{"modelProvider": "gemini"}'`) with a private `HOME`, receives the prompt on stdin as one stream-json message, and selects high thinking through its model ID (`gemini-4-hydrogen-high`). Its requests are priced as `gemini-4-hydrogen`. Web search is off, as in Gemini CLI: a `PreToolUse` hook in the private home denies `search_web` and browser tools, because agy has no setting that removes a tool and ignores `permissions.deny` under `--dangerously-skip-permissions`.
 
 #### pi
 

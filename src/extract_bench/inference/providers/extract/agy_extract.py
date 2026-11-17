@@ -11,6 +11,10 @@ writes ``./output.json``. Only the CLI differs:
   print mode only accepts the prompt on argv, where a large schema would not fit.
 - agy's model IDs carry the thinking level (``gemini-4-hydrogen-high``); its
   requests reach the recorder as the base model, which prices them.
+- Web search is off, as in Gemini CLI. agy has no setting that removes a tool
+  (and ``permissions.deny`` does not apply under
+  ``--dangerously-skip-permissions``), so a global ``PreToolUse`` hook in the
+  private home denies ``search_web`` and browser tools before they run.
 """
 
 from __future__ import annotations
@@ -28,6 +32,18 @@ from extract_bench.inference.providers.extract.gemini_cli_extract import (
 from extract_bench.inference.providers.registry import register_provider
 
 _AGY_SETTINGS = {"modelProvider": "gemini"}
+_WEB_TOOLS_MATCHER = "search_web|browser_.*"
+_DENY_DECISION = {"decision": "deny", "reason": "Web access is disabled for this benchmark."}
+_NO_WEB_HOOKS = {
+    "no-web": {
+        "PreToolUse": [
+            {
+                "matcher": _WEB_TOOLS_MATCHER,
+                "hooks": [{"type": "command", "command": f"echo '{json.dumps(_DENY_DECISION)}'"}],
+            }
+        ]
+    }
+}
 _SHELL_TOOL = "run_command"
 _DONE_STATE = "DONE"
 
@@ -77,7 +93,9 @@ class AgyExtractProvider(GeminiCliExtractProvider):
         return json.dumps(message) + "\n"
 
     def _prepare_home(self, home: Path) -> None:
-        home.mkdir(parents=True)
+        # ~/.gemini/config is agy's global customization root.
+        (home / ".gemini" / "config").mkdir(parents=True)
+        (home / ".gemini" / "config" / "hooks.json").write_text(json.dumps(_NO_WEB_HOOKS), encoding="utf-8")
 
     @staticmethod
     def _result_event(events: Sequence[dict[str, Any]]) -> dict[str, Any] | None:

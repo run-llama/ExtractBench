@@ -1,6 +1,8 @@
 """Contract between the provider and the agy CLI's stream-json stdin/stdout."""
 
 import json
+import re
+import subprocess
 import sys
 from collections import deque
 from pathlib import Path
@@ -74,3 +76,18 @@ def test_agy_pipeline_uses_api_key_mode_and_the_thinking_level_model_id(monkeypa
     assert cmd[cmd.index("--model") + 1] == "gemini-4-hydrogen-high"
     assert json.loads(cmd[cmd.index("--settings") + 1]) == {"modelProvider": "gemini"}
     assert provider._harness.name == "agy_extract" and provider._harness.executable == "agy"
+
+
+def test_agy_home_installs_a_hook_that_denies_web_tools(tmp_path: Path, monkeypatch) -> None:
+    """agy cannot drop a tool and ignores permissions.deny with --dangerously-skip-permissions, so a
+    global PreToolUse hook denies web search, matching Gemini CLI's excluded web tools."""
+    monkeypatch.setenv("GOOGLE_GEMINI_API_KEY", "user-secret")
+    home = tmp_path / "home"
+    AgyExtractProvider("agy_extract")._prepare_home(home)
+    (group,) = json.loads((home / ".gemini" / "config" / "hooks.json").read_text())["no-web"]["PreToolUse"]
+    matcher = re.compile(group["matcher"])
+    assert all(matcher.fullmatch(name) for name in ("search_web", "browser_subagent"))
+    assert not any(matcher.fullmatch(name) for name in ("run_command", "read_file", "write_file"))
+    (hook,) = group["hooks"]
+    output = subprocess.run(["sh", "-c", hook["command"]], capture_output=True, text=True, check=True).stdout
+    assert json.loads(output)["decision"] == "deny"
