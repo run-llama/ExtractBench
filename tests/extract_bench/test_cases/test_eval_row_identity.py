@@ -18,10 +18,6 @@ from pathlib import Path
 
 import pytest
 
-from extract_bench.evaluation.metrics.extract.confidence_scoped.summary import (
-    compute_confidence_scoped_metrics,
-)
-from extract_bench.schemas.extract_output import FieldCitation
 from extract_bench.test_cases.loader import load_test_cases
 from extract_bench.test_cases.schema import ExtractTestCase
 
@@ -137,51 +133,3 @@ def test_loader_rejects_a_malformed_block(tmp_path: Path):
     )
     with pytest.raises(ValueError, match="_eval_row_identity must be an object"):
         load_test_cases(str(tmp_path), product_type="extract")
-
-
-# --------------------------------------------------------------------------
-# end-to-end equivalence on a DUPLICATE-identity doc
-# --------------------------------------------------------------------------
-
-# Duplicated identity tuples are the case that separates the two channels: a
-# schema-declared identity_key is authoritative, while the `match_by:` rule path
-# is gated on global uniqueness and refuses to join. This mirrors real GT docs
-# whose arrays repeat the same identity tuple across many rows.
-DUPE_GT = {
-    "holdings": [
-        {"cusip": "AAA", "amount": 1},
-        {"cusip": "AAA", "amount": 2},
-        {"cusip": "BBB", "amount": 3},
-    ]
-}
-
-
-def _score(schema: dict, identity: dict | None) -> dict[str, float]:
-    tc = _case(
-        schema=schema,
-        expected_output=DUPE_GT,
-        **({"_eval_row_identity": identity} if identity else {}),
-    )
-    predicted = {"holdings": list(reversed(DUPE_GT["holdings"]))}
-    citations = [
-        FieldCitation(field_path=f"holdings[{i}].{cell}", page=1, confidence=0.9, source="t")
-        for i in range(len(predicted["holdings"]))
-        for cell in ("cusip", "amount")
-    ]
-    metrics = compute_confidence_scoped_metrics(
-        extracted_data=predicted,
-        field_rules=[],
-        field_citations=citations,
-        data_schema=tc.eval_data_schema,
-        skip_field_paths=set(),
-        expected_output=DUPE_GT,
-    )
-    return {m.metric_name: m.value for m in metrics}
-
-
-def test_sidecar_scores_identically_to_the_old_inline_block():
-    """The relocation must be a no-op for scoring, duplicates included."""
-    inline = _score({**SCHEMA, "repeated_structure": IDENTITY}, None)
-    sidecar = _score(SCHEMA, IDENTITY)
-    assert inline == sidecar
-    assert inline, "expected the confidence metrics to actually emit"

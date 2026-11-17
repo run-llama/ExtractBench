@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Iterator
 from typing import Any
 
 
@@ -17,65 +18,22 @@ def path_tokens(path: str) -> list[str | int]:
     return tokens
 
 
-def format_path(tokens: list[str | int]) -> str:
-    out = ""
-    for token in tokens:
-        if isinstance(token, int):
-            out = f"{out}[{token}]"
-        elif out:
-            out = f"{out}.{token}"
-        else:
-            out = token
-    return out
-
-
-def value_at(source: Any, tokens: list[str | int]) -> tuple[bool, Any]:
-    cursor = source
-    for token in tokens:
-        if isinstance(token, int):
-            if not isinstance(cursor, list) or token >= len(cursor):
-                return False, None
-            cursor = cursor[token]
-        else:
-            if not isinstance(cursor, dict) or token not in cursor:
-                return False, None
-            cursor = cursor[token]
-    return True, cursor
-
-
-def iter_leaf_values(value: Any, prefix: str = "") -> list[tuple[str, Any]]:
+def iter_field_values(
+    value: Any,
+    prefix: str = "",
+    *,
+    include_containers: bool = False,
+) -> Iterator[tuple[str, Any]]:
+    if len(prefix) > 0 and (include_containers or not isinstance(value, (dict, list))):
+        yield prefix, value
     if isinstance(value, dict):
-        leaves: list[tuple[str, Any]] = []
         for key, child in value.items():
-            if not isinstance(key, str) or not key:
-                continue
-            child_prefix = f"{prefix}.{key}" if prefix else key
-            leaves.extend(iter_leaf_values(child, child_prefix))
-        return leaves
-    if isinstance(value, list):
-        leaves = []
+            if isinstance(key, str) and len(key) > 0:
+                child_path = f"{prefix}.{key}" if len(prefix) > 0 else key
+                yield from iter_field_values(child, child_path, include_containers=include_containers)
+    elif isinstance(value, list):
         for index, child in enumerate(value):
-            child_prefix = f"{prefix}[{index}]"
-            leaves.extend(iter_leaf_values(child, child_prefix))
-        return leaves
-    return [(prefix, value)] if prefix else []
-
-
-def iter_array_values(value: Any, prefix: str = "") -> list[tuple[str, list[Any]]]:
-    if isinstance(value, dict):
-        arrays: list[tuple[str, list[Any]]] = []
-        for key, child in value.items():
-            if not isinstance(key, str) or not key:
-                continue
-            child_prefix = f"{prefix}.{key}" if prefix else key
-            arrays.extend(iter_array_values(child, child_prefix))
-        return arrays
-    if isinstance(value, list):
-        arrays = [(prefix, value)] if prefix else []
-        for index, child in enumerate(value):
-            arrays.extend(iter_array_values(child, f"{prefix}[{index}]"))
-        return arrays
-    return []
+            yield from iter_field_values(child, f"{prefix}[{index}]", include_containers=include_containers)
 
 
 def resolve_schema_ref(root: Any, node: Any) -> Any:
@@ -141,35 +99,8 @@ def schema_at_path(schema: Any, tokens: list[str | int]) -> Any:
     return concrete_schema_node(schema, cursor)
 
 
-def schema_description(schema: Any, path: str) -> str:
-    node = schema_at_path(schema, path_tokens(path))
-    if isinstance(node, dict):
-        return str(node.get("description") or "")
-    return ""
-
-
 def schema_path_exists(schema: Any, path: str) -> bool:
     return schema_at_path(schema, path_tokens(path)) is not None
-
-
-def is_array_schema(schema: Any, path: str) -> bool:
-    node = schema_at_path(schema, path_tokens(path))
-    return isinstance(node, dict) and (node.get("type") == "array" or "items" in node)
-
-
-def field_name(path: str) -> str:
-    return re.sub(r"\[\d+\]", "", path).split(".")[-1]
-
-
-def parent_path_for_array_item(path: str) -> tuple[str, int, str] | None:
-    tokens = path_tokens(path)
-    for pos in range(len(tokens) - 1, -1, -1):
-        index = tokens[pos]
-        if isinstance(index, int):
-            parent = format_path(tokens[:pos])
-            suffix = format_path(tokens[pos + 1 :])
-            return parent, index, suffix
-    return None
 
 
 def path_without_indices(path: str) -> str:
