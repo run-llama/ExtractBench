@@ -201,16 +201,17 @@ def test_invalid_scores_do_not_become_confidence(score: object) -> None:
     assert datalab._build_field_citations({"total": 10, "total_score": {"score": score}}, {}) == []
 
 
-def test_score_survives_unknown_citation_and_parent_scores_are_ignored() -> None:
+def test_container_score_stays_on_parent_and_preserves_independent_child_score() -> None:
     citations = datalab._build_field_citations(
         {
-            "items": [{"total": None, "total_score": {"score": 4}, "total_citations": ["unknown"]}],
+            "items": [{"total": None, "total_score": {"score": 4}, "total_citations": ["unknown"], "unscored": 7}],
             "items_score": {"score": 5},
         },
         {},
     )
     assert [(citation.field_path, citation.confidence, citation.page) for citation in citations] == [
-        ("items[0].total", 0.75, None)
+        ("items", 1.0, None),
+        ("items[0].total", 0.75, None),
     ]
 
 
@@ -328,3 +329,36 @@ def test_inconclusive_verification_is_not_a_failed_score(status: str) -> None:
     assert len(citations) == 1
     assert citations[0].confidence is None
     assert citations[0].metadata["native_verification_status"] == status
+
+
+@pytest.mark.parametrize("names", [[], ["Alice"]])
+@pytest.mark.parametrize("mode", ["fast", "balanced"])
+def test_array_confidence_reaches_the_value_f1_cell(names: list[str], mode: str) -> None:
+    from extract_bench.evaluation.metrics.extract.confidence_scoped.scoring import build_confidence_field_rows
+    from extract_bench.evaluation.metrics.extract.confidence_scoped.summary import confidence_signal_coverage_summary
+    from extract_bench.evaluation.metrics.extract.unified_evidence_metric import (
+        ValueCell,
+        compute_unified_evidence_metrics,
+    )
+
+    data = {"names": names}
+    payload: dict = {**data, "names_citations": ["unknown-block"]}
+    if mode == "fast":
+        payload["names_score"] = {"score": 5}
+    else:
+        payload["names_meta"] = {"verification": {"status": "PASS"}}
+    citations = datalab._build_field_citations(payload, {})
+    schema = {"properties": {"names": {"type": "array", "items": {"type": "string"}}}}
+    cells: list[ValueCell] = []
+    compute_unified_evidence_metrics(data, data, [], data_schema=schema, value_cells=cells)
+    rows = build_confidence_field_rows(
+        extracted_data=data,
+        expected_output=data,
+        field_rules=[],
+        field_citations=citations,
+        data_schema=schema,
+        value_cells=cells,
+    )
+
+    assert [(row.predicted_path, row.confidence, row.correct) for row in rows] == [("names", 1.0, True)]
+    assert confidence_signal_coverage_summary(data, citations, cells)["confidence_signal_coverage"] == 1.0

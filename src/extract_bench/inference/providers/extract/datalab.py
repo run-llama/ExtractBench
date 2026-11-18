@@ -660,8 +660,8 @@ def _build_field_citations(
     """Read vendor signals from the response, including historical snapshots.
 
     Verification is categorical: PASS is 1 and a concluded failure is 0.
-    Missing or pending verification is unscored. List-level verification
-    does not establish confidence in each item. Array paths use brackets
+    Missing or pending verification is unscored. Container signals stay on
+    their own paths without propagating to children. Array paths use brackets
     so the evaluator joins citations and confidence to the same value cells.
     """
     citations: list[FieldCitation] = []
@@ -689,14 +689,13 @@ def _collect_citations(
                 continue
 
             field_path = _format_datalab_path([*path, key])
-            is_leaf = not isinstance(value, (Mapping, list))
             score_obj = node.get(key + _SCORE_SUFFIX)
             meta_obj = node.get(key + _META_SUFFIX)
             confidence, signal_metadata = _datalab_field_signal(
                 score_obj=score_obj,
                 meta_obj=meta_obj,
             )
-            if not is_leaf or (isinstance(meta_obj, Mapping) and value is None):
+            if isinstance(meta_obj, Mapping) and value is None:
                 confidence = None
             entries = _datalab_citation_entries(node.get(key + _CITATIONS_SUFFIX))
             if isinstance(meta_obj, Mapping):
