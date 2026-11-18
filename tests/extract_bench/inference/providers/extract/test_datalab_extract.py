@@ -57,10 +57,13 @@ def test_strip_removes_nested_meta_keys() -> None:
     }
 
 
-def test_meta_sidecar_produces_no_citations() -> None:
+def test_meta_sidecar_recovers_citation_and_verification() -> None:
     payload = {"invoice_number": "NF67652", "invoice_number_meta": _meta()}
 
-    assert _build_field_citations(payload, block_lookup={}) == []
+    citations = _build_field_citations(payload, block_lookup={})
+    assert len(citations) == 1
+    assert citations[0].metadata["block_id"] == "/page/0/Table/7"
+    assert citations[0].confidence == 1.0
 
 
 @pytest.mark.parametrize(

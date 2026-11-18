@@ -195,7 +195,7 @@ def test_extraction_survives_optional_scoring_with_separate_timing(
     asyncio.run(run())
 
 
-@pytest.mark.parametrize("score", [True, "5", float("nan"), float("inf")])
+@pytest.mark.parametrize("score", [None, True, "5", float("nan"), float("inf")])
 def test_invalid_scores_do_not_become_confidence(score: object) -> None:
     assert datalab._build_field_citations({"total": 10, "total_score": {"score": score}}, {}) == []
 
@@ -209,7 +209,7 @@ def test_score_survives_unknown_citation_and_parent_scores_are_ignored() -> None
         {},
     )
     assert [(citation.field_path, citation.confidence, citation.page) for citation in citations] == [
-        ("items.0.total", 0.75, None)
+        ("items[0].total", 0.75, None)
     ]
 
 
@@ -243,3 +243,87 @@ def test_missing_request_ids_do_not_merge_separate_extraction_charges(monkeypatc
         asyncio.run(provider._extract_pdf_async("unused.pdf", {}))
         asyncio.run(provider._extract_pdf_async("unused.pdf", {}))
     assert sum(charges.values()) == pytest.approx(0.04)
+
+
+def _meta_sidecar() -> dict:
+    return {
+        "extraction_status": "EXTRACTED",
+        "reasoning": None,
+        "citations": ["/page/0/Table/7"],
+        "verification": {"status": "PASS", "feedback": "ok"},
+    }
+
+
+def test_fast_scores_are_normalized_on_bracket_array_paths_without_citations() -> None:
+    payload = {
+        "line_items": [
+            {
+                "amount": 10.0,
+                "amount_score": {"score": 3, "reasoning": "Moderate evidence"},
+            }
+        ]
+    }
+
+    citations = datalab._build_field_citations(payload, block_lookup={})
+
+    assert len(citations) == 1
+    assert citations[0].field_path == "line_items[0].amount"
+    assert citations[0].confidence == 0.5
+    assert citations[0].page is None
+    assert citations[0].bbox is None
+    assert citations[0].metadata == {
+        "native_score": 3,
+        "reasoning": "Moderate evidence",
+        "confidence_semantics": "ordinal_1_5",
+    }
+
+
+@pytest.mark.parametrize(
+    ("status", "expected"),
+    [("PASS", 1.0), ("FAIL_FIX", 0.0), ("FAIL_CITATIONS", 0.0), ("ITEMS_MISSING", 0.0)],
+)
+def test_balanced_verification_is_a_binary_categorical_signal(status: str, expected: float) -> None:
+    meta = _meta_sidecar()
+    meta["verification"] = {"status": status, "feedback": "reviewed"}
+    payload = {"invoice_number": "NF67652", "invoice_number_meta": meta}
+
+    citations = datalab._build_field_citations(payload, block_lookup={})
+
+    assert len(citations) == 1
+    assert citations[0].confidence == expected
+    assert citations[0].page is None
+    assert citations[0].metadata["native_verification_status"] == status
+    assert citations[0].metadata["confidence_semantics"] == "categorical_verification"
+    assert citations[0].metadata["datalab_meta"]["verification"]["feedback"] == "reviewed"
+
+
+def test_balanced_missing_verification_status_remains_unscored() -> None:
+    payload = {"invoice_number": "NF67652", "invoice_number_meta": {"verification": {}}}
+
+    assert datalab._build_field_citations(payload, block_lookup={}) == []
+
+
+@pytest.mark.parametrize("status", ["PASS", "FAIL_FIX"])
+def test_balanced_null_value_remains_unscored(status: str) -> None:
+    payload = {
+        "invoice_number": None,
+        "invoice_number_citations": ["block-1"],
+        "invoice_number_meta": {"verification": {"status": status}},
+    }
+
+    citations = datalab._build_field_citations(payload, block_lookup={})
+
+    assert len(citations) == 1
+    assert citations[0].confidence is None
+    assert citations[0].page is None
+
+
+@pytest.mark.parametrize("status", ["PENDING", "NEW_STATUS"])
+def test_inconclusive_verification_is_not_a_failed_score(status: str) -> None:
+    citations = datalab._build_field_citations(
+        {"amount": 10, "amount_citations": ["missing"], "amount_meta": {"verification": {"status": status}}},
+        {},
+    )
+    assert len(citations) == 1
+    assert citations[0].confidence is None
+    assert citations[0].metadata["native_verification_status"] == status

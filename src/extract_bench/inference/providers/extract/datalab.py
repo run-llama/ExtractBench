@@ -658,15 +658,27 @@ def _build_field_citations(
     payload: Any,
     block_lookup: dict[str, dict[str, Any]],
 ) -> list[FieldCitation]:
+    """Read vendor signals from the response, including historical snapshots.
+
+    Verification is categorical: PASS is 1 and a concluded failure is 0.
+    Missing or pending verification is unscored. List-level verification
+    does not establish confidence in each item. Array paths use brackets
+    so the evaluator joins citations and confidence to the same value cells.
+    """
     citations: list[FieldCitation] = []
-    _collect_citations(payload, path=[], block_lookup=block_lookup, citations=citations)
+    _collect_citations(
+        payload,
+        path=[],
+        block_lookup=block_lookup,
+        citations=citations,
+    )
     return _dedupe_citations(citations)
 
 
 def _collect_citations(
     node: Any,
     *,
-    path: list[str],
+    path: list[str | int],
     block_lookup: dict[str, dict[str, Any]],
     citations: list[FieldCitation],
 ) -> None:
@@ -674,41 +686,46 @@ def _collect_citations(
         for key, value in node.items():
             if not isinstance(key, str):
                 continue
-            if key.endswith(_CITATIONS_SUFFIX):
-                field_name = key[: -len(_CITATIONS_SUFFIX)]
-                field_path = ".".join([*path, field_name]) if path or field_name else field_name
-                score_obj = node.get(field_name + _SCORE_SUFFIX)
-                if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
-                    for block_id in value:
-                        citation = _citation_from_block_id(
-                            block_id=block_id,
-                            field_path=field_path,
-                            block_lookup=block_lookup,
-                            score_obj=score_obj,
-                        )
-                        if citation is not None:
-                            citations.append(citation)
+            if key.endswith(_SIDECAR_SUFFIXES):
                 continue
-            if key.endswith(_SCORE_SUFFIX):
-                field_name = key[: -len(_SCORE_SUFFIX)]
-                field_value = node.get(field_name)
-                if field_name in node and not isinstance(field_value, (Mapping, list)):
-                    confidence = _score_confidence(value)
-                    block_ids = node.get(field_name + _CITATIONS_SUFFIX)
-                    if confidence is not None and (block_ids is None or block_ids == []):
-                        citations.append(
-                            FieldCitation(
-                                field_path=".".join([*path, field_name]),
-                                page=None,
-                                bbox=None,
-                                source="datalab",
-                                confidence=confidence,
-                                metadata=_score_metadata(value),
-                            ),
-                        )
-                continue
-            if key.endswith(_META_SUFFIX):
-                continue
+
+            field_path = _format_datalab_path([*path, key])
+            is_leaf = not isinstance(value, (Mapping, list))
+            score_obj = node.get(key + _SCORE_SUFFIX)
+            meta_obj = node.get(key + _META_SUFFIX)
+            confidence, signal_metadata = _datalab_field_signal(
+                score_obj=score_obj,
+                meta_obj=meta_obj,
+            )
+            if not is_leaf or (isinstance(meta_obj, Mapping) and value is None):
+                confidence = None
+            block_ids = _datalab_block_ids(node.get(key + _CITATIONS_SUFFIX))
+            if isinstance(meta_obj, Mapping):
+                block_ids.extend(_datalab_block_ids(meta_obj.get("citations")))
+            block_ids = list(dict.fromkeys(block_ids))
+
+            for block_id in block_ids:
+                citation = _citation_from_block_id(
+                    block_id=block_id,
+                    field_path=field_path,
+                    block_lookup=block_lookup,
+                    confidence=confidence,
+                    signal_metadata=signal_metadata,
+                )
+                if citation is not None:
+                    citations.append(citation)
+            if len(block_ids) == 0 and confidence is not None:
+                citations.append(
+                    FieldCitation(
+                        field_path=field_path,
+                        page=None,
+                        bbox=None,
+                        source="datalab",
+                        confidence=confidence,
+                        metadata=signal_metadata,
+                    )
+                )
+
             _collect_citations(
                 value,
                 path=[*path, key],
@@ -720,10 +737,73 @@ def _collect_citations(
         for idx, item in enumerate(node):
             _collect_citations(
                 item,
-                path=[*path, str(idx)],
+                path=[*path, idx],
                 block_lookup=block_lookup,
                 citations=citations,
             )
+
+
+def _format_datalab_path(path: list[str | int]) -> str:
+    rendered = ""
+    for token in path:
+        if isinstance(token, int):
+            rendered += f"[{token}]"
+        elif len(rendered) > 0:
+            rendered += f".{token}"
+        else:
+            rendered = token
+    return rendered
+
+
+def _datalab_block_ids(raw: Any) -> list[str]:
+    if isinstance(raw, str):
+        return [raw] if len(raw) > 0 else []
+    if not isinstance(raw, Sequence) or isinstance(raw, (str, bytes, bytearray)):
+        return []
+    block_ids: list[str] = []
+    for entry in raw:
+        if isinstance(entry, str) and len(entry) > 0:
+            block_ids.append(entry)
+        elif isinstance(entry, Mapping):
+            block_id = entry.get("block_id") or entry.get("id")
+            if isinstance(block_id, str) and len(block_id) > 0:
+                block_ids.append(block_id)
+    return block_ids
+
+
+def _datalab_field_signal(
+    *,
+    score_obj: Any,
+    meta_obj: Any,
+) -> tuple[float | None, dict[str, Any]]:
+    if isinstance(meta_obj, Mapping):
+        verification = meta_obj.get("verification")
+        status = verification.get("status") if isinstance(verification, Mapping) else None
+        metadata: dict[str, Any] = {
+            "confidence_semantics": "categorical_verification",
+            "datalab_meta": dict(meta_obj),
+        }
+        if isinstance(status, str) and len(status) > 0:
+            metadata["native_verification_status"] = status
+            if status == "PASS":
+                return 1.0, metadata
+            if status in {"FAIL_UNRESOLVABLE", "FAIL_FIX", "FAIL_CITATIONS", "ITEMS_MISSING"}:
+                return 0.0, metadata
+        return None, metadata
+
+    metadata = _confidence_score_metadata(score_obj)
+    if isinstance(score_obj, (int, float)) and not isinstance(score_obj, bool):
+        metadata["native_score"] = score_obj
+    if len(metadata) > 0:
+        metadata["confidence_semantics"] = "ordinal_1_5"
+    raw_score: Any = score_obj.get("score") if isinstance(score_obj, Mapping) else score_obj
+    if isinstance(raw_score, bool) or not isinstance(raw_score, (int, float)):
+        return None, metadata
+    numeric_score = float(raw_score)
+    if not math.isfinite(numeric_score):
+        return None, metadata
+    confidence = max(0.0, min(1.0, (numeric_score - 1.0) / 4.0))
+    return confidence, metadata
 
 
 def _citation_from_block_id(
@@ -731,9 +811,10 @@ def _citation_from_block_id(
     block_id: Any,
     field_path: str,
     block_lookup: dict[str, dict[str, Any]],
-    score_obj: Any,
+    confidence: float | None,
+    signal_metadata: dict[str, Any],
 ) -> FieldCitation | None:
-    if not isinstance(block_id, str) or not block_id:
+    if not isinstance(block_id, str) or len(block_id) == 0:
         return None
     info = block_lookup.get(block_id)
     if info is None:
@@ -744,8 +825,8 @@ def _citation_from_block_id(
             page=None,
             bbox=None,
             source="datalab",
-            confidence=_score_confidence(score_obj),
-            metadata={"block_id": block_id, **_score_metadata(score_obj)},
+            confidence=confidence,
+            metadata={"block_id": block_id, **signal_metadata},
         )
 
     bbox_pixels = info.get("bbox")
@@ -755,12 +836,10 @@ def _citation_from_block_id(
 
     reference_text = info.get("html") if isinstance(info.get("html"), str) else None
 
-    confidence = _score_confidence(score_obj)
-
     metadata: dict[str, Any] = {
         "block_id": block_id,
         "block_type": info.get("block_type"),
-        **_score_metadata(score_obj),
+        **signal_metadata,
     }
 
     return FieldCitation(
@@ -773,6 +852,17 @@ def _citation_from_block_id(
         source="datalab",
         metadata=metadata,
     )
+
+
+def _confidence_score_metadata(score_obj: Any) -> dict[str, Any]:
+    if not isinstance(score_obj, Mapping):
+        return {}
+    out: dict[str, Any] = {}
+    if "score" in score_obj:
+        out["native_score"] = score_obj.get("score")
+    if "reasoning" in score_obj:
+        out["reasoning"] = score_obj.get("reasoning")
+    return out
 
 
 def _normalize_bbox(bbox_pixels: Any, page_w: float, page_h: float) -> list[float] | None:
@@ -788,26 +878,6 @@ def _normalize_bbox(bbox_pixels: Any, page_w: float, page_h: float) -> list[floa
     if page_w <= 0 or page_h <= 0:
         return None
     return [x1 / page_w, y1 / page_h, (x2 - x1) / page_w, (y2 - y1) / page_h]
-
-
-def _score_confidence(score_obj: Any) -> float | None:
-    if score_obj is None:
-        return None
-    score = score_obj["score"]
-    if isinstance(score, bool) or not isinstance(score, (int, float)) or not math.isfinite(score):
-        return None
-    return max(0.0, min(1.0, (float(score) - 1.0) / 4.0))
-
-
-def _score_metadata(score_obj: Any) -> dict[str, Any]:
-    if not isinstance(score_obj, Mapping):
-        return {}
-    out: dict[str, Any] = {}
-    if "score" in score_obj:
-        out["score"] = score_obj.get("score")
-    if "reasoning" in score_obj:
-        out["reasoning"] = score_obj.get("reasoning")
-    return out
 
 
 def _dedupe_citations(citations: list[FieldCitation]) -> list[FieldCitation]:
