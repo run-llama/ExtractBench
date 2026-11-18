@@ -250,3 +250,25 @@ def test_derived_array_confidence_keeps_evidence_on_the_predicted_path(direct_ev
     assert serialized["citation"] == (citations[-1].model_dump() if direct_evidence else None)
     assert serialized["cited_text"] == ("Own array text" if direct_evidence else "")
     assert [citation.model_dump() for citation in citations] == original
+
+
+@pytest.mark.parametrize("array", [False, True], ids=["duplicate-scalar", "array-elements"])
+def test_coverage_retains_semantics_of_all_contributing_confidence_signals(array: bool) -> None:
+    extracted = {"answer": [1, 2] if array else 1}
+    citations = [
+        FieldCitation(
+            field_path=f"answer[{index}]" if array else "answer",
+            page=1,
+            confidence=score,
+            metadata={"confidence_semantics": semantics},
+        )
+        for index, (score, semantics) in enumerate([(0.6, "categorical_verification"), (0.8, "ordinal_1_5")])
+    ]
+    field_schema = {"type": "array", "items": {"type": "number"}} if array else {"type": "number"}
+    metrics = _confidence_metrics(extracted, extracted, citations, {"properties": {"answer": field_schema}})
+    assert metrics["confidence_signal_coverage"].metadata["confidence_semantics"] == [
+        "categorical_verification",
+        "ordinal_1_5",
+    ]
+    (row,) = metrics["confidence_scoped_auc"].metadata["field_rows_sample"]
+    assert row["confidence"] == (0.6 if array else 0.8)

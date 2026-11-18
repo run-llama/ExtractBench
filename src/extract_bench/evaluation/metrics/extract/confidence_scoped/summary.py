@@ -18,7 +18,7 @@ from extract_bench.schemas.extract_output import FieldCitation
 from extract_bench.test_cases.schema import ExtractFieldTestRule
 
 from .paths import iter_field_values
-from .scoring import build_confidence_field_rows, confidence_signals_by_path, value_path_prefix
+from .scoring import build_confidence_field_rows, clamp_confidence, confidence_signals_by_path, value_path_prefix
 from .types import ConfidenceFieldRow
 
 DEFAULT_CONFIDENCE_THRESHOLDS: tuple[float, ...] = (
@@ -398,12 +398,33 @@ def confidence_signal_coverage_summary(
     else:
         emitted_paths = {path for path, _ in iter_field_values(extracted_data)}
         coverage_scope = "emitted_scalar_leaves"
-    scored_paths: set[str] = set()
+    signals = confidence_signals_by_path(extracted_data, field_citations, value_cells)
+    scored_paths = emitted_paths.intersection(signals)
+    source_paths = {signals[path][1].field_path for path in scored_paths}
+    derived_arrays: set[str] = set()
+    for path in scored_paths:
+        source_path = prefix + signals[path][1].field_path.removeprefix(prefix)
+        parent, bracket, index = source_path.rpartition("[")
+        if parent == path and bracket == "[" and index.endswith("]") and index[:-1].isdigit():
+            derived_arrays.add(path)
+
+    # Preserve every contributing signal type, independently of which citation
+    # wins max-per-path or min-per-array score selection.
     signal_semantics: set[str] = set()
-    for field_path, (_, citation) in confidence_signals_by_path(extracted_data, field_citations, value_cells).items():
-        if field_path not in emitted_paths:
+    for citation in field_citations:
+        field_path = prefix + citation.field_path.removeprefix(prefix)
+        parent, bracket, index = field_path.rpartition("[")
+        array_source = (
+            parent in derived_arrays
+            and bracket == "["
+            and index.endswith("]")
+            and index[:-1].isdigit()
+            and field_path in signals
+        )
+        if not (field_path in scored_paths or citation.field_path in source_paths or array_source):
             continue
-        scored_paths.add(field_path)
+        if clamp_confidence(citation.confidence) is None:
+            continue
         metadata = citation.metadata
         if metadata is not None and isinstance(semantics := metadata.get("confidence_semantics"), str):
             signal_semantics.add(semantics)
