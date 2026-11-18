@@ -39,6 +39,68 @@ def value_path_prefix(data: Any) -> str:
     return "value." if unwrap_value(data) is not data else ""
 
 
+def confidence_signals_by_path(
+    extracted_data: Any,
+    field_citations: Sequence[FieldCitation],
+    value_cells: Sequence[ValueCell],
+) -> dict[str, tuple[float, FieldCitation]]:
+    """Resolve confidence for emitted cells, retaining the source citation.
+
+    An opaque scalar array uses its native confidence when available, otherwise
+    the minimum available element confidence. Duplicate citations for one element
+    keep the existing maximum-score policy before aggregation. Source citations
+    remain unchanged; their geometry is not promoted to the array. A cell with
+    no direct or element-derived score inherits its nearest scored object ancestor.
+    """
+    prefix = value_path_prefix(extracted_data)
+    predictions = dict(iter_field_values(extracted_data, include_containers=True))
+    signals: dict[str, tuple[float, FieldCitation]] = {}
+    for citation in field_citations:
+        score = clamp_confidence(citation.confidence)
+        path = citation.field_path
+        if path not in predictions:
+            path = prefix + path.removeprefix(prefix)
+        if score is None or path not in predictions:
+            continue
+        current = signals.get(path)
+        if current is None or score > current[0]:
+            signals[path] = (score, citation)
+
+    array_paths = {
+        prefix + cell.pred_path
+        for cell in value_cells
+        if cell.pred_path is not None
+        and isinstance(value := predictions.get(prefix + cell.pred_path), list)
+        and all(not isinstance(element, (dict, list)) for element in value)
+    }
+    derived: dict[str, tuple[float, FieldCitation]] = {}
+    for path, signal in signals.items():
+        parent, bracket, index = path.rpartition("[")
+        if bracket != "[" or not index.endswith("]") or not index[:-1].isdigit():
+            continue
+        if parent not in array_paths or parent in signals:
+            continue
+        current = derived.get(parent)
+        if current is None or signal[0] < current[0]:
+            derived[parent] = signal
+    resolved = signals | derived
+    for cell in value_cells:
+        if cell.pred_path is None:
+            continue
+        path = prefix + cell.pred_path
+        if path in resolved or path not in predictions:
+            continue
+        # Walk actual ancestors, bounded by path depth rather than the number
+        # of scored objects. Array containers do not supply object confidence.
+        ancestor = path
+        while "." in ancestor:
+            ancestor = ancestor.rsplit(".", 1)[0]
+            if ancestor in signals and isinstance(predictions.get(ancestor), dict):
+                resolved[path] = signals[ancestor]
+                break
+    return resolved
+
+
 def build_confidence_field_rows(
     *,
     extracted_data: Any,
@@ -57,18 +119,24 @@ def build_confidence_field_rows(
     verified = {rule.field_path for rule in field_rules if rule.verified}
     predictions = dict(iter_field_values(extracted_data, include_containers=True))
     expected = dict(iter_field_values(expected_output, include_containers=True))
-    rows: dict[str, ConfidenceFieldRow] = {}
+    # Confidence may come from another path; evidence text must still belong
+    # to the emitted cell, including citations with no confidence of their own.
+    cited_text_by_path: dict[str, str] = {}
     for citation in field_citations:
-        score = clamp_confidence(citation.confidence)
-        cell_path = citation.field_path.removeprefix(pred_prefix)
+        if len(text := _citation_reference_text(citation)) > 0:
+            cited_text_by_path.setdefault(citation.field_path.removeprefix(pred_prefix), text)
+    rows: dict[str, ConfidenceFieldRow] = {}
+    for signal_path, (score, citation) in confidence_signals_by_path(
+        extracted_data,
+        field_citations,
+        value_cells,
+    ).items():
+        cell_path = signal_path.removeprefix(pred_prefix)
         cell = by_path.get(cell_path)
-        if score is None or cell is None:
+        if cell is None:
             continue
         path = pred_prefix + cell_path
         if path not in predictions:
-            continue
-        current = rows.get(path)
-        if current is not None and current.confidence is not None and current.confidence >= score:
             continue
         gt_path = gt_prefix + cell.gt_path if cell.gt_path is not None else None
         field_path = path if gt_path is None else gt_path
@@ -85,7 +153,11 @@ def build_confidence_field_rows(
             verified=gt_path in verified,
             alignment_mode="value_f1" if gt_path is not None else "unmatched_prediction",
             alignment_score=float(gt_path is not None),
-            cited_text=_citation_reference_text(citation),
+            cited_text=(
+                _citation_reference_text(citation)
+                if citation.field_path.removeprefix(pred_prefix) == cell_path
+                else cited_text_by_path.get(cell_path, "")
+            ),
             schema_valid=data_schema is None or len(data_schema) == 0 or schema_path_exists(data_schema, path),
             matched_gt_path=gt_path if gt_path is not None else "",
         )
