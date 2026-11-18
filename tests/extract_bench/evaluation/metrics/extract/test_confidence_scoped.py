@@ -2,6 +2,10 @@
 
 from typing import Any
 
+import pytest
+
+from extract_bench.evaluation.grounded_confidence_payloads import field_citation_lookup, serialize_confidence_row
+from extract_bench.evaluation.metrics.extract.confidence_scoped.scoring import build_confidence_field_rows
 from extract_bench.evaluation.metrics.extract.confidence_scoped.summary import compute_confidence_scoped_metrics
 from extract_bench.evaluation.metrics.extract.unified_evidence_metric import ValueCell, compute_unified_evidence_metrics
 from extract_bench.schemas.evaluation import MetricValue
@@ -135,3 +139,136 @@ def test_duplicate_rows_keep_value_f1_assignments_when_confidence_changes() -> N
             {row["predicted_path"]: (row["matched_gt_path"], row["correct"]) for row in metadata["field_rows_sample"]}
         )
     assert verdicts[0] == verdicts[1]
+
+
+def test_element_confidence_uses_minimum_on_the_aligned_wrapped_array() -> None:
+    expected = {"value": {"rows": [{"id": "A", "labels": [1, 2, 3]}, {"id": "B", "labels": [4]}]}}
+    extracted = {"value": {"rows": [{"id": "B", "labels": [4]}, {"id": "A", "labels": [1, 4, 3, 2]}]}}
+    schema = {
+        "properties": {
+            "rows": {
+                "type": "array",
+                "items": {
+                    "properties": {
+                        "id": {"type": "string"},
+                        "labels": {"type": "array", "items": {"type": "number"}},
+                    },
+                },
+            },
+        },
+    }
+    metrics = _confidence_metrics(
+        expected,
+        extracted,
+        [
+            FieldCitation(field_path=f"value.rows[{row}].labels[{index}]", page=1, confidence=score)
+            for row, index, score in [(0, 0, 0.8), (1, 0, 0.99), (1, 1, 0.1), (1, 2, 0.98), (1, 3, 0.97)]
+        ],
+        schema,
+    )
+    rows = metrics["confidence_scoped_auc"].metadata["field_rows_sample"]
+    assert {row["predicted_path"]: (row["matched_gt_path"], row["confidence"], row["correct"]) for row in rows} == {
+        "value.rows[0].labels": ("value.rows[1].labels", 0.8, True),
+        "value.rows[1].labels": ("value.rows[0].labels", 0.1, False),
+    }
+    assert metrics["confidence_signal_coverage"].value == 0.5
+    assert metrics["confidence_signal_coverage"].metadata["scored_leaf_count"] == 2
+    assert metrics["confidence_full_gt_recall"].value == 0.25
+
+
+@pytest.mark.parametrize(
+    ("native", "children", "expected_score"),
+    [
+        (0.95, [(0, 0.2), (1, 0.4)], 0.95),
+        (0.0, [(0, 0.2), (1, 0.4)], 0.0),
+        (None, [(0, 0.9), (0, 0.1), (1, 0.8)], 0.8),
+        (float("nan"), [(0, 0.7), (1, None), (2, 0.01)], 0.7),
+        (None, [(0, float("nan")), (1, None), (2, 0.01)], None),
+    ],
+    ids=["native-wins", "native-zero-wins", "duplicate-element", "partial-and-out-of-range", "no-valid-elements"],
+)
+def test_array_confidence_respects_native_scores_and_valid_emitted_elements(
+    native: float | None,
+    children: list[tuple[int, float | None]],
+    expected_score: float | None,
+) -> None:
+    extracted = {"labels": ["A", "B"]}
+    citations = [FieldCitation(field_path="labels", page=1, confidence=native)] + [
+        FieldCitation(field_path=f"labels[{index}]", page=1, confidence=score) for index, score in children
+    ]
+    metrics = _confidence_metrics(
+        extracted,
+        extracted,
+        citations,
+        {"properties": {"labels": {"type": "array", "items": {"type": "string"}}}},
+    )
+    rows = metrics["confidence_scoped_auc"].metadata["field_rows_sample"]
+    assert [(row["predicted_path"], row["confidence"]) for row in rows] == (
+        [] if expected_score is None else [("labels", expected_score)]
+    )
+    assert metrics["confidence_signal_coverage"].value == float(expected_score is not None)
+
+
+@pytest.mark.parametrize("direct_evidence", [False, True], ids=["no-array-citation", "unscored-array-citation"])
+def test_derived_array_confidence_keeps_evidence_on_the_predicted_path(direct_evidence: bool) -> None:
+    expected = {"rows": [{"id": "A", "labels": [1]}, {"id": "B", "labels": [2]}]}
+    extracted = {"rows": list(reversed(expected["rows"]))}
+    schema = {
+        "properties": {
+            "rows": {
+                "type": "array",
+                "items": {
+                    "properties": {
+                        "id": {"type": "string"},
+                        "labels": {"type": "array", "items": {"type": "number"}},
+                    },
+                },
+            },
+        },
+    }
+    citations = [
+        FieldCitation(field_path="rows[0].labels[0]", page=1, confidence=0.8, reference_text="Element text"),
+        FieldCitation(field_path="rows[1].labels", page=2, confidence=0.6, reference_text="Other prediction"),
+    ]
+    if direct_evidence:
+        citations.append(FieldCitation(field_path="rows[0].labels", page=3, reference_text="Own array text"))
+    original = [citation.model_dump() for citation in citations]
+    cells: list[ValueCell] = []
+    compute_unified_evidence_metrics(expected, extracted, [], data_schema=schema, value_cells=cells)
+    rows = build_confidence_field_rows(
+        extracted_data=extracted,
+        expected_output=expected,
+        field_rules=[],
+        field_citations=citations,
+        data_schema=schema,
+        value_cells=cells,
+    )
+    row = next(row for row in rows if row.predicted_path == "rows[0].labels")
+    assert row.matched_gt_path == "rows[1].labels"
+    serialized = serialize_confidence_row("doc", 0, row, field_citation_lookup(citations))
+    assert serialized["confidence"] == 0.8
+    assert serialized["citation"] == (citations[-1].model_dump() if direct_evidence else None)
+    assert serialized["cited_text"] == ("Own array text" if direct_evidence else "")
+    assert [citation.model_dump() for citation in citations] == original
+
+
+@pytest.mark.parametrize("array", [False, True], ids=["duplicate-scalar", "array-elements"])
+def test_coverage_retains_semantics_of_all_contributing_confidence_signals(array: bool) -> None:
+    extracted = {"answer": [1, 2] if array else 1}
+    citations = [
+        FieldCitation(
+            field_path=f"answer[{index}]" if array else "answer",
+            page=1,
+            confidence=score,
+            metadata={"confidence_semantics": semantics},
+        )
+        for index, (score, semantics) in enumerate([(0.6, "categorical_verification"), (0.8, "ordinal_1_5")])
+    ]
+    field_schema = {"type": "array", "items": {"type": "number"}} if array else {"type": "number"}
+    metrics = _confidence_metrics(extracted, extracted, citations, {"properties": {"answer": field_schema}})
+    assert metrics["confidence_signal_coverage"].metadata["confidence_semantics"] == [
+        "categorical_verification",
+        "ordinal_1_5",
+    ]
+    (row,) = metrics["confidence_scoped_auc"].metadata["field_rows_sample"]
+    assert row["confidence"] == (0.6 if array else 0.8)

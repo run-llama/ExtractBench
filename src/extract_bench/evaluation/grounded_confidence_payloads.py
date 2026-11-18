@@ -406,8 +406,8 @@ def serialize_citation(citation: Any) -> dict[str, Any]:
 def field_citation_lookup(citations: list[Any], path_prefix: str = "") -> dict[str, dict[str, Any]]:
     """Highest-confidence citation per field path.
 
-    Row confidence is the max citation confidence for the path, so the
-    citation shown next to a row must be the one that produced that number.
+    Direct confidence uses the highest score at its path. Derived confidence
+    can have a different source, while displayed evidence stays at the cell path.
     """
     out: dict[str, dict[str, Any]] = {}
     for citation in citations:
@@ -429,7 +429,9 @@ def field_citation_lookup(citations: list[Any], path_prefix: str = "") -> dict[s
 def serialize_confidence_row(
     doc_id: str, index: int, row: ConfidenceFieldRow, citations_by_path: dict[str, dict[str, Any]]
 ) -> SerializedConfidenceRow:
-    citation = citations_by_path.get(row.predicted_path or "") or citations_by_path.get(row.field_path or "")
+    # A matched GT index may belong to a different predicted row after alignment.
+    citation_path = row.predicted_path if row.predicted_path is not None else row.field_path
+    citation = citations_by_path.get(citation_path)
     return {
         "id": f"{doc_id}:{index}",
         "document_id": doc_id,
