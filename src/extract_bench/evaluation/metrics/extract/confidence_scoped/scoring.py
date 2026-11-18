@@ -117,6 +117,12 @@ def build_confidence_field_rows(
     verified = {rule.field_path for rule in field_rules if rule.verified}
     predictions = dict(iter_field_values(extracted_data, include_containers=True))
     expected = dict(iter_field_values(expected_output, include_containers=True))
+    # Confidence may come from another path; evidence text must still belong
+    # to the emitted cell, including citations with no confidence of their own.
+    cited_text_by_path: dict[str, str] = {}
+    for citation in field_citations:
+        if len(text := _citation_reference_text(citation)) > 0:
+            cited_text_by_path.setdefault(citation.field_path.removeprefix(pred_prefix), text)
     rows: dict[str, ConfidenceFieldRow] = {}
     for signal_path, (score, citation) in confidence_signals_by_path(
         extracted_data,
@@ -145,7 +151,11 @@ def build_confidence_field_rows(
             verified=gt_path in verified,
             alignment_mode="value_f1" if gt_path is not None else "unmatched_prediction",
             alignment_score=float(gt_path is not None),
-            cited_text=_citation_reference_text(citation),
+            cited_text=(
+                _citation_reference_text(citation)
+                if citation.field_path.removeprefix(pred_prefix) == cell_path
+                else cited_text_by_path.get(cell_path, "")
+            ),
             schema_valid=data_schema is None or len(data_schema) == 0 or schema_path_exists(data_schema, path),
             matched_gt_path=gt_path if gt_path is not None else "",
         )
