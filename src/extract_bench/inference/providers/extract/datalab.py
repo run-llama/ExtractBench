@@ -114,12 +114,13 @@ class DatalabExtractProvider(Provider):
         """
         super().__init__(provider_name, base_config)
 
-        self._api_key = self.base_config.get("api_key") or os.getenv("DATALAB_API_KEY")
-        if not self._api_key:
+        api_key = self.base_config.get("api_key") or os.getenv("DATALAB_API_KEY")
+        if not isinstance(api_key, str) or len(api_key) == 0:
             raise ProviderConfigError(
                 "Datalab API key is required. Set DATALAB_API_KEY environment variable or pass api_key in base_config."
             )
 
+        self._api_key = api_key
         self._extraction_mode = self.base_config.get("extraction_mode")
         self._parse_mode = (
             None
@@ -583,6 +584,15 @@ def _build_block_lookup(json_tree: Any) -> dict[str, dict[str, Any]]:
     if not isinstance(pages, Sequence):
         return lookup
 
+    # A page numbered zero identifies a zero-based tree. Use the same offset
+    # throughout the document so its second page does not also become page one.
+    zero_based = any(
+        isinstance(page, Mapping)
+        and page.get("block_type") == "Page"
+        and type(page.get("page_number")) is int
+        and page["page_number"] == 0
+        for page in pages
+    )
     page_idx_counter = 0
     for page in pages:
         if not isinstance(page, Mapping):
@@ -593,8 +603,8 @@ def _build_block_lookup(json_tree: Any) -> dict[str, dict[str, Any]]:
         page_bbox = page.get("bbox")
         page_w, page_h = _page_dims(page_bbox)
         page_number_raw = page.get("page_number")
-        if isinstance(page_number_raw, int) and page_number_raw > 0:
-            page_number = page_number_raw
+        if type(page_number_raw) is int and page_number_raw >= 0:
+            page_number = page_number_raw + int(zero_based)
         else:
             page_number = page_idx_counter + 1
         page_idx_counter += 1
@@ -654,6 +664,9 @@ def _page_dims(page_bbox: Any) -> tuple[float, float]:
     return 1.0, 1.0
 
 
+_VALUE_FAILURES = frozenset({"FAIL_FIX", "FAIL_UNRESOLVABLE", "ITEMS_MISSING"})
+
+
 def _build_field_citations(
     payload: Any,
     block_lookup: dict[str, dict[str, Any]],
@@ -692,41 +705,32 @@ def _collect_citations(
             field_path = _format_datalab_path([*path, key])
             score_obj = node.get(key + _SCORE_SUFFIX)
             meta_obj = node.get(key + _META_SUFFIX)
-            confidence, signal_metadata = _datalab_field_signal(
+            _collect_field_signals(
+                field_path=field_path,
+                value=value,
                 score_obj=score_obj,
                 meta_obj=meta_obj,
+                raw_citations=node.get(key + _CITATIONS_SUFFIX),
+                block_lookup=block_lookup,
+                citations=citations,
             )
-            if isinstance(meta_obj, Mapping) and value is None:
-                confidence = None
-            entries = _datalab_citation_entries(node.get(key + _CITATIONS_SUFFIX))
-            if isinstance(meta_obj, Mapping):
-                entries.extend(_datalab_citation_entries(meta_obj.get("citations")))
-            # A legacy sidecar may repeat a phrase's block. Keep the tighter
-            # phrase evidence instead of adding the entire block to its region.
-            phrase_blocks = {entry["block"] for entry in entries if isinstance(entry, Mapping)}
-            for entry in entries:
-                if isinstance(entry, str) and entry in phrase_blocks:
-                    continue
-                citations.extend(
-                    _citations_from_entry(
-                        entry=entry,
-                        field_path=field_path,
-                        block_lookup=block_lookup,
-                        confidence=confidence,
-                        signal_metadata=signal_metadata,
-                    ),
-                )
-            if len(entries) == 0 and confidence is not None:
-                citations.append(
-                    FieldCitation(
-                        field_path=field_path,
-                        page=None,
-                        bbox=None,
-                        source="datalab",
-                        confidence=confidence,
-                        metadata=signal_metadata,
-                    )
-                )
+            if isinstance(value, list) and isinstance(meta_obj, Mapping):
+                items = meta_obj.get("items")
+                # Scalar item metadata is positional. Only pair a complete list
+                # of slots, so a missing slot cannot shift verification to a sibling.
+                if isinstance(items, list) and len(items) == len(value):
+                    for index, (item, metadata) in enumerate(zip(value, items, strict=True)):
+                        if isinstance(item, (list, Mapping)) or not isinstance(metadata, Mapping):
+                            continue
+                        _collect_field_signals(
+                            field_path=f"{field_path}[{index}]",
+                            value=item,
+                            score_obj=None,
+                            meta_obj=metadata,
+                            raw_citations=None,
+                            block_lookup=block_lookup,
+                            citations=citations,
+                        )
 
             _collect_citations(
                 value,
@@ -743,6 +747,57 @@ def _collect_citations(
                 block_lookup=block_lookup,
                 citations=citations,
             )
+
+
+def _collect_field_signals(
+    *,
+    field_path: str,
+    value: Any,
+    score_obj: Any,
+    meta_obj: Any,
+    raw_citations: Any,
+    block_lookup: Mapping[str, dict[str, Any]],
+    citations: list[FieldCitation],
+) -> None:
+    confidence, signal_metadata = _datalab_field_signal(
+        score_obj=score_obj,
+        meta_obj=meta_obj,
+    )
+    if (
+        isinstance(meta_obj, Mapping)
+        and value is None
+        and signal_metadata.get("native_verification_status") not in _VALUE_FAILURES
+    ):
+        confidence = None
+    entries = _datalab_citation_entries(raw_citations)
+    if isinstance(meta_obj, Mapping):
+        entries.extend(_datalab_citation_entries(meta_obj.get("citations")))
+    # A legacy sidecar may repeat a phrase's block. Keep the tighter
+    # phrase evidence instead of adding the entire block to its region.
+    phrase_blocks = {entry["block"] for entry in entries if isinstance(entry, Mapping)}
+    for entry in entries:
+        if isinstance(entry, str) and entry in phrase_blocks:
+            continue
+        citations.extend(
+            _citations_from_entry(
+                entry=entry,
+                field_path=field_path,
+                block_lookup=block_lookup,
+                confidence=confidence,
+                signal_metadata=signal_metadata,
+            ),
+        )
+    if len(entries) == 0 and confidence is not None:
+        citations.append(
+            FieldCitation(
+                field_path=field_path,
+                page=None,
+                bbox=None,
+                source="datalab",
+                confidence=confidence,
+                metadata=signal_metadata,
+            )
+        )
 
 
 def _format_datalab_path(path: list[str | int]) -> str:
@@ -836,7 +891,7 @@ def _datalab_field_signal(
             metadata["native_verification_status"] = status
             if status == "PASS":
                 return 1.0, metadata
-            if status in {"FAIL_UNRESOLVABLE", "FAIL_FIX", "FAIL_CITATIONS", "ITEMS_MISSING"}:
+            if status in _VALUE_FAILURES or status == "FAIL_CITATIONS":
                 return 0.0, metadata
         return None, metadata
 

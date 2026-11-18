@@ -306,8 +306,8 @@ def test_balanced_missing_verification_status_remains_unscored() -> None:
     assert datalab._build_field_citations(payload, block_lookup={}) == []
 
 
-@pytest.mark.parametrize("status", ["PASS", "FAIL_FIX"])
-def test_balanced_null_value_remains_unscored(status: str) -> None:
+@pytest.mark.parametrize(("status", "expected"), [("PASS", None), ("FAIL_FIX", 0.0), ("FAIL_UNRESOLVABLE", 0.0)])
+def test_explicit_verification_failure_is_retained_on_emitted_null(status: str, expected: float | None) -> None:
     payload = {
         "invoice_number": None,
         "invoice_number_citations": ["block-1"],
@@ -317,7 +317,7 @@ def test_balanced_null_value_remains_unscored(status: str) -> None:
     citations = datalab._build_field_citations(payload, block_lookup={})
 
     assert len(citations) == 1
-    assert citations[0].confidence is None
+    assert citations[0].confidence == expected
     assert citations[0].page is None
 
 
@@ -363,3 +363,48 @@ def test_array_confidence_reaches_the_value_f1_cell(names: list[str], mode: str)
 
     assert [(row.predicted_path, row.confidence, row.correct) for row in rows] == [("names", 1.0, True)]
     assert confidence_signal_coverage_summary(data, citations, cells)["confidence_signal_coverage"] == 1.0
+
+
+@pytest.mark.parametrize(("parent", "expected_score"), [(None, 0.0), ("PASS", 1.0), ("ITEMS_MISSING", 0.0)])
+def test_scalar_item_verification_reaches_array_score(parent: str | None, expected_score: float) -> None:
+    from extract_bench.evaluation.metrics.extract.confidence_scoped.scoring import build_confidence_field_rows
+    from extract_bench.evaluation.metrics.extract.unified_evidence_metric import (
+        ValueCell,
+        compute_unified_evidence_metrics,
+    )
+
+    data = {"codes": ["A", "B", "C"]}
+    schema = {"properties": {"codes": {"type": "array", "items": {"type": "string"}}}}
+    meta = {
+        "items": [
+            {"verification": {"status": "PASS"}},
+            {"verification": {"status": "FAIL_FIX"}, "citations": ["block-2"]},
+            {"verification": {"status": "PENDING"}},
+        ],
+        "verification": {"status": parent},
+    }
+    citations = datalab._build_field_citations({**data, "codes_meta": meta}, {})
+    items = {c.field_path: c for c in citations if c.field_path.startswith("codes[")}
+    assert items["codes[0]"].confidence == 1.0
+    assert items["codes[1]"].confidence == 0.0
+    assert items["codes[1]"].metadata["block_id"] == "block-2"
+    assert items["codes[1]"].metadata["native_verification_status"] == "FAIL_FIX"
+    cells: list[ValueCell] = []
+    compute_unified_evidence_metrics(data, data, [], data_schema=schema, value_cells=cells)
+    rows = build_confidence_field_rows(
+        extracted_data=data,
+        expected_output=data,
+        field_rules=[],
+        field_citations=citations,
+        data_schema=schema,
+        value_cells=cells,
+    )
+    assert [(row.predicted_path, row.confidence) for row in rows] == [("codes", expected_score)]
+
+
+def test_incomplete_positional_item_metadata_does_not_score_the_wrong_element() -> None:
+    payload = {
+        "codes": ["A", "B"],
+        "codes_meta": {"items": [{"verification": {"status": "FAIL_FIX"}}]},
+    }
+    assert datalab._build_field_citations(payload, {}) == []

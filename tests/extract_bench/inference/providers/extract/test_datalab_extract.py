@@ -8,6 +8,7 @@ pytest.importorskip("datalab_sdk", reason="dev and runners extras required; run:
 from extract_bench.evaluation.metrics.extract.unified_evidence_metric import compute_unified_evidence_metrics
 from extract_bench.inference.providers.extract.datalab import (
     _attach_datalab_extract_pricing,
+    _build_block_lookup,
     _build_field_citations,
     _promote_api_cost_breakdown,
     _strip_citation_and_score_keys,
@@ -236,3 +237,16 @@ def test_phrase_without_word_box_keeps_available_block_or_page_evidence(known_bl
     assert citations[0].bbox == ([0.1, 0.1, 0.3, 0.2] if known_block else None)
     assert citations[0].confidence is None
     assert citations[0].metadata["datalab_phrase"]["value_index"] == 0
+
+
+@pytest.mark.parametrize("numbers", [[0, 1], [1, 2], [8, 9], [None, None]])
+def test_legacy_block_citations_preserve_distinct_document_pages(numbers: list[int | None]) -> None:
+    tree = {
+        "children": [
+            {"block_type": "Page", "page_number": number, "children": [{"id": f"block-{i}"}]}
+            for i, number in enumerate(numbers)
+        ]
+    }
+    lookup = _build_block_lookup(tree)
+    citations = _build_field_citations({"name": "A", "name_citations": ["block-0", "block-1"]}, lookup)
+    assert [c.page for c in citations] == ([8, 9] if numbers == [8, 9] else [1, 2])
