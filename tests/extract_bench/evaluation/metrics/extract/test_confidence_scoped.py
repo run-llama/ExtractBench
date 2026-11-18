@@ -317,3 +317,30 @@ def test_derived_array_confidence_keeps_evidence_on_the_predicted_path(direct_ev
     assert serialized["citation"] == (citations[-1].model_dump() if direct_evidence else None)
     assert serialized["cited_text"] == ("Own array text" if direct_evidence else "")
     assert [citation.model_dump() for citation in citations] == original
+
+
+def test_wrapper_object_confidence_keeps_child_evidence() -> None:
+    extracted = {"value": {"amount": 10, "name": "A"}}
+    schema = {"properties": {"amount": {"type": "number"}, "name": {"type": "string"}}}
+    citations = [
+        FieldCitation(field_path="value", page=1, confidence=0.8, reference_text="Parent-only text"),
+        FieldCitation(field_path="value.amount", page=2, reference_text="10"),
+        FieldCitation(field_path="value.name", page=2, confidence=0.0, reference_text="A"),
+    ]
+    cells: list[ValueCell] = []
+    compute_unified_evidence_metrics(extracted, extracted, [], data_schema=schema, value_cells=cells)
+    rows = build_confidence_field_rows(
+        extracted_data=extracted,
+        expected_output=extracted,
+        field_rules=[],
+        field_citations=citations,
+        data_schema=schema,
+        value_cells=cells,
+    )
+    assert {row.predicted_path: row.confidence for row in rows} == {"value.amount": 0.8, "value.name": 0.0}
+    row = next(row for row in rows if row.predicted_path == "value.amount")
+    serialized = serialize_confidence_row("doc", 0, row, field_citation_lookup(citations, "value."))
+    assert serialized["citation"] == citations[1].model_dump()
+    assert serialized["cited_text"] == "10"
+    metrics = _confidence_metrics(extracted, extracted, citations, schema)
+    assert metrics["confidence_signal_coverage"].value == 1.0

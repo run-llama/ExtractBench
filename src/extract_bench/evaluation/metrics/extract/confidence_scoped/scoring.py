@@ -57,7 +57,9 @@ def confidence_signals_by_path(
     signals: dict[str, tuple[float, FieldCitation]] = {}
     for citation in field_citations:
         score = clamp_confidence(citation.confidence)
-        path = prefix + citation.field_path.removeprefix(prefix)
+        path = citation.field_path
+        if path not in predictions:
+            path = prefix + path.removeprefix(prefix)
         if score is None or path not in predictions:
             continue
         current = signals.get(path)
