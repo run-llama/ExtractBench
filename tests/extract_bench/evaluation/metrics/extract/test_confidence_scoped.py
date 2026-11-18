@@ -4,6 +4,8 @@ from typing import Any
 
 import pytest
 
+from extract_bench.evaluation.grounded_confidence_payloads import field_citation_lookup, serialize_confidence_row
+from extract_bench.evaluation.metrics.extract.confidence_scoped.scoring import build_confidence_field_rows
 from extract_bench.evaluation.metrics.extract.confidence_scoped.summary import compute_confidence_scoped_metrics
 from extract_bench.evaluation.metrics.extract.unified_evidence_metric import ValueCell, compute_unified_evidence_metrics
 from extract_bench.schemas.evaluation import MetricValue
@@ -205,3 +207,46 @@ def test_array_confidence_respects_native_scores_and_valid_emitted_elements(
         [] if expected_score is None else [("labels", expected_score)]
     )
     assert metrics["confidence_signal_coverage"].value == float(expected_score is not None)
+
+
+@pytest.mark.parametrize("direct_evidence", [False, True], ids=["no-array-citation", "unscored-array-citation"])
+def test_derived_array_confidence_keeps_evidence_on_the_predicted_path(direct_evidence: bool) -> None:
+    expected = {"rows": [{"id": "A", "labels": [1]}, {"id": "B", "labels": [2]}]}
+    extracted = {"rows": list(reversed(expected["rows"]))}
+    schema = {
+        "properties": {
+            "rows": {
+                "type": "array",
+                "items": {
+                    "properties": {
+                        "id": {"type": "string"},
+                        "labels": {"type": "array", "items": {"type": "number"}},
+                    },
+                },
+            },
+        },
+    }
+    citations = [
+        FieldCitation(field_path="rows[0].labels[0]", page=1, confidence=0.8, reference_text="Element text"),
+        FieldCitation(field_path="rows[1].labels", page=2, confidence=0.6, reference_text="Other prediction"),
+    ]
+    if direct_evidence:
+        citations.append(FieldCitation(field_path="rows[0].labels", page=3, reference_text="Own array text"))
+    original = [citation.model_dump() for citation in citations]
+    cells: list[ValueCell] = []
+    compute_unified_evidence_metrics(expected, extracted, [], data_schema=schema, value_cells=cells)
+    rows = build_confidence_field_rows(
+        extracted_data=extracted,
+        expected_output=expected,
+        field_rules=[],
+        field_citations=citations,
+        data_schema=schema,
+        value_cells=cells,
+    )
+    row = next(row for row in rows if row.predicted_path == "rows[0].labels")
+    assert row.matched_gt_path == "rows[1].labels"
+    serialized = serialize_confidence_row("doc", 0, row, field_citation_lookup(citations))
+    assert serialized["confidence"] == 0.8
+    assert serialized["citation"] == (citations[-1].model_dump() if direct_evidence else None)
+    assert serialized["cited_text"] == ("Own array text" if direct_evidence else "")
+    assert [citation.model_dump() for citation in citations] == original
