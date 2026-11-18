@@ -98,16 +98,31 @@ def test_confidence_rejoins_citations_on_the_original_wrapped_path() -> None:
     assert metrics["confidence_signal_coverage"].value == 1.0
 
 
-def test_parent_only_confidence_does_not_score_uncited_children() -> None:
-    extracted = {"record": {"amount": 10}}
+def test_object_confidence_covers_only_emitted_cells_with_their_own_verdicts() -> None:
+    extracted = {"record": {"amount": 9, "note": None}}
     metrics = _confidence_metrics(
+        {"record": {"amount": 10, "note": None, "missing": "required"}},
         extracted,
-        extracted,
-        [FieldCitation(field_path="record", page=1, confidence=1.0)],
-        {"properties": {"record": {"properties": {"amount": {"type": "number"}}}}},
+        [FieldCitation(field_path="record", page=1, confidence=0.8)],
+        {
+            "properties": {
+                "record": {
+                    "properties": {
+                        "amount": {"type": "number"},
+                        "note": {"type": "null"},
+                        "missing": {"type": "string"},
+                    },
+                },
+            },
+        },
     )
-    assert metrics["confidence_scoped_auc"].metadata["total_fields"] == 0
-    assert metrics["confidence_signal_coverage"].value == 0
+    rows = metrics["confidence_scoped_auc"].metadata["field_rows_sample"]
+    assert {row["predicted_path"]: (row["confidence"], row["correct"]) for row in rows} == {
+        "record.amount": (0.8, False),
+        "record.note": (0.8, True),
+    }
+    assert metrics["confidence_signal_coverage"].value == 1.0
+    assert metrics["confidence_full_gt_recall"].value == pytest.approx(1 / 3)
 
 
 def test_duplicate_rows_keep_value_f1_assignments_when_confidence_changes() -> None:
@@ -205,3 +220,55 @@ def test_array_confidence_respects_native_scores_and_valid_emitted_elements(
         [] if expected_score is None else [("labels", expected_score)]
     )
     assert metrics["confidence_signal_coverage"].value == float(expected_score is not None)
+
+
+@pytest.mark.parametrize("wrapped", [False, True], ids=["plain", "value-wrapper"])
+def test_nearest_object_confidence_preserves_child_and_array_scores(wrapped: bool) -> None:
+    extracted = {
+        "record": {
+            "address": {"city": "Boston", "zip": "02101"},
+            "labels": ["A", "B"],
+            "rows": [{"name": "first"}, {"name": "second"}],
+        },
+    }
+    schema = {
+        "properties": {
+            "record": {
+                "properties": {
+                    "address": {"properties": {"city": {"type": "string"}, "zip": {"type": "string"}}},
+                    "labels": {"type": "array", "items": {"type": "string"}},
+                    "rows": {"type": "array", "items": {"properties": {"name": {"type": "string"}}}},
+                },
+            },
+        },
+    }
+    prefix = "value." if wrapped else ""
+    if wrapped:
+        extracted = {"value": extracted}
+    metrics = _confidence_metrics(
+        extracted,
+        extracted,
+        [
+            FieldCitation(field_path=prefix + path, page=1, confidence=score)
+            for path, score in [
+                ("record", 0.8),
+                ("record.address", 0.4),
+                ("record.address.city", 0.0),
+                ("record.labels[0]", 0.9),
+                ("record.labels[1]", 0.2),
+                ("record.rows", 0.99),
+                ("record.rows[0]", 0.3),
+                ("record.rows[1].name", float("nan")),
+            ]
+        ],
+        schema,
+    )
+    rows = metrics["confidence_scoped_auc"].metadata["field_rows_sample"]
+    assert {row["predicted_path"].removeprefix(prefix): row["confidence"] for row in rows} == {
+        "record.address.city": 0.0,
+        "record.address.zip": 0.4,
+        "record.labels": 0.2,
+        "record.rows[0].name": 0.3,
+        "record.rows[1].name": 0.8,
+    }
+    assert metrics["confidence_signal_coverage"].value == 1.0
