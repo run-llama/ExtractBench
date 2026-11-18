@@ -4,7 +4,7 @@ Uses the Datalab /api/v1/extract endpoint via the official datalab-python-sdk.
 Phrase citations carry value-level pixel boxes; historical responses carry block
 IDs resolved through the ``json`` document tree. Both are normalized to
 ``FieldCitation`` entries with COCO ``[x, y, w, h]`` bboxes in ``[0, 1]``
-page-relative coordinates. Multiline phrases retain one box per line.
+page-relative coordinates. Multiline phrases retain the phrase envelope and individual line boxes.
 """
 
 import asyncio
@@ -214,6 +214,7 @@ class DatalabExtractProvider(Provider):
             raw_response["_config"] = {
                 "mode": self._parse_mode,
                 "parse_mode": self._parse_mode,
+                "citation_granularity": options.citation_granularity,
                 "extraction_mode": self._extraction_mode,
                 "max_pages": self._max_pages,
                 "page_range": self._page_range,
@@ -806,9 +807,10 @@ def _citations_from_entry(
     assert citation.metadata is not None
     citation.metadata = {**citation.metadata, "datalab_phrase": dict(entry)}
     info = block_lookup.get(block_id)
-    boxes = entry.get("bboxes")
-    if not isinstance(boxes, list) or len(boxes) == 0:
-        boxes = [entry["bbox"]] if entry.get("bbox") is not None else []
+    boxes = [entry["bbox"]] if entry.get("bbox") is not None else []
+    line_boxes = entry.get("bboxes")
+    if isinstance(line_boxes, list):
+        boxes.extend(line_boxes)
     if len(boxes) == 0:
         # Computed values can legitimately carry only block/page evidence.
         return [citation]

@@ -157,6 +157,7 @@ def test_extraction_survives_optional_scoring_with_separate_timing(
             with budget.activate():
                 result = await budget.run_async(provider._extract_pdf_async(str(source), {"type": "object"}))
             assert json.loads(result["extraction_schema_json"])["total"] == 10
+            assert result["_config"]["citation_granularity"] == "phrase"
             assert calls["submit"] == 1
             assert result["extraction_latency_ms"] == 2000
             expected_polls = (

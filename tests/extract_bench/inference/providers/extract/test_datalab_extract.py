@@ -5,12 +5,14 @@ import pytest
 pytest.importorskip("pypdf", reason="dev and runners extras required; run: uv sync --extra dev --extra runners")
 pytest.importorskip("datalab_sdk", reason="dev and runners extras required; run: uv sync --extra dev --extra runners")
 
+from extract_bench.evaluation.metrics.extract.unified_evidence_metric import compute_unified_evidence_metrics
 from extract_bench.inference.providers.extract.datalab import (
     _attach_datalab_extract_pricing,
     _build_field_citations,
     _promote_api_cost_breakdown,
     _strip_citation_and_score_keys,
 )
+from extract_bench.test_cases.schema import ExtractFieldTestRule, FieldEvidence
 
 
 def _meta() -> dict:
@@ -184,7 +186,21 @@ def test_phrase_citations_use_tight_boxes_and_keep_verification_separate(multili
 
     citations = _build_field_citations(payload, lookup)
 
-    expected = [[0.1, 0.1, 0.3, 0.05], [0.1, 0.25, 0.2, 0.05]] if multiline else [[0.1, 0.1, 0.3, 0.2]]
+    envelope = [0.1, 0.1, 0.3, 0.2]
+    data = {"items": [{"number": "Invoice number"}]}
+    metrics = compute_unified_evidence_metrics(
+        data,
+        data,
+        [ExtractFieldTestRule(field_path="items[0].number", evidence=[FieldEvidence(page=1, bbox=envelope)])],
+        field_citations=citations,
+        data_schema={
+            "properties": {"items": {"type": "array", "items": {"properties": {"number": {"type": "string"}}}}}
+        },
+    )
+    assert next(m.value for m in metrics if m.metric_name == "extract_unified_grounded_f1") == 1.0
+    expected = [envelope]
+    if multiline:
+        expected.extend([[0.1, 0.1, 0.3, 0.05], [0.1, 0.25, 0.2, 0.05]])
     assert [citation.bbox for citation in citations] == expected
     for citation in citations:
         assert citation.field_path == "items[0].number"
