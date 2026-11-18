@@ -146,3 +146,77 @@ def test_sdk_poll_allowance_uses_remaining_time_and_keeps_fractional_interval(
     assert kwargs["poll_interval"] == cadence
     assert 3.25 <= kwargs["max_polls"] * cadence < 3.25 + cadence
     assert result["extraction_schema_json"] == "{}"
+
+
+@pytest.mark.parametrize("multiline", [False, True])
+def test_phrase_citations_use_tight_boxes_and_keep_verification_separate(multiline: bool) -> None:
+    block_id = "/page/0/Text/3"
+    phrase = {
+        "block": block_id,
+        "page": 0,
+        "text": "Invoice number",
+        "offset": 16,
+        "length": 14,
+        "score": 0.7,
+        "bbox": [20, 40, 80, 120],
+    }
+    if multiline:
+        phrase["bboxes"] = [[20, 40, 80, 60], [20, 100, 60, 120]]
+    payload = {
+        "items": [
+            {
+                "number": "Invoice number",
+                "number_citations": [phrase],
+                "number_meta": {"citations": [block_id], "verification": {"status": "PASS"}},
+            }
+        ],
+    }
+    lookup = {
+        block_id: {
+            "page_number": 1,
+            "page_w": 200,
+            "page_h": 400,
+            "bbox": [0, 0, 200, 400],
+            "html": "whole block",
+            "block_type": "Text",
+        }
+    }
+
+    citations = _build_field_citations(payload, lookup)
+
+    expected = [[0.1, 0.1, 0.3, 0.05], [0.1, 0.25, 0.2, 0.05]] if multiline else [[0.1, 0.1, 0.3, 0.2]]
+    assert [citation.bbox for citation in citations] == expected
+    for citation in citations:
+        assert citation.field_path == "items[0].number"
+        assert citation.page == 1
+        assert citation.reference_text == "Invoice number"
+        assert citation.confidence == 1.0
+        assert citation.metadata["datalab_phrase"] == phrase
+
+
+@pytest.mark.parametrize("known_block", [False, True])
+def test_phrase_without_word_box_keeps_available_block_or_page_evidence(known_block: bool) -> None:
+    block_id = "/page/1/Text/2"
+    phrase = {"block": block_id, "page": 1, "value_index": 0}
+    payload = {"names": ["Alice"], "names_citations": [phrase]}
+    lookup = (
+        {
+            block_id: {
+                "page_number": 2,
+                "page_w": 200,
+                "page_h": 400,
+                "bbox": [20, 40, 80, 120],
+            }
+        }
+        if known_block
+        else {}
+    )
+
+    citations = _build_field_citations(payload, lookup)
+
+    assert len(citations) == 1
+    assert citations[0].field_path == "names"
+    assert citations[0].page == 2
+    assert citations[0].bbox == ([0.1, 0.1, 0.3, 0.2] if known_block else None)
+    assert citations[0].confidence is None
+    assert citations[0].metadata["datalab_phrase"]["value_index"] == 0

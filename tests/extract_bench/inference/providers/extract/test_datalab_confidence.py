@@ -76,6 +76,7 @@ def test_extraction_survives_optional_scoring_with_separate_timing(
         async def submit(request: web.Request) -> web.Response:
             form = await request.post()
             assert form["extraction_mode"] == pipeline.config["extraction_mode"]
+            assert form["citation_granularity"] == "phrase"
             if outcome == "override":
                 assert form["mode"] == "fast"
             else:
