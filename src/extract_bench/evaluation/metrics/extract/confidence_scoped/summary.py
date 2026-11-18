@@ -400,7 +400,11 @@ def confidence_signal_coverage_summary(
         coverage_scope = "emitted_scalar_leaves"
     signals = confidence_signals_by_path(extracted_data, field_citations, value_cells)
     scored_paths = emitted_paths.intersection(signals)
-    source_paths = {signals[path][1].field_path for path in scored_paths}
+    source_paths = {
+        source if source in signals else prefix + source.removeprefix(prefix)
+        for path in scored_paths
+        for source in (signals[path][1].field_path,)
+    }
     derived_arrays: set[str] = set()
     for path in scored_paths:
         source_path = prefix + signals[path][1].field_path.removeprefix(prefix)
@@ -412,7 +416,9 @@ def confidence_signal_coverage_summary(
     # wins max-per-path or min-per-array score selection.
     signal_semantics: set[str] = set()
     for citation in field_citations:
-        field_path = prefix + citation.field_path.removeprefix(prefix)
+        field_path = citation.field_path
+        if field_path not in signals:
+            field_path = prefix + field_path.removeprefix(prefix)
         parent, bracket, index = field_path.rpartition("[")
         array_source = (
             parent in derived_arrays
@@ -421,7 +427,7 @@ def confidence_signal_coverage_summary(
             and index[:-1].isdigit()
             and field_path in signals
         )
-        if not (field_path in scored_paths or citation.field_path in source_paths or array_source):
+        if not (field_path in scored_paths or field_path in source_paths or array_source):
             continue
         if clamp_confidence(citation.confidence) is None:
             continue

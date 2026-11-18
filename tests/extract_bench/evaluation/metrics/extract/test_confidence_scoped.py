@@ -366,3 +366,25 @@ def test_coverage_retains_semantics_of_all_contributing_confidence_signals(array
     ]
     (row,) = metrics["confidence_scoped_auc"].metadata["field_rows_sample"]
     assert row["confidence"] == (0.6 if array else 0.8)
+
+
+def test_inherited_confidence_keeps_semantics_from_equivalent_wrapped_paths() -> None:
+    extracted = {"value": {"record": {"amount": 10}}}
+    metrics = _confidence_metrics(
+        extracted,
+        extracted,
+        [
+            FieldCitation(field_path=path, page=1, confidence=score, metadata={"confidence_semantics": semantics})
+            for path, score, semantics in [
+                ("record", 0.8, "ordinal_1_5"),
+                ("value.record", 0.6, "categorical_verification"),
+            ]
+        ],
+        {"properties": {"record": {"properties": {"amount": {"type": "number"}}}}},
+    )
+    assert metrics["confidence_signal_coverage"].metadata["confidence_semantics"] == [
+        "categorical_verification",
+        "ordinal_1_5",
+    ]
+    (row,) = metrics["confidence_scoped_auc"].metadata["field_rows_sample"]
+    assert row["confidence"] == 0.8
