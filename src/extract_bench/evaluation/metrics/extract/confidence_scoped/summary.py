@@ -18,7 +18,7 @@ from extract_bench.schemas.extract_output import FieldCitation
 from extract_bench.test_cases.schema import ExtractFieldTestRule
 
 from .paths import iter_field_values
-from .scoring import build_confidence_field_rows, clamp_confidence, value_path_prefix
+from .scoring import build_confidence_field_rows, confidence_signals_by_path, value_path_prefix
 from .types import ConfidenceFieldRow
 
 DEFAULT_CONFIDENCE_THRESHOLDS: tuple[float, ...] = (
@@ -400,9 +400,8 @@ def confidence_signal_coverage_summary(
         coverage_scope = "emitted_scalar_leaves"
     scored_paths: set[str] = set()
     signal_semantics: set[str] = set()
-    for citation in field_citations:
-        field_path = prefix + citation.field_path.removeprefix(prefix)
-        if field_path not in emitted_paths or clamp_confidence(citation.confidence) is None:
+    for field_path, (_, citation) in confidence_signals_by_path(extracted_data, field_citations, value_cells).items():
+        if field_path not in emitted_paths:
             continue
         scored_paths.add(field_path)
         metadata = citation.metadata

@@ -39,6 +39,50 @@ def value_path_prefix(data: Any) -> str:
     return "value." if unwrap_value(data) is not data else ""
 
 
+def confidence_signals_by_path(
+    extracted_data: Any,
+    field_citations: Sequence[FieldCitation],
+    value_cells: Sequence[ValueCell],
+) -> dict[str, tuple[float, FieldCitation]]:
+    """Resolve confidence for emitted cells, retaining the source citation.
+
+    An opaque scalar array uses its native confidence when available, otherwise
+    the minimum available element confidence. Duplicate citations for one element
+    keep the existing maximum-score policy before aggregation. Source citations
+    remain unchanged; their geometry is not promoted to the array.
+    """
+    prefix = value_path_prefix(extracted_data)
+    predictions = dict(iter_field_values(extracted_data, include_containers=True))
+    signals: dict[str, tuple[float, FieldCitation]] = {}
+    for citation in field_citations:
+        score = clamp_confidence(citation.confidence)
+        path = prefix + citation.field_path.removeprefix(prefix)
+        if score is None or path not in predictions:
+            continue
+        current = signals.get(path)
+        if current is None or score > current[0]:
+            signals[path] = (score, citation)
+
+    array_paths = {
+        prefix + cell.pred_path
+        for cell in value_cells
+        if cell.pred_path is not None
+        and isinstance(value := predictions.get(prefix + cell.pred_path), list)
+        and all(not isinstance(element, (dict, list)) for element in value)
+    }
+    derived: dict[str, tuple[float, FieldCitation]] = {}
+    for path, signal in signals.items():
+        parent, bracket, index = path.rpartition("[")
+        if bracket != "[" or not index.endswith("]") or not index[:-1].isdigit():
+            continue
+        if parent not in array_paths or parent in signals:
+            continue
+        current = derived.get(parent)
+        if current is None or signal[0] < current[0]:
+            derived[parent] = signal
+    return signals | derived
+
+
 def build_confidence_field_rows(
     *,
     extracted_data: Any,
@@ -58,17 +102,17 @@ def build_confidence_field_rows(
     predictions = dict(iter_field_values(extracted_data, include_containers=True))
     expected = dict(iter_field_values(expected_output, include_containers=True))
     rows: dict[str, ConfidenceFieldRow] = {}
-    for citation in field_citations:
-        score = clamp_confidence(citation.confidence)
-        cell_path = citation.field_path.removeprefix(pred_prefix)
+    for signal_path, (score, citation) in confidence_signals_by_path(
+        extracted_data,
+        field_citations,
+        value_cells,
+    ).items():
+        cell_path = signal_path.removeprefix(pred_prefix)
         cell = by_path.get(cell_path)
-        if score is None or cell is None:
+        if cell is None:
             continue
         path = pred_prefix + cell_path
         if path not in predictions:
-            continue
-        current = rows.get(path)
-        if current is not None and current.confidence is not None and current.confidence >= score:
             continue
         gt_path = gt_prefix + cell.gt_path if cell.gt_path is not None else None
         field_path = path if gt_path is None else gt_path

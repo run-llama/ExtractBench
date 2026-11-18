@@ -2,6 +2,8 @@
 
 from typing import Any
 
+import pytest
+
 from extract_bench.evaluation.metrics.extract.confidence_scoped.summary import compute_confidence_scoped_metrics
 from extract_bench.evaluation.metrics.extract.unified_evidence_metric import ValueCell, compute_unified_evidence_metrics
 from extract_bench.schemas.evaluation import MetricValue
@@ -135,3 +137,71 @@ def test_duplicate_rows_keep_value_f1_assignments_when_confidence_changes() -> N
             {row["predicted_path"]: (row["matched_gt_path"], row["correct"]) for row in metadata["field_rows_sample"]}
         )
     assert verdicts[0] == verdicts[1]
+
+
+def test_element_confidence_uses_minimum_on_the_aligned_wrapped_array() -> None:
+    expected = {"value": {"rows": [{"id": "A", "labels": [1, 2, 3]}, {"id": "B", "labels": [4]}]}}
+    extracted = {"value": {"rows": [{"id": "B", "labels": [4]}, {"id": "A", "labels": [1, 4, 3, 2]}]}}
+    schema = {
+        "properties": {
+            "rows": {
+                "type": "array",
+                "items": {
+                    "properties": {
+                        "id": {"type": "string"},
+                        "labels": {"type": "array", "items": {"type": "number"}},
+                    },
+                },
+            },
+        },
+    }
+    metrics = _confidence_metrics(
+        expected,
+        extracted,
+        [
+            FieldCitation(field_path=f"value.rows[{row}].labels[{index}]", page=1, confidence=score)
+            for row, index, score in [(0, 0, 0.8), (1, 0, 0.99), (1, 1, 0.1), (1, 2, 0.98), (1, 3, 0.97)]
+        ],
+        schema,
+    )
+    rows = metrics["confidence_scoped_auc"].metadata["field_rows_sample"]
+    assert {row["predicted_path"]: (row["matched_gt_path"], row["confidence"], row["correct"]) for row in rows} == {
+        "value.rows[0].labels": ("value.rows[1].labels", 0.8, True),
+        "value.rows[1].labels": ("value.rows[0].labels", 0.1, False),
+    }
+    assert metrics["confidence_signal_coverage"].value == 0.5
+    assert metrics["confidence_signal_coverage"].metadata["scored_leaf_count"] == 2
+    assert metrics["confidence_full_gt_recall"].value == 0.25
+
+
+@pytest.mark.parametrize(
+    ("native", "children", "expected_score"),
+    [
+        (0.95, [(0, 0.2), (1, 0.4)], 0.95),
+        (0.0, [(0, 0.2), (1, 0.4)], 0.0),
+        (None, [(0, 0.9), (0, 0.1), (1, 0.8)], 0.8),
+        (float("nan"), [(0, 0.7), (1, None), (2, 0.01)], 0.7),
+        (None, [(0, float("nan")), (1, None), (2, 0.01)], None),
+    ],
+    ids=["native-wins", "native-zero-wins", "duplicate-element", "partial-and-out-of-range", "no-valid-elements"],
+)
+def test_array_confidence_respects_native_scores_and_valid_emitted_elements(
+    native: float | None,
+    children: list[tuple[int, float | None]],
+    expected_score: float | None,
+) -> None:
+    extracted = {"labels": ["A", "B"]}
+    citations = [FieldCitation(field_path="labels", page=1, confidence=native)] + [
+        FieldCitation(field_path=f"labels[{index}]", page=1, confidence=score) for index, score in children
+    ]
+    metrics = _confidence_metrics(
+        extracted,
+        extracted,
+        citations,
+        {"properties": {"labels": {"type": "array", "items": {"type": "string"}}}},
+    )
+    rows = metrics["confidence_scoped_auc"].metadata["field_rows_sample"]
+    assert [(row["predicted_path"], row["confidence"]) for row in rows] == (
+        [] if expected_score is None else [("labels", expected_score)]
+    )
+    assert metrics["confidence_signal_coverage"].value == float(expected_score is not None)
