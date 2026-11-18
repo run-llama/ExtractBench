@@ -724,7 +724,7 @@ nvtx = [
 
 [[package]]
 name = "datalab-python-sdk"
-version = "0.9.1"
+version = "0.10.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
@@ -735,9 +735,9 @@ dependencies = [
     { name = "tenacity" },
     { name = "tqdm" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/c0/64/b5c43a1a5bbc1a70bbb18b96b7c4e168df98f73ab30bc3b6508d162fa5db/datalab_python_sdk-0.9.1.tar.gz", hash = "sha256:62f9648069000b8c134e2a4acb7a9de46b3233dd6fa4c68d7eca0a897b6deb8e", size = 1984836, upload-time = "2026-11-06T16:47:48.458Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/f0/72/59506d67d286d8401d9efb3100b7c557f3b7e87c2299d28a2c16f6981fae/datalab_python_sdk-0.10.0.tar.gz", hash = "sha256:4447d51536ded6b35414a24bb234527b8aabcb84d3b28f9ade43d9afbb2d532a", size = 1995120, upload-time = "2026-11-13T06:46:52.592Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/b4/29/4988b8c74b2643d85cf05951f71d0f9becfaec2c2145dab7590e6b27b99f/datalab_python_sdk-0.9.1-py3-none-any.whl", hash = "sha256:a4f0a5b576b982e3e35157e287a19536ad9a359eed8cbe90ce7a08314736ea5b", size = 51491, upload-time = "2026-11-06T16:47:47.006Z" },
+    { url = "https://files.pythonhosted.org/packages/33/a3/9a6ba997cec0ddb50feb1e9b391f3bf79b169cbfa7edd3a478546425692f/datalab_python_sdk-0.10.0-py3-none-any.whl", hash = "sha256:bb832e50e2ba29421edf528edf4861cece8883e9157fc7f5f4404a0e42bc6442", size = 57800, upload-time = "2026-11-13T06:46:51.232Z" },
 ]
 
 [[package]]
@@ -1835,8 +1835,8 @@ requires-dist = [
     { name = "boto3", marker = "extra == 'aws'", specifier = ">=1.34.0" },
     { name = "boto3", marker = "extra == 'runners'", specifier = ">=1.34.0" },
     { name = "chunkr-ai", marker = "extra == 'runners'", specifier = ">=0.0.43" },
-    { name = "datalab-python-sdk", marker = "extra == 'datalab'", specifier = ">=0.9.1" },
-    { name = "datalab-python-sdk", marker = "extra == 'runners'", specifier = ">=0.9.1" },
+    { name = "datalab-python-sdk", marker = "extra == 'datalab'", specifier = ">=0.10.0" },
+    { name = "datalab-python-sdk", marker = "extra == 'runners'", specifier = ">=0.10.0" },
     { name = "docling-core", marker = "extra == 'runners'", specifier = ">=2.71.0" },
     { name = "extend-ai", marker = "extra == 'extend'", specifier = ">=1.16.0" },
     { name = "extend-ai", marker = "extra == 'runners'", specifier = ">=1.16.0" },
