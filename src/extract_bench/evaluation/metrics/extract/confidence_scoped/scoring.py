@@ -49,14 +49,17 @@ def confidence_signals_by_path(
     An opaque scalar array uses its native confidence when available, otherwise
     the minimum available element confidence. Duplicate citations for one element
     keep the existing maximum-score policy before aggregation. Source citations
-    remain unchanged; their geometry is not promoted to the array.
+    remain unchanged; their geometry is not promoted to the array. A cell with
+    no direct or element-derived score inherits its nearest scored object ancestor.
     """
     prefix = value_path_prefix(extracted_data)
     predictions = dict(iter_field_values(extracted_data, include_containers=True))
     signals: dict[str, tuple[float, FieldCitation]] = {}
     for citation in field_citations:
         score = clamp_confidence(citation.confidence)
-        path = prefix + citation.field_path.removeprefix(prefix)
+        path = citation.field_path
+        if path not in predictions:
+            path = prefix + path.removeprefix(prefix)
         if score is None or path not in predictions:
             continue
         current = signals.get(path)
@@ -80,7 +83,22 @@ def confidence_signals_by_path(
         current = derived.get(parent)
         if current is None or signal[0] < current[0]:
             derived[parent] = signal
-    return signals | derived
+    resolved = signals | derived
+    for cell in value_cells:
+        if cell.pred_path is None:
+            continue
+        path = prefix + cell.pred_path
+        if path in resolved or path not in predictions:
+            continue
+        # Walk actual ancestors, bounded by path depth rather than the number
+        # of scored objects. Array containers do not supply object confidence.
+        ancestor = path
+        while "." in ancestor:
+            ancestor = ancestor.rsplit(".", 1)[0]
+            if ancestor in signals and isinstance(predictions.get(ancestor), dict):
+                resolved[path] = signals[ancestor]
+                break
+    return resolved
 
 
 def build_confidence_field_rows(
