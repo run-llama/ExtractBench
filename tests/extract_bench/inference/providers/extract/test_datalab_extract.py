@@ -170,7 +170,7 @@ def test_phrase_citations_use_tight_boxes_and_keep_verification_separate(multili
             {
                 "number": "Invoice number",
                 "number_citations": [phrase],
-                "number_meta": {"citations": [block_id], "verification": {"status": "PASS"}},
+                "number_meta": {"citations": [block_id], "verification": {"status": "FAIL_CITATIONS"}},
             }
         ],
     }
@@ -208,6 +208,7 @@ def test_phrase_citations_use_tight_boxes_and_keep_verification_separate(multili
         assert citation.page == 1
         assert citation.reference_text == "Invoice number"
         assert citation.confidence == 1.0
+        assert citation.metadata["native_verification_status"] == "FAIL_CITATIONS"
         assert citation.metadata["datalab_phrase"] == phrase
 
 

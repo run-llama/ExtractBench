@@ -673,7 +673,7 @@ def _build_field_citations(
 ) -> list[FieldCitation]:
     """Read vendor signals from the response, including historical snapshots.
 
-    Verification is categorical: PASS is 1 and a concluded failure is 0.
+    PASS and FAIL_CITATIONS confirm the value. Value failures score 0.
     Missing or pending verification is unscored. Container signals stay on
     their own paths without propagating to children. Array paths use brackets
     so the evaluator joins citations and confidence to the same value cells.
@@ -763,11 +763,7 @@ def _collect_field_signals(
         score_obj=score_obj,
         meta_obj=meta_obj,
     )
-    if (
-        isinstance(meta_obj, Mapping)
-        and value is None
-        and signal_metadata.get("native_verification_status") not in _VALUE_FAILURES
-    ):
+    if value is None and signal_metadata.get("native_verification_status") == "PASS":
         confidence = None
     entries = _datalab_citation_entries(raw_citations)
     if isinstance(meta_obj, Mapping):
@@ -889,9 +885,9 @@ def _datalab_field_signal(
         }
         if isinstance(status, str) and len(status) > 0:
             metadata["native_verification_status"] = status
-            if status == "PASS":
+            if status in {"PASS", "FAIL_CITATIONS"}:
                 return 1.0, metadata
-            if status in _VALUE_FAILURES or status == "FAIL_CITATIONS":
+            if status in _VALUE_FAILURES:
                 return 0.0, metadata
         return None, metadata
 

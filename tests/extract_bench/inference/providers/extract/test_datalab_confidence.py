@@ -283,7 +283,7 @@ def test_fast_scores_are_normalized_on_bracket_array_paths_without_citations() -
 
 @pytest.mark.parametrize(
     ("status", "expected"),
-    [("PASS", 1.0), ("FAIL_FIX", 0.0), ("FAIL_CITATIONS", 0.0), ("ITEMS_MISSING", 0.0)],
+    [("PASS", 1.0), ("FAIL_FIX", 0.0), ("FAIL_CITATIONS", 1.0), ("ITEMS_MISSING", 0.0)],
 )
 def test_balanced_verification_is_a_binary_categorical_signal(status: str, expected: float) -> None:
     meta = _meta_sidecar()
@@ -306,7 +306,9 @@ def test_balanced_missing_verification_status_remains_unscored() -> None:
     assert datalab._build_field_citations(payload, block_lookup={}) == []
 
 
-@pytest.mark.parametrize(("status", "expected"), [("PASS", None), ("FAIL_FIX", 0.0), ("FAIL_UNRESOLVABLE", 0.0)])
+@pytest.mark.parametrize(
+    ("status", "expected"), [("PASS", None), ("FAIL_CITATIONS", 1.0), ("FAIL_FIX", 0.0), ("FAIL_UNRESOLVABLE", 0.0)]
+)
 def test_explicit_verification_failure_is_retained_on_emitted_null(status: str, expected: float | None) -> None:
     payload = {
         "invoice_number": None,
