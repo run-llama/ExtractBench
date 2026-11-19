@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+from copy import deepcopy
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -58,9 +59,19 @@ def test_extraction_survives_optional_scoring_with_separate_timing(
             "type": "object",
             "properties": {
                 "total": {"type": ["number", "null"]},
+                "items": {"type": ["string", "null"]},
+                "rows": {"type": "array", "items": {"$ref": "#/$defs/Row"}},
                 "bank": {"type": ["object", "null"], "properties": {"name": {"type": "string"}}},
             },
         }
+        schema["$defs"] = {
+            "Row": {
+                "type": "array",
+                "items": {"type": ["string", "null"], "maxLength": 12},
+                "examples": [{"items": {"type": ["string", "null"]}}],
+            },
+        }
+        original = deepcopy(schema)
         submitted_schemas = []
         calls = {"submit": 0, "poll": 0}
         clock = {"now": 0.0}
@@ -165,7 +176,11 @@ def test_extraction_survives_optional_scoring_with_separate_timing(
                 return
             with budget.activate():
                 result = await budget.run_async(provider._extract_pdf_async(str(source), schema))
-            assert submitted_schemas == [schema]
+            assert schema == original
+            expected = deepcopy(original)
+            if extraction_mode == "fast":
+                expected["$defs"]["Row"]["items"] = {"anyOf": [{"type": "string"}, {"type": "null"}], "maxLength": 12}
+            assert submitted_schemas == [expected]
             assert json.loads(result["extraction_schema_json"])["total"] == 10
             assert result["_config"]["citation_granularity"] == "phrase"
             assert calls["submit"] == 1
