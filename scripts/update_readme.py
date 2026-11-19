@@ -46,6 +46,11 @@ def fmt_cost(v: str) -> str:
     return f"{float(v) * 100:.2f}¢" if v else "—"
 
 
+def confidence_cells(row: dict[str, str]) -> list[str]:
+    coverage, augrc = row["Confidence_Coverage"], row["Confidence_AUGRC"]
+    return [f"{coverage}%" if coverage != "" else "—", f"{float(augrc):.4g}" if augrc != "" else "—"]
+
+
 def column_ranks(rows: list[dict], columns: tuple[str, ...]) -> dict[str, dict[float, str]]:
     """Return emphasis for the best and second-best distinct score in each column."""
     ranks = {}
@@ -84,14 +89,15 @@ def value_table(rows: list[dict]) -> str:
     score_columns = ("Overall", "Short", "Medium", "Long")
     ranks = column_ranks(rows, score_columns)
     body = table(
-        "| Rank | Provider | Category | Overall | Short | Medium | Long | ¢ / Page |",
-        "|---:|---|---|---:|---:|---:|---:|---:|",
+        "| Rank | Provider | Category | Overall | Short | Medium | Long | Confidence coverage | AUGRC ↓ | ¢ / Page |",
+        "|---:|---|---|---:|---:|---:|---:|---:|---:|---:|",
         [
             [
                 str(i),
                 r["Provider"],
                 r["Category"],
                 *(fmt_ranked(r[column], ranks[column].get(float(r[column]))) for column in score_columns),
+                *confidence_cells(r),
                 fmt_cost(r["Cost_Per_Page"]),
             ]
             for i, r in enumerate(ranked, 1)
@@ -169,8 +175,9 @@ def pro_table(rows: list[dict[str, str]]) -> str:
     columns = ("Perfect_Documents", "Value_F1", "Word_Grounding")
     ranks = column_ranks(overall, columns)
     body = table(
-        "| Rank | Provider | Category | % Perfect | Value F1 | Grounding F1 | ¢ / Page |",
-        "|---:|---|---|---:|---:|---:|---:|",
+        "| Rank | Provider | Category | % Perfect | Value F1 | Grounding F1 | "
+        "Confidence coverage | AUGRC ↓ | ¢ / Page |",
+        "|---:|---|---|---:|---:|---:|---:|---:|---:|",
         [
             [
                 str(index),
@@ -185,6 +192,7 @@ def pro_table(rows: list[dict[str, str]]) -> str:
                     else "—"
                     for column in columns
                 ),
+                *confidence_cells(row),
                 fmt_cost(row["Cost_Per_Page"]),
             ]
             for index, row in enumerate(ranked, 1)

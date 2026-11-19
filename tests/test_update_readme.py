@@ -31,6 +31,8 @@ def test_unranked_winner_cannot_take_rank_or_best_score_emphasis(
             "include_in_rankings": included,
             "Challenge": "all",
             "Cost_Per_Page": "0.01",
+            "Confidence_Coverage": "0",
+            "Confidence_AUGRC": "",
             **dict.fromkeys(score_columns, score),
         }
         for name, included, score in (("Excluded winner", "false", "100"), ("Ranked system", "true", "90"))
@@ -53,6 +55,7 @@ def test_unranked_winner_cannot_take_rank_or_best_score_emphasis(
     monkeypatch.setattr(sys, "argv", ["update_readme.py"])
     main()
     rendered = readme.read_text(encoding="utf-8")
+    assert rendered.count("| 0% | — |") == 2
     assert "Excluded winner" not in rendered
     assert rendered.count("Top 1 of 1 ranked systems") == 3
     assert "| 1 | Ranked system | Coding Agents | **90**" in rendered

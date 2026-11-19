@@ -1,5 +1,6 @@
 """Confidence summaries use the cells scored by Value F1."""
 
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -7,8 +8,10 @@ import pytest
 from extract_bench.evaluation.grounded_confidence_payloads import field_citation_lookup, serialize_confidence_row
 from extract_bench.evaluation.metrics.extract.confidence_scoped.scoring import build_confidence_field_rows
 from extract_bench.evaluation.metrics.extract.confidence_scoped.summary import compute_confidence_scoped_metrics
+from extract_bench.evaluation.metrics.extract.leaderboard_confidence import pooled_leaderboard_confidence
 from extract_bench.evaluation.metrics.extract.unified_evidence_metric import ValueCell, compute_unified_evidence_metrics
-from extract_bench.schemas.evaluation import MetricValue
+from extract_bench.evaluation.runner import EvaluationRunner
+from extract_bench.schemas.evaluation import EvaluationResult, MetricValue
 from extract_bench.schemas.extract_output import FieldCitation
 
 ROW_SCHEMA = {
@@ -388,3 +391,70 @@ def test_inherited_confidence_keeps_semantics_from_equivalent_wrapped_paths() ->
     ]
     (row,) = metrics["confidence_scoped_auc"].metadata["field_rows_sample"]
     assert row["confidence"] == 0.8
+
+
+def test_leaderboard_pools_fields_and_ties_unscored_with_zero(tmp_path: Path) -> None:
+    docs = [
+        _confidence_metrics(
+            {"name": "A", "address": "X"},
+            {"name": "A", "address": "wrong"},
+            [FieldCitation(field_path="address", page=1, confidence=0.0)],
+            ROW_SCHEMA,
+        ),
+        _confidence_metrics(
+            {"name": "B"},
+            {"name": "B"},
+            [FieldCitation(field_path="name", page=1, confidence=1.0)],
+            ROW_SCHEMA,
+        ),
+    ]
+    results = [
+        EvaluationResult(
+            test_id=str(i),
+            example_id=str(i),
+            pipeline_name="test",
+            product_type="extract",
+            success=True,
+            metrics=list(metrics.values()),
+        )
+        for i, metrics in enumerate(docs)
+    ]
+    pooled = EvaluationRunner(tmp_path)._aggregate_metrics(results)
+    assert pooled["Confidence_Coverage"] == pytest.approx(200 / 3)
+    # One high correct field and a bottom tie (one error, one correct).
+    assert pooled["Confidence_AUGRC"] == pytest.approx((0 + 0.5 + 1) / 9)
+
+
+def test_omitted_blank_gets_rank_only_in_represented_record() -> None:
+    schema = {"type": "object", "properties": {"rows": {"type": "array", "items": ROW_SCHEMA}}}
+    metric = _confidence_metrics(
+        {"rows": [{"name": "A", "address": None}, {"name": "B", "address": None}]},
+        {"rows": [{"name": "A", "address": "wrong"}, {"name": "B"}]},
+        [],
+        schema,
+    )["confidence_signal_coverage"]
+    # The omitted blank adds a fourth ranked cell. Only the wrong address is an error.
+    assert metric.metadata["emitted_leaf_count"] == 3
+    assert pooled_leaderboard_confidence([metric]) == {"Confidence_Coverage": 0.0, "Confidence_AUGRC": 2.5 / 16}
+    dropped = _confidence_metrics(
+        {"rows": [{"name": "A", "address": None}, {"name": "B", "address": None}]},
+        {"rows": [{"name": "A", "address": "wrong"}]},
+        [],
+        schema,
+    )["confidence_signal_coverage"]
+    assert pooled_leaderboard_confidence([dropped])["Confidence_AUGRC"] == 1.5 / 4
+
+
+def test_partial_rank_metadata_cannot_publish_partial_augrc() -> None:
+    current = _confidence_metrics(
+        {"name": "A"},
+        {"name": "A"},
+        [FieldCitation(field_path="name", page=1, confidence=0.5)],
+        ROW_SCHEMA,
+    )["confidence_signal_coverage"]
+    historical = MetricValue(
+        metric_name="confidence_signal_coverage",
+        value=0.0,
+        metadata={"coverage_scope": "emitted_value_f1_cells", "emitted_leaf_count": 2, "scored_leaf_count": 0},
+    )
+    assert pooled_leaderboard_confidence([current, historical]) == {"Confidence_Coverage": 100 / 3}

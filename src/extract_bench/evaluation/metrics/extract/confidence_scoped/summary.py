@@ -12,6 +12,7 @@ from bisect import bisect_left
 from collections.abc import Sequence
 from typing import Any
 
+from extract_bench.evaluation.metrics.extract.leaderboard_confidence import AUGRC_GROUPS, augrc_groups
 from extract_bench.evaluation.metrics.extract.unified_evidence_metric import ValueCell
 from extract_bench.schemas.evaluation import MetricValue
 from extract_bench.schemas.extract_output import FieldCitation
@@ -387,6 +388,8 @@ def confidence_signal_coverage_summary(
     extracted_data: Any,
     field_citations: Sequence[FieldCitation],
     value_cells: Sequence[ValueCell],
+    *,
+    expected_output: Any | None = None,
 ) -> dict[str, Any]:
     prefix = value_path_prefix(extracted_data)
     if len(value_cells) > 0:
@@ -438,7 +441,7 @@ def confidence_signal_coverage_summary(
     missing_paths = sorted(emitted_paths - scored_paths)
     emitted_count = len(emitted_paths)
     scored_count = len(scored_paths)
-    return {
+    result: dict[str, Any] = {
         "confidence_signal_coverage": _safe_ratio(scored_count, emitted_count),
         "confidence_signal_emitted_leaf_count": emitted_count,
         "confidence_signal_scored_leaf_count": scored_count,
@@ -447,14 +450,23 @@ def confidence_signal_coverage_summary(
         "confidence_semantics": sorted(signal_semantics),
         "coverage_scope": coverage_scope,
     }
+    if expected_output is not None:
+        result[AUGRC_GROUPS] = augrc_groups(value_cells, emitted_paths, signals, prefix, expected_output)
+    return result
 
 
 def _confidence_signal_coverage_metric(
     extracted_data: Any,
     field_citations: Sequence[FieldCitation],
     value_cells: Sequence[ValueCell],
+    expected_output: Any | None,
 ) -> MetricValue:
-    coverage = confidence_signal_coverage_summary(extracted_data, field_citations, value_cells)
+    coverage = confidence_signal_coverage_summary(
+        extracted_data,
+        field_citations,
+        value_cells,
+        expected_output=expected_output,
+    )
     return MetricValue(
         metric_name="confidence_signal_coverage",
         value=coverage["confidence_signal_coverage"],
@@ -465,6 +477,7 @@ def _confidence_signal_coverage_metric(
             "missing_confidence_paths_sample": coverage["missing_confidence_paths_sample"],
             "confidence_semantics": coverage["confidence_semantics"],
             "coverage_scope": coverage["coverage_scope"],
+            **({AUGRC_GROUPS: coverage[AUGRC_GROUPS]} if AUGRC_GROUPS in coverage else {}),
         },
     )
 
@@ -496,7 +509,12 @@ def compute_confidence_scoped_metrics(
         coverage_precision_target=coverage_precision_target,
         value_cells=value_cells,
     )
-    signal_coverage_metric = _confidence_signal_coverage_metric(extracted_data, field_citations, value_cells)
+    signal_coverage_metric = _confidence_signal_coverage_metric(
+        extracted_data,
+        field_citations,
+        value_cells,
+        expected_output,
+    )
     if (
         not rows
         and not summary["confidence_full_gt_expected_leaf_count"]
