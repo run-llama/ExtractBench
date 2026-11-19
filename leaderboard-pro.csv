@@ -48,13 +48,13 @@ Codex GPT-6.1 Terra Medium,Coding Agents,codex_code_extract_gpt_6_1_terra_medium
 Codex GPT-6.1 Terra Medium,Coding Agents,codex_code_extract_gpt_6_1_terra_medium_evidence,medium,true,relational_diagrams,20,19,30.00,74.38,79.43,81.38,0.013800,0,,,,30.00,74.38,79.43,81.38
 Codex GPT-6.1 Terra Medium,Coding Agents,codex_code_extract_gpt_6_1_terra_medium_evidence,medium,true,charts_and_maps,25,10,56.00,87.68,94.11,95.11,0.010200,0,,,,56.00,87.68,94.11,95.11
 Codex GPT-6.1 Terra Medium,Coding Agents,codex_code_extract_gpt_6_1_terra_medium_evidence,medium,true,long_single_pages,7,7,0.00,34.57,0.89,38.63,0.436700,0,,,,0.00,34.57,0.89,38.63
-Datalab Accurate,Specialized APIs,datalab_extract_accurate,,true,all,100,81,2.00,43.93,0.32,4.66,0.157500,0,0,,,3.00,54.36,0.32,4.68
-Datalab Accurate,Specialized APIs,datalab_extract_accurate,,true,interpretation_rules,22,22,4.55,67.25,0.04,1.10,0.150100,0,0,,,9.09,89.20,0.04,1.18
-Datalab Accurate,Specialized APIs,datalab_extract_accurate,,true,custom_terminology,14,14,0.00,44.92,0.00,0.01,0.146100,0,0,,,0.00,84.94,0.01,0.03
-Datalab Accurate,Specialized APIs,datalab_extract_accurate,,true,conditional_aggregation,12,9,0.00,45.78,0.00,0.00,0.027700,0,0,,,0.00,45.78,0.00,0.00
-Datalab Accurate,Specialized APIs,datalab_extract_accurate,,true,relational_diagrams,20,19,0.00,33.48,1.32,18.57,0.038200,0,0,,,0.00,33.48,1.32,18.57
-Datalab Accurate,Specialized APIs,datalab_extract_accurate,,true,charts_and_maps,25,10,4.00,42.63,0.00,0.00,0.019400,0,0,,,4.00,42.63,0.00,0.00
-Datalab Accurate,Specialized APIs,datalab_extract_accurate,,true,long_single_pages,7,7,0.00,0.00,0.00,0.00,1.260000,0,0,,,0.00,0.00,0.00,0.00
+Datalab Accurate,Specialized APIs,datalab_extract_accurate,,true,all,100,81,42.00,80.26,43.95,54.97,0.072941,0,0,,,42.00,82.55,46.52,57.69
+Datalab Accurate,Specialized APIs,datalab_extract_accurate,,true,interpretation_rules,22,22,18.18,93.81,69.93,78.82,0.031879,0,0,,,18.18,93.81,69.93,78.82
+Datalab Accurate,Specialized APIs,datalab_extract_accurate,,true,custom_terminology,14,14,78.57,97.83,49.58,60.77,0.026269,0,0,,,78.57,97.83,49.58,60.77
+Datalab Accurate,Specialized APIs,datalab_extract_accurate,,true,conditional_aggregation,12,9,66.67,85.95,16.84,46.18,0.038617,0,0,,,66.67,85.95,16.84,46.18
+Datalab Accurate,Specialized APIs,datalab_extract_accurate,,true,relational_diagrams,20,19,20.00,58.47,44.90,53.16,0.081137,0,0,,,20.00,69.90,55.85,64.73
+Datalab Accurate,Specialized APIs,datalab_extract_accurate,,true,charts_and_maps,25,10,60.00,95.68,32.29,44.23,0.052252,0,0,,,60.00,95.68,32.29,44.23
+Datalab Accurate,Specialized APIs,datalab_extract_accurate,,true,long_single_pages,7,7,0.00,0.00,0.00,0.00,0.404643,0,0,,,0.00,0.00,0.00,0.00
 Extend Operator,Specialized APIs,extend_extract_operator,,true,all,100,81,34.00,73.87,57.75,68.84,0.098800,0,0,,,34.00,73.87,57.75,68.84
 Extend Operator,Specialized APIs,extend_extract_operator,,true,interpretation_rules,22,22,27.27,99.64,80.29,91.42,0.100100,0,0,,,27.27,99.64,80.29,91.42
 Extend Operator,Specialized APIs,extend_extract_operator,,true,custom_terminology,14,14,64.29,97.55,78.24,91.14,0.087500,0,0,,,64.29,97.55,78.24,91.14
