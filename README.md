@@ -55,8 +55,8 @@ In the official benchmark, documents that fail or exceed a 30-minute limit score
 |---:|---|---|---:|---:|---:|---:|---:|---:|
 | 1 | LlamaExtract Agentic Plus | LlamaExtract | **96.17** | <u>97.02</u> | 94.30 | 94.65 | 0.01504 | 7.50¢ |
 | 2 | LlamaExtract Agentic Plus (Max Effort) | LlamaExtract | **96.17** | 96.82 | **95.48** | 91.36 | — | 19.11¢ |
-| 3 | Datalab Balanced | Specialized APIs | <u>96.13</u> | 96.74 | <u>94.87</u> | 94.70 | — | 8.67¢ |
-| 4 | Datalab Accurate | Specialized APIs | 96.09 | 96.67 | <u>94.87</u> | **94.81** | — | 9.10¢ |
+| 3 | Datalab Balanced | Specialized APIs | <u>96.13</u> | 96.74 | <u>94.87</u> | 94.70 | 0.01168 | 8.67¢ |
+| 4 | Datalab Accurate | Specialized APIs | 96.09 | 96.67 | <u>94.87</u> | **94.81** | 0.01235 | 9.10¢ |
 | 5 | Reducto Deep Extract | Specialized APIs | 96.08 | 96.84 | 94.80 | 92.85 | 0.02477 | 6.35¢ |
 | 6 | Pulse (Effort) | Specialized APIs | 96.07 | 96.83 | 94.70 | 93.24 | — | 10.50¢ |
 | 7 | LlamaExtract Agentic | LlamaExtract | 95.65 | 96.06 | 94.79 | <u>94.73</u> | 0.01635 | 3.12¢ |
@@ -102,7 +102,7 @@ Rows are ordered by % Perfect, then Value F1, then lower cost.
 | 1 | Codex GPT-6 Astra | Coding Agents | **58** | **94.53** | **70.97** | — | 95.20¢ |
 | 2 | LlamaExtract Agentic Plus (Max Effort) | LlamaExtract | <u>56</u> | <u>92.71</u> | <u>66.20</u> | — | 36.60¢ |
 | 3 | Claude Code Opus 5.5 | Coding Agents | 51 | 74.87 | 45.29 | — | 41.20¢ |
-| 4 | Datalab Accurate | Specialized APIs | 42 | 80.26 | 43.95 | — | 7.29¢ |
+| 4 | Datalab Accurate | Specialized APIs | 42 | 80.26 | 43.95 | 0.0439 | 7.29¢ |
 | 5 | Gemini CLI (Gemini 4 Hydrogen) | Coding Agents | 42 | 63.88 | 43.88 | — | 43.89¢ |
 | 6 | LlamaExtract Agentic Plus | LlamaExtract | 38 | 77.70 | 60.39 | — | 7.50¢ |
 | 7 | Extend Operator | Specialized APIs | 34 | 73.87 | 57.75 | — | 9.88¢ |
