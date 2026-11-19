@@ -35,6 +35,7 @@ from extract_bench.evaluation.evaluators.layoutdet import LayoutDetectionEvaluat
 from extract_bench.evaluation.evaluators.parse import ParseEvaluator
 from extract_bench.evaluation.evaluators.qa import QAEvaluator
 from extract_bench.evaluation.layout_adapters import create_layout_adapter_for_result
+from extract_bench.evaluation.metrics.extract.confidence_scoped.summary import pooled_leaderboard_confidence
 from extract_bench.evaluation.metrics.field_grounding.extract_adapter import (
     compute_failure_field_denominator,
 )
@@ -1929,6 +1930,7 @@ class EvaluationRunner:
         # Applies to any metric with "tables_predicted" metadata (TEDS, GriTS, etc.)
         predicted_values: dict[str, list[float]] = {}
         metric_count_sums: dict[str, list[int]] = {}  # count totals
+        confidence_counts: list[tuple[MetricValue, float | None]] = []
 
         # Count-as-zero: examples that errored out (genuine failures, not
         # legitimate skips or harness errors) should drag the score down, not
@@ -1953,6 +1955,9 @@ class EvaluationRunner:
                 continue
             result_metrics = result.diagnostic_metrics if metric_list_name == "diagnostic_metrics" else result.metrics
             for metric in result_metrics:
+                if metric.metric_name == "confidence_signal_coverage":
+                    latency_ms = next((stat.value for stat in result.stats if stat.name == "latency_ms"), None)
+                    confidence_counts.append((metric, latency_ms))
                 if metric.metric_name not in metric_values:
                     metric_values[metric.metric_name] = []
                 metric_values[metric.metric_name].append(metric.value)
@@ -2044,6 +2049,8 @@ class EvaluationRunner:
 
         # Compute averages
         aggregate: dict[str, float] = {}
+        if len(confidence_counts) > 0 and len({r.pipeline_name for r in evaluation_results}) == 1:
+            aggregate.update(pooled_leaderboard_confidence(confidence_counts))
         for metric_name, values in metric_values.items():
             if values:
                 aggregate[f"avg_{metric_name}"] = sum(values) / len(values)

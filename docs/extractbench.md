@@ -100,14 +100,17 @@ See "Output Structure" under [Configuration](../README.md#configuration) for the
 
 ## Submitting results
 
-`Confidence_AUGRC` stores raw AUGRC (lower is better), not a percentage or its reciprocal; blank means unreported. The website displays `1 / Confidence_AUGRC`.
-
 Add one row per system to [leaderboard.csv](../leaderboard.csv). Each row carries `Pipeline`, `Reasoning`, `include_in_rankings` (`true` or `false`), value F1 (`Overall`, `Short`, `Medium`, `Long`), precision and recall per split (`P_*`, `R_*`), word- and page-level grounding F1 overall and per split, cost per page overall and per split, and latency per document per split. Then follow the shared steps in [Submitting results](../README.md#submitting-results).
 
-Confidence is evaluated at Value F1's cell granularity. A scalar array is one cell: its native array-level confidence takes precedence; otherwise, we use the minimum valid confidence available on its emitted scalar elements. Missing element scores are excluded from this minimum, and an array with no valid score remains unscored. Duplicate citations for an element retain the highest confidence before aggregation. A scored cell without direct or element-derived confidence inherits the nearest scored object ancestor. Explicit child scores, including zero, take precedence. This applies only to emitted Value F1 cells; missing predictions stay unscored, and parent citation geometry is not copied to children.
+Inference runs use a three-hour execution limit per document. Job-status polling defaults to three seconds, with backoff for rate limits and transient errors.
 
-The [confidence curves CSV](../confidence-curves.csv) has one `Allowed_Error_Percent` column and one column per provider, reporting correct accepted fields as a percentage of expected fields. The chart samples 1–7% allowed error in 0.05-point steps; this is a display range, not a scoring limit.
+### Confidence metrics
 
-Where available, [threshold counts](../confidence-thresholds.csv) preserve every confidence level, cumulative accepted/correct counts, and unscored totals for reproducing [tie-averaged AUGRC](https://www.llamaindex.ai/blog/what-makes-an-extraction-confidence-score-useful). Unscored entries, including correctly omitted blanks, rank at zero for AUGRC and are excluded from acceptance curves. Other missing fields are excluded from AUGRC; all expected fields remain in the curve denominator.
+Pool Value F1 cells across the documents in each leaderboard row using the 30-minute scoring cutoff. Leave unreported or undefined metrics blank.
 
-New inference runs use a three-hour execution limit per document, shared by ExtractBench and Pro. Timeout retries are disabled; transient retries stay inside that budget. Job-status polling defaults to three seconds, with backoff for rate limits and transient errors.
+- **`Confidence_Coverage`** is the percentage of returned cells with a confidence score, including explicit zeros.
+- **`Confidence_AUGRC`** ranks returned cells and correctly omitted blanks by descending confidence. Missing scores tie with zero. For $N$ ranked cells and $E_k$ errors among the first $k$, raw AUGRC is $\sum_{k=1}^{N} E_k/N^2$, averaged over orderings within ties. Lower is better.
+
+An omitted null or blank string earns credit only in a represented record. For scalar arrays, use the array score or, if absent, the lowest available element score. Duplicate scores at a path use the highest. A cell without a score inherits its nearest scored object ancestor.
+
+The [acceptance curves](../confidence-curves.csv) show correctly accepted fields as a percentage of all expected fields. [Threshold counts](../confidence-thresholds.csv) support reproducing the [published AUGRC results](https://www.llamaindex.ai/blog/what-makes-an-extraction-confidence-score-useful).
