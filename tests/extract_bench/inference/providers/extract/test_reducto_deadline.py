@@ -143,7 +143,7 @@ def test_cancelled_awaiter_still_records_late_submission(monkeypatch: pytest.Mon
 
 
 @pytest.mark.parametrize("status", ["Completed", "Failed"])
-@pytest.mark.parametrize(("credits", "expected_cost"), [(0, 0.0), (4, 0.06), (None, 0.08)])
+@pytest.mark.parametrize(("credits", "expected_cost"), [(0, 0.0), (4, 0.04), (None, 0.08)])
 def test_terminal_job_usage_is_journaled_even_after_cancellation(
     monkeypatch: pytest.MonkeyPatch,
     status: str,
@@ -199,5 +199,5 @@ def test_sync_job_ids_keep_distinct_calls_separate_when_optional_id_is_absent(mo
     with bind_provider_event_sink(record):
         for _ in responses:
             asyncio.run(provider._extract_pdf_async("unused.pdf", {}))
-    assert charges["reducto/known"] == pytest.approx(0.06)
-    assert sum(charges.values()) == pytest.approx(0.18)
+    assert charges["reducto/known"] == pytest.approx(0.04)
+    assert sum(charges.values()) == pytest.approx(0.12)

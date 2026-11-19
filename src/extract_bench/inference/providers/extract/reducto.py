@@ -47,7 +47,9 @@ from extract_bench.schemas.pipeline_io import (
 )
 from extract_bench.schemas.product import ProductType
 
-REDUCTO_USD_PER_CREDIT = 0.015
+# Public credit value under Reducto's September 2026 rate card.
+# https://reducto.ai/blog/reducto-simple-transparent-document-processing-pricing
+REDUCTO_USD_PER_CREDIT = 0.01
 # USD per page on the standard rate card. Extract includes parsing.
 # https://docs.reducto.ai/reference/credit-usage
 _REDUCTO_EXTRACT_PAGE_USD = 0.02

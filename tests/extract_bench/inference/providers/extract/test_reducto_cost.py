@@ -23,8 +23,8 @@ from extract_bench.inference.providers.extract.reducto import (
 )
 
 
-@pytest.mark.parametrize("credits", [0, 8.0])
-def test_returned_credits_override_both_page_counts(credits: float) -> None:
+@pytest.mark.parametrize(("credits", "expected_usd"), [(0, 0.0), (8.0, 0.08)])
+def test_returned_credits_use_public_rate_and_override_both_page_counts(credits: float, expected_usd: float) -> None:
     raw = {
         "usage": {
             "credits": credits,
@@ -38,7 +38,7 @@ def test_returned_credits_override_both_page_counts(credits: float) -> None:
         COST_IS_ESTIMATE: True,
     }
     attach_reducto_extract_cost(raw, {"deep_extract": True})
-    assert raw[COST_USD] == pytest.approx(credits * 0.015)
+    assert raw[COST_USD] == pytest.approx(expected_usd)
     assert raw[COST_SOURCE] == ReductoCostSourceValues.REPORTED_CREDITS
     assert raw["credits_used"] == credits
     assert COST_IS_ESTIMATE not in raw
