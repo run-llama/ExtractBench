@@ -7,8 +7,10 @@ import pytest
 
 from extract_bench.evaluation.grounded_confidence_payloads import field_citation_lookup, serialize_confidence_row
 from extract_bench.evaluation.metrics.extract.confidence_scoped.scoring import build_confidence_field_rows
-from extract_bench.evaluation.metrics.extract.confidence_scoped.summary import compute_confidence_scoped_metrics
-from extract_bench.evaluation.metrics.extract.leaderboard_confidence import pooled_leaderboard_confidence
+from extract_bench.evaluation.metrics.extract.confidence_scoped.summary import (
+    compute_confidence_scoped_metrics,
+    pooled_leaderboard_confidence,
+)
 from extract_bench.evaluation.metrics.extract.unified_evidence_metric import ValueCell, compute_unified_evidence_metrics
 from extract_bench.evaluation.runner import EvaluationRunner
 from extract_bench.schemas.evaluation import EvaluationResult, MetricValue

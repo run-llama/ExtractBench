@@ -35,7 +35,7 @@ from extract_bench.evaluation.evaluators.layoutdet import LayoutDetectionEvaluat
 from extract_bench.evaluation.evaluators.parse import ParseEvaluator
 from extract_bench.evaluation.evaluators.qa import QAEvaluator
 from extract_bench.evaluation.layout_adapters import create_layout_adapter_for_result
-from extract_bench.evaluation.metrics.extract.leaderboard_confidence import pooled_leaderboard_confidence
+from extract_bench.evaluation.metrics.extract.confidence_scoped.summary import pooled_leaderboard_confidence
 from extract_bench.evaluation.metrics.field_grounding.extract_adapter import (
     compute_failure_field_denominator,
 )

@@ -9,18 +9,26 @@ instead.
 from __future__ import annotations
 
 from bisect import bisect_left
-from collections.abc import Sequence
+from collections import defaultdict
+from collections.abc import Iterable, Sequence
 from typing import Any
 
-from extract_bench.evaluation.metrics.extract.leaderboard_confidence import AUGRC_GROUPS, augrc_groups
 from extract_bench.evaluation.metrics.extract.unified_evidence_metric import ValueCell
 from extract_bench.schemas.evaluation import MetricValue
 from extract_bench.schemas.extract_output import FieldCitation
 from extract_bench.test_cases.schema import ExtractFieldTestRule
 
 from .paths import iter_field_values
-from .scoring import build_confidence_field_rows, clamp_confidence, confidence_signals_by_path, value_path_prefix
+from .scoring import (
+    augrc_groups,
+    build_confidence_field_rows,
+    clamp_confidence,
+    confidence_signals_by_path,
+    value_path_prefix,
+)
 from .types import ConfidenceFieldRow
+
+AUGRC_GROUPS = "augrc_groups"
 
 DEFAULT_CONFIDENCE_THRESHOLDS: tuple[float, ...] = (
     0.0,
@@ -382,6 +390,41 @@ def _threshold_metric_values(threshold_rows: list[dict[str, Any]]) -> list[Metri
             )
         )
     return metrics
+
+
+def pooled_leaderboard_confidence(coverage_metrics: Iterable[MetricValue]) -> dict[str, float]:
+    """Pool document count metadata across the splits represented by one CSV row."""
+    returned = scored = 0
+    groups: dict[float, list[int]] = defaultdict(lambda: [0, 0])
+    complete_ranks = True
+    for metric in coverage_metrics:
+        data = metric.metadata
+        if data.get("coverage_scope") != "emitted_value_f1_cells":
+            if AUGRC_GROUPS not in data and data.get("emitted_leaf_count", 0) > 0:
+                # Older scalar-leaf counters cannot be mixed with Value F1 cells.
+                return {}
+            continue
+        returned += data["emitted_leaf_count"]
+        scored += data["scored_leaf_count"]
+        if AUGRC_GROUPS not in data:
+            complete_ranks = False
+            continue
+        for score, total, errors in data[AUGRC_GROUPS]:
+            groups[score][0] += total
+            groups[score][1] += errors
+
+    result = {"Confidence_Coverage": 100 * scored / returned} if returned > 0 else {}
+    if complete_ranks and len(groups) > 0:
+        # At rank j within a tie of size m, the expected new errors are j*e/m.
+        # Summing over j=1..m gives e*(m+1)/2; keep twice the sum integral.
+        prior_errors = twice_integral = n = 0
+        for score in sorted(groups, reverse=True):
+            total, errors = groups[score]
+            twice_integral += 2 * total * prior_errors + errors * (total + 1)
+            prior_errors += errors
+            n += total
+        result["Confidence_AUGRC"] = twice_integral / (2 * n * n)
+    return result
 
 
 def confidence_signal_coverage_summary(

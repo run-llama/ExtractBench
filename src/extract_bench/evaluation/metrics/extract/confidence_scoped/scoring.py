@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import math
-from collections.abc import Sequence
+from collections import defaultdict
+from collections.abc import Mapping, Sequence, Set
 from typing import Any
 
 from extract_bench.evaluation.metrics.extract.array_record_match_metric import unwrap_value
@@ -162,3 +163,47 @@ def build_confidence_field_rows(
             matched_gt_path=gt_path if gt_path is not None else "",
         )
     return list(rows.values())
+
+
+def augrc_groups(
+    value_cells: Sequence[ValueCell],
+    emitted_paths: Set[str],
+    signals: Mapping[str, tuple[float, FieldCitation]],
+    pred_prefix: str,
+    expected_output: Any,
+) -> list[tuple[float, int, int]]:
+    """Count evaluated fields and errors at each exact score in one document."""
+    counts: dict[float, list[int]] = defaultdict(lambda: [0, 0])
+    represented_records: set[str] = set()
+    omitted: set[str] = set()
+    for cell in value_cells:
+        path = pred_prefix + cell.pred_path if cell.pred_path is not None else None
+        if path is None or path not in emitted_paths:
+            if cell.gt_path is not None:
+                omitted.add(cell.gt_path)
+            continue
+        score = signals[path][0] if path in signals else 0.0
+        counts[score][0] += 1
+        counts[score][1] += int(not cell.value_correct)
+        if cell.gt_path is not None:
+            record = cell.gt_path
+            while "]" in record:
+                parent, _, _ = record.rpartition("]")
+                key = parent + "]"
+                if key in represented_records:
+                    break
+                represented_records.add(key)
+                record = parent
+
+    # Credit a missing blank within a represented record. An entirely absent
+    # document or dropped array record contributes no synthetic ranked fields.
+    if len(omitted) > 0 and len(counts) > 0:
+        gt_prefix = value_path_prefix(expected_output)
+        for gt_path, value in iter_field_values(expected_output):
+            path = gt_path.removeprefix(gt_prefix)
+            if path not in omitted or not (value is None or isinstance(value, str) and value.strip() == ""):
+                continue
+            record, bracket, _ = path.rpartition("]")
+            if bracket == "" or record + "]" in represented_records:
+                counts[0.0][0] += 1
+    return [(score, total, errors) for score, (total, errors) in counts.items()]
