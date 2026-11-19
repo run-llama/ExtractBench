@@ -29,6 +29,7 @@ from .scoring import (
 from .types import ConfidenceFieldRow
 
 AUGRC_GROUPS = "augrc_groups"
+LEADERBOARD_SCORING_CUTOFF_MS = 30 * 60 * 1_000
 
 DEFAULT_CONFIDENCE_THRESHOLDS: tuple[float, ...] = (
     0.0,
@@ -392,13 +393,22 @@ def _threshold_metric_values(threshold_rows: list[dict[str, Any]]) -> list[Metri
     return metrics
 
 
-def pooled_leaderboard_confidence(coverage_metrics: Iterable[MetricValue]) -> dict[str, float]:
-    """Pool document count metadata across the splits represented by one CSV row."""
+def pooled_leaderboard_confidence(
+    timed_metrics: Iterable[tuple[MetricValue, float | None]],
+) -> dict[str, float]:
+    """Pool (field counts, document result latency in ms) for the official score."""
     returned = scored = 0
     groups: dict[float, list[int]] = defaultdict(lambda: [0, 0])
     complete_ranks = True
-    for metric in coverage_metrics:
+    for metric, latency_ms in timed_metrics:
         data = metric.metadata
+        if latency_ms is None:
+            if data.get("emitted_leaf_count", 0) > 0:
+                # An untimed prediction makes the official denominator unknown.
+                return {}
+            continue
+        if latency_ms > LEADERBOARD_SCORING_CUTOFF_MS:
+            continue
         if data.get("coverage_scope") != "emitted_value_f1_cells":
             if AUGRC_GROUPS not in data and data.get("emitted_leaf_count", 0) > 0:
                 # Older scalar-leaf counters cannot be mixed with Value F1 cells.

@@ -1930,7 +1930,7 @@ class EvaluationRunner:
         # Applies to any metric with "tables_predicted" metadata (TEDS, GriTS, etc.)
         predicted_values: dict[str, list[float]] = {}
         metric_count_sums: dict[str, list[int]] = {}  # count totals
-        confidence_counts: list[MetricValue] = []
+        confidence_counts: list[tuple[MetricValue, float | None]] = []
 
         # Count-as-zero: examples that errored out (genuine failures, not
         # legitimate skips or harness errors) should drag the score down, not
@@ -1956,7 +1956,8 @@ class EvaluationRunner:
             result_metrics = result.diagnostic_metrics if metric_list_name == "diagnostic_metrics" else result.metrics
             for metric in result_metrics:
                 if metric.metric_name == "confidence_signal_coverage":
-                    confidence_counts.append(metric)
+                    latency_ms = next((stat.value for stat in result.stats if stat.name == "latency_ms"), None)
+                    confidence_counts.append((metric, latency_ms))
                 if metric.metric_name not in metric_values:
                     metric_values[metric.metric_name] = []
                 metric_values[metric.metric_name].append(metric.value)

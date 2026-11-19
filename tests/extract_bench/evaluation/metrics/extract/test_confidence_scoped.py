@@ -13,7 +13,7 @@ from extract_bench.evaluation.metrics.extract.confidence_scoped.summary import (
 )
 from extract_bench.evaluation.metrics.extract.unified_evidence_metric import ValueCell, compute_unified_evidence_metrics
 from extract_bench.evaluation.runner import EvaluationRunner
-from extract_bench.schemas.evaluation import EvaluationResult, MetricValue
+from extract_bench.schemas.evaluation import EvaluationResult, MetricValue, RunStat
 from extract_bench.schemas.extract_output import FieldCitation
 
 ROW_SCHEMA = {
@@ -418,6 +418,7 @@ def test_leaderboard_pools_fields_and_ties_unscored_with_zero(tmp_path: Path) ->
             product_type="extract",
             success=True,
             metrics=list(metrics.values()),
+            stats=[RunStat(name="latency_ms", value=1_800_000, unit="ms")],
         )
         for i, metrics in enumerate(docs)
     ]
@@ -425,6 +426,13 @@ def test_leaderboard_pools_fields_and_ties_unscored_with_zero(tmp_path: Path) ->
     assert pooled["Confidence_Coverage"] == pytest.approx(200 / 3)
     # One high correct field and a bottom tie (one error, one correct).
     assert pooled["Confidence_AUGRC"] == pytest.approx((0 + 0.5 + 1) / 9)
+
+    # Late results leave both pooled metrics.
+    # The document exactly at the cutoff still contributes its scored correct cell.
+    results[0].stats = [RunStat(name="latency_ms", value=1_800_001, unit="ms")]
+    pooled = EvaluationRunner(tmp_path)._aggregate_metrics(results)
+    assert pooled["Confidence_Coverage"] == 100.0
+    assert pooled["Confidence_AUGRC"] == 0.0
 
 
 def test_omitted_blank_gets_rank_only_in_represented_record() -> None:
@@ -437,14 +445,14 @@ def test_omitted_blank_gets_rank_only_in_represented_record() -> None:
     )["confidence_signal_coverage"]
     # The omitted blank adds a fourth ranked cell. Only the wrong address is an error.
     assert metric.metadata["emitted_leaf_count"] == 3
-    assert pooled_leaderboard_confidence([metric]) == {"Confidence_Coverage": 0.0, "Confidence_AUGRC": 2.5 / 16}
+    assert pooled_leaderboard_confidence([(metric, 1000)]) == {"Confidence_Coverage": 0.0, "Confidence_AUGRC": 2.5 / 16}
     dropped = _confidence_metrics(
         {"rows": [{"name": "A", "address": None}, {"name": "B", "address": None}]},
         {"rows": [{"name": "A", "address": "wrong"}]},
         [],
         schema,
     )["confidence_signal_coverage"]
-    assert pooled_leaderboard_confidence([dropped])["Confidence_AUGRC"] == 1.5 / 4
+    assert pooled_leaderboard_confidence([(dropped, 1000)])["Confidence_AUGRC"] == 1.5 / 4
 
 
 def test_partial_rank_metadata_cannot_publish_partial_augrc() -> None:
@@ -459,4 +467,6 @@ def test_partial_rank_metadata_cannot_publish_partial_augrc() -> None:
         value=0.0,
         metadata={"coverage_scope": "emitted_value_f1_cells", "emitted_leaf_count": 2, "scored_leaf_count": 0},
     )
-    assert pooled_leaderboard_confidence([current, historical]) == {"Confidence_Coverage": 100 / 3}
+    assert pooled_leaderboard_confidence([(current, 1000), (historical, 1000)]) == {"Confidence_Coverage": 100 / 3}
+    assert pooled_leaderboard_confidence([(current, 1000), (historical, None)]) == {}
+    assert pooled_leaderboard_confidence([(current, 1_800_001)]) == {}
