@@ -88,7 +88,7 @@ def value_table(rows: list[dict]) -> str:
     score_columns = ("Overall", "Short", "Medium", "Long")
     ranks = column_ranks(rows, score_columns)
     body = table(
-        "| Rank | Provider | Category | Overall | Short | Medium | Long | AUGRC ↓ | ¢ / Page |",
+        "| Rank | Provider | Category | Overall | Short | Medium | Long | AUGRC | ¢ / Page |",
         "|---:|---|---|---:|---:|---:|---:|---:|---:|",
         [
             [
@@ -174,7 +174,7 @@ def pro_table(rows: list[dict[str, str]]) -> str:
     columns = ("Perfect_Documents", "Value_F1", "Word_Grounding")
     ranks = column_ranks(overall, columns)
     body = table(
-        "| Rank | Provider | Category | % Perfect | Value F1 | Grounding F1 | AUGRC ↓ | ¢ / Page |",
+        "| Rank | Provider | Category | % Perfect | Value F1 | Grounding F1 | AUGRC | ¢ / Page |",
         "|---:|---|---|---:|---:|---:|---:|---:|",
         [
             [

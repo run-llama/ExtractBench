@@ -51,7 +51,7 @@ In the official benchmark, documents that fail or exceed a 30-minute limit score
 <!-- LEADERBOARD:START -->
 **Unified value F1** — rows are ordered by Overall Value F1, then lower cost.
 
-| Rank | Provider | Category | Overall | Short | Medium | Long | AUGRC ↓ | ¢ / Page |
+| Rank | Provider | Category | Overall | Short | Medium | Long | AUGRC | ¢ / Page |
 |---:|---|---|---:|---:|---:|---:|---:|---:|
 | 1 | LlamaExtract Agentic Plus | LlamaExtract | **96.17** | <u>97.02</u> | 94.30 | <u>94.65</u> | 0.01504 | 7.50¢ |
 | 2 | LlamaExtract Agentic Plus (Max Effort) | LlamaExtract | **96.17** | 96.82 | **95.48** | 91.36 | — | 19.11¢ |
@@ -97,7 +97,7 @@ Top 10 of 56 ranked systems — all results in [leaderboard.csv](leaderboard.csv
 <!-- PRO_LEADERBOARD:START -->
 Rows are ordered by % Perfect, then Value F1, then lower cost.
 
-| Rank | Provider | Category | % Perfect | Value F1 | Grounding F1 | AUGRC ↓ | ¢ / Page |
+| Rank | Provider | Category | % Perfect | Value F1 | Grounding F1 | AUGRC | ¢ / Page |
 |---:|---|---|---:|---:|---:|---:|---:|
 | 1 | Codex GPT-6 Astra | Coding Agents | **58** | **94.53** | **70.97** | — | 95.20¢ |
 | 2 | LlamaExtract Agentic Plus (Max Effort) | LlamaExtract | <u>56</u> | <u>92.71</u> | <u>66.20</u> | — | 36.60¢ |
