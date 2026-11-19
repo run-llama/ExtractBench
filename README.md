@@ -55,8 +55,8 @@ In the official benchmark, documents that fail or exceed a 30-minute limit score
 |---:|---|---|---:|---:|---:|---:|---:|---:|
 | 1 | LlamaExtract Agentic Plus | LlamaExtract | **96.17** | <u>97.02</u> | 94.30 | 94.65 | 0.01504 | 7.50¢ |
 | 2 | LlamaExtract Agentic Plus (Max Effort) | LlamaExtract | **96.17** | 96.82 | **95.48** | 91.36 | — | 19.11¢ |
-| 3 | Datalab Balanced | Specialized APIs | <u>96.13</u> | 96.74 | <u>94.87</u> | 94.70 | 0.01168 | 8.67¢ |
-| 4 | Datalab Accurate | Specialized APIs | 96.09 | 96.67 | <u>94.87</u> | **94.81** | 0.01235 | 9.10¢ |
+| 3 | Datalab Balanced | Specialized APIs | <u>96.13</u> | 96.74 | <u>94.87</u> | 94.70 | 0.01172 | 8.67¢ |
+| 4 | Datalab Accurate | Specialized APIs | 96.09 | 96.67 | <u>94.87</u> | **94.81** | 0.01236 | 9.10¢ |
 | 5 | Reducto Deep Extract | Specialized APIs | 96.08 | 96.84 | 94.80 | 92.85 | 0.02477 | 6.35¢ |
 | 6 | Pulse (Effort) | Specialized APIs | 96.07 | 96.83 | 94.70 | 93.24 | — | 10.50¢ |
 | 7 | LlamaExtract Agentic | LlamaExtract | 95.65 | 96.06 | 94.79 | <u>94.73</u> | 0.01635 | 3.12¢ |
