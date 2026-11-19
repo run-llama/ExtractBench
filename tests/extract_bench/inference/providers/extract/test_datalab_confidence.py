@@ -195,10 +195,13 @@ def test_extraction_survives_optional_scoring_with_separate_timing(
                 assert [(citation.field_path, citation.confidence, citation.bbox) for citation in citations] == [
                     ("total", 0.5, None)
                 ]
+            elif outcome == "failed":
+                assert result["_confidence_polling"]["status"] == "scoring_failed"
+                assert result["extraction_scoring_status"] == "failed"
+                assert json.loads(result["extraction_schema_json"]) == {"total": 10}
             else:
                 assert result["_confidence_polling"]["status"] in {
                     "poll_error",
-                    "scoring_failed",
                     "deadline_exceeded",
                 }
         finally:

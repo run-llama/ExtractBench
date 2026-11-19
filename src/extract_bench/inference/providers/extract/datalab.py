@@ -325,6 +325,7 @@ class DatalabExtractProvider(Provider):
                         if refreshed.get("success") is False:
                             raise ValueError("Completed extraction result reports success=false")
                         if refreshed.get("extraction_scoring_status") == "failed":
+                            completed["extraction_scoring_status"] = refreshed["extraction_scoring_status"]
                             status = ConfidencePollingStatusValues.SCORING_FAILED
                             break
                         completed = {
