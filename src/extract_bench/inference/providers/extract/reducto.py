@@ -12,15 +12,19 @@ from uuid import uuid4
 
 from reducto import Reducto
 
-from extract_bench.inference.cost_accounting import record_response_cost
+from extract_bench.inference.cost_accounting import SUCCESS_OUTCOME, record_response_cost, summarize_attempts
 from extract_bench.inference.cost_contract import (
+    ATTEMPT_ACCOUNTING,
+    ATTEMPTS,
     COMPLETE,
     COST_ACCOUNTING,
+    COST_COMPLETE,
     COST_IS_ESTIMATE,
     COST_PER_PAGE_USD,
     COST_SOURCE,
     COST_USD,
     KNOWN_COST_USD,
+    OUTCOME,
     RAW_COST_COMPLETE,
 )
 from extract_bench.inference.events import emit_provider_event
@@ -51,6 +55,7 @@ _REDUCTO_DEEP_EXTRACT_PAGE_USD = 0.04
 _REDUCTO_EXTRACT_BATCH_MULTIPLIER = 0.8
 _REDUCTO_EXTRACT_PRODUCT = "Extract"
 _REDUCTO_DEEP_EXTRACT_PRODUCT = "Deep Extract"
+_REDUCTO_DENSE_FIELDS_PER_PAGE = 100
 
 
 class ReductoCostSourceValues:
@@ -98,6 +103,29 @@ def _coerce_nonnegative_float(value: Any) -> float | None:
     return None
 
 
+def _discard_cached_page_estimates(raw_output: dict[str, Any], stale_success: bool) -> None:
+    """Prevent a saved attempt total from restoring prices rejected by new normalization."""
+    accounting = raw_output.get(ATTEMPT_ACCOUNTING)
+    if not isinstance(accounting, dict):
+        return
+    attempts = accounting.get(ATTEMPTS, [])
+    if not attempts:
+        if stale_success or accounting.get(COST_IS_ESTIMATE) is True:
+            raw_output[ATTEMPT_ACCOUNTING] = summarize_attempts([])
+        return
+
+    # Pre-migration formula costs may only be identifiable from the saved response.
+    latest_success = next((i for i in reversed(range(len(attempts))) if attempts[i][OUTCOME] == SUCCESS_OUTCOME), None)
+    updated = []
+    for i, attempt in enumerate(attempts):
+        if attempt.get(COST_IS_ESTIMATE) is True or (stale_success and i == latest_success):
+            attempt = {**attempt, COST_USD: None, COST_COMPLETE: False}
+            attempt.pop(COST_IS_ESTIMATE, None)
+        updated.append(attempt)
+    if updated != attempts:
+        raw_output[ATTEMPT_ACCOUNTING] = summarize_attempts(updated)
+
+
 def attach_reducto_extract_cost(
     raw_output: dict[str, Any],
     pipeline_config: dict[str, Any],
@@ -106,7 +134,8 @@ def attach_reducto_extract_cost(
     """Price returned credits, then billed Extract pages, then reported document pages."""
     usage = raw_output.get("usage")
     usage = usage if isinstance(usage, dict) else {}
-    if raw_output.get("deep_extract_cost_calculated") is True:
+    stale_success = raw_output.get("deep_extract_cost_calculated") is True or raw_output.get(COST_IS_ESTIMATE) is True
+    if stale_success:
         for key in _DERIVED_COST_KEYS:
             raw_output.pop(key, None)
     breakdown = usage.get("usage_breakdown")
@@ -125,6 +154,20 @@ def attach_reducto_extract_cost(
         source = ReductoCostSourceValues.REPORTED_CREDITS
     else:
         pages = billed_pages if billed_pages is not None else reported_pages
+        fields = _coerce_nonnegative_float(breakdown.get("extract_fields"))
+        if fields is None:
+            fields = _coerce_nonnegative_float(usage.get("num_fields"))
+        # The rate card gives a per-page threshold and does not price the surcharge.
+        # A job total of at most that threshold guarantees no page exceeds it.
+        if fields is None or fields > _REDUCTO_DENSE_FIELDS_PER_PAGE:
+            raw_output[COST_USD] = None
+            raw_output.pop(COST_PER_PAGE_USD, None)
+            raw_output[RAW_COST_COMPLETE] = False
+            _discard_cached_page_estimates(raw_output, stale_success)
+            if billed_pages is not None:
+                raw_output["num_pages_billed"] = billed_pages
+            return
+
         product = breakdown.get("extract_model")
         if product is None:
             mode = usage.get("extract_mode")
@@ -145,7 +188,6 @@ def attach_reducto_extract_cost(
         else:
             return
 
-        # The rate card does not publish the dense-field surcharge or negotiated rates.
         cost_usd = pages * rate
         source = (
             ReductoCostSourceValues.BILLED_PAGES if billed_pages is not None else ReductoCostSourceValues.DOCUMENT_PAGES

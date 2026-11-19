@@ -5,7 +5,18 @@ import pytest
 pytest.importorskip("reducto", reason="dev and runners extras required")
 pytest.importorskip("pypdf", reason="dev and runners extras required")
 
-from extract_bench.inference.cost_contract import COST_IS_ESTIMATE, COST_PER_PAGE_USD, COST_SOURCE, COST_USD
+from extract_bench.evaluation.stats import build_cost_stats
+from extract_bench.inference.cost_accounting import summarize_attempts
+from extract_bench.inference.cost_contract import (
+    ATTEMPT_ACCOUNTING,
+    COST_COMPLETE,
+    COST_IS_ESTIMATE,
+    COST_PER_PAGE_USD,
+    COST_SOURCE,
+    COST_USD,
+    KNOWN_COST_USD,
+    OUTCOME,
+)
 from extract_bench.inference.providers.extract.reducto import (
     ReductoCostSourceValues,
     attach_reducto_extract_cost,
@@ -55,7 +66,7 @@ def test_page_estimate_uses_reported_billing_product_and_preferred_page_count(
         "usage": {
             "credits": None,
             "num_pages": 10,
-            "num_fields": 3000,
+            "num_fields": 80,
             "extract_mode": mode,
             "usage_breakdown": {"extract_model": product, "tier": tier, "extract_pages": pages},
         },
@@ -72,6 +83,39 @@ def test_page_estimate_uses_reported_billing_product_and_preferred_page_count(
 
 
 def test_unknown_billing_product_cannot_be_priced_from_the_request_defaults() -> None:
-    raw = {"usage": {"num_pages": 10, "usage_breakdown": {"extract_model": "Future", "extract_pages": 10}}}
+    raw = {
+        "usage": {
+            "num_pages": 10,
+            "usage_breakdown": {"extract_model": "Future", "extract_pages": 10, "extract_fields": 20},
+        }
+    }
     attach_reducto_extract_cost(raw, {"deep_extract": True})
     assert COST_USD not in raw
+
+
+@pytest.mark.parametrize("fields", [None, 101])
+def test_unknown_surcharge_clears_stale_page_cost_even_at_low_average_density(fields: int | None) -> None:
+    raw = {
+        "usage": {
+            "num_pages": 12,
+            "usage_breakdown": {"extract_model": "Deep Extract", "extract_pages": 12, "extract_fields": fields},
+        },
+        COST_USD: 0.48,
+        COST_IS_ESTIMATE: True,
+        COST_PER_PAGE_USD: 0.04,
+        ATTEMPT_ACCOUNTING: summarize_attempts(
+            [
+                {OUTCOME: "failed", COST_USD: 0.06, COST_COMPLETE: True},
+                {OUTCOME: "success", COST_USD: 0.48, COST_COMPLETE: True, COST_IS_ESTIMATE: True},
+            ]
+        ),
+    }
+    attach_reducto_extract_cost(raw, {"deep_extract": True})
+    assert raw[COST_USD] is None
+    assert COST_PER_PAGE_USD not in raw
+    assert COST_IS_ESTIMATE not in raw
+    assert raw["num_pages_billed"] == 12
+    stats = {stat.name: stat.value for stat in build_cost_stats(raw)}
+    assert COST_USD not in stats
+    assert COST_IS_ESTIMATE not in stats
+    assert stats[KNOWN_COST_USD] == pytest.approx(0.06)
