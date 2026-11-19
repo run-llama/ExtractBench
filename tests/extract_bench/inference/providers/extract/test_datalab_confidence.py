@@ -307,9 +307,9 @@ def test_balanced_missing_verification_status_remains_unscored() -> None:
 
 
 @pytest.mark.parametrize(
-    ("status", "expected"), [("PASS", None), ("FAIL_CITATIONS", 1.0), ("FAIL_FIX", 0.0), ("FAIL_UNRESOLVABLE", 0.0)]
+    ("status", "expected"), [("PASS", 1.0), ("FAIL_CITATIONS", 1.0), ("FAIL_FIX", 0.0), ("FAIL_UNRESOLVABLE", 0.0)]
 )
-def test_explicit_verification_failure_is_retained_on_emitted_null(status: str, expected: float | None) -> None:
+def test_explicit_verification_is_retained_on_emitted_null(status: str, expected: float) -> None:
     payload = {
         "invoice_number": None,
         "invoice_number_citations": ["block-1"],
