@@ -54,6 +54,14 @@ def test_extraction_survives_optional_scoring_with_separate_timing(
     outcome: str,
 ) -> None:
     async def run() -> None:
+        schema = {
+            "type": "object",
+            "properties": {
+                "total": {"type": ["number", "null"]},
+                "bank": {"type": ["object", "null"], "properties": {"name": {"type": "string"}}},
+            },
+        }
+        submitted_schemas = []
         calls = {"submit": 0, "poll": 0}
         clock = {"now": 0.0}
         monkeypatch.setattr(datalab, "time", SimpleNamespace(perf_counter=lambda: clock["now"]))
@@ -75,6 +83,7 @@ def test_extraction_survives_optional_scoring_with_separate_timing(
 
         async def submit(request: web.Request) -> web.Response:
             form = await request.post()
+            submitted_schemas.append(json.loads(form["page_schema"]))
             assert form["extraction_mode"] == pipeline.config["extraction_mode"]
             assert form["citation_granularity"] == "phrase"
             if outcome == "override":
@@ -151,11 +160,12 @@ def test_extraction_survives_optional_scoring_with_separate_timing(
         try:
             if outcome in ("invalid", "invalid_url"):
                 with budget.activate(), pytest.raises(datalab.ProviderPermanentError) as caught:
-                    await budget.run_async(provider._extract_pdf_async(str(source), {"type": "object"}))
+                    await budget.run_async(provider._extract_pdf_async(str(source), schema))
                 assert caught.value.debug_payload[COST_ACCOUNTING] == {KNOWN_COST_USD: 0.017, COMPLETE: True}
                 return
             with budget.activate():
-                result = await budget.run_async(provider._extract_pdf_async(str(source), {"type": "object"}))
+                result = await budget.run_async(provider._extract_pdf_async(str(source), schema))
+            assert submitted_schemas == [schema]
             assert json.loads(result["extraction_schema_json"])["total"] == 10
             assert result["_config"]["citation_granularity"] == "phrase"
             assert calls["submit"] == 1
