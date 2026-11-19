@@ -154,7 +154,7 @@ class DatalabExtractProvider(Provider):
             extraction_started = time.perf_counter()
             pdf_page_count = _read_pdf_page_count(pdf_path)
             options = ExtractOptions(
-                page_schema=json.dumps(_adapt_schema_for_datalab(schema)),
+                page_schema=json.dumps(schema),
                 citation_granularity="phrase",
                 mode=self._parse_mode,
                 output_format=self._output_format,
@@ -505,32 +505,6 @@ def _promote_api_cost_breakdown(raw_output: dict[str, Any]) -> None:
 # ---------------------------------------------------------------------------
 # Schema adapter
 # ---------------------------------------------------------------------------
-
-
-def _adapt_schema_for_datalab(schema: Any) -> Any:
-    """Normalize a JSON Schema so Datalab's /api/v1/extract accepts it.
-
-    Datalab returns HTTP 500 on schemas that use the JSON Schema union form
-    ``"type": ["string", "null"]`` (a common way to mark a nullable scalar).
-    Empirically a payload identical to one that 500s succeeds once those
-    unions are collapsed to a single non-null type. This adapter is a pure
-    shape transform: it recursively walks ``properties``, ``items``, and
-    object dicts, and replaces any ``type`` list with its first non-null
-    member (falling back to ``"string"``). Nothing else is touched, so the
-    semantics of the user's schema are preserved.
-    """
-    if isinstance(schema, Mapping):
-        out: dict[str, Any] = {}
-        for key, value in schema.items():
-            if key == "type" and isinstance(value, list):
-                non_null = [t for t in value if t != "null"]
-                out[key] = non_null[0] if non_null else "string"
-            else:
-                out[key] = _adapt_schema_for_datalab(value)
-        return out
-    if isinstance(schema, list):
-        return [_adapt_schema_for_datalab(item) for item in schema]
-    return schema
 
 
 # ---------------------------------------------------------------------------
