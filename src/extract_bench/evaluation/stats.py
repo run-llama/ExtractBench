@@ -10,6 +10,7 @@ from typing import Any
 from extract_bench.inference.cost_contract import (
     ATTEMPT_ACCOUNTING,
     COST_COMPLETE,
+    COST_IS_ESTIMATE,
     COST_PER_PAGE_USD,
     COST_USD,
     KNOWN_COST_USD,
@@ -36,6 +37,7 @@ _RAW_OUTPUT_STATS: list[tuple[str, str]] = [
     ("agent_usage_usd", "$"),
     ("total_credits", "credits"),
     ("num_pages_billed", "pages"),
+    (COST_IS_ESTIMATE, "ratio"),
     (COST_USD, "$"),
     (COST_PER_PAGE_USD, "$/page"),
     ("input_cost_usd", "$"),

@@ -16,7 +16,9 @@ from extract_bench.inference.cost_accounting import record_response_cost
 from extract_bench.inference.cost_contract import (
     COMPLETE,
     COST_ACCOUNTING,
+    COST_IS_ESTIMATE,
     COST_PER_PAGE_USD,
+    COST_SOURCE,
     COST_USD,
     KNOWN_COST_USD,
     RAW_COST_COMPLETE,
@@ -42,10 +44,37 @@ from extract_bench.schemas.pipeline_io import (
 from extract_bench.schemas.product import ProductType
 
 REDUCTO_USD_PER_CREDIT = 0.015
-REDUCTO_DEEP_CREDITS_PER_PAGE = 4.0
-REDUCTO_DEEP_CREDITS_PER_FIELD = 0.1
-REDUCTO_DEEP_MIN_CREDITS_PER_DOCUMENT = 30.0
-REDUCTO_PARSE_CREDITS_PER_PAGE = 1.0
+# USD per page on the standard rate card. Extract includes parsing.
+# https://docs.reducto.ai/reference/credit-usage
+_REDUCTO_EXTRACT_PAGE_USD = 0.02
+_REDUCTO_DEEP_EXTRACT_PAGE_USD = 0.04
+_REDUCTO_EXTRACT_BATCH_MULTIPLIER = 0.8
+_REDUCTO_EXTRACT_PRODUCT = "Extract"
+_REDUCTO_DEEP_EXTRACT_PRODUCT = "Deep Extract"
+
+
+class ReductoCostSourceValues:
+    REPORTED_CREDITS = "reducto_reported_credits"
+    BILLED_PAGES = "reducto_list_price_from_billed_pages"
+    DOCUMENT_PAGES = "reducto_list_price_from_document_pages"
+
+
+# Saved responses may still contain fields derived from the old credit formula.
+_DERIVED_COST_KEYS = (
+    "deep_extract_billable_fields",
+    "deep_extract_credits",
+    "parse_credits",
+    "deep_extract_cost_calculated",
+    "reported_credits",
+    "credits_used",
+    "total_credits",
+    "credits_per_page",
+    "num_pages_billed",
+    COST_IS_ESTIMATE,
+    COST_PER_PAGE_USD,
+    COST_SOURCE,
+    COST_USD,
+)
 
 
 def _unwrap_citation_values(value: Any) -> Any:
@@ -59,74 +88,82 @@ def _unwrap_citation_values(value: Any) -> Any:
 
 
 def _coerce_positive_float(value: Any) -> float | None:
-    if isinstance(value, (int, float)) and value > 0:
-        return float(value)
-    return None
+    number = _coerce_nonnegative_float(value)
+    return number if number is not None and number > 0 else None
 
 
 def _coerce_nonnegative_float(value: Any) -> float | None:
-    if isinstance(value, (int, float)) and math.isfinite(value) and value >= 0:
+    if not isinstance(value, bool) and isinstance(value, (int, float)) and math.isfinite(value) and value >= 0:
         return float(value)
     return None
 
 
-def _attach_cost_stats(
+def attach_reducto_extract_cost(
     raw_output: dict[str, Any],
     pipeline_config: dict[str, Any],
     source_file_path: str | None = None,
 ) -> None:
-    """Surface Reducto usage credits as top-level report stats.
-
-    Standard Extract uses returned ``usage.credits``. Deep Extract uses one
-    deterministic total: the greater of 30 credits or 4 credits per page plus
-    0.1 credits per returned field, followed by 1 parse credit per page.
-    """
-    config = pipeline_config if isinstance(pipeline_config, dict) else {}
-    response_config = raw_output.get("_config")
-    response_config = response_config if isinstance(response_config, dict) else {}
-    deep_extract = bool(config.get("deep_extract") or response_config.get("deep_extract"))
-
+    """Price returned credits, then billed Extract pages, then reported document pages."""
     usage = raw_output.get("usage")
-    usage_dict = usage if isinstance(usage, dict) else {}
-    num_pages = _coerce_positive_float(usage_dict.get("num_pages"))
-    if num_pages is None and source_file_path:
-        counted_pages = page_count(Path(source_file_path))
-        if counted_pages > 0:
-            num_pages = float(counted_pages)
+    usage = usage if isinstance(usage, dict) else {}
+    if raw_output.get("deep_extract_cost_calculated") is True:
+        for key in _DERIVED_COST_KEYS:
+            raw_output.pop(key, None)
+    breakdown = usage.get("usage_breakdown")
+    breakdown = breakdown if isinstance(breakdown, dict) else {}
+    reported_pages = _coerce_nonnegative_float(usage.get("num_pages"))
+    billed_pages = _coerce_nonnegative_float(breakdown.get("extract_pages"))
+    num_pages = reported_pages if reported_pages is not None else billed_pages
+    if (num_pages is None or num_pages == 0) and source_file_path is not None:
+        num_pages = _coerce_positive_float(page_count(Path(source_file_path)))
     if num_pages is not None:
         raw_output["num_pages"] = num_pages
 
-    reported_credits = _coerce_nonnegative_float(usage_dict.get("credits"))
-    if reported_credits is not None:
-        raw_output["reported_credits"] = reported_credits
-    credits_used = reported_credits
+    credits = _coerce_nonnegative_float(usage.get("credits"))
+    if credits is not None:
+        cost_usd = credits * REDUCTO_USD_PER_CREDIT
+        source = ReductoCostSourceValues.REPORTED_CREDITS
+    else:
+        pages = billed_pages if billed_pages is not None else reported_pages
+        product = breakdown.get("extract_model")
+        if product is None:
+            mode = usage.get("extract_mode")
+            response_config = raw_output.get("_config")
+            response_config = response_config if isinstance(response_config, dict) else {}
+            deep_extract = response_config.get("deep_extract", pipeline_config.get("deep_extract"))
+            if mode == "super_agent" or (mode is None and deep_extract is True):
+                product = _REDUCTO_DEEP_EXTRACT_PRODUCT
+            elif mode in ("extract", "spreadsheet_agent") or (mode is None and deep_extract is False):
+                product = _REDUCTO_EXTRACT_PRODUCT
+        tier = breakdown.get("tier")
+        if pages is None or tier not in (None, "Default", "Batch"):
+            return
+        if product == _REDUCTO_DEEP_EXTRACT_PRODUCT and tier != "Batch":
+            rate = _REDUCTO_DEEP_EXTRACT_PAGE_USD
+        elif product == _REDUCTO_EXTRACT_PRODUCT:
+            rate = _REDUCTO_EXTRACT_PAGE_USD * (_REDUCTO_EXTRACT_BATCH_MULTIPLIER if tier == "Batch" else 1)
+        else:
+            return
 
-    if deep_extract and num_pages is not None:
-        num_fields_value = usage_dict.get("num_fields")
-        if isinstance(num_fields_value, (int, float)) and num_fields_value >= 0:
-            billable_fields = float(num_fields_value)
-            deep_credits = max(
-                REDUCTO_DEEP_MIN_CREDITS_PER_DOCUMENT,
-                REDUCTO_DEEP_CREDITS_PER_PAGE * num_pages + REDUCTO_DEEP_CREDITS_PER_FIELD * billable_fields,
-            )
-            parse_credits = REDUCTO_PARSE_CREDITS_PER_PAGE * num_pages
+        # The rate card does not publish the dense-field surcharge or negotiated rates.
+        cost_usd = pages * rate
+        source = (
+            ReductoCostSourceValues.BILLED_PAGES if billed_pages is not None else ReductoCostSourceValues.DOCUMENT_PAGES
+        )
 
-            raw_output["deep_extract_billable_fields"] = billable_fields
-            raw_output["deep_extract_credits"] = deep_credits
-            raw_output["parse_credits"] = parse_credits
-            raw_output["deep_extract_cost_calculated"] = True
-            credits_used = deep_credits + parse_credits
-
-    if credits_used is None:
-        return
-
-    raw_output["credits_used"] = credits_used
-    raw_output["total_credits"] = credits_used
-
-    cost_usd = credits_used * REDUCTO_USD_PER_CREDIT
+    for key in _DERIVED_COST_KEYS:
+        raw_output.pop(key, None)
     raw_output[COST_USD] = cost_usd
-    if num_pages is not None:
-        raw_output["credits_per_page"] = credits_used / num_pages
+    raw_output[COST_SOURCE] = source
+    if credits is not None:
+        raw_output.update(reported_credits=credits, credits_used=credits, total_credits=credits)
+        if num_pages is not None and num_pages > 0:
+            raw_output["credits_per_page"] = credits / num_pages
+    else:
+        raw_output[COST_IS_ESTIMATE] = True
+        if billed_pages is not None:
+            raw_output["num_pages_billed"] = billed_pages
+    if num_pages is not None and num_pages > 0:
         raw_output[COST_PER_PAGE_USD] = cost_usd / num_pages
 
 
@@ -139,8 +176,6 @@ class ReductoExtractProvider(Provider):
     According to https://docs.reducto.ai/extraction/extract-overview
     """
 
-    _attach_cost_stats = staticmethod(_attach_cost_stats)
-
     def _record_cost(
         self,
         raw: dict[str, Any],
@@ -148,7 +183,7 @@ class ReductoExtractProvider(Provider):
         component_id: str,
         source_file_path: str | None = None,
     ) -> dict[str, Any]:
-        self._attach_cost_stats(raw, config, source_file_path)
+        attach_reducto_extract_cost(raw, config, source_file_path)
         cost = raw.get(COST_USD)
         raw[RAW_COST_COMPLETE] = cost is not None
         snapshot = {KNOWN_COST_USD: cost, COMPLETE: cost is not None}
@@ -290,7 +325,7 @@ class ReductoExtractProvider(Provider):
                                 cost_payload = result_payload if isinstance(result_payload, dict) else last_response
                                 accounting = self._record_cost(
                                     cost_payload,
-                                    {"deep_extract": deep_extract and job.status == "Completed"},
+                                    {"deep_extract": deep_extract},
                                     f"reducto/{job_id}",
                                     pdf_path if job.status == "Completed" else None,
                                 )
@@ -361,7 +396,7 @@ class ReductoExtractProvider(Provider):
                     # present; a local ID keeps separate calls distinct when absent.
                     response_id = last_response.get("job_id")
                     component_id = f"reducto/{response_id if response_id is not None else uuid4().hex}"
-                    accounting = self._record_cost(last_response, {}, component_id, pdf_path)
+                    accounting = self._record_cost(last_response, {"deep_extract": False}, component_id, pdf_path)
                     emit_provider_event(
                         "stage.completed",
                         provider="reducto",
@@ -523,7 +558,7 @@ class ReductoExtractProvider(Provider):
             completed_at = datetime.now()
             latency_ms = int((completed_at - started_at).total_seconds() * 1000)
 
-            self._attach_cost_stats(
+            attach_reducto_extract_cost(
                 raw_output,
                 extract_config,
                 str(file_path),
@@ -576,7 +611,7 @@ class ReductoExtractProvider(Provider):
         if raw_result.request.config_override:
             extract_config.update(raw_result.request.config_override)
 
-        self._attach_cost_stats(
+        attach_reducto_extract_cost(
             raw_result.raw_output,
             extract_config,
             raw_result.request.source_file_path,
