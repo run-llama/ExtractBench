@@ -189,11 +189,10 @@ class ReductoExtractProvider(Provider):
         snapshot = {KNOWN_COST_USD: cost, COMPLETE: cost is not None}
         if cost is not None:
             usage = raw.get("usage")
-            record_response_cost(
-                cost,
-                usage if usage is not None else {},
-                component_id=component_id,
-            )
+            cost_usage = dict(usage) if isinstance(usage, dict) else {}
+            if raw.get(COST_IS_ESTIMATE) is True:
+                cost_usage.update({COST_IS_ESTIMATE: True, COST_SOURCE: raw[COST_SOURCE]})
+            record_response_cost(cost, cost_usage, component_id=component_id)
         return snapshot
 
     def __init__(self, provider_name: str, base_config: dict[str, Any] | None = None):
@@ -368,7 +367,9 @@ class ReductoExtractProvider(Provider):
                             result_payload = cancellation.get("result")
                             cost_payload = result_payload if isinstance(result_payload, dict) else cancellation
                             if isinstance(cost_payload.get("usage"), dict):
-                                accounting = self._record_cost(cost_payload, {}, f"reducto/{job_id}")
+                                accounting = self._record_cost(
+                                    cost_payload, {"deep_extract": deep_extract}, f"reducto/{job_id}"
+                                )
                     except Exception as cancel_error:
                         logging.getLogger(__name__).warning("Reducto job cancellation failed", exc_info=True)
                         emit_provider_event(

@@ -16,6 +16,7 @@ from extract_bench.inference.cost_contract import (
     COST_ATTEMPT_EVENT,
     COST_COMPLETE,
     COST_COMPONENT_EVENT,
+    COST_IS_ESTIMATE,
     COST_USD,
     KNOWN_COST_USD,
     OUTCOME,
@@ -161,10 +162,18 @@ class AttemptCost:
             self.complete = False
         self.components[component_id] = updated
 
+    @property
+    def cost_is_estimate(self) -> bool:
+        return any(
+            isinstance(usage := component.get(USAGE), Mapping) and usage.get(COST_IS_ESTIMATE) is True
+            for component in self.components.values()
+        )
+
     def snapshot(self) -> dict[str, Any]:
         return {
             COST_USD: self.known_cost_usd,
             COST_COMPLETE: self.complete,
+            **({COST_IS_ESTIMATE: True} if self.cost_is_estimate else {}),
             COMPONENTS: {key: dict(value) for key, value in self.components.items()},
             USAGE: self.usage,
         }
@@ -189,4 +198,5 @@ def summarize_attempts(attempts: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
             successful[COST_USD] if successful is not None and successful[COST_COMPLETE] else None
         ),
         COST_COMPLETE: complete,
+        **({COST_IS_ESTIMATE: True} if any(item.get(COST_IS_ESTIMATE) is True for item in attempts) else {}),
     }
