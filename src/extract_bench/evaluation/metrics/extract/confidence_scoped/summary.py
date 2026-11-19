@@ -9,7 +9,8 @@ instead.
 from __future__ import annotations
 
 from bisect import bisect_left
-from collections.abc import Sequence
+from collections import defaultdict
+from collections.abc import Iterable, Sequence
 from typing import Any
 
 from extract_bench.evaluation.metrics.extract.unified_evidence_metric import ValueCell
@@ -18,8 +19,17 @@ from extract_bench.schemas.extract_output import FieldCitation
 from extract_bench.test_cases.schema import ExtractFieldTestRule
 
 from .paths import iter_field_values
-from .scoring import build_confidence_field_rows, clamp_confidence, confidence_signals_by_path, value_path_prefix
+from .scoring import (
+    augrc_groups,
+    build_confidence_field_rows,
+    clamp_confidence,
+    confidence_signals_by_path,
+    value_path_prefix,
+)
 from .types import ConfidenceFieldRow
+
+AUGRC_GROUPS = "augrc_groups"
+LEADERBOARD_SCORING_CUTOFF_MS = 30 * 60 * 1_000
 
 DEFAULT_CONFIDENCE_THRESHOLDS: tuple[float, ...] = (
     0.0,
@@ -383,10 +393,56 @@ def _threshold_metric_values(threshold_rows: list[dict[str, Any]]) -> list[Metri
     return metrics
 
 
+def pooled_leaderboard_confidence(
+    timed_metrics: Iterable[tuple[MetricValue, float | None]],
+) -> dict[str, float]:
+    """Pool (field counts, document result latency in ms) for the official score."""
+    returned = scored = 0
+    groups: dict[float, list[int]] = defaultdict(lambda: [0, 0])
+    complete_ranks = True
+    for metric, latency_ms in timed_metrics:
+        data = metric.metadata
+        if latency_ms is None:
+            if data.get("emitted_leaf_count", 0) > 0:
+                # An untimed prediction makes the official denominator unknown.
+                return {}
+            continue
+        if latency_ms > LEADERBOARD_SCORING_CUTOFF_MS:
+            continue
+        if data.get("coverage_scope") != "emitted_value_f1_cells":
+            if AUGRC_GROUPS not in data and data.get("emitted_leaf_count", 0) > 0:
+                # Older scalar-leaf counters cannot be mixed with Value F1 cells.
+                return {}
+            continue
+        returned += data["emitted_leaf_count"]
+        scored += data["scored_leaf_count"]
+        if AUGRC_GROUPS not in data:
+            complete_ranks = False
+            continue
+        for score, total, errors in data[AUGRC_GROUPS]:
+            groups[score][0] += total
+            groups[score][1] += errors
+
+    result = {"Confidence_Coverage": 100 * scored / returned} if returned > 0 else {}
+    if complete_ranks and len(groups) > 0:
+        # At rank j within a tie of size m, the expected new errors are j*e/m.
+        # Summing over j=1..m gives e*(m+1)/2; keep twice the sum integral.
+        prior_errors = twice_integral = n = 0
+        for score in sorted(groups, reverse=True):
+            total, errors = groups[score]
+            twice_integral += 2 * total * prior_errors + errors * (total + 1)
+            prior_errors += errors
+            n += total
+        result["Confidence_AUGRC"] = twice_integral / (2 * n * n)
+    return result
+
+
 def confidence_signal_coverage_summary(
     extracted_data: Any,
     field_citations: Sequence[FieldCitation],
     value_cells: Sequence[ValueCell],
+    *,
+    expected_output: Any | None = None,
 ) -> dict[str, Any]:
     prefix = value_path_prefix(extracted_data)
     if len(value_cells) > 0:
@@ -438,7 +494,7 @@ def confidence_signal_coverage_summary(
     missing_paths = sorted(emitted_paths - scored_paths)
     emitted_count = len(emitted_paths)
     scored_count = len(scored_paths)
-    return {
+    result: dict[str, Any] = {
         "confidence_signal_coverage": _safe_ratio(scored_count, emitted_count),
         "confidence_signal_emitted_leaf_count": emitted_count,
         "confidence_signal_scored_leaf_count": scored_count,
@@ -447,14 +503,23 @@ def confidence_signal_coverage_summary(
         "confidence_semantics": sorted(signal_semantics),
         "coverage_scope": coverage_scope,
     }
+    if expected_output is not None:
+        result[AUGRC_GROUPS] = augrc_groups(value_cells, emitted_paths, signals, prefix, expected_output)
+    return result
 
 
 def _confidence_signal_coverage_metric(
     extracted_data: Any,
     field_citations: Sequence[FieldCitation],
     value_cells: Sequence[ValueCell],
+    expected_output: Any | None,
 ) -> MetricValue:
-    coverage = confidence_signal_coverage_summary(extracted_data, field_citations, value_cells)
+    coverage = confidence_signal_coverage_summary(
+        extracted_data,
+        field_citations,
+        value_cells,
+        expected_output=expected_output,
+    )
     return MetricValue(
         metric_name="confidence_signal_coverage",
         value=coverage["confidence_signal_coverage"],
@@ -465,6 +530,7 @@ def _confidence_signal_coverage_metric(
             "missing_confidence_paths_sample": coverage["missing_confidence_paths_sample"],
             "confidence_semantics": coverage["confidence_semantics"],
             "coverage_scope": coverage["coverage_scope"],
+            **({AUGRC_GROUPS: coverage[AUGRC_GROUPS]} if AUGRC_GROUPS in coverage else {}),
         },
     )
 
@@ -496,7 +562,12 @@ def compute_confidence_scoped_metrics(
         coverage_precision_target=coverage_precision_target,
         value_cells=value_cells,
     )
-    signal_coverage_metric = _confidence_signal_coverage_metric(extracted_data, field_citations, value_cells)
+    signal_coverage_metric = _confidence_signal_coverage_metric(
+        extracted_data,
+        field_citations,
+        value_cells,
+        expected_output,
+    )
     if (
         not rows
         and not summary["confidence_full_gt_expected_leaf_count"]
