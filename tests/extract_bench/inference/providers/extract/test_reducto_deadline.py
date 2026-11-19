@@ -15,7 +15,9 @@ pytest.importorskip("pypdf", reason="dev and runners extras required")
 from extract_bench.inference.cost_contract import (
     COMPONENT_ID,
     COST_COMPONENT_EVENT,
+    COST_IS_ESTIMATE,
     COST_USD,
+    USAGE,
 )
 from extract_bench.inference.events import bind_provider_event_sink
 from extract_bench.inference.limits import ExecutionBudget
@@ -141,11 +143,12 @@ def test_cancelled_awaiter_still_records_late_submission(monkeypatch: pytest.Mon
 
 
 @pytest.mark.parametrize("status", ["Completed", "Failed"])
-@pytest.mark.parametrize("credits", [0, 4])
+@pytest.mark.parametrize(("credits", "expected_cost"), [(0, 0.0), (4, 0.06), (None, 0.08)])
 def test_terminal_job_usage_is_journaled_even_after_cancellation(
     monkeypatch: pytest.MonkeyPatch,
     status: str,
-    credits: int,
+    credits: int | None,
+    expected_cost: float,
 ) -> None:
     from extract_bench.inference.providers.base import ProviderTransientError
 
@@ -175,7 +178,8 @@ def test_terminal_job_usage_is_journaled_even_after_cancellation(
     charges = [payload for event, payload in events if event == COST_COMPONENT_EVENT]
     assert len(charges) == 1
     # The successful public Deep rate has a minimum; failure uses only returned billing.
-    assert charges[0][COST_USD] == pytest.approx(0.48 if status == "Completed" else credits * 0.015)
+    assert charges[0][COST_USD] == pytest.approx(expected_cost)
+    assert (charges[0][USAGE].get(COST_IS_ESTIMATE) is True) == (credits is None)
 
 
 def test_sync_job_ids_keep_distinct_calls_separate_when_optional_id_is_absent(monkeypatch: pytest.MonkeyPatch) -> None:

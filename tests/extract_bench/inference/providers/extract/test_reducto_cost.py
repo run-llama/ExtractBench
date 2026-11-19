@@ -2,6 +2,9 @@
 
 import pytest
 
+pytest.importorskip("reducto", reason="dev and runners extras required")
+pytest.importorskip("pypdf", reason="dev and runners extras required")
+
 from extract_bench.inference.cost_contract import COST_IS_ESTIMATE, COST_PER_PAGE_USD, COST_SOURCE, COST_USD
 from extract_bench.inference.providers.extract.reducto import (
     ReductoCostSourceValues,
