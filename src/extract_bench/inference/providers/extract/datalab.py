@@ -722,7 +722,6 @@ def _collect_citations(
             meta_obj = node.get(key + _META_SUFFIX)
             _collect_field_signals(
                 field_path=field_path,
-                value=value,
                 score_obj=score_obj,
                 meta_obj=meta_obj,
                 raw_citations=node.get(key + _CITATIONS_SUFFIX),
@@ -739,7 +738,6 @@ def _collect_citations(
                             continue
                         _collect_field_signals(
                             field_path=f"{field_path}[{index}]",
-                            value=item,
                             score_obj=None,
                             meta_obj=metadata,
                             raw_citations=None,
@@ -767,7 +765,6 @@ def _collect_citations(
 def _collect_field_signals(
     *,
     field_path: str,
-    value: Any,
     score_obj: Any,
     meta_obj: Any,
     raw_citations: Any,
@@ -778,8 +775,6 @@ def _collect_field_signals(
         score_obj=score_obj,
         meta_obj=meta_obj,
     )
-    if value is None and signal_metadata.get("native_verification_status") == "PASS":
-        confidence = None
     entries = _datalab_citation_entries(raw_citations)
     if isinstance(meta_obj, Mapping):
         entries.extend(_datalab_citation_entries(meta_obj.get("citations")))
