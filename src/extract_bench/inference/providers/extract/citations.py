@@ -552,8 +552,10 @@ def _landingai_v2_leaf_citations(
     return citations
 
 
-_LANDINGAI_V2_CHECKED_MARKS = ("[x]", "[X]", "\u2611", "\u2612")
-_LANDINGAI_V2_UNCHECKED_MARKS = ("[ ]", "\u2610")
+# Checkbox marks as they appear in v2 Parse Markdown: "[x]" / "[ ]" and Unicode boxes
+# (ballot boxes, square, check marks).
+_LANDINGAI_V2_CHECKED_MARKS = ("[x]", "[X]", "\u2611", "\u2612", "\u25a0", "\u2713", "\u2714")
+_LANDINGAI_V2_UNCHECKED_MARKS = ("[ ]", "\u2610", "\u25a1", "\u25a2")
 _LANDINGAI_V2_HTML_TAG = re.compile(r"<[^>]*>")
 _LANDINGAI_V2_WORD = re.compile(r"[^\W_]+")
 # Largest Markdown gap (characters) between two value words that still belong to one

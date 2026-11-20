@@ -341,3 +341,17 @@ def test_booleans_prefer_marks_in_the_reported_state() -> None:
     assert [c.bbox[0] for c in extract_landingai_v2_field_citations(unchecked, structure, markdown)] == pytest.approx(
         [0.16]
     )
+
+
+def test_booleans_recognize_unicode_checkbox_symbols() -> None:
+    markdown = "Form 4972 □ Other ☑ done"
+    structure = _word_structure(markdown)
+    unchecked = {"flag": {"value": False, "ranges": [{"start": 0, "end": len(markdown)}]}}
+    checked = {"flag": {"value": True, "ranges": [{"start": 0, "end": len(markdown)}]}}
+
+    assert [c.bbox[0] for c in extract_landingai_v2_field_citations(unchecked, structure, markdown)] == pytest.approx(
+        [0.22]
+    )
+    assert [c.bbox[0] for c in extract_landingai_v2_field_citations(checked, structure, markdown)] == pytest.approx(
+        [0.34]
+    )
