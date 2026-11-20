@@ -493,7 +493,7 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
             provider_name="reducto_extract",
             config={
                 "citations": True,
-                REDUCTO_CONFIDENCE_SIGNAL_TYPE: "categorical",
+                REDUCTO_CONFIDENCE_SIGNAL_TYPE: "continuous",
                 "array_extract": False,
             },
         )
@@ -505,7 +505,7 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
             provider_name="reducto_extract",
             config={
                 "citations": True,
-                REDUCTO_CONFIDENCE_SIGNAL_TYPE: "categorical",
+                REDUCTO_CONFIDENCE_SIGNAL_TYPE: "continuous",
                 "array_extract": False,
                 "extract_model": "v4",
             },
@@ -518,7 +518,7 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
             provider_name="reducto_extract",
             config={
                 "citations": True,
-                REDUCTO_CONFIDENCE_SIGNAL_TYPE: "categorical",
+                REDUCTO_CONFIDENCE_SIGNAL_TYPE: "continuous",
                 "array_extract": False,
                 "deep_extract": True,
             },

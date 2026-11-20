@@ -150,13 +150,12 @@ def test_reducto_keeps_confidence_when_grounding_boxes_are_rejected() -> None:
     )
 
     by_path = {citation.field_path: citation for citation in result.output.field_citations}
-    assert len(result.output.field_citations) == 4
+    assert len(result.output.field_citations) == 3
     assert by_path[""].confidence == 0.91
     assert by_path["voting_authority_none"].confidence == 0.996
-    assert by_path["label_only"].confidence == 1.0
-    for field_path in ("voting_authority_none", "label_only"):
-        assert by_path[field_path].bbox is None
-        assert by_path[field_path].page is None
+    assert by_path["voting_authority_none"].bbox is None
+    assert by_path["voting_authority_none"].page is None
+    assert "label_only" not in by_path
     assert by_path["mixed_grounding"].confidence == 0.31
     assert by_path["mixed_grounding"].page == 1
     assert by_path["mixed_grounding"].bbox == [0.25, 0.25, 0.01, 0.02]
