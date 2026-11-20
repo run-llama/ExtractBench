@@ -170,6 +170,22 @@ def test_failed_job_is_permanent_and_timeout_is_transient() -> None:
         provider._extract_from_document(Path("doc.pdf"), {})
 
 
+def test_extract_job_timeout_fails_the_document_without_retry() -> None:
+    provider = _provider()
+    _wire_success(provider)
+    v2 = provider._client.v2
+    v2.extract_jobs.get.side_effect = None
+    v2.extract_jobs.get.return_value = _job(
+        "failed", "extract-1", error={"code": "timeout", "message": "Request timed out"}
+    )
+
+    with pytest.raises(ProviderPermanentError) as caught:
+        provider._extract_from_document(Path("doc.pdf"), {})
+
+    # The parse credits already spent are still reported.
+    assert caught.value.debug_payload["cost_accounting"]["known_cost_usd"] == pytest.approx(0.03)
+
+
 def test_unknown_config_key_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("LANDING_AI_API_KEY", "test-key")
     with pytest.raises(ProviderConfigError):

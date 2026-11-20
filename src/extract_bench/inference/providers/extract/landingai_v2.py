@@ -14,6 +14,9 @@ endpoints. DPT-3 parse models and the v2 extract models (for example
 
 Both stages run as async jobs and are polled against the document's shared
 execution budget, so the harness deadline and cancellation are respected.
+An extract job that the service stops at its own time limit (error code
+``timeout``) fails the document without a retry, since a retry would parse
+again and hit the same limit.
 """
 
 from __future__ import annotations
@@ -305,6 +308,10 @@ class LandingAIADEV2ExtractProvider(Provider):
                 return ProviderTransientError(f"Transient LandingAI error: {error}", debug_payload=debug_payload)
             return ProviderPermanentError(f"LandingAI request rejected: {error}", debug_payload=debug_payload)
         if isinstance(error, _JobFailed):
+            if error.stage == "extract" and (error.code or "").lower() == "timeout":
+                # The service stopped the extract job at its own time limit. A retry would re-parse,
+                # pay again and hit the same limit, so the document fails now.
+                return ProviderPermanentError(f"LandingAI job failed: {error}", debug_payload=debug_payload)
             text = str(error).lower()
             if any(word in text for word in ("timeout", "timed out", "unavailable", "internal")):
                 return ProviderTransientError(f"LandingAI job failed: {error}", debug_payload=debug_payload)
