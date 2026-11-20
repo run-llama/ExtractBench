@@ -294,6 +294,25 @@ def test_value_without_ranges_is_located_in_the_markdown() -> None:
     assert citations[0].bbox == pytest.approx([0.1, 0.12, 0.17, 0.03])
 
 
+def test_numbers_without_ranges_are_located_as_printed() -> None:
+    markdown = "Coupon 5.780 Par 1,000 Value 1,003,418 Shares 12"
+    metadata = {
+        "value_usd": {"value": 1003418, "ranges": None},
+        "coupon": {"value": 5.78, "ranges": None},
+        "shares": {"value": 12, "ranges": None},
+        "flag": {"value": True, "ranges": None},
+    }
+
+    citations = extract_landingai_v2_field_citations(metadata, _word_structure(markdown), markdown)
+    by_path = {citation.field_path: citation for citation in citations}
+
+    assert by_path["value_usd"].metadata["range"] == [markdown.index("1,003,418"), markdown.index(" Shares")]
+    assert by_path["coupon"].metadata["range"] == [markdown.index("5.780"), markdown.index(" Par")]
+    # Under three digits is too ambiguous to search for; booleans are never searched.
+    assert "shares" not in by_path
+    assert "flag" not in by_path
+
+
 def test_numbers_match_printed_digits_and_skip_label_numbers() -> None:
     markdown = "1 Ordinary income (loss) | -5,307."
     metadata = {"box_1": {"value": -5307, "ranges": [{"start": 0, "end": len(markdown)}]}}

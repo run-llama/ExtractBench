@@ -682,10 +682,35 @@ def _landingai_v2_union_bbox(boxes: list[list[float]]) -> list[float]:
     return [x1, y1, x2 - x1, y2 - y1]
 
 
+def _landingai_v2_number_pattern(value: int | float) -> str | None:
+    """Regex for a number as it may be printed: optional thousands separators, optional trailing
+    decimal zeros ("1,003,418", "5.780"). Numbers with fewer than three digits are too ambiguous."""
+    text = str(value)
+    if isinstance(value, float):
+        text = repr(value).removesuffix(".0")
+    if "e" in text.lower():
+        return None
+    whole, _, fraction = text.lstrip("-").partition(".")
+    if len(whole + fraction) < 3:
+        return None
+    whole_pattern = ",?".join(re.escape(digit) for digit in whole)
+    fraction_pattern = rf"\.{re.escape(fraction)}0*" if fraction else r"(?:\.0+)?"
+    return rf"(?<![\d.,]){whole_pattern}{fraction_pattern}(?!\d)"
+
+
 def _landingai_v2_locate_value(markdown: str, value: Any) -> tuple[int, int] | None:
-    """Range of the first occurrence of a text ``value`` in ``markdown``, allowing any punctuation,
-    whitespace or ``<br>`` between its words (a value joined with ", " from printed lines)."""
-    if not isinstance(value, str) or isinstance(value, bool):
+    """Range of the first occurrence of ``value`` in ``markdown``.
+
+    Text values allow any punctuation, whitespace or ``<br>`` between their words (a value joined
+    with ", " from printed lines); numbers allow thousands separators and trailing decimal zeros.
+    """
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        number_pattern = _landingai_v2_number_pattern(value)
+        match = re.search(number_pattern, markdown) if number_pattern else None
+        return (match.start(), match.end()) if match else None
+    if not isinstance(value, str):
         return None
     words = _LANDINGAI_V2_WORD.findall(value)
     if not words or len("".join(words)) < 3:
