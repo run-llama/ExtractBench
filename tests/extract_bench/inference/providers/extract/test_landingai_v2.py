@@ -200,3 +200,144 @@ def test_citations_follow_array_paths() -> None:
     metadata = {"items": [{"amount": {"value": "42.00", "ranges": [{"start": 21, "end": 26}]}}]}
     citations = extract_landingai_v2_field_citations(metadata, _structure())
     assert [citation.field_path for citation in citations] == ["items[0].amount"]
+
+
+def _word_structure(markdown: str, line_breaks: tuple[str, ...] = ("<br>", "\n")) -> dict:
+    """One text block whose atomic spans are the whitespace-separated tokens of ``markdown``.
+
+    Each token gets a 0.05-wide box; a token after a line break starts a new line 0.02 lower.
+    """
+    spans = []
+    x, y, position = 0.1, 0.1, 0
+    for token in markdown.split(" "):
+        start = position
+        position += len(token) + 1
+        if not token:
+            continue
+        spans.append(
+            {
+                "page": 1,
+                "range": {"start": start, "end": start + len(token)},
+                "box": {"xmin": x, "ymin": y, "xmax": x + 0.05, "ymax": y + 0.01},
+            }
+        )
+        x += 0.06
+        if any(token.endswith(mark) for mark in line_breaks):
+            x, y = 0.1, y + 0.02
+    return {
+        "type": "document",
+        "children": [
+            {
+                "type": "page",
+                "page": 1,
+                "children": [
+                    {
+                        "type": "text",
+                        "id": "text-0",
+                        "grounding": {
+                            "page": 1,
+                            "range": {"start": 0, "end": len(markdown)},
+                            "box": {"xmin": 0, "ymin": 0, "xmax": 1, "ymax": 1},
+                        },
+                        "atomic_grounding": spans,
+                    }
+                ],
+            }
+        ],
+    }
+
+
+def test_value_words_are_kept_and_merged_without_the_label() -> None:
+    markdown = "F Partner's name, address<br> ESK LLC<br> 237 MAYFAIR DRIVE<br> BROOKLYN, NY 11234"
+    metadata = {
+        "partner_address": {
+            "value": "237 MAYFAIR DRIVE, BROOKLYN, NY 11234",
+            "ranges": [{"start": 0, "end": len(markdown)}],
+        }
+    }
+
+    citations = extract_landingai_v2_field_citations(metadata, _word_structure(markdown), markdown)
+
+    assert len(citations) == 1
+    citation = citations[0]
+    # Two address lines: x from the first word to the end of "11234", y over both lines.
+    assert citation.bbox == pytest.approx([0.1, 0.14, 0.17, 0.03])
+    assert citation.metadata["granularity"] == "value"
+    assert citation.metadata["span_count"] == 6
+
+
+def test_value_without_ranges_is_located_in_the_markdown() -> None:
+    markdown = "TELCO EXPERTS LLC<br> 38 PARK AVENUE<br> RUTHERFORD, NJ 07070"
+    metadata = {"address": {"value": "38 PARK AVENUE, RUTHERFORD, NJ 07070", "ranges": None}}
+
+    citations = extract_landingai_v2_field_citations(metadata, _word_structure(markdown), markdown)
+
+    assert len(citations) == 1
+    assert citations[0].metadata["range_source"] == "located"
+    assert citations[0].metadata["range"] == [markdown.index("38"), len(markdown)]
+    assert citations[0].bbox == pytest.approx([0.1, 0.12, 0.17, 0.03])
+
+
+def test_numbers_match_printed_digits_and_skip_label_numbers() -> None:
+    markdown = "1 Ordinary income (loss) | -5,307."
+    metadata = {"box_1": {"value": -5307, "ranges": [{"start": 0, "end": len(markdown)}]}}
+
+    citations = extract_landingai_v2_field_citations(metadata, _word_structure(markdown), markdown)
+
+    assert [c.bbox[0] for c in citations] == pytest.approx([0.1 + 5 * 0.06])
+
+
+def test_booleans_cite_the_checkbox_mark() -> None:
+    markdown = "H [x] Domestic partner"
+    metadata = {"is_domestic": {"value": True, "ranges": [{"start": 0, "end": len(markdown)}]}}
+
+    citations = extract_landingai_v2_field_citations(metadata, _word_structure(markdown), markdown)
+
+    assert [c.bbox[0] for c in citations] == pytest.approx([0.16])
+
+
+def test_word_fragments_join_only_next_to_matching_words() -> None:
+    # The label shares the word "entity" with the value; it forms its own group and is dropped.
+    markdown = "What type of entity is this partner? DISREGARDED ENTI TY"
+    metadata = {"entity_type": {"value": "DISREGARDED ENTITY", "ranges": [{"start": 0, "end": len(markdown)}]}}
+
+    citations = extract_landingai_v2_field_citations(metadata, _word_structure(markdown), markdown)
+
+    assert len(citations) == 1
+    assert citations[0].metadata["span_count"] == 3
+    assert citations[0].bbox[0] == pytest.approx(0.1 + 7 * 0.06)
+
+
+def test_unmatched_values_keep_the_word_boxes() -> None:
+    markdown = "Total due 42.00"
+    metadata = {"note": {"value": "paid in full", "ranges": [{"start": 0, "end": 9}]}}
+
+    citations = extract_landingai_v2_field_citations(metadata, _word_structure(markdown), markdown)
+
+    assert len(citations) == 2
+    assert {c.metadata["granularity"] for c in citations} == {"atomic"}
+
+
+def test_raw_output_keeps_the_parse_markdown() -> None:
+    provider = _provider()
+    _wire_success(provider)
+
+    result = provider._extract_from_document(Path("doc.pdf"), {})
+
+    assert result["parse_markdown"] == MARKDOWN
+
+
+def test_booleans_prefer_marks_in_the_reported_state() -> None:
+    markdown = "G [x] General partner [ ] Limited partner"
+    structure = _word_structure(markdown)
+    checked = {"flag": {"value": True, "ranges": [{"start": 0, "end": len(markdown)}]}}
+    unchecked = {"flag": {"value": False, "ranges": [{"start": 0, "end": len(markdown)}]}}
+
+    # Tokens: G, [x], General, partner, [, ], Limited, partner -> "[x]" is the 2nd token.
+    assert [c.bbox[0] for c in extract_landingai_v2_field_citations(checked, structure, markdown)] == pytest.approx(
+        [0.16]
+    )
+    # The unchecked mark is split into "[" and "]" here, so no token holds "[ ]": fall back to any mark.
+    assert [c.bbox[0] for c in extract_landingai_v2_field_citations(unchecked, structure, markdown)] == pytest.approx(
+        [0.16]
+    )

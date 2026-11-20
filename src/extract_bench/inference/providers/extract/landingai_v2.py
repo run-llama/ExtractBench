@@ -8,7 +8,8 @@ endpoints. DPT-3 parse models and the v2 extract models (for example
 2. ``client.v2.extract_jobs`` extracts with the benchmark schema, passed unchanged,
    from the v2 Parse Markdown.
 3. Field citations map each extracted value's Markdown ranges to the parse
-   structure's atomic boxes, word-level on ``dpt-3-pro-20261111`` (see
+   structure's atomic boxes, word-level on ``dpt-3-pro-20261111``, keeping the words
+   that match the value and merging them into one box per occurrence (see
    ``extract_landingai_v2_field_citations``).
 
 Both stages run as async jobs and are polled against the document's shared
@@ -274,6 +275,8 @@ class LandingAIADEV2ExtractProvider(Provider):
                 "data": extraction if isinstance(extraction, Mapping) else {},
                 "extraction_metadata": extract_payload.get("extraction_metadata"),
                 "parse_structure": parse_payload.get("structure"),
+                # Kept so citations can be rebuilt from saved results without new API calls.
+                "parse_markdown": markdown,
                 "parse_metadata": parse_metadata,
                 "extract_metadata": extract_metadata,
                 "warnings": extract_payload.get("warnings"),
@@ -359,6 +362,7 @@ class LandingAIADEV2ExtractProvider(Provider):
             field_citations=extract_landingai_v2_field_citations(
                 raw_output.get("extraction_metadata"),
                 raw_output.get("parse_structure"),
+                raw_output.get("parse_markdown"),
             ),
         )
         return InferenceResult(
