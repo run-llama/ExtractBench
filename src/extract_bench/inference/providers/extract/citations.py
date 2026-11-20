@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import bisect
 import logging
 import math
 from collections.abc import Iterator, Mapping, Sequence
@@ -336,6 +337,181 @@ def extract_landingai_field_citations(
             pdf_path=Path(pdf_path),
             extracted_data=extracted_data,
         )
+    return citations
+
+
+def extract_landingai_v2_field_citations(
+    extraction_metadata: Any,
+    structure: Any,
+) -> list[FieldCitation]:
+    """Map LandingAI ADE v2 extraction ranges to page boxes from the v2 parse structure.
+
+    v2 Extract returns ``extraction_metadata``: a tree that mirrors the extraction, with
+    each leaf replaced by ``{"value": ..., "ranges": [{"start", "end"}, ...]}``. The
+    ranges are Unicode code-point offsets into the Markdown that was extracted from,
+    which is the v2 Parse Markdown. The v2 Parse ``structure`` tree carries the same
+    kind of ``grounding.range`` on every block, plus ``atomic_grounding`` (one entry
+    per word on ``dpt-3-pro-20261111`` and later, per visual line on earlier DPT-3
+    snapshots) on leaf blocks; boxes are normalized ``xmin/ymin/xmax/ymax`` and
+    pages are 1-indexed.
+
+    Each leaf range is matched to the overlapping atomic spans first (word boxes on
+    current snapshots, the tightest available), then to the smallest overlapping blocks
+    when no atomic span covers it. This is the same join as the public ``/v2/ground``
+    endpoint, done locally at atomic granularity instead of block granularity.
+    """
+    metadata = _as_mapping(extraction_metadata)
+    structure_map = _as_mapping(structure)
+    if not metadata or not structure_map:
+        return []
+
+    atomic, blocks = _landingai_v2_spans(structure_map)
+    if not atomic and not blocks:
+        return []
+    atomic.sort(key=lambda span: span["start"])
+    blocks.sort(key=lambda span: span["start"])
+    index = {
+        "atomic": atomic,
+        "atomic_starts": [span["start"] for span in atomic],
+        "blocks": blocks,
+        "block_starts": [span["start"] for span in blocks],
+    }
+    return _dedupe(_collect_landingai_v2_citations(node=metadata, index=index, path=[]))
+
+
+def _landingai_v2_spans(structure: Mapping[str, Any]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Flatten the v2 parse structure into atomic spans (words or lines) and leaf-block spans."""
+    atomic: list[dict[str, Any]] = []
+    blocks: list[dict[str, Any]] = []
+
+    def visit(node: Any) -> None:
+        node_map = _as_mapping(node)
+        if not node_map:
+            return
+        children = _as_sequence(node_map.get("children"))
+        node_type = node_map.get("type")
+        if node_type not in ("document", "page"):
+            grounding = _landingai_v2_span(node_map.get("grounding"))
+            if grounding is not None and not children:
+                grounding["type"] = node_type
+                grounding["block_id"] = node_map.get("id")
+                blocks.append(grounding)
+            for entry in _as_sequence(node_map.get("atomic_grounding")):
+                span = _landingai_v2_span(entry)
+                if span is not None:
+                    span["type"] = node_type
+                    span["block_id"] = node_map.get("id")
+                    atomic.append(span)
+        for child in children:
+            visit(child)
+
+    visit(structure)
+    return atomic, blocks
+
+
+def _landingai_v2_span(grounding: Any) -> dict[str, Any] | None:
+    """Return ``{start, end, page, bbox}`` for one v2 grounding entry, or None."""
+    grounding_map = _as_mapping(grounding)
+    text_range = _as_mapping(grounding_map.get("range"))
+    box = _as_mapping(grounding_map.get("box"))
+    start = _coerce_int(text_range.get("start"))
+    end = _coerce_int(text_range.get("end"))
+    page = _coerce_int(grounding_map.get("page"))
+    xmin = _coerce_float(box.get("xmin"))
+    ymin = _coerce_float(box.get("ymin"))
+    xmax = _coerce_float(box.get("xmax"))
+    ymax = _coerce_float(box.get("ymax"))
+    if None in (start, end, xmin, ymin, xmax, ymax) or end <= start:  # type: ignore[operator]
+        return None
+    bbox = _normalize_bbox([xmin, ymin, xmax - xmin, ymax - ymin], None)  # type: ignore[operator]
+    if bbox is None:
+        return None
+    return {"start": start, "end": end, "page": page if page and page >= 1 else None, "bbox": bbox}
+
+
+def _landingai_v2_overlaps(
+    spans: list[dict[str, Any]],
+    starts: list[int],
+    start: int,
+    end: int,
+) -> list[dict[str, Any]]:
+    """Spans (sorted by start) that overlap the half-open range [start, end)."""
+    hits: list[dict[str, Any]] = []
+    position = bisect.bisect_left(starts, end) - 1
+    while position >= 0:
+        span = spans[position]
+        if span["end"] > start:
+            hits.append(span)
+        else:
+            # Atomic spans and leaf blocks do not nest, so earlier spans end even earlier.
+            break
+        position -= 1
+    hits.reverse()
+    return hits
+
+
+def _collect_landingai_v2_citations(
+    *,
+    node: Any,
+    index: Mapping[str, Any],
+    path: list[str],
+) -> list[FieldCitation]:
+    node_map = _as_mapping(node)
+    if node_map:
+        if "ranges" in node_map and "value" in node_map:
+            return _landingai_v2_leaf_citations(node_map, index=index, field_path=format_field_path(path))
+        citations: list[FieldCitation] = []
+        for key, value in node_map.items():
+            citations.extend(_collect_landingai_v2_citations(node=value, index=index, path=[*path, str(key)]))
+        return citations
+
+    if isinstance(node, Sequence) and not isinstance(node, (str, bytes, bytearray)):
+        citations = []
+        for item_index, item in enumerate(node):
+            citations.extend(_collect_landingai_v2_citations(node=item, index=index, path=[*path, f"[{item_index}]"]))
+        return citations
+
+    return []
+
+
+def _landingai_v2_leaf_citations(
+    leaf: Mapping[str, Any],
+    *,
+    index: Mapping[str, Any],
+    field_path: str,
+) -> list[FieldCitation]:
+    if not field_path:
+        return []
+    value = leaf.get("value")
+    reference_text = None if value is None else str(value)
+    citations: list[FieldCitation] = []
+    for raw_range in _as_sequence(leaf.get("ranges")):
+        range_map = _as_mapping(raw_range)
+        start = _coerce_int(range_map.get("start"))
+        end = _coerce_int(range_map.get("end"))
+        if start is None or end is None or end <= start:
+            continue
+        granularity = "atomic"
+        hits = _landingai_v2_overlaps(index["atomic"], index["atomic_starts"], start, end)
+        if not hits:
+            granularity = "block"
+            hits = _landingai_v2_overlaps(index["blocks"], index["block_starts"], start, end)
+        for hit in hits:
+            citations.append(
+                FieldCitation(
+                    field_path=field_path,
+                    page=hit["page"],
+                    bbox=list(hit["bbox"]),
+                    reference_text=reference_text,
+                    source="landingai",
+                    metadata={
+                        "range": [start, end],
+                        "granularity": granularity,
+                        "block_type": hit.get("type"),
+                        "block_id": hit.get("block_id"),
+                    },
+                )
+            )
     return citations
 
 
