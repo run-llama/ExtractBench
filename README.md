@@ -53,13 +53,13 @@ In the official benchmark, documents that fail or exceed a 30-minute limit score
 
 | Rank | Provider | Category | Overall | Short | Medium | Long | AUGRC | ¢ / Page |
 |---:|---|---|---:|---:|---:|---:|---:|---:|
-| 1 | LlamaExtract Agentic Plus | LlamaExtract | **96.17** | <u>97.02</u> | 94.30 | 94.65 | 0.01504 | 7.50¢ |
+| 1 | LlamaExtract Agentic Plus | LlamaExtract | **96.17** | <u>97.02</u> | 94.30 | <u>94.65</u> | 0.01504 | 7.50¢ |
 | 2 | LlamaExtract Agentic Plus (Max Effort) | LlamaExtract | **96.17** | 96.82 | **95.48** | 91.36 | — | 19.11¢ |
-| 3 | Datalab Balanced | Specialized APIs | <u>96.13</u> | 96.74 | <u>94.87</u> | 94.70 | 0.01172 | 8.67¢ |
-| 4 | Datalab Accurate | Specialized APIs | 96.09 | 96.67 | <u>94.87</u> | **94.81** | 0.01236 | 9.10¢ |
-| 5 | Reducto Deep Extract | Specialized APIs | 96.08 | 96.84 | 94.80 | 92.85 | 0.02477 | 6.35¢ |
-| 6 | Pulse (Effort) | Specialized APIs | 96.07 | 96.83 | 94.70 | 93.24 | — | 10.50¢ |
-| 7 | LlamaExtract Agentic | LlamaExtract | 95.65 | 96.06 | 94.79 | <u>94.73</u> | 0.01635 | 3.12¢ |
+| 3 | Reducto Deep Extract | Specialized APIs | <u>96.08</u> | 96.84 | 94.80 | 92.85 | 0.02477 | 6.35¢ |
+| 4 | Pulse (Effort) | Specialized APIs | 96.07 | 96.83 | 94.70 | 93.24 | — | 10.50¢ |
+| 5 | Datalab Balanced | Specialized APIs | 95.99 | 96.53 | <u>94.95</u> | 94.29 | 0.01516 | 8.61¢ |
+| 6 | Datalab Accurate | Specialized APIs | 95.96 | 96.67 | 94.44 | 94.50 | 0.0153 | 9.10¢ |
+| 7 | LlamaExtract Agentic | LlamaExtract | 95.65 | 96.06 | 94.79 | **94.73** | 0.01635 | 3.12¢ |
 | 8 | Codex (GPT-6.1 Sol) | Coding Agents | 95.31 | 97.01 | 92.96 | 85.46 | — | 7.13¢ |
 | 9 | Claude Code (Sonnet 5.5) | Coding Agents | 94.68 | 96.22 | 92.97 | 83.69 | — | 5.69¢ |
 | 10 | KYNEX (GPT-6.1 Sol) | Coding Agents | 94.63 | 96.04 | 93.14 | 84.18 | — | 9.35¢ |
