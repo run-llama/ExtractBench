@@ -2244,3 +2244,81 @@ def test_value_only_alternate_retains_existing_grounding() -> None:
         _schema(),
     )
     assert _val(metrics, "extract_unified_grounded_f1") == 1.0
+
+
+@pytest.mark.parametrize(
+    ("predicted", "correct", "expected_cells", "predicted_cells"),
+    [
+        (["A", "B", "C", "D"], 4, 4, 4),
+        (["D", "C", "B", "A"], 1, 4, 4),
+        (["A", "C", "D"], 3, 4, 3),
+        (["A", "X", "B", "C", "D"], 4, 4, 5),
+    ],
+)
+def test_ordered_array_scores_only_monotone_pairs(
+    predicted: list[str], correct: int, expected_cells: int, predicted_cells: int
+) -> None:
+    rules = [ExtractFieldTestRule(field_path="holdings", structural="ordered")]
+    expected = {"holdings": [{"security": security} for security in ["A", "B", "C", "D"]]}
+    actual = {"holdings": [{"security": security} for security in predicted]}
+    results = compute_unified_evidence_metrics(expected, actual, rules, data_schema=_schema())
+    metric = next(result for result in results if result.metric_name == "extract_unified_value_f1")
+    assert metric.value == pytest.approx(2 * correct / (expected_cells + predicted_cells))
+    assert metric.metadata is not None
+    assert metric.metadata["v_correct"] == correct
+    assert metric.metadata["expected_cells"] == expected_cells
+    assert metric.metadata["predicted_cells"] == predicted_cells
+
+
+def test_ordered_row_alignment_uses_scored_values_and_emits_only_selected_paths() -> None:
+    expected = {"holdings": [{"security": "A", "coupon": 1, "note": "x"}, {"security": "B"}]}
+    actual = {"holdings": [{"security": "B"}, {"security": "A alt", "coupon": 1, "note": "x"}]}
+    rules = [
+        ExtractFieldTestRule(field_path="holdings", structural="ordered"),
+        _rule("holdings[0].security", "A alt"),
+    ]
+    cells: list[unified_evidence_metric.ValueCell] = []
+    results = compute_unified_evidence_metrics(expected, actual, rules, data_schema=_schema(), value_cells=cells)
+    assert _val(results, "extract_unified_value_f1") == 0.75
+    assert [(cell.gt_path, cell.pred_path) for cell in cells if cell.value_correct] == [
+        ("holdings[0].security", "holdings[1].security"),
+        ("holdings[0].coupon", "holdings[1].coupon"),
+        ("holdings[0].note", "holdings[1].note"),
+    ]
+    assert len(cells) == 5
+
+
+@pytest.mark.parametrize("index_width", [1, 2])
+def test_ordered_children_influence_unordered_parent_pairing(index_width: int) -> None:
+    schema = _schema()
+    child_schema = schema["properties"]["holdings"]
+    schema["properties"]["groups"] = {
+        "type": "array",
+        "items": {"type": "object", "properties": {"holdings": child_schema}},
+    }
+    forward = {"holdings": [{"security": "A"}, {"security": "B"}]}
+    backward = {"holdings": list(reversed(forward["holdings"]))}
+    expected = {"groups": [forward, backward]}
+    actual = {"groups": [backward, forward]}
+    rules = [
+        ExtractFieldTestRule(field_path=f"groups[{i:0{index_width}d}].holdings", structural="ordered") for i in range(2)
+    ]
+    cells: list[unified_evidence_metric.ValueCell] = []
+    results = compute_unified_evidence_metrics(expected, actual, rules, data_schema=schema, value_cells=cells)
+    assert _val(results, "extract_unified_value_f1") == 1.0
+    assert len(cells) == 4
+    assert cells[0].gt_path == "groups[0].holdings[0].security"
+    assert cells[0].pred_path == "groups[1].holdings[0].security"
+
+
+def test_ordered_replacement_keeps_aligned_cell_paths() -> None:
+    expected = {"holdings": [{"security": "A"}, {"security": "B"}]}
+    actual = {"holdings": [{"security": "A"}, {"security": "Z"}]}
+    rules = [ExtractFieldTestRule(field_path="holdings", structural="ordered")]
+    cells: list[unified_evidence_metric.ValueCell] = []
+    results = compute_unified_evidence_metrics(expected, actual, rules, data_schema=_schema(), value_cells=cells)
+    assert _val(results, "extract_unified_value_f1") == 0.5
+    assert cells == [
+        unified_evidence_metric.ValueCell("holdings[0].security", "holdings[0].security", True),
+        unified_evidence_metric.ValueCell("holdings[1].security", "holdings[1].security", False),
+    ]

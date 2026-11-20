@@ -211,7 +211,7 @@ Both benchmarks use the same deterministic evaluator: one metric for value accur
 <details>
 <summary><strong>How the unified value F1 is computed</strong></summary>
 
-- **Array alignment.** A repeated structure compares as an unordered set of records: records pair by a globally optimal one-to-one assignment (the Hungarian algorithm) that minimizes mismatched cells. Unmatched expected records lower recall, surplus predictions lower precision.
+- **Array alignment.** Record arrays use Hungarian matching by default. An array-parent rule with `structural: "ordered"` uses sequence alignment to maximize matching values while preserving relative row order. Unmatched expected records lower recall, and surplus predictions lower precision.
 - **Normalization.** Matching is deterministic and mostly exact: dates in eight written formats canonicalize to ISO form, strings compare exactly after whitespace collapsing, and everything else uses plain equality, with no numeric tolerance and no LLM judge.
 - **Missing values.** An omitted key scores as an explicit `null`, every scalar field enters both denominators, and a correct `null` on a blank field is credited. Only repeated records move precision and recall apart, so a gap between them means records were dropped or invented.
 
