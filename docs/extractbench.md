@@ -113,4 +113,4 @@ Pool Value F1 cells across the documents in each leaderboard row using the 30-mi
 
 An omitted null or blank string earns credit only in a represented record. For scalar arrays, use the array score or, if absent, the lowest available element score. Duplicate scores at a path use the highest. A cell without a score inherits its nearest scored object ancestor.
 
-The [acceptance curves](../confidence-curves.csv) show correctly accepted fields as a percentage of all expected fields. [Threshold counts](../confidence-thresholds.csv) support reproducing the [published AUGRC results](https://www.llamaindex.ai/blog/what-makes-an-extraction-confidence-score-useful).
+The [acceptance curves](../confidence-curves.csv) show correctly accepted fields as a percentage of all expected fields. Each curve uses the ground-truth field count from its evaluation. [Threshold counts](../confidence-thresholds.csv) support reproducing the [published AUGRC results](https://www.llamaindex.ai/blog/what-makes-an-extraction-confidence-score-useful).
