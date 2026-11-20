@@ -14,6 +14,7 @@ import math
 import os
 import time
 from collections.abc import Mapping, Sequence
+from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Literal
@@ -75,6 +76,45 @@ class ConfidencePollingStatusValues:
     SCORING_FAILED: ConfidencePollingStatus = "scoring_failed"
     DEADLINE_EXCEEDED: ConfidencePollingStatus = "deadline_exceeded"
     POLL_ERROR: ConfidencePollingStatus = "poll_error"
+
+
+def _fast_request_schema(schema: dict[str, Any]) -> dict[str, Any]:
+    """Fast accepts nullable string array elements when their types are expressed with anyOf."""
+    result = deepcopy(schema)
+    pending = [result]
+    while len(pending) > 0:
+        node = pending.pop()
+        if not isinstance(node, dict):
+            continue
+        items = node.get("items")
+        if isinstance(items, dict) and items.get("type") == ["string", "null"] and "anyOf" not in items:
+            del items["type"]
+            items["anyOf"] = [{"type": "string"}, {"type": "null"}]
+
+        # Follow subschemas, including local definitions. Property names and literal
+        # values (such as examples, defaults and const) can themselves look like schemas.
+        for key, value in node.items():
+            if key in ("properties", "patternProperties", "$defs", "definitions", "dependentSchemas", "dependencies"):
+                if isinstance(value, dict):
+                    pending.extend(value.values())
+            elif key in ("allOf", "anyOf", "oneOf", "prefixItems", "items") and isinstance(value, list):
+                pending.extend(value)
+            elif key in (
+                "items",
+                "contains",
+                "additionalItems",
+                "unevaluatedItems",
+                "additionalProperties",
+                "unevaluatedProperties",
+                "propertyNames",
+                "contentSchema",
+                "if",
+                "then",
+                "else",
+                "not",
+            ):
+                pending.append(value)
+    return result
 
 
 @register_provider("datalab_extract")
@@ -154,7 +194,7 @@ class DatalabExtractProvider(Provider):
             extraction_started = time.perf_counter()
             pdf_page_count = _read_pdf_page_count(pdf_path)
             options = ExtractOptions(
-                page_schema=json.dumps(schema),
+                page_schema=json.dumps(_fast_request_schema(schema) if self._extraction_mode == "fast" else schema),
                 citation_granularity="phrase",
                 mode=self._parse_mode,
                 output_format=self._output_format,
@@ -682,7 +722,6 @@ def _collect_citations(
             meta_obj = node.get(key + _META_SUFFIX)
             _collect_field_signals(
                 field_path=field_path,
-                value=value,
                 score_obj=score_obj,
                 meta_obj=meta_obj,
                 raw_citations=node.get(key + _CITATIONS_SUFFIX),
@@ -699,7 +738,6 @@ def _collect_citations(
                             continue
                         _collect_field_signals(
                             field_path=f"{field_path}[{index}]",
-                            value=item,
                             score_obj=None,
                             meta_obj=metadata,
                             raw_citations=None,
@@ -727,7 +765,6 @@ def _collect_citations(
 def _collect_field_signals(
     *,
     field_path: str,
-    value: Any,
     score_obj: Any,
     meta_obj: Any,
     raw_citations: Any,
@@ -738,8 +775,6 @@ def _collect_field_signals(
         score_obj=score_obj,
         meta_obj=meta_obj,
     )
-    if value is None and signal_metadata.get("native_verification_status") == "PASS":
-        confidence = None
     entries = _datalab_citation_entries(raw_citations)
     if isinstance(meta_obj, Mapping):
         entries.extend(_datalab_citation_entries(meta_obj.get("citations")))
