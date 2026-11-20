@@ -8,8 +8,9 @@ reordered rows.
 
 Design
 ------
-The value scorer is ``array_record``'s keyless Hungarian row assignment with
-three additions:
+The value scorer extends ``array_record``'s keyless Hungarian row assignment.
+Record arrays with a ``structural: "ordered"`` parent rule use sequence alignment.
+Both assignments score the same value leaves.
 
 1. **OR-acceptable values.** A ground-truth cell passes if the prediction
    matches its ``expected_output`` value *or any* alternate value declared in
@@ -87,7 +88,8 @@ from __future__ import annotations
 
 import math
 import re
-from collections.abc import Mapping, MutableSequence, Sequence
+from collections.abc import Callable, Mapping, MutableSequence, Sequence
+from copy import copy
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import Any, SupportsFloat
@@ -110,12 +112,14 @@ from extract_bench.evaluation.metrics.extract.array_record_match_metric import (
     unwrap_value,
 )
 from extract_bench.evaluation.metrics.extract.json_subset_match import normalize_date_string
+from extract_bench.inference.providers.extract.citations import format_field_path
 from extract_bench.inference.providers.extract.table_codegen.schema_utils import (
     resolve_refs,
     schema_items,
     schema_properties,
 )
 from extract_bench.schemas.evaluation import MetricValue
+from extract_bench.test_cases.extract_field_paths import parse_field_path
 from extract_bench.test_cases.schema import ExtractFieldTestRule, iter_rule_evidence
 
 # Opt-in per-field normalizers (``_field_rules[path].normalizers``). Each is a
@@ -669,6 +673,67 @@ def union_xywh(boxes: Sequence[BBox]) -> BBox | None:
     return (x0, y0, x1 - x0, y1 - y0)
 
 
+def _ordered_record_paths(rules: Sequence[ExtractFieldTestRule], schema: Mapping[str, Any]) -> frozenset[str]:
+    paths = set()
+    for rule in rules:
+        if rule.structural != "ordered":
+            continue
+        try:
+            tokens = parse_field_path(rule.field_path)
+        except ValueError:
+            continue
+        node: Any = schema
+        for token in tokens:
+            node = schema_items(node) if isinstance(token, int) else schema_properties(node).get(token, {})
+        if is_object_array_schema(node):
+            paths.add(format_field_path([f"[{token}]" if isinstance(token, int) else token for token in tokens]))
+    return frozenset(paths)
+
+
+def _align_ordered_rows(
+    expected_count: int,
+    predicted_count: int,
+    matched_values: Callable[[int, int], int],
+) -> dict[int, int]:
+    """Maximize matched values over monotone row pairs, with gaps on either side."""
+    # Among equal value scores, retain as many paired rows as possible.
+    # The scale keeps the secondary row count below one matched value.
+    value_scale = min(expected_count, predicted_count) + 1
+    # Retain only the last two score rows and one byte per cell for traceback.
+    skip_expected, skip_predicted, pair = 0, 1, 2
+    directions = np.empty((expected_count, predicted_count), dtype=np.uint8)
+    previous = [0] * (predicted_count + 1)
+    for i in range(expected_count):
+        current = [0] * (predicted_count + 1)
+        for j in range(predicted_count):
+            up, left = previous[j + 1], current[j]
+            diagonal = previous[j] + matched_values(i, j) * value_scale + 1
+            if diagonal >= max(up, left):
+                current[j + 1] = diagonal
+                directions[i, j] = pair
+            elif up >= left:
+                current[j + 1] = up
+                directions[i, j] = skip_expected
+            else:
+                current[j + 1] = left
+                directions[i, j] = skip_predicted
+        previous = current
+
+    selected: dict[int, int] = {}
+    i, j = expected_count - 1, predicted_count - 1
+    while i >= 0 and j >= 0:
+        direction = directions[i, j]
+        if direction == pair:
+            selected[i] = j
+            i -= 1
+            j -= 1
+        elif direction == skip_expected:
+            i -= 1
+        else:
+            j -= 1
+    return selected
+
+
 class Scorer:
     def __init__(
         self,
@@ -682,6 +747,7 @@ class Scorer:
         fuzzy: dict[str, float],
         iou_threshold: float,
         evidence_targets: Mapping[str, Sequence[_ValueEvidence]],
+        ordered_arrays: frozenset[str],
         graded_cells: list[GradedCell] | None = None,
         value_cells: MutableSequence[ValueCell] | None = None,
     ) -> None:
@@ -696,6 +762,10 @@ class Scorer:
         self._pred_pages = pred_pages
         self._fuzzy = fuzzy
         self._iou = iou_threshold
+        self._ordered_arrays = ordered_arrays
+        self._ordered_array_ancestors = {
+            path[: index.start()] for path in ordered_arrays for index in re.finditer(r"\[\d+\]", path)
+        }
 
     def _configured_cell_match(self, gt_path: str, expected: Any, actual: Any, field: str) -> bool:
         return configured_cell_match(
@@ -1009,6 +1079,60 @@ class Scorer:
             if in_side:
                 self._count_subtree(f"{base}.{s}", child_val, child_schema, c, expected=expected, ground=ground)
 
+    def _align_annotated_rows(
+        self,
+        gt_field: str,
+        pred_field: str,
+        exp_rows: Sequence[Any],
+        act_rows: Sequence[Any],
+        item_schema: Mapping[str, Any],
+    ) -> dict[int, int]:
+        """Align this array using value scores that include any ordered descendants."""
+        # Probe candidate pairs without emitting verdicts. Only selected pairs
+        # contribute to the score and diagnostics below.
+        probe = copy(self)
+        probe._value_cells = None
+        probe._cells = None
+
+        def matched_values(i: int, j: int) -> int:
+            counts = _Counts()
+            probe._score_node(
+                f"{gt_field}[{i}]", f"{pred_field}[{j}]", exp_rows[i], act_rows[j], item_schema, counts, ground=False
+            )
+            return counts.v_correct
+
+        if gt_field in self._ordered_arrays:
+            # An identical edge pair earns every leaf on both rows. A monotone
+            # alignment can pair at most one of those rows elsewhere, so fixing
+            # the edge pair preserves the optimal score.
+            exp_end, act_end = len(exp_rows), len(act_rows)
+            start = 0
+            pairs: dict[int, int] = {}
+            while start < min(exp_end, act_end) and exp_rows[start] == act_rows[start]:
+                pairs[start] = start
+                start += 1
+            while start < min(exp_end, act_end) and exp_rows[exp_end - 1] == act_rows[act_end - 1]:
+                exp_end -= 1
+                act_end -= 1
+                pairs[exp_end] = act_end
+            if start < min(exp_end, act_end):
+                middle = _align_ordered_rows(
+                    exp_end - start, act_end - start, lambda i, j: matched_values(i + start, j + start)
+                )
+                pairs.update({i + start: j + start for i, j in middle.items()})
+            return pairs
+
+        # An unordered parent still uses Hungarian assignment, with row
+        # weights that reflect sequence alignment at the annotated child paths.
+        shape = (len(exp_rows), len(act_rows))
+        weights = np.fromiter(
+            (matched_values(i, j) for i in range(shape[0]) for j in range(shape[1])),
+            dtype=np.int32,
+            count=shape[0] * shape[1],
+        ).reshape(shape)
+        expected_indices, predicted_indices = linear_sum_assignment(weights, maximize=True)
+        return {int(i): int(j) for i, j in zip(expected_indices, predicted_indices, strict=True)}
+
     def _score_array(
         self,
         gt_field: str,
@@ -1030,7 +1154,8 @@ class Scorer:
         if len(subfield_names) == 0:
             return
         item_sch = array_item_properties(schema)
-        # List-of-objects subfields recurse with another Hungarian pass.
+        uses_ordered_paths = gt_field in self._ordered_arrays or gt_field in self._ordered_array_ancestors
+        # List-of-objects subfields recurse with their own alignment.
         # Dict-valued subfields recurse via ``_score_node`` (same as root).
         # Scalars and scalar lists stay opaque cells.
         object_array_names = [s for s in subfield_names if is_object_array_subfield(item_sch.get(s, {}))]
@@ -1058,7 +1183,8 @@ class Scorer:
         # unmatched rows can still grow if few rows match exactly, so treat it as
         # a heuristic, not a hard ceiling.
         giant = (
-            len(exp_rows) > 0
+            not uses_ordered_paths
+            and len(exp_rows) > 0
             and len(act_rows) > 0
             and len(cell_names) > 0
             and len(object_array_names) == 0
@@ -1123,7 +1249,11 @@ class Scorer:
         # Object-array subfields are counted by the recursion below, per matched
         # pair (and as one-sided misses for unmatched rows).
         match_for_exp: dict[int, int] = {}
-        if len(exp_rows) > 0 and len(act_rows) > 0:
+        if len(exp_rows) > 0 and len(act_rows) > 0 and uses_ordered_paths:
+            match_for_exp = self._align_annotated_rows(
+                gt_field, pred_field, exp_rows, act_rows, {"type": "object", "properties": item_sch}
+            )
+        elif len(exp_rows) > 0 and len(act_rows) > 0:
             # Align on the same leaves F1 scores: opaque cells plus nested-object
             # children (not a 0/1 ``==`` on the whole object). Object-arrays add
             # their nested Hungarian cost. Scalar arrays stay one opaque cell.
@@ -1570,7 +1700,7 @@ def compute_unified_evidence_metrics(
     graded_cells: list[GradedCell] | None = None,
     value_cells: MutableSequence[ValueCell] | None = None,
 ) -> list[MetricValue]:
-    """Value + grounded precision/recall/F1 under keyless Hungarian alignment.
+    """Value + grounded precision/recall/F1 with per-array row alignment.
 
     Returns an empty list when either side is not a dict (no array structure to
     score), matching ``array_record``'s ``counts is None`` guard.
@@ -1625,6 +1755,7 @@ def compute_unified_evidence_metrics(
         graded_cells=graded_cells,
         value_cells=value_cells,
         evidence_targets=ev_targets,
+        ordered_arrays=_ordered_record_paths(field_rules, resolved),
     ).score_root(expected, actual, schema_props)
     if c.expected == 0 and c.predicted == 0:
         return []
