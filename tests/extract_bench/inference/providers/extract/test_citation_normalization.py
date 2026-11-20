@@ -81,6 +81,87 @@ def test_reducto_citations_follow_wrapped_object_values() -> None:
     assert [(c.field_path, c.page) for c in citations] == [("portfolio.name", 2)]
 
 
+def test_reducto_preserves_grounding_in_a_legacy_wrapped_array() -> None:
+    raw_output = {"result": [[{"amount": {"value": 12, "citations": [{"page": 1}]}}]]}
+
+    citations = extract_reducto_field_citations(raw_output)
+
+    assert [(citation.field_path, citation.page) for citation in citations] == [("[0].amount", 1)]
+
+
+def test_reducto_keeps_confidence_when_grounding_boxes_are_rejected() -> None:
+    from datetime import UTC, datetime
+
+    pytest.importorskip("reducto")
+    from extract_bench.inference.pipelines import get_pipeline
+    from extract_bench.inference.providers.extract.reducto import ReductoExtractProvider
+    from extract_bench.schemas.pipeline_io import InferenceRequest, RawInferenceResult
+    from extract_bench.schemas.product import ProductType
+
+    bad_box = {"left": 1.02, "top": 0.25, "width": 0.01, "height": 0.02, "page": 1}
+    good_box = {"left": 0.25, "top": 0.25, "width": 0.01, "height": 0.02, "page": 1}
+    raw_output = {
+        "result": {
+            "voting_authority_none": {
+                "value": 0,
+                "citations": [
+                    {
+                        "bbox": bad_box,
+                        "confidence": "high",
+                        "granular_confidence": {"extract_confidence": 0.996},
+                    },
+                ],
+            },
+            "label_only": {
+                "value": "ABC",
+                "citations": [{"bbox": bad_box, "confidence": "high"}],
+            },
+            "mixed_grounding": {
+                "value": 42,
+                "citations": [
+                    {"bbox": good_box, "granular_confidence": {"extract_confidence": 0.99}},
+                    {"bbox": bad_box, "granular_confidence": {"extract_confidence": 0.31}},
+                ],
+            },
+        }
+    }
+    raw_output["result"] = {
+        "value": raw_output["result"],
+        "citations": [{"bbox": good_box, "granular_confidence": {"extract_confidence": 0.91}}],
+    }
+    provider = ReductoExtractProvider("reducto_extract", {"api_key": "test"})
+    pipeline = get_pipeline("reducto_deep_extract")
+    now = datetime.now(UTC)
+    result = provider.normalize(
+        RawInferenceResult(
+            request=InferenceRequest(
+                example_id="doc-1",
+                source_file_path="/tmp/doc.pdf",
+                product_type=ProductType.EXTRACT,
+            ),
+            pipeline=pipeline,
+            pipeline_name=pipeline.pipeline_name,
+            product_type=ProductType.EXTRACT,
+            raw_output=raw_output,
+            started_at=now,
+            completed_at=now,
+            latency_in_ms=0,
+        )
+    )
+
+    by_path = {citation.field_path: citation for citation in result.output.field_citations}
+    assert len(result.output.field_citations) == 4
+    assert by_path[""].confidence == 0.91
+    assert by_path["voting_authority_none"].confidence == 0.996
+    assert by_path["label_only"].confidence == 1.0
+    for field_path in ("voting_authority_none", "label_only"):
+        assert by_path[field_path].bbox is None
+        assert by_path[field_path].page is None
+    assert by_path["mixed_grounding"].confidence == 0.31
+    assert by_path["mixed_grounding"].page == 1
+    assert by_path["mixed_grounding"].bbox == [0.25, 0.25, 0.01, 0.02]
+
+
 def test_confidence_without_location_cannot_earn_page_or_box_credit() -> None:
     metadata = {
         "field_metadata": {

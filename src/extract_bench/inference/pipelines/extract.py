@@ -9,6 +9,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from extract_bench.inference.limits import EXTRACT_HARD_TIMEOUT_S
+from extract_bench.inference.providers.extract.citations import REDUCTO_CONFIDENCE_SIGNAL_TYPE
 from extract_bench.schemas.pipeline import PipelineSpec
 from extract_bench.schemas.product import ProductType
 
@@ -492,6 +493,7 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
             provider_name="reducto_extract",
             config={
                 "citations": True,
+                REDUCTO_CONFIDENCE_SIGNAL_TYPE: "categorical",
                 "array_extract": False,
             },
         )
@@ -503,6 +505,7 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
             provider_name="reducto_extract",
             config={
                 "citations": True,
+                REDUCTO_CONFIDENCE_SIGNAL_TYPE: "categorical",
                 "array_extract": False,
                 "extract_model": "v4",
             },
@@ -515,6 +518,7 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
             provider_name="reducto_extract",
             config={
                 "citations": True,
+                REDUCTO_CONFIDENCE_SIGNAL_TYPE: "categorical",
                 "array_extract": False,
                 "deep_extract": True,
             },

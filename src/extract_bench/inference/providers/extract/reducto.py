@@ -7,7 +7,7 @@ import os
 import threading
 from datetime import datetime
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Literal, cast
 from uuid import uuid4
 
 from reducto import Reducto
@@ -29,7 +29,10 @@ from extract_bench.inference.providers.base import (
     ProviderPermanentError,
     ProviderTransientError,
 )
-from extract_bench.inference.providers.extract.citations import extract_reducto_field_citations
+from extract_bench.inference.providers.extract.citations import (
+    REDUCTO_CONFIDENCE_SIGNAL_TYPE,
+    extract_reducto_field_citations,
+)
 from extract_bench.inference.providers.extract.direct_model_utils import page_count
 from extract_bench.inference.providers.registry import register_provider
 from extract_bench.schemas.extract_output import ExtractOutput
@@ -56,6 +59,34 @@ def _unwrap_citation_values(value: Any) -> Any:
     if isinstance(value, list):
         return [_unwrap_citation_values(item) for item in value]
     return value
+
+
+def normalize_reducto_output(
+    raw_output: dict[str, Any],
+    *,
+    example_id: str,
+    pipeline_name: str,
+    confidence_signal_type: Literal["continuous", "ordinal", "categorical"] | None = None,
+) -> ExtractOutput:
+    """Normalize values and evidence from a live or saved Reducto response."""
+    result = raw_output.get("result")
+    if isinstance(result, list) and len(result) > 0:
+        extracted_data = _unwrap_citation_values(result[0])
+    elif isinstance(result, dict):
+        extracted_data = _unwrap_citation_values(result)
+    else:
+        extracted_data = {}
+    return ExtractOutput(
+        task_type="extract",
+        example_id=example_id,
+        pipeline_name=pipeline_name,
+        extracted_data=extracted_data,
+        field_citations=extract_reducto_field_citations(
+            raw_output,
+            confidence_signal_type=confidence_signal_type,
+            extracted_data=extracted_data,
+        ),
+    )
 
 
 def _coerce_positive_float(value: Any) -> float | None:
@@ -582,25 +613,15 @@ class ReductoExtractProvider(Provider):
             raw_result.request.source_file_path,
         )
 
-        # Extract the structured data from the response
-        # Reducto returns data in the "result" field as a list
-        result = raw_result.raw_output.get("result", [])
-        # If result is a list, take the first element (should be a dict)
-        if isinstance(result, list) and len(result) > 0:
-            extracted_data = _unwrap_citation_values(result[0])
-        elif isinstance(result, dict):
-            # Fallback: if it's already a dict, use it directly
-            extracted_data = _unwrap_citation_values(result)
-        else:
-            # Empty list or unexpected type
-            extracted_data = {}
+        confidence_signal_type = extract_config.get(REDUCTO_CONFIDENCE_SIGNAL_TYPE)
+        if confidence_signal_type not in (None, "continuous", "ordinal", "categorical"):
+            raise ProviderConfigError(f"Unknown Reducto confidence signal type: {confidence_signal_type!r}")
 
-        output = ExtractOutput(
-            task_type="extract",
+        output = normalize_reducto_output(
+            raw_result.raw_output,
             example_id=raw_result.request.example_id,
             pipeline_name=raw_result.pipeline_name,
-            extracted_data=extracted_data,
-            field_citations=list(extract_reducto_field_citations(raw_result.raw_output)),
+            confidence_signal_type=confidence_signal_type,
         )
 
         return InferenceResult(
