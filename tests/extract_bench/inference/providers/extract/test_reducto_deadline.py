@@ -155,7 +155,7 @@ def test_terminal_job_usage_is_journaled_even_after_cancellation(
     budget = ExecutionBudget(100)
     client = Mock()
     client.extract.run_job.return_value = SimpleNamespace(job_id="job")
-    payload = {"usage": {"credits": credits, "num_pages": 2, "num_fields": 0}}
+    payload = {"usage": {"credits": credits, "num_pages": 2}}
 
     def poll(*args: object, **kwargs: object) -> SimpleNamespace:
         if status == "Completed":
@@ -177,7 +177,6 @@ def test_terminal_job_usage_is_journaled_even_after_cancellation(
             asyncio.run(provider._extract_pdf_async("unused.pdf", {}, deep_extract=True))
     charges = [payload for event, payload in events if event == COST_COMPONENT_EVENT]
     assert len(charges) == 1
-    # The successful public Deep rate has a minimum; failure uses only returned billing.
     assert charges[0][COST_USD] == pytest.approx(expected_cost)
     assert (charges[0][USAGE].get(COST_IS_ESTIMATE) is True) == (credits is None)
 

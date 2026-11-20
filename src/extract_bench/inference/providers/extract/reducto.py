@@ -58,6 +58,10 @@ _REDUCTO_EXTRACT_BATCH_MULTIPLIER = 0.8
 _REDUCTO_EXTRACT_PRODUCT = "Extract"
 _REDUCTO_DEEP_EXTRACT_PRODUCT = "Deep Extract"
 _REDUCTO_DENSE_FIELDS_PER_PAGE = 100
+# Benchmarks assume no dense-field surcharge. Two Deep Extract jobs over
+# 100 fields/page showed $0.24 for six pages in Reducto's usage dashboard.
+# https://github.com/run-llama/ExtractBench/pull/166#issuecomment-7024270397
+REDUCTO_BENCHMARK_FIELD_LIMIT = math.inf
 
 
 class ReductoCostSourceValues:
@@ -132,6 +136,8 @@ def attach_reducto_extract_cost(
     raw_output: dict[str, Any],
     pipeline_config: dict[str, Any],
     source_file_path: str | None = None,
+    *,
+    max_fields_for_page_estimate: float = _REDUCTO_DENSE_FIELDS_PER_PAGE,
 ) -> None:
     """Price returned credits, then billed Extract pages, then reported document pages."""
     usage = raw_output.get("usage")
@@ -156,19 +162,19 @@ def attach_reducto_extract_cost(
         source = ReductoCostSourceValues.REPORTED_CREDITS
     else:
         pages = billed_pages if billed_pages is not None else reported_pages
-        fields = _coerce_nonnegative_float(breakdown.get("extract_fields"))
-        if fields is None:
-            fields = _coerce_nonnegative_float(usage.get("num_fields"))
-        # The rate card gives a per-page threshold and does not price the surcharge.
-        # A job total of at most that threshold guarantees no page exceeds it.
-        if fields is None or fields > _REDUCTO_DENSE_FIELDS_PER_PAGE:
-            raw_output[COST_USD] = None
-            raw_output.pop(COST_PER_PAGE_USD, None)
-            raw_output[RAW_COST_COMPLETE] = False
-            _discard_cached_page_estimates(raw_output, stale_success)
-            if billed_pages is not None:
-                raw_output["num_pages_billed"] = billed_pages
-            return
+        if max_fields_for_page_estimate != math.inf:
+            fields = _coerce_nonnegative_float(breakdown.get("extract_fields"))
+            if fields is None:
+                fields = _coerce_nonnegative_float(usage.get("num_fields"))
+            # A job total at or below the per-page threshold rules out a surcharge.
+            if fields is None or fields > max_fields_for_page_estimate:
+                raw_output[COST_USD] = None
+                raw_output.pop(COST_PER_PAGE_USD, None)
+                raw_output[RAW_COST_COMPLETE] = False
+                _discard_cached_page_estimates(raw_output, stale_success)
+                if billed_pages is not None:
+                    raw_output["num_pages_billed"] = billed_pages
+                return
 
         product = breakdown.get("extract_model")
         if product is None:
@@ -227,7 +233,12 @@ class ReductoExtractProvider(Provider):
         component_id: str,
         source_file_path: str | None = None,
     ) -> dict[str, Any]:
-        attach_reducto_extract_cost(raw, config, source_file_path)
+        attach_reducto_extract_cost(
+            raw,
+            config,
+            source_file_path,
+            max_fields_for_page_estimate=REDUCTO_BENCHMARK_FIELD_LIMIT,
+        )
         cost = raw.get(COST_USD)
         raw[RAW_COST_COMPLETE] = cost is not None
         snapshot = {KNOWN_COST_USD: cost, COMPLETE: cost is not None}
@@ -607,6 +618,7 @@ class ReductoExtractProvider(Provider):
                 raw_output,
                 extract_config,
                 str(file_path),
+                max_fields_for_page_estimate=REDUCTO_BENCHMARK_FIELD_LIMIT,
             )
 
             return RawInferenceResult(
@@ -660,6 +672,7 @@ class ReductoExtractProvider(Provider):
             raw_result.raw_output,
             extract_config,
             raw_result.request.source_file_path,
+            max_fields_for_page_estimate=REDUCTO_BENCHMARK_FIELD_LIMIT,
         )
 
         # Extract the structured data from the response

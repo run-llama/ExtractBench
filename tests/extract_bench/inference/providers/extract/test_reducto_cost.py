@@ -18,6 +18,7 @@ from extract_bench.inference.cost_contract import (
     OUTCOME,
 )
 from extract_bench.inference.providers.extract.reducto import (
+    REDUCTO_BENCHMARK_FIELD_LIMIT,
     ReductoCostSourceValues,
     attach_reducto_extract_cost,
 )
@@ -46,12 +47,12 @@ def test_returned_credits_use_public_rate_and_override_both_page_counts(credits:
 
 
 @pytest.mark.parametrize(
-    ("product", "tier", "pages", "mode", "expected", "source"),
+    ("product", "tier", "pages", "mode", "fields", "expected", "source"),
     [
-        ("Deep Extract", "Default", 12, "super_agent", 0.48, ReductoCostSourceValues.BILLED_PAGES),
-        ("Deep Extract", "Default", 0, "super_agent", 0.0, ReductoCostSourceValues.BILLED_PAGES),
-        ("Extract", "Batch", 8, "extract", 0.128, ReductoCostSourceValues.BILLED_PAGES),
-        (None, None, None, "super_agent", 0.4, ReductoCostSourceValues.DOCUMENT_PAGES),
+        ("Deep Extract", "Default", 12, "super_agent", 3000, 0.48, ReductoCostSourceValues.BILLED_PAGES),
+        ("Deep Extract", "Default", 0, "super_agent", 0, 0.0, ReductoCostSourceValues.BILLED_PAGES),
+        ("Extract", "Batch", 8, "extract", 80, 0.128, ReductoCostSourceValues.BILLED_PAGES),
+        (None, None, None, "super_agent", None, 0.4, ReductoCostSourceValues.DOCUMENT_PAGES),
     ],
 )
 def test_page_estimate_uses_reported_billing_product_and_preferred_page_count(
@@ -59,6 +60,7 @@ def test_page_estimate_uses_reported_billing_product_and_preferred_page_count(
     tier: str | None,
     pages: int | None,
     mode: str,
+    fields: int | None,
     expected: float,
     source: str,
 ) -> None:
@@ -66,14 +68,14 @@ def test_page_estimate_uses_reported_billing_product_and_preferred_page_count(
         "usage": {
             "credits": None,
             "num_pages": 10,
-            "num_fields": 80,
+            "num_fields": fields,
             "extract_mode": mode,
             "usage_breakdown": {"extract_model": product, "tier": tier, "extract_pages": pages},
         },
     }
-    attach_reducto_extract_cost(raw, {})
+    attach_reducto_extract_cost(raw, {}, max_fields_for_page_estimate=REDUCTO_BENCHMARK_FIELD_LIMIT)
     first = raw.copy()
-    attach_reducto_extract_cost(raw, {})
+    attach_reducto_extract_cost(raw, {}, max_fields_for_page_estimate=REDUCTO_BENCHMARK_FIELD_LIMIT)
     assert raw == first
     assert raw[COST_USD] == pytest.approx(expected)
     assert raw[COST_PER_PAGE_USD] == pytest.approx(expected / 10)
