@@ -6,7 +6,7 @@ import logging
 import math
 from collections.abc import Iterator, Mapping, Sequence
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from extract_bench.schemas.extract_output import FieldCitation
 
@@ -104,12 +104,174 @@ def _collect_extend_review_agent_signals(
     return signals
 
 
-def extract_reducto_field_citations(raw_output: Mapping[str, Any]) -> Sequence[FieldCitation]:
-    """Extract citations from Reducto's value/citations field wrappers."""
+REDUCTO_CONFIDENCE_SIGNAL_TYPE = "confidence_signal_type"
+REDUCTO_HYBRID_CONFIDENCE = "reducto_extract_or_high_low"
+REDUCTO_CATEGORICAL_SOURCE = "categorical_high_or_zero"
+
+
+def extract_reducto_field_citations(
+    raw_output: Mapping[str, Any],
+    *,
+    confidence_signal_type: Literal["continuous", "ordinal", "categorical"] | None = None,
+    extracted_data: Any | None = None,
+) -> Sequence[FieldCitation]:
+    """Extract Reducto grounding and value confidence independently."""
     result = raw_output.get("result")
     if isinstance(result, list) and len(result) > 0:
         result = result[0]
-    return _dedupe(_collect_reducto_citations(result, path=()))
+    citations = _collect_reducto_citations(result, path=())
+    if confidence_signal_type not in {"categorical", "continuous"}:
+        return _dedupe(citations)
+
+    categorical = confidence_signal_type == "categorical"
+    signals = _collect_reducto_extraction_signals(result, categorical=categorical)
+    cited_default = (
+        (
+            0.0,
+            {
+                "citation_confidence_labels": [],
+                "confidence_source": REDUCTO_CATEGORICAL_SOURCE,
+                "confidence_semantics": REDUCTO_HYBRID_CONFIDENCE,
+            },
+        )
+        if categorical
+        else (None, {})
+    )
+    normalized: list[FieldCitation] = []
+    cited_paths: set[str] = set()
+    for citation in citations:
+        cited_paths.add(citation.field_path)
+        confidence, signal_metadata = signals.get(citation.field_path, cited_default)
+        update: dict[str, Any] = {"confidence": confidence}
+        if len(signal_metadata) > 0:
+            # Keep the raw metadata of each surviving grounding citation.
+            update["metadata"] = {**signal_metadata, **(citation.metadata if citation.metadata is not None else {})}
+        normalized.append(citation.model_copy(update=update))
+
+    if categorical:
+        for field_path in _iter_emitted_leaf_paths(extracted_data):
+            if field_path not in cited_paths:
+                signals.setdefault(
+                    field_path,
+                    (
+                        0.0,
+                        {
+                            "confidence_source": "missing_or_unavailable",
+                            "confidence_semantics": REDUCTO_HYBRID_CONFIDENCE,
+                        },
+                    ),
+                )
+    for field_path, (confidence, signal_metadata) in signals.items():
+        if field_path not in cited_paths:
+            normalized.append(
+                FieldCitation(
+                    field_path=field_path,
+                    page=None,
+                    bbox=None,
+                    source="reducto",
+                    confidence=confidence,
+                    metadata=signal_metadata,
+                )
+            )
+    return _dedupe(normalized)
+
+
+def _iter_emitted_leaf_paths(value: Any, path: Sequence[str] | None = None) -> Sequence[str]:
+    path = () if path is None else path
+    if isinstance(value, Mapping):
+        paths: list[str] = []
+        for key, item in value.items():
+            paths.extend(_iter_emitted_leaf_paths(item, [*path, str(key)]))
+        return paths
+    if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
+        paths = []
+        for index, item in enumerate(value):
+            paths.extend(_iter_emitted_leaf_paths(item, [*path, f"[{index}]"]))
+        return paths
+    if value is None:
+        return []
+    field_path = format_field_path(path)
+    return [field_path] if len(field_path) > 0 else []
+
+
+def _collect_reducto_extraction_signals(
+    result: Any,
+    *,
+    categorical: bool,
+) -> dict[str, tuple[float, dict[str, Any]]]:
+    """Read scores from field wrappers and raw citations, including rejected boxes.
+
+    Use the minimum granular extraction score for a field. Categorical pipelines
+    use citation labels when no granular score is available.
+    """
+    granular_scores: dict[str, tuple[float, dict[str, Any]]] = {}
+    citation_labels: dict[str, set[str]] = {}
+
+    def record_granular(field_path: str, entry: Mapping[str, Any]) -> None:
+        granular = _as_mapping(entry.get("granular_confidence"))
+        raw_confidence = _coerce_float(granular.get("extract_confidence"))
+        if raw_confidence is None or not math.isfinite(raw_confidence):
+            return
+        confidence = max(0.0, min(1.0, raw_confidence))
+        current = granular_scores.get(field_path)
+        if current is not None and current[0] <= confidence:
+            return
+        metadata: dict[str, Any] = {
+            "granular_confidence": dict(granular),
+            "confidence_semantics": "continuous_0_1",
+        }
+        if isinstance(label := entry.get("confidence"), str):
+            metadata["confidence_label"] = label
+        granular_scores[field_path] = (confidence, metadata)
+
+    def walk(node: Any, path: Sequence[str]) -> None:
+        if isinstance(node, Mapping):
+            wrapper = "value" in node and "citations" in node
+            field_path = format_field_path(path)
+            if len(field_path) > 0:
+                record_granular(field_path, node)
+            if wrapper:
+                for raw_entry in _iter_citation_entries(node):
+                    entry = _as_mapping(raw_entry)
+                    record_granular(field_path, entry)
+                    raw_label = entry.get("confidence")
+                    if categorical and isinstance(raw_label, str) and len(label := raw_label.strip().lower()) > 0:
+                        citation_labels.setdefault(field_path, set()).add(label)
+
+            for key, value in node.items():
+                if key in {"citations", "citation", "granular_confidence"}:
+                    continue
+                next_path = path if key == "value" and wrapper else (*path, key)
+                walk(value, next_path)
+            return
+        if isinstance(node, Sequence) and not isinstance(node, (str, bytes, bytearray)):
+            for index, item in enumerate(node):
+                walk(item, [*path, f"[{index}]"])
+
+    walk(result, ())
+    if not categorical:
+        return granular_scores
+
+    signals: dict[str, tuple[float, dict[str, Any]]] = {}
+    for field_path in dict.fromkeys((*granular_scores, *citation_labels)):
+        labels = sorted(citation_labels.get(field_path, ()), key=lambda label: (label != "low", label != "high", label))
+        if field_path in granular_scores:
+            confidence, metadata = granular_scores[field_path]
+            source = "granular_extract_confidence"
+        else:
+            confidence = 1.0 if labels == ["high"] else 0.0
+            metadata = {}
+            source = REDUCTO_CATEGORICAL_SOURCE
+        signals[field_path] = (
+            confidence,
+            {
+                **metadata,
+                "citation_confidence_labels": labels,
+                "confidence_source": source,
+                "confidence_semantics": REDUCTO_HYBRID_CONFIDENCE,
+            },
+        )
+    return signals
 
 
 def _collect_reducto_citations(node: Any, *, path: Sequence[str]) -> Sequence[FieldCitation]:
@@ -235,6 +397,13 @@ def _collect_field_map(
     return citations
 
 
+def confidence_only_citation(field_path: str, *, source: str, confidence: float | None) -> FieldCitation | None:
+    """Keep a score from a citation with unusable grounding."""
+    if confidence is None or not math.isfinite(confidence):
+        return None
+    return FieldCitation(field_path=field_path, page=None, bbox=None, confidence=confidence, source=source)
+
+
 def _collect_node_citations(
     *,
     field_path: str,
@@ -251,32 +420,39 @@ def _collect_node_citations(
     if page is None:
         page = default_page
     dimensions = _extract_dimensions(node_map) or default_dimensions
+    field_confidence = _extract_confidence(node_map)
     citations: list[FieldCitation] = []
+    confidence_only: list[FieldCitation] = []
     for citation in _iter_citation_entries(node_map):
-        citations.extend(
-            _normalize_citation(
-                field_path=field_path,
-                citation=citation,
+        normalized = _normalize_citation(
+            field_path=field_path,
+            citation=citation,
+            source=source,
+            default_page=page,
+            default_dimensions=dimensions,
+            default_confidence=field_confidence,
+        )
+        citations.extend(normalized)
+        if len(normalized) == 0:
+            signal = confidence_only_citation(
+                field_path,
                 source=source,
-                default_page=page,
-                default_dimensions=dimensions,
-                default_confidence=_extract_confidence(node_map),
+                confidence=_extract_confidence(_as_mapping(citation)),
+            )
+            if signal is not None:
+                confidence_only.append(signal)
+    if len(citations) == 0 and field_confidence is not None:
+        citations.append(
+            FieldCitation(
+                field_path=field_path,
+                page=page,
+                bbox=None,
+                source=source,
+                confidence=field_confidence,
+                metadata=_compact_metadata(node_map),
             )
         )
-    if len(citations) == 0:
-        confidence = _extract_confidence(node_map)
-        if confidence is not None:
-            citations.append(
-                FieldCitation(
-                    field_path=field_path,
-                    page=page,
-                    bbox=None,
-                    source=source,
-                    confidence=confidence,
-                    metadata=_compact_metadata(node_map),
-                )
-            )
-    return citations
+    return citations + confidence_only
 
 
 def _iter_citation_entries(node: Mapping[str, Any]) -> list[Any]:
@@ -391,21 +567,20 @@ def _landingai_reference_to_citation(
     reference_text: str | None,
     grounding_entry: Mapping[str, Any],
 ) -> FieldCitation | None:
+    confidence = _extract_confidence(grounding_entry)
     box = _as_mapping(grounding_entry.get("box"))
     left = _coerce_float(box.get("left"))
     top = _coerce_float(box.get("top"))
     right = _coerce_float(box.get("right"))
     bottom = _coerce_float(box.get("bottom"))
-    if left is None or top is None or right is None or bottom is None:
-        return None
-
-    bbox = _normalize_bbox([left, top, right - left, bottom - top], None)
+    bbox = None
+    if left is not None and top is not None and right is not None and bottom is not None:
+        bbox = _normalize_bbox([left, top, right - left, bottom - top], None)
     if bbox is None:
-        return None
+        return confidence_only_citation(field_path, source="landingai", confidence=confidence)
 
     page_index = _coerce_int(grounding_entry.get("page"))
     page = page_index + 1 if page_index is not None and page_index >= 0 else None
-    confidence = _extract_confidence(grounding_entry)
     metadata = {"reference": reference}
     grounding_type = grounding_entry.get("type")
     if isinstance(grounding_type, str):
@@ -819,6 +994,9 @@ def _dedupe(citations: Sequence[FieldCitation]) -> list[FieldCitation]:
             tuple(citation.bbox) if citation.bbox is not None else None,
             citation.reference_text,
             citation.source,
+            # Distinct scores with no location belong to the same field, but
+            # must reach the confidence scorer for its per-field aggregation.
+            citation.confidence if citation.page is None and citation.bbox is None else None,
         )
         if key in seen:
             continue

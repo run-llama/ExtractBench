@@ -27,6 +27,7 @@ from extract_bench.inference.providers.base import (
     ProviderRateLimitError,
     ProviderTransientError,
 )
+from extract_bench.inference.providers.extract.citations import confidence_only_citation
 from extract_bench.inference.providers.registry import register_provider
 from extract_bench.schemas.extract_output import ExtractOutput, FieldCitation
 from extract_bench.schemas.pipeline import PipelineSpec
@@ -715,9 +716,15 @@ def _citation_from_field(
     *,
     document_text: str | None = None,
 ) -> FieldCitation | None:
+    raw_confidence = field.get("confidence")
+    confidence = (
+        float(raw_confidence)
+        if isinstance(raw_confidence, (int, float)) and not isinstance(raw_confidence, bool)
+        else None
+    )
     source = field.get("source")
-    if not isinstance(source, str) or not source:
-        return None
+    if not isinstance(source, str) or len(source) == 0:
+        return confidence_only_citation(field_path, source="azure_content_understanding", confidence=confidence)
     selected_region_indexes, reference_text = _selected_source_region_indexes(field, document_text)
     page, bbox = _parse_source_bbox(source, page_sizes, selected_region_indexes=selected_region_indexes)
     return FieldCitation(
@@ -725,7 +732,7 @@ def _citation_from_field(
         page=page,
         bbox=bbox,
         reference_text=reference_text or _reference_text(field),
-        confidence=float(field["confidence"]) if isinstance(field.get("confidence"), (int, float)) else None,
+        confidence=confidence,
         source="azure_content_understanding",
         metadata={"source": source, "spans": field.get("spans")},
     )

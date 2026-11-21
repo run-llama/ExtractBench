@@ -13,7 +13,7 @@ import json
 import os
 import threading
 import time
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -31,6 +31,7 @@ from extract_bench.inference.providers.base import (
     ProviderRateLimitError,
     ProviderTransientError,
 )
+from extract_bench.inference.providers.extract.citations import _dedupe
 from extract_bench.inference.providers.registry import register_provider
 from extract_bench.schemas.extract_output import ExtractOutput, FieldCitation
 from extract_bench.schemas.pipeline import PipelineSpec
@@ -929,7 +930,7 @@ class PulseExtractProvider(Provider):
             _as_mapping(raw_result.raw_output.get("extract")).get("bounding_boxes")
         )
         resolved_citations = _resolve_pulse_citation_anchors(schema_output.get("citations"), anchor_index)
-        citations = _extract_pulse_field_citations(resolved_citations)
+        citations = _extract_pulse_field_citations(resolved_citations, schema_output.get("confidence"))
 
         output = ExtractOutput(
             task_type="extract",
@@ -1018,8 +1019,36 @@ def _apply_usage_cost_fields(raw_output: dict[str, Any]) -> None:
             raw_output["cost_per_page_usd"] = raw_output["cost_usd"] / pages_used
 
 
-def _extract_pulse_field_citations(citations: Any) -> list[FieldCitation]:
-    return _dedupe(_collect_citations(citations, path=[]))
+def _extract_pulse_field_citations(citations: Any, confidence: Any = None) -> list[FieldCitation]:
+    grounding = _dedupe(_collect_citations(citations, path=[]))
+    # Schema confidence follows the extracted field paths. Anchor scores
+    # describe the source text or cell and measure a different signal.
+    scores = dict(_iter_pulse_field_scores(confidence, path=[]))
+    grounded_paths = {citation.field_path for citation in grounding}
+    normalized = [
+        citation.model_copy(update={"confidence": scores[citation.field_path]})
+        if citation.field_path in scores
+        else citation
+        for citation in grounding
+    ]
+    normalized.extend(
+        FieldCitation(field_path=field_path, page=None, bbox=None, confidence=score, source="pulse")
+        for field_path, score in scores.items()
+        if field_path not in grounded_paths
+    )
+    return normalized
+
+
+def _iter_pulse_field_scores(node: Any, path: list[str]) -> Iterator[tuple[str, float]]:
+    if isinstance(node, Mapping):
+        for key, value in node.items():
+            if isinstance(key, str):
+                yield from _iter_pulse_field_scores(value, [*path, key])
+    elif isinstance(node, list):
+        for index, value in enumerate(node):
+            yield from _iter_pulse_field_scores(value, [*path, f"[{index}]"])
+    elif len(path) > 0 and (score := _coerce_probability(node)) is not None:
+        yield format_field_path(path), score
 
 
 def _build_pulse_anchor_index(bounding_boxes: Any) -> dict[str, dict[str, Any]]:
@@ -1095,9 +1124,6 @@ def _register_pulse_anchor(
         if isinstance(text, str) and text:
             resolved["text"] = text
             break
-    confidence = _coerce_probability(node.get("confidence") or node.get("average_word_confidence"))
-    if confidence is not None:
-        resolved["confidence"] = confidence
     index[anchor] = resolved
 
 
@@ -1173,16 +1199,12 @@ def _citation_from_node(field_path: str, node: Mapping[str, Any]) -> FieldCitati
     if page is None:
         return None
     bbox, polygon = _extract_bbox_and_polygon(node)
-    if bbox is None and not _has_page_only_citation(node):
-        return None
-
     return FieldCitation(
         field_path=field_path,
         page=page,
         bbox=bbox,
         polygon=polygon,
         reference_text=_reference_text(node),
-        confidence=_coerce_probability(node.get("confidence") or node.get("score")),
         source="pulse",
         metadata=_compact_metadata(node),
     )
@@ -1222,10 +1244,6 @@ def _extract_bbox_and_polygon(node: Mapping[str, Any]) -> tuple[list[float] | No
     return None, None
 
 
-def _has_page_only_citation(node: Mapping[str, Any]) -> bool:
-    return "page" in node or "page_number" in node
-
-
 def _reference_text(node: Mapping[str, Any]) -> str | None:
     for key in ("text", "content", "value", "reference_text", "referenceText", "quote"):
         value = node.get(key)
@@ -1253,23 +1271,6 @@ def format_field_path(path: list[str]) -> str:
         else:
             rendered = token
     return rendered
-
-
-def _dedupe(citations: list[FieldCitation]) -> list[FieldCitation]:
-    seen: set[tuple[Any, ...]] = set()
-    deduped: list[FieldCitation] = []
-    for citation in citations:
-        key = (
-            citation.field_path,
-            citation.page,
-            tuple(citation.bbox) if citation.bbox is not None else None,
-            citation.reference_text,
-        )
-        if key in seen:
-            continue
-        seen.add(key)
-        deduped.append(citation)
-    return deduped
 
 
 def _round_bbox(bbox: list[float]) -> list[float] | None:
