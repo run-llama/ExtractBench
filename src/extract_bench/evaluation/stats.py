@@ -10,6 +10,7 @@ from typing import Any
 from extract_bench.inference.cost_contract import (
     ATTEMPT_ACCOUNTING,
     COST_COMPLETE,
+    COST_IS_ESTIMATE,
     COST_PER_PAGE_USD,
     COST_USD,
     KNOWN_COST_USD,
@@ -19,7 +20,7 @@ from extract_bench.schemas.evaluation import RunStat
 from extract_bench.schemas.pipeline_io import InferenceResult
 from extract_bench.schemas.product import ProductType
 
-COST_STAT_NAMES = {COST_USD, KNOWN_COST_USD, COST_PER_PAGE_USD, COST_COMPLETE}
+COST_STAT_NAMES = {COST_USD, KNOWN_COST_USD, COST_PER_PAGE_USD, COST_COMPLETE, COST_IS_ESTIMATE}
 
 # Stat keys to look for in raw_output, with their units
 _RAW_OUTPUT_STATS: list[tuple[str, str]] = [
@@ -110,6 +111,10 @@ def build_cost_stats(raw: Mapping[str, Any]) -> list[RunStat]:
     complete = known is not None and complete is True
     stats = [RunStat(name=COST_COMPLETE, value=float(complete), unit="ratio")]
     if known is not None:
+        if raw.get(COST_IS_ESTIMATE) is True or (
+            isinstance(accounting, dict) and accounting.get(COST_IS_ESTIMATE) is True
+        ):
+            stats.append(RunStat(name=COST_IS_ESTIMATE, value=1, unit="ratio"))
         stats.append(RunStat(name=KNOWN_COST_USD, value=known, unit="$"))
         if complete:
             stats.append(RunStat(name=COST_USD, value=known, unit="$"))
