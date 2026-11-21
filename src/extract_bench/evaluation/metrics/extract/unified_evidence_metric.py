@@ -135,18 +135,8 @@ _NULL_EQUALS_FALSE = "null_equals_false"
 _PHONE_DIGITS = "phone_digits"
 _LENIENT_DATE = "lenient_date"
 _PUNCTUATION_SPACING = "punctuation_spacing"
-# Above this many cells (GT rows x predicted rows) in a single flat array, the
-# grounded assignment matrix -- an int16 cost matrix plus scipy's internal
-# float64 copy -- is several GB, and a memory-limited eval runner OOMs building
-# it. For such an array we SKIP grounding (its bbox metrics), which lets the
-# value score take the exact-row peel that is provably value-identical for
-# opaque un-grounded cells (the pairing the full matrix would have chosen only
-# matters for grounded/nested TP, which we are not scoring). The document then
-# emits NO grounded metric at all (``grounded_incomplete``), rather than a
-# partial grounded score. Only arrays with no nested object or object-array
-# subfields qualify, so the peel
-# never shifts nested TP. ~100M cells keeps the matrix
-# under ~1 GB while sparing every ordinary document.
+# A 100M-pair dense assignment takes roughly 1 GB including SciPy's copy.
+# For oversized flat arrays, pair exact rows first and bound the residual matrix.
 _GROUNDED_MAX_CELLS = 100_000_000
 # Everything ``configured_cell_match`` handles; kept equal to the schema's
 # EXTRACT_FIELD_NORMALIZERS vocabulary (guarded by a unit test) so a name can't
@@ -1228,21 +1218,8 @@ class Scorer:
         # ``_score_pair`` below (omit with no ``default`` is not a cell).
         c.expected_rows += len(exp_rows)
         c.predicted_rows += len(act_rows)
-        # A flat array whose full grounded matrix would be multi-GB: skip its
-        # grounding-family scoring (bbox AND page). Leaving has_ev_page/
-        # has_pred_page False routes the value score to the exact-row peel below
-        # (value-identical for opaque cells), and not counting
-        # g_expected/g_claims/p_expected/p_claims here keeps the grounded and
-        # page denominators consistent with the skipped g_correct/p_correct.
-        # ``len(object_array_names) == 0 and len(object_names) == 0`` guarantees
-        # no nested recursion, so the peel cannot
-        # shift nested TP. The memory win only lands on the plain peel path: an
-        # array with genuine alternate values (``multi``) or field normalizers
-        # still builds the full candidate matrix below regardless of ``giant`` --
-        # there grounding is withheld but the allocation is unchanged. The
-        # threshold bounds the FULL matrix; the peel's residual matrix over
-        # unmatched rows can still grow if few rows match exactly, so treat it as
-        # a heuristic, not a hard ceiling.
+        # Oversized flat arrays use the value scorer's exact-row pairing for
+        # citations too. Duplicate values inherit that pairing's tie-break.
         giant = (
             not uses_ordered_paths
             and len(exp_rows) > 0
@@ -1252,61 +1229,13 @@ class Scorer:
             and len(object_names) == 0
             and len(exp_rows) * len(act_rows) > _GROUNDED_MAX_CELLS
         )
-        score_ground = ground and not giant
-        # Page presence drives both the grounded-family denominators and the
-        # pairing-sensitive branch selection below. It is a SUPERSET of bbox
-        # presence (every bbox-bearing evidence/citation also carries a page), so
-        # probing pages alone detects any dropped grounding -- bbox or page-only.
-        has_ev_page = False
-        has_pred_page = False
-        if giant:
-            # Existence-only probe (early-exit) so we still know whether any
-            # grounding-family scoring was actually dropped -- only then is the
-            # document's grounded/page score incomplete and must be withheld
-            # entirely. Pages are the superset, so this covers dropped bboxes too.
-            dropped_grounding = False
-            for i in range(len(exp_rows)):
-                for s in cell_names:
-                    pages = self._ev_pages.get(f"{gt_field}[{i}].{s}")
-                    if pages is not None and len(pages) > 0:
-                        dropped_grounding = True
-                        break
-                if dropped_grounding:
-                    break
-            if not dropped_grounding:
-                for j in range(len(act_rows)):
-                    for s in cell_names:
-                        pages = self._pred_pages.get(f"{pred_field}[{j}].{s}")
-                        if pages is not None and len(pages) > 0:
-                            dropped_grounding = True
-                            break
-                    if dropped_grounding:
-                        break
-            if dropped_grounding:
-                c.grounded_incomplete = True
-        else:
-            for i in range(len(exp_rows)):
-                for s in cell_names:
-                    gt_path = f"{gt_field}[{i}].{s}"
-                    pages = self._ev_pages.get(gt_path)
-                    if pages is not None and len(pages) > 0:
-                        has_ev_page = True
-                        break
-                if has_ev_page:
-                    break
-            # Flag-only scan: g_claims/p_claims are counted per aligned pair
-            # below, and only for cells whose GT side carries a bbox/page
-            # (ungradeable claims stay out of the precision denominator). The flag
-            # reflects ANY predicted page (the superset of any predicted bbox) so
-            # the pairing-sensitive branch selection below covers both families.
-            for j in range(len(act_rows)):
-                for s in cell_names:
-                    pages = self._pred_pages.get(f"{pred_field}[{j}].{s}")
-                    if pages is not None and len(pages) > 0:
-                        has_pred_page = True
-                        break
-                if has_pred_page:
-                    break
+        score_ground = ground
+        has_ev_page = any(f"{gt_field}[{i}].{s}" in self._ev_pages for i in range(len(exp_rows)) for s in cell_names)
+        has_pred_page = (
+            has_ev_page
+            and not giant
+            and any(f"{pred_field}[{j}].{s}" in self._pred_pages for j in range(len(act_rows)) for s in cell_names)
+        )
         # Object-array subfields are counted by the recursion below, per matched
         # pair (and as one-sided misses for unmatched rows).
         match_for_exp: dict[int, int] = {}
@@ -1336,7 +1265,7 @@ class Scorer:
                 )
                 row_ind, col_ind = linear_sum_assignment(cost)
                 match_for_exp = {int(i): int(j) for j, i in zip(row_ind, col_ind, strict=True)}
-            elif len(object_array_names) > 0 or len(object_names) > 0 or (has_ev_page and has_pred_page):
+            elif len(object_array_names) > 0 or len(object_names) > 0 or has_pred_page:
                 # Pairing-sensitive scoring: nested object arrays and in-row objects
                 # recurse on the matched predicted index, and per-cell grounding +
                 # page grading key off it too. Among equal-cost optima the exact-row peel could
@@ -1356,9 +1285,7 @@ class Scorer:
                 row_ind, col_ind = linear_sum_assignment(cost)
                 match_for_exp = {int(i): int(j) for j, i in zip(row_ind, col_ind, strict=True)}
             else:
-                # Opaque-cell-only, un-grounded: the value score is pairing-
-                # independent (n_pairs*k - total_cost), so peeling exact rows is
-                # safe. Flatten through ``lookup`` so omit/default/null match F1.
+                # Match flat rows on their values, including schema defaults.
                 flat_act = list(_flatten_pairing_rows(act_rows, paths=pairing_paths, item_sch=item_sch))
                 flat_exp = list(_flatten_pairing_rows(exp_rows, paths=pairing_paths, item_sch=item_sch))
                 assignment = peel_exact_row_matches(
@@ -1383,6 +1310,9 @@ class Scorer:
                     # flagged ``value_incomplete`` -- a lower bound, not a crash.
                     if len(residual_actual) * len(residual_expected) > _GROUNDED_MAX_CELLS:
                         c.value_incomplete = True
+                        if ground and has_ev_page:
+                            c.grounded_incomplete = True
+                            score_ground = False
                     else:
                         cost = mismatch_cost_matrix(
                             residual_actual,

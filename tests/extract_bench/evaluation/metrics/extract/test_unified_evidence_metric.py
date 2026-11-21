@@ -1944,12 +1944,7 @@ def test_supported_normalizers_match_schema_vocabulary() -> None:
     assert unified_evidence_metric.SUPPORTED_NORMALIZERS == EXTRACT_FIELD_NORMALIZERS
 
 
-def test_giant_grounded_array_skips_grounding_value_exact_and_peels(monkeypatch: Any) -> None:
-    """A grounded flat array over the cell threshold: value stays bit-exact, the
-    grounded metrics are withheld (grounded_incomplete), and it takes the peel
-    instead of building the multi-GB grounded matrix. Nothing below the
-    threshold changes. This is the memory escape hatch for oklahoma-scale docs.
-    """
+def test_large_array_grades_citations_when_residual_assignment_fits(monkeypatch: Any) -> None:
     box = [0.0, 0.0, 10.0, 10.0]
     expected = {
         "as_of": None,
@@ -1971,27 +1966,23 @@ def test_giant_grounded_array_skips_grounding_value_exact_and_peels(monkeypatch:
     full = compute_unified_evidence_metrics(expected, actual, rules, cits, _schema())
     assert _val(full, "extract_unified_grounded_f1") is not None
 
-    # Force the skip by lowering the threshold below this array's cell count
-    # (6 GT x 6 pred = 36), and confirm it takes the peel, not the full matrix.
     monkeypatch.setattr(unified_evidence_metric, "_GROUNDED_MAX_CELLS", 1)
     calls = _spy_on_peel(monkeypatch)
-    skipped = compute_unified_evidence_metrics(expected, actual, rules, cits, _schema())
+    bounded = compute_unified_evidence_metrics(expected, actual, rules, cits, _schema())
 
-    assert [("security",), ("coupon",), ("note",)] in calls, "giant grounded array falls back to the peel"
-    # Value metrics identical to the full-matrix reference.
-    for name in (
-        "extract_unified_value_precision",
-        "extract_unified_value_recall",
-        "extract_unified_value_f1",
-    ):
-        assert _val(skipped, name) == _val(full, name), name
-    # Grounded metrics withheld entirely for the document.
-    assert _val(skipped, "extract_unified_grounded_f1") is None
-    assert _val(skipped, "extract_unified_grounded_precision") is None
-    assert _val(skipped, "extract_unified_grounded_recall") is None
-    # And the value metadata records why.
-    vf1 = next(m for m in skipped if m.metric_name == "extract_unified_value_f1")
-    assert vf1.metadata["grounded_incomplete"] is True
+    assert len(calls) == 1
+    assert {metric.metric_name: metric.value for metric in bounded} == {
+        metric.metric_name: metric.value for metric in full
+    }
+    assert bounded[0].metadata["grounded_incomplete"] is False
+
+    # A second changed row leaves four candidate pairs, above the one-pair budget.
+    actual["holdings"][3]["coupon"] = 998.0
+    partial = compute_unified_evidence_metrics(expected, actual, rules, cits, _schema())
+    assert partial[0].metadata["value_incomplete"] is True
+    assert partial[0].metadata["grounded_incomplete"] is True
+    assert _val(partial, "extract_unified_page_f1") is None
+    assert _val(partial, "extract_unified_grounded_f1") is None
 
 
 def test_giant_threshold_does_not_touch_nested_or_below_threshold(monkeypatch: Any) -> None:
