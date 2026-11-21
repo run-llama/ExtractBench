@@ -2194,12 +2194,16 @@ def test_alternate_values_require_their_own_citations(
             ],
         ),
     ]
+    cells: list[unified_evidence_metric.ValueCell] = []
     metrics = compute_unified_evidence_metrics(
         {field: 7681},
         {field: value},
         rules,
         [{"field_path": field, "page": slide, "bbox": box}],
+        value_cells=cells,
     )
+    assert len(cells) == 1 and cells[0].eligible_evidence is not None
+    assert [group.value for group in cells[0].eligible_evidence] == [value]
     assert _val(metrics, "extract_unified_value_f1") == 1.0
     assert _val(metrics, "extract_unified_page_f1") == float(correct)
     assert _val(metrics, "extract_unified_grounded_f1") == float(correct)

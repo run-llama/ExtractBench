@@ -90,7 +90,7 @@ import math
 import re
 from collections.abc import Iterable, Iterator, Mapping, MutableSequence, Sequence
 from copy import copy
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import lru_cache
 from itertools import chain
 from typing import Any, SupportsFloat
@@ -185,10 +185,29 @@ type _EvidenceBox = tuple[int, BBox, bool]
 
 
 @dataclass(frozen=True)
-class _ValueEvidence:
+class ValueEvidence:
+    """Locations associated with one normalized answer, or shared across answers."""
+
     value: Any
     pages: frozenset[int]
     targets: Sequence[EvidenceTarget]
+
+
+def matching_value_evidence(
+    groups: Sequence[ValueEvidence],
+    actual: Any,
+    field: str,
+    *,
+    fuzzy: dict[str, float],
+    normalizers: tuple[str, ...] | None,
+) -> tuple[ValueEvidence, ...]:
+    """Select shared locations and every located answer accepted by the field matcher."""
+    return tuple(
+        group
+        for group in groups
+        if group.value is None
+        or configured_cell_match(group.value, actual, field, fuzzy=fuzzy, normalizers=normalizers)
+    )
 
 
 @dataclass(frozen=True)
@@ -203,6 +222,9 @@ class ValueCell:
     gt_path: str | None
     pred_path: str | None
     value_correct: bool
+    # None uses field-wide evidence. An empty tuple means the accepted prediction
+    # has no eligible location among the field's explicitly located alternatives.
+    eligible_evidence: tuple[ValueEvidence, ...] | None = field(default=None, compare=False, repr=False)
 
 
 @dataclass(frozen=True)
@@ -736,7 +758,7 @@ class Scorer:
         pred_pages: dict[str, set[int]],
         fuzzy: dict[str, float],
         iou_threshold: float,
-        evidence_targets: Mapping[str, Sequence[_ValueEvidence]],
+        evidence_targets: Mapping[str, Sequence[ValueEvidence]],
         ordered_arrays: frozenset[str],
         graded_cells: list[GradedCell] | None = None,
         value_cells: MutableSequence[ValueCell] | None = None,
@@ -925,13 +947,11 @@ class Scorer:
         if self._ev_boxes.get(gt_path):
             c.g_claims += 1
 
-    def _match_grounding(self, gt_path: str, pred_path: str, actual: Any, field: str) -> tuple[bool, bool]:
+    def _match_grounding(self, pred_path: str, locations: Sequence[ValueEvidence]) -> tuple[bool, bool]:
         pred_boxes = self._pred_boxes.get(pred_path)
         pred_pages = self._pred_pages.get(pred_path)
         page_correct = False
-        for evidence in self._ev_targets.get(gt_path, ()):
-            if evidence.value is not None and not self._configured_cell_match(gt_path, evidence.value, actual, field):
-                continue
+        for evidence in locations:
             if pred_boxes is not None and any(
                 evidence_target_hit(target, pred_boxes, iou_threshold=self._iou) for target in evidence.targets
             ):
@@ -950,14 +970,25 @@ class Scorer:
         g_correct/p_correct on the same skipped set.
         """
         matched = self._value_match(gt_path, canonical, actual, field)
+        locations = self._ev_targets.get(gt_path, ())
+        eligible_evidence = None
+        if matched and len(locations) > 1 and (ground or self._value_cells is not None):
+            eligible_evidence = matching_value_evidence(
+                locations,
+                actual,
+                field,
+                fuzzy=self._fuzzy,
+                normalizers=self._normalizers.get(gt_path),
+            )
+            locations = eligible_evidence
         if self._value_cells is not None:
-            self._value_cells.append(ValueCell(gt_path, pred_path, matched))
+            self._value_cells.append(ValueCell(gt_path, pred_path, matched, eligible_evidence))
         paged = False
         boxed = False
         if matched:
             c.v_correct += 1
             if ground:
-                boxed, paged = self._match_grounding(gt_path, pred_path, actual, field)
+                boxed, paged = self._match_grounding(pred_path, locations)
                 c.g_correct += int(boxed)
                 c.p_correct += int(paged)
         if self._cells is not None and ground:
@@ -1530,18 +1561,18 @@ def build_evidence_targets(field_rules: Sequence[ExtractFieldTestRule]) -> Targe
     return {path: group_evidence_targets(entries) for path, entries in items.items()}
 
 
-def _build_value_evidence(
+def build_value_evidence(
     field_rules: Sequence[ExtractFieldTestRule],
     *,
     normalize_dates: bool,
-) -> dict[str, Sequence[_ValueEvidence]]:
+) -> dict[str, Sequence[ValueEvidence]]:
     """Use explicit value locations when the field locates at least two different answers.
 
     Older rules give some alternatives no page or box. Keep field-wide grounding
     when there is only one located answer. Untagged locations can provide shared
     evidence or lines for the tagged envelopes that contain them.
     """
-    result: dict[str, Sequence[_ValueEvidence]] = {}
+    result: dict[str, Sequence[ValueEvidence]] = {}
     for rule in field_rules:
         entries = iter_rule_evidence(rule)
         if len(entries) < 2:
@@ -1568,7 +1599,7 @@ def _build_value_evidence(
             continue
 
         shared_boxes = next((boxes for value, _, boxes in entries_by_value if value is None), [])
-        value_targets: list[_ValueEvidence] = []
+        value_targets: list[ValueEvidence] = []
         for value, pages, boxes in entries_by_value:
             if value is None:
                 # Group both sets to detect shared lines inside tagged envelopes
@@ -1584,7 +1615,7 @@ def _build_value_evidence(
             else:
                 targets = tuple(group_evidence_targets(boxes, parts_only=shared_boxes))
             target_pages = pages | {page for page, _, _ in targets}
-            value_targets.append(_ValueEvidence(value=value, pages=frozenset(target_pages), targets=targets))
+            value_targets.append(ValueEvidence(value=value, pages=frozenset(target_pages), targets=targets))
         result[rule.field_path] = tuple(value_targets)
     return result
 
@@ -1713,7 +1744,7 @@ def compute_unified_evidence_metrics(
 
     fuzzy = dict(DEFAULT_FUZZY_FIELD_THRESHOLDS if fuzzy_field_thresholds is None else fuzzy_field_thresholds)
     alt, ev_boxes, ev_pages, normalizers = build_rule_indexes(field_rules)
-    ev_targets = _build_value_evidence(
+    ev_targets = build_value_evidence(
         field_rules,
         normalize_dates=normalize_dates,
     )
@@ -1721,7 +1752,7 @@ def compute_unified_evidence_metrics(
     for path, pages in ev_pages.items():
         if path not in ev_targets:
             ev_targets[path] = (
-                _ValueEvidence(
+                ValueEvidence(
                     value=None,
                     pages=frozenset(pages),
                     targets=field_targets.get(path, ()),
