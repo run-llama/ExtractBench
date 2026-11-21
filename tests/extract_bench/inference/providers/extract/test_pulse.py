@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -20,7 +21,7 @@ from extract_bench.inference.providers.extract.pulse import (
     _extract_pulse_field_citations,
     _resolve_pulse_citation_anchors,
 )
-from extract_bench.schemas.pipeline_io import InferenceRequest
+from extract_bench.schemas.pipeline_io import InferenceRequest, RawInferenceResult
 from extract_bench.schemas.product import ProductType
 
 _PROMPT = "Extract the document into the provided JSON schema. Use only information present in the document."
@@ -453,25 +454,55 @@ def test_anchor_index_covers_all_block_categories_and_never_invents_page() -> No
     ]
 
 
-def test_citation_confidence_survives_missing_page_or_coordinates() -> None:
-    index = _build_pulse_anchor_index(
-        {
-            "Text": [
-                {"id": "unpaged", "bounding_box": [0.1, 0.1, 0.2, 0.2], "confidence": 0.8},
-                {"id": "no-box", "page": 2, "confidence": 0.0, "average_word_confidence": 0.9},
-                {"id": "duplicate", "confidence": 0.6},
-                {"id": "duplicate", "page": 3, "bounding_box": [0.1, 0.1, 0.2, 0.2]},
-            ],
-        }
+def test_normalize_uses_schema_confidence_with_and_without_grounding(tmp_path: Path) -> None:
+    pipeline = get_pipeline("pulse_schema_effort")
+    now = datetime(2026, 1, 1, tzinfo=UTC)
+    raw = RawInferenceResult(
+        request=_request(tmp_path / "invoice.pdf", {}),
+        pipeline=pipeline,
+        pipeline_name=pipeline.pipeline_name,
+        product_type=ProductType.EXTRACT,
+        raw_output={
+            "extract": {
+                "bounding_boxes": {
+                    "Text": [
+                        {"id": "txt-1", "page_number": 1, "bounding_box": [0.1, 0.1, 0.2, 0.2], "confidence": 0.9},
+                        {
+                            "id": "txt-2",
+                            "page_number": 2,
+                            "bounding_box": [0.2, 0.2, 0.4, 0.4],
+                            "average_word_confidence": 0.99,
+                        },
+                    ]
+                }
+            },
+            "schema": {
+                "schema_output": {
+                    "values": {
+                        "items": [{"amount": 12, "note": "Paid"}, {"amount": None}],
+                        "title": "Invoice",
+                    },
+                    "citations": {
+                        "items": [{"amount": "txt-1, txt-2", "note": "missing-anchor"}, {"amount": None}],
+                        "title": "txt-1",
+                    },
+                    "confidence": {"items": [{"amount": 0.0, "note": 0.8}, {"amount": 0.7}]},
+                }
+            },
+        },
+        started_at=now,
+        completed_at=now,
+        latency_in_ms=0,
     )
-    resolved = _resolve_pulse_citation_anchors({"amount": "unpaged, no-box", "total": "duplicate"}, index)
 
-    citations = _extract_pulse_field_citations(resolved)
+    output = _provider().normalize(raw).output
 
-    assert [(c.field_path, c.page, c.bbox, c.confidence) for c in citations] == [
-        ("amount", None, None, 0.8),
-        ("amount", None, None, 0.0),
-        ("total", 3, [0.1, 0.1, 0.1, 0.1], 0.6),
+    assert [(c.field_path, c.page, c.bbox, c.confidence) for c in output.field_citations] == [
+        ("items[0].amount", 1, [0.1, 0.1, 0.1, 0.1], 0.0),
+        ("items[0].amount", 2, [0.2, 0.2, 0.2, 0.2], 0.0),
+        ("title", 1, [0.1, 0.1, 0.1, 0.1], None),
+        ("items[0].note", None, None, 0.8),
+        ("items[1].amount", None, None, 0.7),
     ]
 
 
