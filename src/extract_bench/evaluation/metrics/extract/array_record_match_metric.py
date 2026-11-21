@@ -228,12 +228,25 @@ def _intern_field[K: CellKey](
     normalizing each cell once, not once per pair. Returns ``None`` if any
     cell cannot be interned so the caller scores that column pairwise.
     """
+    return intern_cell_values(
+        [row.get(field) if isinstance(row, dict) else None for row in actual_list],
+        [row.get(field) if isinstance(row, dict) else None for row in expected_list],
+        field_schema,
+    )
+
+
+def intern_cell_values(
+    actual: Sequence[Any],
+    expected: Sequence[Any],
+    field_schema: Any = None,
+) -> tuple[np.ndarray, np.ndarray] | None:
+    """Encode a pair of exact-match columns in one shared integer vocabulary."""
     keymap: dict[Any, int] = {}
     out: list[np.ndarray] = []
-    for rows in (actual_list, expected_list):
-        ids = np.empty(len(rows), dtype=np.int64)
-        for idx, row in enumerate(rows):
-            key = _cell_key(row.get(field), field_schema) if isinstance(row, dict) else _cell_key(None, field_schema)
+    for values in (actual, expected):
+        ids = np.empty(len(values), dtype=np.int64)
+        for idx, value in enumerate(values):
+            key = _cell_key(value, field_schema)
             if key is _UNHASHABLE:
                 return None
             slot = keymap.get(key)

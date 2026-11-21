@@ -2322,3 +2322,35 @@ def test_ordered_replacement_keeps_aligned_cell_paths() -> None:
         unified_evidence_metric.ValueCell("holdings[0].security", "holdings[0].security", True),
         unified_evidence_metric.ValueCell("holdings[1].security", "holdings[1].security", False),
     ]
+
+
+def test_ordered_pairing_credits_configured_matches_and_skips_absent_fields() -> None:
+    expected = {"holdings": [{"security": "Acme"}]}
+    # With absent == absent counted as a match, the last candidate would win
+    # on coupon and note even though it misses the only field being scored.
+    actual = {"holdings": [{"security": "ACME", "coupon": 5, "note": None}, {"security": "unrelated"}]}
+    rules = [
+        ExtractFieldTestRule(field_path="holdings", structural="ordered"),
+        _rule("holdings[0].security", normalizers=["case_insensitive"]),
+    ]
+    cells: list[unified_evidence_metric.ValueCell] = []
+    compute_unified_evidence_metrics(expected, actual, rules, data_schema=_schema(), value_cells=cells)
+    assert [(cell.gt_path, cell.pred_path) for cell in cells if cell.value_correct] == [
+        ("holdings[0].security", "holdings[0].security"),
+    ]
+
+
+def test_ordered_tied_value_matches_keep_the_same_citation_path() -> None:
+    expected = {"holdings": [{"security": "Acme"}]}
+    actual = {"holdings": [{"security": " Acme"}, {"security": "Acme "}]}
+    cells: list[unified_evidence_metric.ValueCell] = []
+    compute_unified_evidence_metrics(
+        expected,
+        actual,
+        [ExtractFieldTestRule(field_path="holdings", structural="ordered")],
+        data_schema=_schema(),
+        value_cells=cells,
+    )
+    assert [(cell.gt_path, cell.pred_path) for cell in cells if cell.value_correct] == [
+        ("holdings[0].security", "holdings[1].security"),
+    ]

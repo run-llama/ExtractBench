@@ -88,10 +88,11 @@ from __future__ import annotations
 
 import math
 import re
-from collections.abc import Callable, Mapping, MutableSequence, Sequence
+from collections.abc import Iterable, Iterator, Mapping, MutableSequence, Sequence
 from copy import copy
 from dataclasses import dataclass
 from functools import lru_cache
+from itertools import chain
 from typing import Any, SupportsFloat
 
 import numpy as np
@@ -104,6 +105,7 @@ from extract_bench.evaluation.metrics.extract.array_record_match_metric import (
     array_subfield_names,
     as_rows,
     cell_match,
+    intern_cell_values,
     is_array_schema,
     mismatch_cost_matrix,
     normalize_dates_deep,
@@ -693,7 +695,7 @@ def _ordered_record_paths(rules: Sequence[ExtractFieldTestRule], schema: Mapping
 def _align_ordered_rows(
     expected_count: int,
     predicted_count: int,
-    matched_values: Callable[[int, int], int],
+    weight_rows: Iterable[np.ndarray],
 ) -> dict[int, int]:
     """Maximize matched values over monotone row pairs, with gaps on either side."""
     # Among equal value scores, retain as many paired rows as possible.
@@ -702,22 +704,20 @@ def _align_ordered_rows(
     # Retain only the last two score rows and one byte per cell for traceback.
     skip_expected, skip_predicted, pair = 0, 1, 2
     directions = np.empty((expected_count, predicted_count), dtype=np.uint8)
-    previous = [0] * (predicted_count + 1)
-    for i in range(expected_count):
-        current = [0] * (predicted_count + 1)
-        for j in range(predicted_count):
-            up, left = previous[j + 1], current[j]
-            diagonal = previous[j] + matched_values(i, j) * value_scale + 1
-            if diagonal >= max(up, left):
-                current[j + 1] = diagonal
-                directions[i, j] = pair
-            elif up >= left:
-                current[j + 1] = up
-                directions[i, j] = skip_expected
-            else:
-                current[j + 1] = left
-                directions[i, j] = skip_predicted
-        previous = current
+    previous = np.zeros(predicted_count + 1, dtype=np.int64)
+    current = np.zeros_like(previous)
+    for i, weights in enumerate(weight_rows):
+        up = previous[1:]
+        diagonal = previous[:-1] + weights * value_scale + 1
+        # Moving left carries the previous column's score for free. The running
+        # maximum accounts for any number of left moves within this row.
+        np.maximum(up, diagonal, out=current[1:])
+        np.maximum.accumulate(current[1:], out=current[1:])
+        left = current[:-1]
+        # Equal scores prefer pairing, then skipping the expected row. The
+        # selected paths also determine which citations and confidences are graded.
+        directions[i] = np.where(diagonal == current[1:], pair, np.where(up >= left, skip_expected, skip_predicted))
+        previous, current = current, previous
 
     selected: dict[int, int] = {}
     i, j = expected_count - 1, predicted_count - 1
@@ -1079,6 +1079,49 @@ class Scorer:
             if in_side:
                 self._count_subtree(f"{base}.{s}", child_val, child_schema, c, expected=expected, ground=ground)
 
+    def _flat_ordered_weights(
+        self,
+        gt_field: str,
+        start: int,
+        expected: Sequence[Any],
+        predicted: Sequence[Any],
+        properties: Mapping[str, Any],
+    ) -> Iterator[np.ndarray]:
+        """Yield one vector of matched-field counts per expected row."""
+        columns = []
+        for key in properties:
+            exp = [_read_segments(row, segments=(key,), item_sch=properties) for row in expected]
+            act = [_read_segments(row, segments=(key,), item_sch=properties) for row in predicted]
+            leaf = path_leaf(key)
+            ids = None
+            if leaf not in self._fuzzy and not any(isinstance(v, float) and math.isnan(v) for v in chain(exp, act)):
+                ids = intern_cell_values(act, exp)
+            columns.append((key, leaf, exp, act, ids))
+
+        for i in range(len(expected)):
+            weights = np.zeros(len(predicted), dtype=np.int64)
+            for key, leaf, exp, act, ids in columns:
+                value = exp[i]
+                if value is ABSENT:
+                    continue
+                path = f"{gt_field}[{start + i}].{key}"
+                if (
+                    ids is not None
+                    and path not in self._normalizers
+                    and all(alt == value for alt in self._alt.get(path, ()))
+                ):
+                    actual_ids, expected_ids = ids
+                    weights += actual_ids == expected_ids[i]
+                else:
+                    # Fuzzy fields, alternative readings and normalizers keep the
+                    # same predicate as the final, per-field scoring pass.
+                    weights += np.fromiter(
+                        (v is not ABSENT and self._value_match(path, value, v, leaf) for v in act),
+                        dtype=np.bool_,
+                        count=len(act),
+                    )
+            yield weights
+
     def _align_annotated_rows(
         self,
         gt_field: str,
@@ -1116,9 +1159,27 @@ class Scorer:
                 act_end -= 1
                 pairs[exp_end] = act_end
             if start < min(exp_end, act_end):
-                middle = _align_ordered_rows(
-                    exp_end - start, act_end - start, lambda i, j: matched_values(i + start, j + start)
-                )
+                properties = schema_properties(item_schema)
+                if len(properties) > 0 and all(
+                    not is_object_schema(child) and not is_object_array_schema(child) for child in properties.values()
+                ):
+                    weight_rows = self._flat_ordered_weights(
+                        gt_field,
+                        start,
+                        exp_rows[start:exp_end],
+                        act_rows[start:act_end],
+                        properties,
+                    )
+                else:
+                    weight_rows = (
+                        np.fromiter(
+                            (matched_values(i, j) for j in range(start, act_end)),
+                            dtype=np.int64,
+                            count=act_end - start,
+                        )
+                        for i in range(start, exp_end)
+                    )
+                middle = _align_ordered_rows(exp_end - start, act_end - start, weight_rows)
                 pairs.update({i + start: j + start for i, j in middle.items()})
             return pairs
 
