@@ -185,12 +185,25 @@ type _EvidenceBox = tuple[int, BBox, bool]
 
 
 @dataclass(frozen=True)
+class LocatedBox:
+    page: int
+    box: BBox
+    coarse: bool
+    layer: str | None
+
+    @property
+    def geometry(self) -> _EvidenceBox:
+        return self.page, self.box, self.coarse
+
+
+@dataclass(frozen=True)
 class ValueEvidence:
     """Locations associated with one normalized answer, or shared across answers."""
 
     value: Any
     pages: frozenset[int]
     targets: Sequence[EvidenceTarget]
+    boxes: tuple[LocatedBox, ...] = ()
 
 
 def matching_value_evidence(
@@ -1577,7 +1590,7 @@ def build_value_evidence(
         entries = iter_rule_evidence(rule)
         if len(entries) < 2:
             continue
-        entries_by_value: list[tuple[Any, set[int], list[_EvidenceBox]]] = []
+        entries_by_value: list[tuple[Any, set[int], list[LocatedBox]]] = []
         for entry in entries:
             page = entry.page
             if page is None:
@@ -1594,28 +1607,46 @@ def build_value_evidence(
             if box is None:
                 pages.add(page)
             else:
-                boxes.append((page, box, entry.coarse))
+                boxes.append(LocatedBox(page, box, entry.coarse, entry.layer))
         if sum(value is not None for value, _, _ in entries_by_value) < 2:
             continue
 
         shared_boxes = next((boxes for value, _, boxes in entries_by_value if value is None), [])
+        shared_geometry = [box.geometry for box in shared_boxes]
         value_targets: list[ValueEvidence] = []
         for value, pages, boxes in entries_by_value:
+            geometry = [box.geometry for box in boxes]
             if value is None:
                 # Group both sets to detect shared lines inside tagged envelopes
                 # and shared envelopes that would absorb tagged lines. Keep only
                 # the shared targets whose geometry is independent.
-                all_boxes = [box for _, _, group_boxes in entries_by_value for box in group_boxes]
+                all_boxes = [box.geometry for _, _, group_boxes in entries_by_value for box in group_boxes]
                 all_targets = {(page, box, frozenset(parts)) for page, box, parts in group_evidence_targets(all_boxes)}
                 targets = tuple(
                     (page, box, parts)
-                    for page, box, parts in group_evidence_targets(boxes)
+                    for page, box, parts in group_evidence_targets(geometry)
                     if (page, box, frozenset(parts)) in all_targets
                 )
+                anchors = {(page, box) for page, box, _ in targets}
+                owned = [box for box in boxes if (box.page, box.box) in anchors]
             else:
-                targets = tuple(group_evidence_targets(boxes, parts_only=shared_boxes))
+                targets = tuple(group_evidence_targets(geometry, parts_only=shared_geometry))
+                owned = list(boxes)
+            # Keep precise boxes folded into a coarse target, including near-
+            # duplicates. A layer may grade the ink and the envelope separately.
+            envelopes = [box for box in owned if box.coarse]
+            owned.extend(
+                box
+                for box in shared_boxes
+                if not box.coarse
+                and box not in owned
+                and any(
+                    box.page == outer.page and contained_fraction_xywh(box.box, outer.box) >= ENVELOPE_PART_CONTAINMENT
+                    for outer in envelopes
+                )
+            )
             target_pages = pages | {page for page, _, _ in targets}
-            value_targets.append(ValueEvidence(value=value, pages=frozenset(target_pages), targets=targets))
+            value_targets.append(ValueEvidence(value, frozenset(target_pages), targets, tuple(owned)))
         result[rule.field_path] = tuple(value_targets)
     return result
 
