@@ -390,3 +390,14 @@ def test_booleans_recognize_unicode_checkbox_symbols() -> None:
     assert [c.bbox[0] for c in extract_landingai_v2_field_citations(checked, structure, markdown)] == pytest.approx(
         [0.34]
     )
+
+
+def test_attempt_cost_matches_the_sum_of_stage_charges() -> None:
+    # 0.1 + 0.6 credits: (0.1 + 0.6) * 0.01 rounds to 0.006999…, below the two stage
+    # charges summed (0.007), which the harness rejects as invalid billing.
+    import math
+
+    provider = _provider()
+    rate = provider.CREDIT_RATE_USD
+    snapshot = provider._cost_accounting({"parse_credits": 0.1, "extract_credits": 0.6})
+    assert snapshot["known_cost_usd"] == math.fsum([0.1 * rate, 0.6 * rate])

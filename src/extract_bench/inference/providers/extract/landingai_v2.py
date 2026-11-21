@@ -21,6 +21,7 @@ again and hit the same limit.
 
 from __future__ import annotations
 
+import math
 import os
 from collections.abc import Callable, Mapping
 from datetime import datetime
@@ -240,7 +241,10 @@ class LandingAIADEV2ExtractProvider(Provider):
     def _cost_accounting(self, accounting: Mapping[str, Any]) -> dict[str, Any]:
         credits = [accounting[key] for key in ("parse_credits", "extract_credits") if key in accounting]
         return {
-            KNOWN_COST_USD: sum(credits) * self.CREDIT_RATE_USD if credits else None,
+            # Sum the per-stage prices exactly as recorded (fsum), so the attempt total
+            # matches the component charges bit for bit; (a + b) * rate can round
+            # below a * rate + b * rate and fail the harness's billing check.
+            KNOWN_COST_USD: math.fsum(c * self.CREDIT_RATE_USD for c in credits) if credits else None,
             COMPLETE: len(credits) == 2,
         }
 
