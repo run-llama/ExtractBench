@@ -31,6 +31,7 @@ from extract_bench.inference.providers.base import (
     ProviderRateLimitError,
     ProviderTransientError,
 )
+from extract_bench.inference.providers.extract.citations import _dedupe, confidence_only_citation
 from extract_bench.inference.providers.registry import register_provider
 from extract_bench.schemas.extract_output import ExtractOutput, FieldCitation
 from extract_bench.schemas.pipeline import PipelineSpec
@@ -1083,7 +1084,12 @@ def _register_pulse_anchor(
         if location
         else node.get("bounding_box") or node.get("bbox_normalized") or node.get("bbox") or node.get("coordinates")
     )
+    confidence = _coerce_probability(node.get("confidence"))
+    if confidence is None:
+        confidence = _coerce_probability(node.get("average_word_confidence"))
     if not isinstance(coordinates, Sequence) or isinstance(coordinates, (str, bytes, bytearray)):
+        if confidence is not None:
+            index.setdefault(anchor, {"polygon": None}).setdefault("confidence", confidence)
         return
 
     resolved: dict[str, Any] = {"polygon": list(coordinates)}
@@ -1095,7 +1101,8 @@ def _register_pulse_anchor(
         if isinstance(text, str) and text:
             resolved["text"] = text
             break
-    confidence = _coerce_probability(node.get("confidence") or node.get("average_word_confidence"))
+    if confidence is None:
+        confidence = _coerce_probability(index.get(anchor, {}).get("confidence"))
     if confidence is not None:
         resolved["confidence"] = confidence
     index[anchor] = resolved
@@ -1169,20 +1176,20 @@ def _looks_like_citation(node: Mapping[str, Any]) -> bool:
 
 
 def _citation_from_node(field_path: str, node: Mapping[str, Any]) -> FieldCitation | None:
+    confidence = _coerce_probability(node.get("confidence"))
+    if confidence is None:
+        confidence = _coerce_probability(node.get("score"))
     page = _coerce_int(node.get("page")) or _coerce_int(node.get("page_number"))
     if page is None:
-        return None
+        return confidence_only_citation(field_path, source="pulse", confidence=confidence)
     bbox, polygon = _extract_bbox_and_polygon(node)
-    if bbox is None and not _has_page_only_citation(node):
-        return None
-
     return FieldCitation(
         field_path=field_path,
         page=page,
         bbox=bbox,
         polygon=polygon,
         reference_text=_reference_text(node),
-        confidence=_coerce_probability(node.get("confidence") or node.get("score")),
+        confidence=confidence,
         source="pulse",
         metadata=_compact_metadata(node),
     )
@@ -1222,10 +1229,6 @@ def _extract_bbox_and_polygon(node: Mapping[str, Any]) -> tuple[list[float] | No
     return None, None
 
 
-def _has_page_only_citation(node: Mapping[str, Any]) -> bool:
-    return "page" in node or "page_number" in node
-
-
 def _reference_text(node: Mapping[str, Any]) -> str | None:
     for key in ("text", "content", "value", "reference_text", "referenceText", "quote"):
         value = node.get(key)
@@ -1253,23 +1256,6 @@ def format_field_path(path: list[str]) -> str:
         else:
             rendered = token
     return rendered
-
-
-def _dedupe(citations: list[FieldCitation]) -> list[FieldCitation]:
-    seen: set[tuple[Any, ...]] = set()
-    deduped: list[FieldCitation] = []
-    for citation in citations:
-        key = (
-            citation.field_path,
-            citation.page,
-            tuple(citation.bbox) if citation.bbox is not None else None,
-            citation.reference_text,
-        )
-        if key in seen:
-            continue
-        seen.add(key)
-        deduped.append(citation)
-    return deduped
 
 
 def _round_bbox(bbox: list[float]) -> list[float] | None:

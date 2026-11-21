@@ -397,6 +397,13 @@ def _collect_field_map(
     return citations
 
 
+def confidence_only_citation(field_path: str, *, source: str, confidence: float | None) -> FieldCitation | None:
+    """Keep a score from a citation with unusable grounding."""
+    if confidence is None or not math.isfinite(confidence):
+        return None
+    return FieldCitation(field_path=field_path, page=None, bbox=None, confidence=confidence, source=source)
+
+
 def _collect_node_citations(
     *,
     field_path: str,
@@ -413,32 +420,39 @@ def _collect_node_citations(
     if page is None:
         page = default_page
     dimensions = _extract_dimensions(node_map) or default_dimensions
+    field_confidence = _extract_confidence(node_map)
     citations: list[FieldCitation] = []
+    confidence_only: list[FieldCitation] = []
     for citation in _iter_citation_entries(node_map):
-        citations.extend(
-            _normalize_citation(
-                field_path=field_path,
-                citation=citation,
+        normalized = _normalize_citation(
+            field_path=field_path,
+            citation=citation,
+            source=source,
+            default_page=page,
+            default_dimensions=dimensions,
+            default_confidence=field_confidence,
+        )
+        citations.extend(normalized)
+        if len(normalized) == 0:
+            signal = confidence_only_citation(
+                field_path,
                 source=source,
-                default_page=page,
-                default_dimensions=dimensions,
-                default_confidence=_extract_confidence(node_map),
+                confidence=_extract_confidence(_as_mapping(citation)),
+            )
+            if signal is not None:
+                confidence_only.append(signal)
+    if len(citations) == 0 and field_confidence is not None:
+        citations.append(
+            FieldCitation(
+                field_path=field_path,
+                page=page,
+                bbox=None,
+                source=source,
+                confidence=field_confidence,
+                metadata=_compact_metadata(node_map),
             )
         )
-    if len(citations) == 0:
-        confidence = _extract_confidence(node_map)
-        if confidence is not None:
-            citations.append(
-                FieldCitation(
-                    field_path=field_path,
-                    page=page,
-                    bbox=None,
-                    source=source,
-                    confidence=confidence,
-                    metadata=_compact_metadata(node_map),
-                )
-            )
-    return citations
+    return citations + confidence_only
 
 
 def _iter_citation_entries(node: Mapping[str, Any]) -> list[Any]:
@@ -553,21 +567,20 @@ def _landingai_reference_to_citation(
     reference_text: str | None,
     grounding_entry: Mapping[str, Any],
 ) -> FieldCitation | None:
+    confidence = _extract_confidence(grounding_entry)
     box = _as_mapping(grounding_entry.get("box"))
     left = _coerce_float(box.get("left"))
     top = _coerce_float(box.get("top"))
     right = _coerce_float(box.get("right"))
     bottom = _coerce_float(box.get("bottom"))
-    if left is None or top is None or right is None or bottom is None:
-        return None
-
-    bbox = _normalize_bbox([left, top, right - left, bottom - top], None)
+    bbox = None
+    if left is not None and top is not None and right is not None and bottom is not None:
+        bbox = _normalize_bbox([left, top, right - left, bottom - top], None)
     if bbox is None:
-        return None
+        return confidence_only_citation(field_path, source="landingai", confidence=confidence)
 
     page_index = _coerce_int(grounding_entry.get("page"))
     page = page_index + 1 if page_index is not None and page_index >= 0 else None
-    confidence = _extract_confidence(grounding_entry)
     metadata = {"reference": reference}
     grounding_type = grounding_entry.get("type")
     if isinstance(grounding_type, str):
@@ -981,6 +994,9 @@ def _dedupe(citations: Sequence[FieldCitation]) -> list[FieldCitation]:
             tuple(citation.bbox) if citation.bbox is not None else None,
             citation.reference_text,
             citation.source,
+            # Distinct scores with no location belong to the same field, but
+            # must reach the confidence scorer for its per-field aggregation.
+            citation.confidence if citation.page is None and citation.bbox is None else None,
         )
         if key in seen:
             continue

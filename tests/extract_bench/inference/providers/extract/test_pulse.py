@@ -453,6 +453,28 @@ def test_anchor_index_covers_all_block_categories_and_never_invents_page() -> No
     ]
 
 
+def test_citation_confidence_survives_missing_page_or_coordinates() -> None:
+    index = _build_pulse_anchor_index(
+        {
+            "Text": [
+                {"id": "unpaged", "bounding_box": [0.1, 0.1, 0.2, 0.2], "confidence": 0.8},
+                {"id": "no-box", "page": 2, "confidence": 0.0, "average_word_confidence": 0.9},
+                {"id": "duplicate", "confidence": 0.6},
+                {"id": "duplicate", "page": 3, "bounding_box": [0.1, 0.1, 0.2, 0.2]},
+            ],
+        }
+    )
+    resolved = _resolve_pulse_citation_anchors({"amount": "unpaged, no-box", "total": "duplicate"}, index)
+
+    citations = _extract_pulse_field_citations(resolved)
+
+    assert [(c.field_path, c.page, c.bbox, c.confidence) for c in citations] == [
+        ("amount", None, None, 0.8),
+        ("amount", None, None, 0.0),
+        ("total", 3, [0.1, 0.1, 0.1, 0.1], 0.6),
+    ]
+
+
 def test_cancel_targets_current_remote_job(monkeypatch: pytest.MonkeyPatch) -> None:
     provider = _provider({"async_run": True})
     control = provider._register_request("invoice/doc-1")

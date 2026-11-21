@@ -487,41 +487,30 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
     # Commercial extraction APIs
     # =========================================================================
 
+    reducto_config = {
+        "citations": True,
+        "array_extract": False,
+        REDUCTO_CONFIDENCE_SIGNAL_TYPE: "continuous",
+    }
     register_fn(
         _pipeline_spec(
             pipeline_name="reducto_extract",
             provider_name="reducto_extract",
-            config={
-                "citations": True,
-                REDUCTO_CONFIDENCE_SIGNAL_TYPE: "continuous",
-                "array_extract": False,
-            },
+            config=reducto_config,
         )
     )
-
     register_fn(
         _pipeline_spec(
             pipeline_name="reducto_extract_v4",
             provider_name="reducto_extract",
-            config={
-                "citations": True,
-                REDUCTO_CONFIDENCE_SIGNAL_TYPE: "continuous",
-                "array_extract": False,
-                "extract_model": "v4",
-            },
+            config={**reducto_config, "extract_model": "v4"},
         )
     )
-
     register_fn(
         _pipeline_spec(
             pipeline_name="reducto_deep_extract",
             provider_name="reducto_extract",
-            config={
-                "citations": True,
-                REDUCTO_CONFIDENCE_SIGNAL_TYPE: "continuous",
-                "array_extract": False,
-                "deep_extract": True,
-            },
+            config={**reducto_config, "deep_extract": True},
         )
     )
 

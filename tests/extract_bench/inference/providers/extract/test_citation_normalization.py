@@ -81,6 +81,55 @@ def test_reducto_citations_follow_wrapped_object_values() -> None:
     assert [(c.field_path, c.page) for c in citations] == [("portfolio.name", 2)]
 
 
+@pytest.mark.parametrize("provider", ["llamaextract", "extend", "reducto"])
+def test_rejected_shared_citations_keep_native_confidence(provider: str) -> None:
+    from extract_bench.inference.providers.extract.citations import extract_extend_field_citations
+
+    bad_box = [1.02, 0.2, 0.1, 0.1]
+    fields = {
+        "amount": {
+            "value": 12,
+            "page": 3,
+            "confidence": 0.1,
+            "citations": [
+                {"page": 2, "bbox": bad_box, "confidence": 0.0},
+                {"page": 2, "bounding_boxes": [bad_box], "confidence": 0.8},
+            ],
+        },
+        "unscored": {"value": "x", "citations": [{"page": 2, "bbox": bad_box}]},
+    }
+    if provider == "llamaextract":
+        citations = extract_llamaextract_field_citations(
+            {"field_metadata": {"document_metadata": fields}}, source=provider
+        )
+    elif provider == "extend":
+        citations = extract_extend_field_citations({"processor_run": {"output": {"metadata": fields}}})
+    else:
+        citations = extract_reducto_field_citations({"result": fields})
+
+    assert [(c.field_path, c.page, c.bbox, c.confidence) for c in citations] == [
+        ("amount", 3, None, 0.1),
+        ("amount", None, None, 0.0),
+        ("amount", None, None, 0.8),
+    ]
+
+
+@pytest.mark.parametrize(
+    "box",
+    [{"left": 1.02, "top": 0.2, "right": 1.1, "bottom": 0.3}, {"left": 0.1, "top": 0.2}],
+)
+def test_landingai_preserves_confidence_when_grounding_box_is_rejected(box: dict[str, float]) -> None:
+    from extract_bench.inference.providers.extract.citations import extract_landingai_field_citations
+
+    citations = extract_landingai_field_citations(
+        {
+            "extraction_metadata": {"amount": {"references": ["a"]}},
+            "parse_response": {"grounding": {"a": {"page": 0, "box": box, "confidence": 0.73}}},
+        }
+    )
+    assert [(c.field_path, c.page, c.bbox, c.confidence) for c in citations] == [("amount", None, None, 0.73)]
+
+
 def test_reducto_preserves_grounding_in_a_legacy_wrapped_array() -> None:
     raw_output = {"result": [[{"amount": {"value": 12, "citations": [{"page": 1}]}}]]}
 
@@ -284,10 +333,11 @@ def test_landingai_only_converts_explicit_nonnegative_page_indexes(page_index: i
     assert citations[0].page == (1 if page_index == 0 else None)
 
 
-def test_azure_unresolved_source_preserves_confidence_without_claiming_page_one() -> None:
+@pytest.mark.parametrize("source", [None, "", "D(unknown)"])
+def test_azure_unresolved_source_preserves_confidence_without_claiming_page_one(source: str | None) -> None:
     from extract_bench.inference.providers.extract.azure_content_understanding import _citation_from_field
 
-    citation = _citation_from_field("amount", {"source": "D(unknown)", "confidence": 0.8}, {})
+    citation = _citation_from_field("amount", {"source": source, "confidence": 0.8}, {})
     assert citation is not None
     assert citation.page is None
     assert citation.bbox is None
