@@ -34,6 +34,7 @@ _PROVIDER_MODULES = [
     "nuextract3_extract",
     "openai_responses",
     "kynex",
+    "pageindex",
     "parseur",
     "pi_extract",
     "pulse",
