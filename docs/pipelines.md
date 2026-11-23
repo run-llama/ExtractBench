@@ -49,6 +49,7 @@ uv run extract-bench run <pipeline_name>
 | `extend_extract_max` | Extend Max Context + Review Agent | same settings as Performance, with `large_array_max_context` |
 | `extend_extract_operator` | Extend | Operator extraction on the 2026-02-09 API with word-level citations; cost from the run's reported usage (`EXTEND_API_KEY`) |
 | `landingai_extract` | LandingAI ADE | |
+| `pageindex_extract_standard` / `pageindex_extract_pro` | PageIndex Page Extract | Standard or Pro tier; the PDF uploaded as a document, then extracted; the page each value was read from, as page-only citations; cost is the extraction charge plus upload preprocessing (`PAGEINDEX_API_KEY`) |
 | `parseur_extract_v3_vision` | Parseur | AI Vision engine v3; no citations (`PARSEUR_API_KEY`) |
 | `datalab_extract_turbo` | Datalab Turbo | Image-only extraction; no parsing, citations, or confidence scores |
 | `datalab_extract_fast` | Datalab Fast | Fast extraction with source citations; a separate, free confidence step runs afterward |
