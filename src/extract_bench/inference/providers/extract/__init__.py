@@ -15,6 +15,7 @@ _PROVIDER_MODULES = [
     "anthropic_direct",
     "azure_content_understanding",
     "claude_code_extract",
+    "codebuddy_extract",
     "codex_code_extract",
     "codex_deepseek_extract",
     "collaborative_direct",

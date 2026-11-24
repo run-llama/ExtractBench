@@ -483,6 +483,27 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
         )
     )
 
+    # Tencent Hy4 Flash in the CodeBuddy Code CLI, on TokenHub's OpenAI-compatible
+    # chat-completions endpoint, with vision and page/box citations. Prices are
+    # TokenHub's list rates in USD per million tokens.
+    register_fn(
+        _pipeline_spec(
+            pipeline_name="codebuddy_extract_hy4_flash_evidence",
+            provider_name="codebuddy_extract",
+            config={
+                "model": "hy4-flash",
+                "url": "https://tokenhub-intl.tencentcloudmaas.com/v1/chat/completions",
+                "api_key_env": "TENCENT_TOKENHUB_API_KEY",
+                "max_cost_usd": None,
+                "input_price_per_1m": 0.07,
+                "output_price_per_1m": 0.281,
+                "cache_read_price_per_1m": 0.003,
+                "enable_vision": True,
+                "evidence_mode": True,
+            },
+        )
+    )
+
     # =========================================================================
     # Commercial extraction APIs
     # =========================================================================

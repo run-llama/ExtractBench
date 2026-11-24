@@ -13,6 +13,13 @@ Claude Code Sonnet 5.5,Coding Agents,claude_code_extract_sonnet_5_5_evidence,med
 Claude Code Sonnet 5.5,Coding Agents,claude_code_extract_sonnet_5_5_evidence,medium,true,relational_diagrams,20,19,55.00,83.80,46.46,52.45,0.060600,0,,,,55.00,83.80,46.46,52.45
 Claude Code Sonnet 5.5,Coding Agents,claude_code_extract_sonnet_5_5_evidence,medium,true,charts_and_maps,25,10,44.00,88.04,64.87,78.41,0.047900,0,,,,44.00,88.04,64.87,78.41
 Claude Code Sonnet 5.5,Coding Agents,claude_code_extract_sonnet_5_5_evidence,medium,true,long_single_pages,7,7,0.00,40.93,9.48,40.93,2.188200,0,,,,0.00,80.44,19.13,79.71
+CodeBuddy Code (Tencent Hy4 Flash),Coding Agents,codebuddy_extract_hy4_flash_evidence,default,true,all,100,81,3.00,7.75,6.45,7.77,0.019442,0,,,,6.00,49.41,29.90,43.47
+CodeBuddy Code (Tencent Hy4 Flash),Coding Agents,codebuddy_extract_hy4_flash_evidence,default,true,interpretation_rules,22,22,0.00,19.35,19.88,19.97,0.003556,0,,,,0.00,61.75,41.97,50.41
+CodeBuddy Code (Tencent Hy4 Flash),Coding Agents,codebuddy_extract_hy4_flash_evidence,default,true,custom_terminology,14,14,0.00,0.00,0.00,0.00,0.019797,0,,,,0.00,50.13,29.45,45.57
+CodeBuddy Code (Tencent Hy4 Flash),Coding Agents,codebuddy_extract_hy4_flash_evidence,default,true,conditional_aggregation,12,9,0.00,2.14,0.00,0.00,0.019112,0,,,,8.33,48.99,16.30,24.44
+CodeBuddy Code (Tencent Hy4 Flash),Coding Agents,codebuddy_extract_hy4_flash_evidence,default,true,relational_diagrams,20,19,5.00,5.00,0.00,5.26,0.012787,0,,,,10.00,37.31,30.61,39.55
+CodeBuddy Code (Tencent Hy4 Flash),Coding Agents,codebuddy_extract_hy4_flash_evidence,default,true,charts_and_maps,25,10,8.00,8.95,8.50,9.00,0.013964,0,,,,12.00,52.81,28.50,57.57
+CodeBuddy Code (Tencent Hy4 Flash),Coding Agents,codebuddy_extract_hy4_flash_evidence,default,true,long_single_pages,7,7,0.00,0.00,0.00,0.00,0.135676,0,,,,0.00,32.34,10.45,32.39
 Codex GPT-6 Astra,Coding Agents,codex_code_extract_gpt_6_astra_xhigh_evidence,xhigh,true,all,100,81,58.00,94.53,70.97,79.10,0.952000,0,,,,58.00,95.53,72.19,80.34
 Codex GPT-6 Astra,Coding Agents,codex_code_extract_gpt_6_astra_xhigh_evidence,xhigh,true,interpretation_rules,22,22,27.27,92.58,87.67,88.87,0.170300,0,,,,27.27,97.12,92.15,93.41
 Codex GPT-6 Astra,Coding Agents,codex_code_extract_gpt_6_astra_xhigh_evidence,xhigh,true,custom_terminology,14,14,64.29,99.51,63.53,63.62,0.141700,0,,,,64.29,99.51,63.53,63.62
