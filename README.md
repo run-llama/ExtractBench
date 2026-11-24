@@ -64,7 +64,7 @@ In the official benchmark, documents that fail or exceed a 30-minute limit score
 | 9 | Claude Code (Sonnet 5.5) | Coding Agents | 94.68 | 96.22 | 92.97 | 83.69 | — | 5.69¢ |
 | 10 | KYNEX (GPT-6.1 Sol) | Coding Agents | 94.63 | 96.04 | 93.14 | 84.18 | — | 9.35¢ |
 
-Top 10 of 59 ranked systems — all results in [leaderboard.csv](leaderboard.csv).
+Top 10 of 60 ranked systems — all results in [leaderboard.csv](leaderboard.csv).
 <!-- LEADERBOARD:END -->
 
 <!-- GROUNDING:START -->
@@ -89,7 +89,7 @@ Top 10 of 59 ranked systems — all results in [leaderboard.csv](leaderboard.csv
   </tbody>
 </table>
 
-Top 10 of 59 ranked systems — all results in [leaderboard.csv](leaderboard.csv).
+Top 10 of 60 ranked systems — all results in [leaderboard.csv](leaderboard.csv).
 <!-- GROUNDING:END -->
 
 ### ExtractBench Pro leaderboard
@@ -110,7 +110,7 @@ Rows are ordered by % Perfect, then Value F1, then lower cost.
 | 9 | Gemini CLI (Gemini 4 Argon Medium) | Coding Agents | 30 | 42.98 | 33.90 | — | 36.16¢ |
 | 10 | Codex GPT-6.1 Terra Medium | Coding Agents | 27 | 74.19 | 60.16 | — | 4.06¢ |
 
-Top 10 of 18 ranked systems — all results in [leaderboard-pro.csv](leaderboard-pro.csv). Scores with no time limit are also available there.
+Top 10 of 19 ranked systems — all results in [leaderboard-pro.csv](leaderboard-pro.csv). Scores with no time limit are also available there.
 <!-- PRO_LEADERBOARD:END -->
 
 ### Submitting results
