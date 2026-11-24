@@ -25,6 +25,10 @@ from typing import Any
 
 from filelock import FileLock, Timeout
 
+from extract_bench.inference.cost_contract import (
+    VENDOR_LOGS_EVENT,
+)
+from extract_bench.inference.events import emit_provider_event
 from extract_bench.inference.limits import EXTRACT_HARD_TIMEOUT_S
 from extract_bench.inference.providers.base import (
     Provider,
@@ -157,24 +161,46 @@ async def _extract_async(
             env.update(HARNESS_ENV)
             env["HOME"] = td
             env["USERPROFILE"] = td
-            proc = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                cwd=str(repo),
-                timeout=timeout,
-                env=env,
+            try:
+                proc = subprocess.run(
+                    cmd,
+                    capture_output=True,
+                    check=False,
+                    text=True,
+                    cwd=str(repo),
+                    timeout=timeout,
+                    env=env,
+                )
+            except subprocess.TimeoutExpired as exc:
+                logs = {
+                    "stdout": exc.stdout.decode(errors="replace") if isinstance(exc.stdout, bytes) else exc.stdout,
+                    "stderr": exc.stderr.decode(errors="replace") if isinstance(exc.stderr, bytes) else exc.stderr,
+                    "harness_revision": HARNESS_REVISION,
+                }
+                emit_provider_event(
+                    VENDOR_LOGS_EVENT,
+                    **logs,
+                )
+                raise ProviderPermanentError("harness extraction timed out", debug_payload=logs) from exc
+            logs = {"stdout": proc.stdout, "stderr": proc.stderr, "harness_revision": HARNESS_REVISION}
+            emit_provider_event(
+                VENDOR_LOGS_EVENT,
+                **logs,
             )
             if proc.returncode != 0:
                 raise ProviderPermanentError(
-                    f"harness extraction failed (exit {proc.returncode}): {(proc.stderr or proc.stdout)[-400:]}"
+                    f"harness extraction failed (exit {proc.returncode}): {(proc.stderr or proc.stdout)[-400:]}",
+                    debug_payload=logs,
                 )
             if not out_file.exists():
-                raise ProviderPermanentError("harness produced no extraction file")
-            extraction = json.loads(out_file.read_text(encoding="utf-8"))
-        return {"extraction": extraction, "harness_revision": HARNESS_REVISION}
+                raise ProviderPermanentError("harness produced no extraction file", debug_payload=logs)
+            try:
+                extraction = json.loads(out_file.read_text(encoding="utf-8"))
+            except json.JSONDecodeError as exc:
+                raise ProviderPermanentError("harness produced invalid JSON", debug_payload=logs) from exc
+        return {"extraction": extraction, **logs}
 
-    return await asyncio.get_running_loop().run_in_executor(None, _run)
+    return await asyncio.to_thread(_run)
 
 
 @register_provider("kynex_extract")

@@ -51,20 +51,20 @@ In the official benchmark, documents that fail or exceed a 30-minute limit score
 <!-- LEADERBOARD:START -->
 **Unified value F1** — rows are ordered by Overall Value F1, then lower cost.
 
-| Rank | Provider | Category | Overall | Short | Medium | Long | ¢ / Page |
-|---:|---|---|---:|---:|---:|---:|---:|
-| 1 | LlamaExtract Agentic Plus | LlamaExtract | **96.17** | <u>97.02</u> | 94.30 | <u>94.65</u> | 7.50¢ |
-| 2 | LlamaExtract Agentic Plus (Max Effort) | LlamaExtract | **96.17** | 96.82 | **95.48** | 91.36 | 19.11¢ |
-| 3 | Reducto Deep Extract | Specialized APIs | <u>96.08</u> | 96.84 | <u>94.80</u> | 92.85 | 6.35¢ |
-| 4 | Pulse (Effort) | Specialized APIs | 96.07 | 96.83 | 94.70 | 93.24 | 10.50¢ |
-| 5 | LlamaExtract Agentic | LlamaExtract | 95.65 | 96.06 | 94.79 | **94.73** | 3.12¢ |
-| 6 | Codex (GPT-6.1 Sol) | Coding Agents | 95.31 | 97.01 | 92.96 | 85.46 | 7.13¢ |
-| 7 | Claude Code (Sonnet 5.5) | Coding Agents | 94.68 | 96.22 | 92.97 | 83.69 | 5.69¢ |
-| 8 | KYNEX (GPT-6.1 Sol) | Coding Agents | 94.63 | 96.04 | 93.14 | 84.18 | 9.35¢ |
-| 9 | Codex (GPT-6 Sol) | Coding Agents | 94.57 | 95.99 | 92.42 | 87.25 | 9.80¢ |
-| 10 | Pulse (Non-effort) | Specialized APIs | 94.51 | 95.39 | 92.49 | 93.31 | 3.00¢ |
+| Rank | Provider | Category | Overall | Short | Medium | Long | AUGRC | ¢ / Page |
+|---:|---|---|---:|---:|---:|---:|---:|---:|
+| 1 | LlamaExtract Agentic Plus | LlamaExtract | **96.17** | <u>97.02</u> | 94.30 | <u>94.65</u> | 0.01504 | 7.50¢ |
+| 2 | LlamaExtract Agentic Plus (Max Effort) | LlamaExtract | **96.17** | 96.82 | **95.48** | 91.36 | — | 19.11¢ |
+| 3 | Reducto Deep Extract | Specialized APIs | <u>96.08</u> | 96.84 | 94.80 | 92.85 | 0.02477 | 6.35¢ |
+| 4 | Pulse (Effort) | Specialized APIs | 96.07 | 96.83 | 94.70 | 93.24 | — | 10.50¢ |
+| 5 | Datalab Balanced | Specialized APIs | 95.99 | 96.53 | <u>94.95</u> | 94.29 | 0.01516 | 8.61¢ |
+| 6 | Datalab Accurate | Specialized APIs | 95.96 | 96.67 | 94.44 | 94.50 | 0.0153 | 9.10¢ |
+| 7 | LlamaExtract Agentic | LlamaExtract | 95.65 | 96.06 | 94.79 | **94.73** | 0.01635 | 3.12¢ |
+| 8 | Codex (GPT-6.1 Sol) | Coding Agents | 95.31 | 97.01 | 92.96 | 85.46 | — | 7.13¢ |
+| 9 | Claude Code (Sonnet 5.5) | Coding Agents | 94.68 | 96.22 | 92.97 | 83.69 | — | 5.69¢ |
+| 10 | KYNEX (GPT-6.1 Sol) | Coding Agents | 94.63 | 96.04 | 93.14 | 84.18 | — | 9.35¢ |
 
-Top 10 of 53 ranked systems — all results in [leaderboard.csv](leaderboard.csv).
+Top 10 of 60 ranked systems — all results in [leaderboard.csv](leaderboard.csv).
 <!-- LEADERBOARD:END -->
 
 <!-- GROUNDING:START -->
@@ -76,20 +76,20 @@ Top 10 of 53 ranked systems — all results in [leaderboard.csv](leaderboard.csv
     <tr><th align="right">Overall</th><th align="right">Short</th><th align="right">Medium</th><th align="right">Long</th><th align="right">Overall</th><th align="right">Short</th><th align="right">Medium</th><th align="right">Long</th></tr>
   </thead>
   <tbody>
-    <tr><td align="right">1</td><td>Codex (GPT-6.1 Sol)</td><td align="right"><strong>87.61</strong></td><td align="right"><strong>89.03</strong></td><td align="right">84.38</td><td align="right"><strong>85.70</strong></td><td align="right">89.37</td><td align="right">89.63</td><td align="right">89.25</td><td align="right">86.80</td></tr>
+    <tr><td align="right">1</td><td>Codex (GPT-6.1 Sol)</td><td align="right"><strong>87.61</strong></td><td align="right"><strong>89.03</strong></td><td align="right">84.38</td><td align="right">85.70</td><td align="right">89.37</td><td align="right">89.63</td><td align="right">89.25</td><td align="right">86.80</td></tr>
     <tr><td align="right">2</td><td>Codex (GPT-6.1 Terra)</td><td align="right"><u>85.69</u></td><td align="right"><u>88.13</u></td><td align="right">81.32</td><td align="right">77.21</td><td align="right">87.42</td><td align="right">88.49</td><td align="right">86.10</td><td align="right">81.15</td></tr>
-    <tr><td align="right">3</td><td>LlamaExtract Agentic Plus</td><td align="right">83.25</td><td align="right">83.22</td><td align="right">83.44</td><td align="right"><u>82.84</u></td><td align="right">88.26</td><td align="right">87.97</td><td align="right">88.48</td><td align="right"><u>90.61</u></td></tr>
-    <tr><td align="right">4</td><td>LlamaExtract Agentic</td><td align="right">82.33</td><td align="right">81.39</td><td align="right"><u>84.94</u></td><td align="right">81.63</td><td align="right">88.20</td><td align="right">86.95</td><td align="right">90.33</td><td align="right"><strong>92.59</strong></td></tr>
-    <tr><td align="right">5</td><td>LlamaExtract Agentic Plus (Max Effort)</td><td align="right">81.78</td><td align="right">80.58</td><td align="right"><strong>85.55</strong></td><td align="right">78.74</td><td align="right"><u>90.02</u></td><td align="right">89.92</td><td align="right"><u>90.67</u></td><td align="right">88.10</td></tr>
-    <tr><td align="right">6</td><td>LlamaExtract Cost-Effective</td><td align="right">79.80</td><td align="right">80.99</td><td align="right">77.52</td><td align="right">76.16</td><td align="right">86.28</td><td align="right">86.97</td><td align="right">84.60</td><td align="right">86.41</td></tr>
-    <tr><td align="right">7</td><td>Codex (GPT-6 Sol)</td><td align="right">77.11</td><td align="right">77.61</td><td align="right">75.53</td><td align="right">78.31</td><td align="right">86.50</td><td align="right">87.20</td><td align="right">85.12</td><td align="right">84.82</td></tr>
-    <tr><td align="right">8</td><td>Claude Code (Opus 5.5)</td><td align="right">71.55</td><td align="right">73.57</td><td align="right">65.54</td><td align="right">74.87</td><td align="right">76.95</td><td align="right">79.27</td><td align="right">71.36</td><td align="right">76.47</td></tr>
-    <tr><td align="right">9</td><td>Codex (GPT-6 Luna)</td><td align="right">65.70</td><td align="right">62.91</td><td align="right">71.11</td><td align="right">74.36</td><td align="right">83.93</td><td align="right">84.41</td><td align="right">83.47</td><td align="right">80.17</td></tr>
-    <tr><td align="right">10</td><td>Claude Code (Sonnet 5.5)</td><td align="right">64.61</td><td align="right">64.59</td><td align="right">63.18</td><td align="right">71.22</td><td align="right">75.99</td><td align="right">77.93</td><td align="right">71.50</td><td align="right">74.98</td></tr>
+    <tr><td align="right">3</td><td>Gemini CLI (Gemini 4 Hydrogen)</td><td align="right">85.11</td><td align="right">86.89</td><td align="right">80.34</td><td align="right"><u>86.11</u></td><td align="right">85.97</td><td align="right">87.63</td><td align="right">82.27</td><td align="right">84.23</td></tr>
+    <tr><td align="right">4</td><td>LlamaExtract Agentic Plus</td><td align="right">83.25</td><td align="right">83.22</td><td align="right">83.44</td><td align="right">82.84</td><td align="right">88.26</td><td align="right">87.97</td><td align="right">88.48</td><td align="right">90.61</td></tr>
+    <tr><td align="right">5</td><td>LlamaExtract Agentic</td><td align="right">82.33</td><td align="right">81.39</td><td align="right"><u>84.94</u></td><td align="right">81.63</td><td align="right">88.20</td><td align="right">86.95</td><td align="right">90.33</td><td align="right"><strong>92.59</strong></td></tr>
+    <tr><td align="right">6</td><td>LlamaExtract Agentic Plus (Max Effort)</td><td align="right">81.78</td><td align="right">80.58</td><td align="right"><strong>85.55</strong></td><td align="right">78.74</td><td align="right"><u>90.02</u></td><td align="right">89.92</td><td align="right"><u>90.67</u></td><td align="right">88.10</td></tr>
+    <tr><td align="right">7</td><td>Antigravity CLI (Gemini 4 Hydrogen)</td><td align="right">80.37</td><td align="right">81.97</td><td align="right">76.02</td><td align="right">81.38</td><td align="right">82.32</td><td align="right">84.22</td><td align="right">78.27</td><td align="right">79.65</td></tr>
+    <tr><td align="right">8</td><td>LlamaExtract Cost-Effective</td><td align="right">79.80</td><td align="right">80.99</td><td align="right">77.52</td><td align="right">76.16</td><td align="right">86.28</td><td align="right">86.97</td><td align="right">84.60</td><td align="right">86.41</td></tr>
+    <tr><td align="right">9</td><td>Pi (Tencent Hy4)</td><td align="right">79.53</td><td align="right">79.67</td><td align="right">76.60</td><td align="right"><strong>92.19</strong></td><td align="right">76.67</td><td align="right">77.81</td><td align="right">72.67</td><td align="right">82.24</td></tr>
+    <tr><td align="right">10</td><td>Codex (GPT-6 Sol)</td><td align="right">77.11</td><td align="right">77.61</td><td align="right">75.53</td><td align="right">78.31</td><td align="right">86.50</td><td align="right">87.20</td><td align="right">85.12</td><td align="right">84.82</td></tr>
   </tbody>
 </table>
 
-Top 10 of 53 ranked systems — all results in [leaderboard.csv](leaderboard.csv).
+Top 10 of 60 ranked systems — all results in [leaderboard.csv](leaderboard.csv).
 <!-- GROUNDING:END -->
 
 ### ExtractBench Pro leaderboard
@@ -97,20 +97,20 @@ Top 10 of 53 ranked systems — all results in [leaderboard.csv](leaderboard.csv
 <!-- PRO_LEADERBOARD:START -->
 Rows are ordered by % Perfect, then Value F1, then lower cost.
 
-| Rank | Provider | Category | % Perfect | Value F1 | Grounding F1 | ¢ / Page |
-|---:|---|---|---:|---:|---:|---:|
-| 1 | Codex GPT-6 Astra | Coding Agents | **58** | **94.53** | **70.97** | 95.20¢ |
-| 2 | LlamaExtract Agentic Plus (Max Effort) | LlamaExtract | <u>56</u> | <u>92.71</u> | <u>66.20</u> | 36.60¢ |
-| 3 | Claude Code Opus 5.5 | Coding Agents | 51 | 74.87 | 45.29 | 41.20¢ |
-| 4 | LlamaExtract Agentic Plus | LlamaExtract | 38 | 77.70 | 60.39 | 7.50¢ |
-| 5 | Extend Operator | Specialized APIs | 34 | 73.87 | 57.75 | 9.88¢ |
-| 6 | Claude Code Sonnet 5.5 | Coding Agents | 32 | 73.62 | 40.47 | 19.98¢ |
-| 7 | Gemini CLI (Gemini 4 Argon Medium) | Coding Agents | 30 | 42.98 | 33.90 | 36.16¢ |
-| 8 | Codex GPT-6.1 Terra Medium | Coding Agents | 27 | 74.19 | 60.16 | 4.06¢ |
-| 9 | LlamaExtract Agentic | LlamaExtract | 20 | 71.32 | 58.01 | 3.12¢ |
-| 10 | Pulse Effort | Specialized APIs | 18 | 70.53 | 18.74 | 10.50¢ |
+| Rank | Provider | Category | % Perfect | Value F1 | Grounding F1 | AUGRC | ¢ / Page |
+|---:|---|---|---:|---:|---:|---:|---:|
+| 1 | Codex GPT-6 Astra | Coding Agents | **58** | **94.53** | **70.97** | — | 95.20¢ |
+| 2 | LlamaExtract Agentic Plus (Max Effort) | LlamaExtract | <u>56</u> | <u>92.71</u> | <u>66.20</u> | — | 36.60¢ |
+| 3 | Claude Code Opus 5.5 | Coding Agents | 51 | 74.87 | 45.29 | — | 41.20¢ |
+| 4 | Datalab Accurate | Specialized APIs | 42 | 80.16 | 42.44 | 0.05833 | 7.34¢ |
+| 5 | Gemini CLI (Gemini 4 Hydrogen) | Coding Agents | 42 | 63.88 | 43.88 | — | 43.89¢ |
+| 6 | LlamaExtract Agentic Plus | LlamaExtract | 38 | 77.70 | 60.39 | — | 7.50¢ |
+| 7 | Extend Operator | Specialized APIs | 34 | 73.87 | 57.75 | — | 9.88¢ |
+| 8 | Claude Code Sonnet 5.5 | Coding Agents | 32 | 73.62 | 40.47 | — | 19.98¢ |
+| 9 | Gemini CLI (Gemini 4 Argon Medium) | Coding Agents | 30 | 42.98 | 33.90 | — | 36.16¢ |
+| 10 | Codex GPT-6.1 Terra Medium | Coding Agents | 27 | 74.19 | 60.16 | — | 4.06¢ |
 
-Top 10 of 16 ranked systems — all results in [leaderboard-pro.csv](leaderboard-pro.csv). Scores with no time limit are also available there.
+Top 10 of 19 ranked systems — all results in [leaderboard-pro.csv](leaderboard-pro.csv). Scores with no time limit are also available there.
 <!-- PRO_LEADERBOARD:END -->
 
 ### Submitting results
@@ -211,7 +211,7 @@ Both benchmarks use the same deterministic evaluator: one metric for value accur
 <details>
 <summary><strong>How the unified value F1 is computed</strong></summary>
 
-- **Array alignment.** A repeated structure compares as an unordered set of records: records pair by a globally optimal one-to-one assignment (the Hungarian algorithm) that minimizes mismatched cells. Unmatched expected records lower recall, surplus predictions lower precision.
+- **Array alignment.** Record arrays use Hungarian matching by default. An array-parent rule with `structural: "ordered"` uses sequence alignment to maximize matching values while preserving relative row order. Unmatched expected records lower recall, and surplus predictions lower precision.
 - **Normalization.** Matching is deterministic and mostly exact: dates in eight written formats canonicalize to ISO form, strings compare exactly after whitespace collapsing, and everything else uses plain equality, with no numeric tolerance and no LLM judge.
 - **Missing values.** An omitted key scores as an explicit `null`, every scalar field enters both denominators, and a correct `null` on a blank field is credited. Only repeated records move precision and recall apart, so a gap between them means records were dropped or invented.
 

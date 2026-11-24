@@ -34,3 +34,5 @@ are skipped. These describe client admission, not backend worker capacity.
 ## Row identity hints
 
 For `.test.json` annotations, `_identity_hints` can declare row identity beside `data_schema`, for example `"_identity_hints": {"holdings": ["cusip"]}`. Array-record metrics use these hints to partition top-level arrays only when the residual assignment exceeds 100 million cells after exact-row matching. Each bucket keeps the same cap; smaller assignments remain keyless. Hints are evaluation-only and are not added to the schema sent to providers.
+
+Dataset JSONL stores `_identity_hints` as a JSON string. Downloaded sidecars and Harbor verifier references decode it into an object.

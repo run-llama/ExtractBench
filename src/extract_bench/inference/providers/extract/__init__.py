@@ -11,9 +11,11 @@ import logging
 logger = logging.getLogger(__name__)
 
 _PROVIDER_MODULES = [
+    "agy_extract",
     "anthropic_direct",
     "azure_content_understanding",
     "claude_code_extract",
+    "codebuddy_extract",
     "codex_code_extract",
     "codex_deepseek_extract",
     "collaborative_direct",
@@ -28,12 +30,14 @@ _PROVIDER_MODULES = [
     "glm_zai_extract",
     "kimi_extract",
     "landingai",
+    "landingai_v2",
     "lift",
     "llamaextract_v2_api",
     "nuextract3_extract",
     "openai_responses",
     "kynex",
     "parseur",
+    "pi_extract",
     "pulse",
     "reducto",
     "table_codegen_extract",

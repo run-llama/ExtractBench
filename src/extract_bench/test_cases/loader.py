@@ -25,35 +25,6 @@ from extract_bench.test_cases.schema import (
 logger = logging.getLogger(__name__)
 
 
-def _row_identity_kwargs(payload: dict[str, Any], source: Any) -> dict[str, Any]:
-    """Extract the eval-only ``_eval_row_identity`` block, refusing a malformed one.
-
-    A typo'd or wrongly-typed block must not be silently ignored: that would
-    quietly drop row identity and downgrade the document to gated/positional
-    alignment, which is exactly the failure this key exists to prevent.
-    """
-    if "_eval_row_identity" not in payload:
-        legacy = payload.get("_repeated_structure")
-        if isinstance(legacy, dict) and legacy:
-            logger.warning(
-                "%s: ignoring a non-empty _repeated_structure block. Row identity is only read "
-                "from _eval_row_identity; honoring the legacy name would activate the inert "
-                "blocks that predate it and move scores. Re-run `extract-bench download` to "
-                "refresh this sidecar, or rename the key if the declaration is intended.",
-                source,
-            )
-        return {}
-    block = payload["_eval_row_identity"]
-    if not isinstance(block, dict):
-        raise ValueError(f"{source}: _eval_row_identity must be an object, got {type(block).__name__}")
-    for array_path, spec in block.items():
-        if not isinstance(spec, dict):
-            raise ValueError(
-                f"{source}: _eval_row_identity[{array_path!r}] must be an object, got {type(spec).__name__}"
-            )
-    return {"_eval_row_identity": block}
-
-
 # Supported file extensions for input files
 SUPPORTED_EXTENSIONS = {".pdf", ".png", ".jpg", ".jpeg", ".jfif", ".docx"}
 
@@ -405,7 +376,6 @@ def load_test_case(
             expected_output=expected_output,
             test_rules=test_rules,
             **({"_schema_version": test_config["_schema_version"]} if "_schema_version" in test_config else {}),
-            **_row_identity_kwargs(test_config, test_json_path),
             identity_hints=test_config.get("_identity_hints"),
         )
 

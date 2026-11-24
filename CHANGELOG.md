@@ -8,6 +8,9 @@ Notable changes to `llama-extract-bench`. This project follows
 
 ### Evaluation
 
+- Removed support for the legacy `repeated_structure` schema and dataset metadata, along with `_eval_row_identity` and the provider promotion toggle. Declare arrays under JSON Schema `properties` and use `_identity_hints` for array-record matching hints.
+- Confidence scoring uses Value F1’s row assignments and field verdicts, including accepted alternative values. Confidence precision, recall, and signal coverage use Value F1 cells, including primitive arrays scored as a unit. Rescore cached predictions to compare confidence results across this change.
+- Grounding checks citations against the accepted value that matched and always uses envelope matching. Remove the `bbox_match_mode` argument from calls to `compute_unified_evidence_metrics`. [#148](https://github.com/run-llama/ExtractBench/pull/148)
 - Layout diagnostics use ParseBench's attribution scorer, including rotated box overlap and zero for missing reading-order indices. Import helpers from `parse_bench.evaluation.metrics.attribution`. [#130](https://github.com/run-llama/ExtractBench/pull/130)
 - Field confidence grading excludes object and array citations and pairs identical rows one-to-one. Rescore cached runs with container confidence before comparing. Published full confidence threshold counts. [#128](https://github.com/run-llama/ExtractBench/pull/128)
 - Array-record metrics accept `_identity_hints` for large row-matching problems. [#77](https://github.com/run-llama/ExtractBench/pull/77)

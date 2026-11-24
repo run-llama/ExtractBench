@@ -8,8 +8,9 @@ reordered rows.
 
 Design
 ------
-The value scorer is ``array_record``'s keyless Hungarian row assignment with
-three additions:
+The value scorer extends ``array_record``'s keyless Hungarian row assignment.
+Record arrays with a ``structural: "ordered"`` parent rule use sequence alignment.
+Both assignments score the same value leaves.
 
 1. **OR-acceptable values.** A ground-truth cell passes if the prediction
    matches its ``expected_output`` value *or any* alternate value declared in
@@ -42,58 +43,56 @@ three additions:
    when the value matches AND the citation's page is in the evidence's page set
    -- the coarser **page** check (no IoU), emitted as ``*_page_*``. Page is a
    per-cell superset of bbox (a box match requires equal pages, and page
-   evidence/claims are supersets of bbox evidence/claims), so the three F1s nest:
-   ``value_f1 >= page_f1 >= grounded_f1``. Together ``*_grounded_*`` and
-   ``*_page_*`` are one nested precision/recall/F1 trio.
-   Grounding is only defined where the GT carries the corresponding annotation
-   (a page for ``*_page_*``, a bbox for ``*_grounded_*``), on
-   BOTH sides of the P/R pair: recall's denominator is the GT cells that carry
-   an evidence bbox, and precision's denominator is the predicted citation-bbox
-   claims on cells *aligned to such a GT cell*. A claim on a cell whose GT has
-   no bbox (or on an extra predicted row with no GT counterpart) is ungradeable
-   -- it can never be verified right or wrong -- so it is excluded from the
-   denominator rather than counted as a miss. Without this, a sparsely
-   annotated document (e.g. one bbox-bearing cover field among 30k value-only
-   cells) pins precision to ~0 for every pipeline that cites everything. A
-   document whose GT has no evidence bbox at all emits **no** ``*_grounded_*``
-   metric (excluded from the dataset average), rather than a 0.0 that would
-   punish a document that simply cannot be graded for grounding.
+   evidence/claims are supersets of bbox evidence/claims), so the three F1s
+   nest: ``value_f1 >= page_f1 >= grounded_f1``. When a field locates multiple
+   alternative values, grounding uses the locations for the matched value and
+   any shared evidence. Together ``*_grounded_*`` and ``*_page_*`` are one
+   nested precision/recall/F1 trio.
 
-   How a citation is matched against a cell's evidence boxes is selected by
-   ``bbox_match_mode``. The default ``"envelope"`` reads the entries as an OR
-   of ANDs: a ``coarse`` entry is the envelope of the precise entries it
-   encloses on its page (a value printed on several lines carries one entry
-   per line plus their union, flagged coarse), and a citation matches the
-   envelope only when it covers it -- one box at IoU >= threshold, or several
-   boxes (one per line) whose union is -- AND touches every enclosed line. A
-   citation of one line of a paragraph-long value is not grounded. A precise
-   entry outside every envelope, and a coarse entry enclosing no precise
-   entry, is matched by one citation box at IoU >= threshold, so GT without
-   coarse envelopes grades exactly as before. ``"any"`` is that original flat
-   OR for every entry (any citation box against any evidence box).
+   Grounding is only defined where the GT carries the corresponding annotation
+   (a page for ``*_page_*``, a bbox for ``*_grounded_*``), on BOTH sides of the
+   P/R pair: recall's denominator is the GT cells that carry an evidence bbox,
+   and precision's denominator is the predicted citation-bbox claims on cells
+   *aligned to such a GT cell*. A claim on a cell whose GT has no bbox (or on
+   an extra predicted row with no GT counterpart) is ungradeable -- it can
+   never be verified right or wrong -- so it is excluded from the denominator
+   rather than counted as a miss. Without this, a sparsely annotated document
+   (e.g. one bbox-bearing cover field among 30k value-only cells) pins
+   precision to ~0 for every pipeline that cites everything. A document whose
+   GT has no evidence bbox at all emits **no** ``*_grounded_*`` metric
+   (excluded from the dataset average), rather than a 0.0 that would punish a
+   document that simply cannot be graded for grounding.
+
+   Grounding treats each occurrence of a value as an alternative location. A
+   ``coarse`` entry is the envelope of the precise entries it encloses on its
+   page. A citation must cover the envelope at the required IoU and touch every
+   enclosed line. It can use one box or the union of several boxes. A precise
+   entry outside every envelope, or a coarse entry enclosing no precise
+   entries, is matched by one citation box at the required IoU.
 
 On a document with no object-array subfields, no object-valued cells, no
-alternate evidence values, and no omit/default split, the ``*_value_*``
-metrics match ``array_record_*`` alignment. ``array_record`` reads
-omitted keys with ``.get`` (implicit ``null``); this scorer uses ``lookup``.
-Object-array subfields and objects recursed as child cells make the value
-metrics diverge from array_record (per-child credit); the
-``*_grounded_*`` metrics
-are the other new signal (0 for pipelines that emit no citations *on documents
-whose GT carries bboxes*; omitted entirely on documents whose GT has none).
-Truncation
-drops recall exactly as in ``array_record``: an unaligned ground-truth row
-contributes 0 correct against a full denominator, so there is no vacuous null
-pass.
+alternate evidence values, and no omit/default split, the ``*_value_*`` metrics
+match ``array_record_*`` alignment. ``array_record`` reads omitted keys with
+``.get`` (implicit ``null``); this scorer uses ``lookup``. Object-array
+subfields and objects recursed as child cells make the value metrics diverge
+from array_record (per-child credit); the ``*_grounded_*`` metrics are the
+other new signal (0 for pipelines that emit no citations *on documents whose GT
+carries bboxes*; omitted entirely on documents whose GT has none).
+
+Truncation drops recall exactly as in ``array_record``: an unaligned
+ground-truth row contributes 0 correct against a full denominator, so there is
+no vacuous null pass.
 """
 
 from __future__ import annotations
 
 import math
 import re
-from collections.abc import Mapping, MutableSequence, Sequence
-from dataclasses import dataclass
+from collections.abc import Iterable, Iterator, Mapping, MutableSequence, Sequence
+from copy import copy
+from dataclasses import dataclass, field
 from functools import lru_cache
+from itertools import chain
 from typing import Any, SupportsFloat
 
 import numpy as np
@@ -106,6 +105,7 @@ from extract_bench.evaluation.metrics.extract.array_record_match_metric import (
     array_subfield_names,
     as_rows,
     cell_match,
+    intern_cell_values,
     is_array_schema,
     mismatch_cost_matrix,
     normalize_dates_deep,
@@ -114,12 +114,14 @@ from extract_bench.evaluation.metrics.extract.array_record_match_metric import (
     unwrap_value,
 )
 from extract_bench.evaluation.metrics.extract.json_subset_match import normalize_date_string
+from extract_bench.inference.providers.extract.citations import format_field_path
 from extract_bench.inference.providers.extract.table_codegen.schema_utils import (
     resolve_refs,
     schema_items,
     schema_properties,
 )
 from extract_bench.schemas.evaluation import MetricValue
+from extract_bench.test_cases.extract_field_paths import parse_field_path
 from extract_bench.test_cases.schema import ExtractFieldTestRule, iter_rule_evidence
 
 # Opt-in per-field normalizers (``_field_rules[path].normalizers``). Each is a
@@ -133,18 +135,8 @@ _NULL_EQUALS_FALSE = "null_equals_false"
 _PHONE_DIGITS = "phone_digits"
 _LENIENT_DATE = "lenient_date"
 _PUNCTUATION_SPACING = "punctuation_spacing"
-# Above this many cells (GT rows x predicted rows) in a single flat array, the
-# grounded assignment matrix -- an int16 cost matrix plus scipy's internal
-# float64 copy -- is several GB, and a memory-limited eval runner OOMs building
-# it. For such an array we SKIP grounding (its bbox metrics), which lets the
-# value score take the exact-row peel that is provably value-identical for
-# opaque un-grounded cells (the pairing the full matrix would have chosen only
-# matters for grounded/nested TP, which we are not scoring). The document then
-# emits NO grounded metric at all (``grounded_incomplete``), rather than a
-# partial grounded score. Only arrays with no nested object or object-array
-# subfields qualify, so the peel
-# never shifts nested TP. ~100M cells keeps the matrix
-# under ~1 GB while sparing every ordinary document.
+# A 100M-pair dense assignment takes roughly 1 GB including SciPy's copy.
+# For oversized flat arrays, pair exact rows first and bound the residual matrix.
 _GROUNDED_MAX_CELLS = 100_000_000
 # Everything ``configured_cell_match`` handles; kept equal to the schema's
 # EXTRACT_FIELD_NORMALIZERS vocabulary (guarded by a unit test) so a name can't
@@ -165,11 +157,18 @@ _TERMINAL_PUNCT_RE = re.compile(r"\s*[.,;:]\s*$")
 _PUNCT_SPACING_RE = re.compile(r"\s*([,.;:])\s*", re.U)
 _NON_DIGIT_RE = re.compile(r"\D+")
 _DIGIT_RE = re.compile(r"\d")
+# Capture the month and day, then check the full ordinal against the calendar days.
+_MONTH_ORDINAL_DAY_RE = re.compile(
+    r"\b(?=([A-Za-z]+ [0-9]{1,2}))[A-Za-z]+ "
+    r"(?:(?:1|21|31)st|(?:2|22)nd|(?:3|23)rd|(?:[4-9]|1[0-9]|20|2[4-9]|30)th)\b",
+    re.IGNORECASE,
+)
 # Preprinted decade split: a filer types "55" after the printed "19", so
 # transcriptions render "19 55". Only joined when a digit (a day) already
 # appears before the pair -- "June 19 44" is a day 19 plus a 2-digit year,
 # not a split 1944.
 _SPLIT_YEAR_RE = re.compile(r"\b(19|20)\s+(\d{2})\b")
+_DATE_HYPHEN_WHITESPACE_RE = re.compile(r"(?<=\d)\s*-\s*(?=\d)")
 _TRAILING_2DIGIT_YEAR_RE = re.compile(r"^(.*[ ,/-])(\d{2})\s*$")
 _ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
@@ -177,12 +176,51 @@ _ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 type BBox = tuple[float, float, float, float]
 type PageBBox = tuple[int, BBox]
 type BoxIndex = dict[str, list[PageBBox]]
-# One gradeable location under ``bbox_match_mode="envelope"``: the page, the box
-# a citation must cover, and the precise boxes it encloses (the lines of a value
-# printed on several lines) that the citation must all touch. Empty parts = a
-# plain single-box IoU target.
+# An evidence target contains the page, the box a citation must cover,
+# and any enclosed line boxes the citation must touch. An empty tuple
+# of line boxes denotes a single-box IoU target.
 type EvidenceTarget = tuple[int, BBox, tuple[BBox, ...]]
 type TargetIndex = dict[str, Sequence[EvidenceTarget]]
+type _EvidenceBox = tuple[int, BBox, bool]
+
+
+@dataclass(frozen=True)
+class LocatedBox:
+    page: int
+    box: BBox
+    coarse: bool
+    layer: str | None
+
+    @property
+    def geometry(self) -> _EvidenceBox:
+        return self.page, self.box, self.coarse
+
+
+@dataclass(frozen=True)
+class ValueEvidence:
+    """Locations associated with one normalized answer, or shared across answers."""
+
+    value: Any
+    pages: frozenset[int]
+    targets: Sequence[EvidenceTarget]
+    boxes: tuple[LocatedBox, ...] = ()
+
+
+def matching_value_evidence(
+    groups: Sequence[ValueEvidence],
+    actual: Any,
+    field: str,
+    *,
+    fuzzy: dict[str, float],
+    normalizers: tuple[str, ...] | None,
+) -> tuple[ValueEvidence, ...]:
+    """Select shared locations and every located answer accepted by the field matcher."""
+    return tuple(
+        group
+        for group in groups
+        if group.value is None
+        or configured_cell_match(group.value, actual, field, fuzzy=fuzzy, normalizers=normalizers)
+    )
 
 
 @dataclass(frozen=True)
@@ -197,6 +235,9 @@ class ValueCell:
     gt_path: str | None
     pred_path: str | None
     value_correct: bool
+    # None uses field-wide evidence. An empty tuple means the accepted prediction
+    # has no eligible location among the field's explicitly located alternatives.
+    eligible_evidence: tuple[ValueEvidence, ...] | None = field(default=None, compare=False, repr=False)
 
 
 @dataclass(frozen=True)
@@ -233,11 +274,6 @@ class GradedCell:
     pred_pages: tuple[int, ...]
 
 
-# ``envelope``: OR of ANDs -- a coarse evidence entry is the envelope of the
-# precise entries it encloses and a citation must cover all of it (default).
-# ``any``: the original flat OR -- any citation box against any evidence box.
-BBOX_MATCH_MODES: frozenset[str] = frozenset({"envelope", "any"})
-DEFAULT_BBOX_MATCH_MODE = "envelope"
 # A precise entry is a part of a coarse entry on the same page when it lies
 # inside it. Envelopes are the union of their lines, so containment is 1.0 up
 # to 5-decimal rounding on stored boxes. 0.99 admits that rounding without
@@ -266,25 +302,27 @@ def _validated_bbox(raw: Sequence[SupportsFloat]) -> BBox | None:
 
 @lru_cache(maxsize=8192)
 def _lenient_date_probes(value: str) -> frozenset[str]:
-    """Date readings of a scanned-form value: split-year joined, and 2-digit
-    trailing years expanded into both centuries ("June 17, 43" -> 1943/2043).
+    """Normalize date transcriptions with spaced hyphens, ordinal days,
+    split years, or two-digit years ("June 17, 43" -> 1943/2043).
 
     Guardrails against equating different values:
-    - Both rewrites require a digit (a day) before the year token, so a lone
+    - The year rewrites require a digit (a day) before the year token, so a lone
       trailing pair ("May 11") is never century-expanded.
     - A rewritten probe only counts when it parses to an ISO date; unparseable
       rewrites are discarded rather than matched as raw strings ("Permit 12-34"
       vs "Permit 12-19 34" must not intersect on a fabricated "Permit 12-1934").
     """
     probes = {normalize_date_string(value)}
-    rewrites: list[str] = []
-    m = _SPLIT_YEAR_RE.search(value)
-    if m and _DIGIT_RE.search(value[: m.start()]):
-        rewrites.append(_SPLIT_YEAR_RE.sub(r"\1\2", value))
-    for base in (value, *rewrites):
+    plain_day = _MONTH_ORDINAL_DAY_RE.sub(r"\1", value)
+    rewrites = [plain_day]
+    m = _SPLIT_YEAR_RE.search(plain_day)
+    if m and _DIGIT_RE.search(plain_day[: m.start()]):
+        rewrites.append(_SPLIT_YEAR_RE.sub(r"\1\2", plain_day))
+    for base in tuple(rewrites):
         m = _TRAILING_2DIGIT_YEAR_RE.match(base)
         if m and _DIGIT_RE.search(m.group(1)):
             rewrites += [f"{m.group(1)}19{m.group(2)}", f"{m.group(1)}20{m.group(2)}"]
+    rewrites.append(_DATE_HYPHEN_WHITESPACE_RE.sub("-", value))
     for rewrite in rewrites:
         normalized = normalize_date_string(rewrite)
         if _ISO_DATE_RE.match(normalized):
@@ -662,9 +700,63 @@ def union_xywh(boxes: Sequence[BBox]) -> BBox | None:
     return (x0, y0, x1 - x0, y1 - y0)
 
 
-def _flat_targets(boxes: BoxIndex) -> TargetIndex:
-    """Every box a target of its own (no envelope structure): ``envelope`` mode then equals ``any``."""
-    return {path: [(page, box, ()) for page, box in entries] for path, entries in boxes.items()}
+def _ordered_record_paths(rules: Sequence[ExtractFieldTestRule], schema: Mapping[str, Any]) -> frozenset[str]:
+    paths = set()
+    for rule in rules:
+        if rule.structural != "ordered":
+            continue
+        try:
+            tokens = parse_field_path(rule.field_path)
+        except ValueError:
+            continue
+        node: Any = schema
+        for token in tokens:
+            node = schema_items(node) if isinstance(token, int) else schema_properties(node).get(token, {})
+        if is_object_array_schema(node):
+            paths.add(format_field_path([f"[{token}]" if isinstance(token, int) else token for token in tokens]))
+    return frozenset(paths)
+
+
+def _align_ordered_rows(
+    expected_count: int,
+    predicted_count: int,
+    weight_rows: Iterable[np.ndarray],
+) -> dict[int, int]:
+    """Maximize matched values over monotone row pairs, with gaps on either side."""
+    # Among equal value scores, retain as many paired rows as possible.
+    # The scale keeps the secondary row count below one matched value.
+    value_scale = min(expected_count, predicted_count) + 1
+    # Retain only the last two score rows and one byte per cell for traceback.
+    skip_expected, skip_predicted, pair = 0, 1, 2
+    directions = np.empty((expected_count, predicted_count), dtype=np.uint8)
+    previous = np.zeros(predicted_count + 1, dtype=np.int64)
+    current = np.zeros_like(previous)
+    for i, weights in enumerate(weight_rows):
+        up = previous[1:]
+        diagonal = previous[:-1] + weights * value_scale + 1
+        # Moving left carries the previous column's score for free. The running
+        # maximum accounts for any number of left moves within this row.
+        np.maximum(up, diagonal, out=current[1:])
+        np.maximum.accumulate(current[1:], out=current[1:])
+        left = current[:-1]
+        # Equal scores prefer pairing, then skipping the expected row. The
+        # selected paths also determine which citations and confidences are graded.
+        directions[i] = np.where(diagonal == current[1:], pair, np.where(up >= left, skip_expected, skip_predicted))
+        previous, current = current, previous
+
+    selected: dict[int, int] = {}
+    i, j = expected_count - 1, predicted_count - 1
+    while i >= 0 and j >= 0:
+        direction = directions[i, j]
+        if direction == pair:
+            selected[i] = j
+            i -= 1
+            j -= 1
+        elif direction == skip_expected:
+            i -= 1
+        else:
+            j -= 1
+    return selected
 
 
 class Scorer:
@@ -679,25 +771,26 @@ class Scorer:
         pred_pages: dict[str, set[int]],
         fuzzy: dict[str, float],
         iou_threshold: float,
-        evidence_targets: TargetIndex | None = None,
-        bbox_match_mode: str = DEFAULT_BBOX_MATCH_MODE,
+        evidence_targets: Mapping[str, Sequence[ValueEvidence]],
+        ordered_arrays: frozenset[str],
         graded_cells: list[GradedCell] | None = None,
         value_cells: MutableSequence[ValueCell] | None = None,
     ) -> None:
-        if bbox_match_mode not in BBOX_MATCH_MODES:
-            raise ValueError(f"unknown bbox_match_mode {bbox_match_mode!r}; supported: {sorted(BBOX_MATCH_MODES)}")
         self._alt = alt_values
         self._cells = graded_cells
         self._value_cells = value_cells
         self._ev_boxes = evidence_boxes
         self._ev_pages = evidence_pages
-        self._ev_targets = _flat_targets(evidence_boxes) if evidence_targets is None else evidence_targets
-        self._mode = bbox_match_mode
+        self._ev_targets = evidence_targets
         self._normalizers = normalizers
         self._pred_boxes = pred_boxes
         self._pred_pages = pred_pages
         self._fuzzy = fuzzy
         self._iou = iou_threshold
+        self._ordered_arrays = ordered_arrays
+        self._ordered_array_ancestors = {
+            path[: index.start()] for path in ordered_arrays for index in re.finditer(r"\[\d+\]", path)
+        }
 
     def _configured_cell_match(self, gt_path: str, expected: Any, actual: Any, field: str) -> bool:
         return configured_cell_match(
@@ -857,26 +950,6 @@ class Scorer:
                 return True
         return False
 
-    def _gt_targets(self, gt_path: str) -> Sequence[EvidenceTarget] | None:
-        return self._ev_targets.get(gt_path)
-
-    def _target_hit(self, target: EvidenceTarget, pred: list[PageBBox]) -> bool:
-        return evidence_target_hit(target, pred, iou_threshold=self._iou)
-
-    def _box_match(self, gt_path: str, pred_path: str) -> bool:
-        pred = self._pred_boxes.get(pred_path)
-        if pred is None:
-            return False
-        if self._mode == "envelope":
-            targets = self._gt_targets(gt_path)
-            if targets is None:
-                return False
-            return any(self._target_hit(t, pred) for t in targets)
-        gt_boxes = self._ev_boxes.get(gt_path)
-        if gt_boxes is None:
-            return False
-        return any(gp == pp and iou_xywh(gb, pb) >= self._iou for gp, gb in gt_boxes for pp, pb in pred)
-
     def _note_grounded_expected(self, path: str, c: _Counts) -> None:
         if self._ev_boxes.get(path):
             c.g_expected += 1
@@ -887,16 +960,18 @@ class Scorer:
         if self._ev_boxes.get(gt_path):
             c.g_claims += 1
 
-    def _page_match(self, gt_path: str, pred_path: str) -> bool:
-        """A cited page for pred_path lands in the GT evidence's page set for
-        gt_path. Coarser than ``_box_match`` (no IoU) and implied by it: a box
-        match requires the pages to be equal, so every box match is a page
-        match."""
-        gt_pages = self._ev_pages.get(gt_path)
+    def _match_grounding(self, pred_path: str, locations: Sequence[ValueEvidence]) -> tuple[bool, bool]:
+        pred_boxes = self._pred_boxes.get(pred_path)
         pred_pages = self._pred_pages.get(pred_path)
-        if not gt_pages or not pred_pages:
-            return False
-        return not gt_pages.isdisjoint(pred_pages)
+        page_correct = False
+        for evidence in locations:
+            if pred_boxes is not None and any(
+                evidence_target_hit(target, pred_boxes, iou_threshold=self._iou) for target in evidence.targets
+            ):
+                return True, True
+            if pred_pages is not None and not evidence.pages.isdisjoint(pred_pages):
+                page_correct = True
+        return False, page_correct
 
     def _score_cell(
         self, gt_path: str, pred_path: str, canonical: Any, actual: Any, field: str, c: _Counts, ground: bool = True
@@ -908,19 +983,27 @@ class Scorer:
         g_correct/p_correct on the same skipped set.
         """
         matched = self._value_match(gt_path, canonical, actual, field)
+        locations = self._ev_targets.get(gt_path, ())
+        eligible_evidence = None
+        if matched and len(locations) > 1 and (ground or self._value_cells is not None):
+            eligible_evidence = matching_value_evidence(
+                locations,
+                actual,
+                field,
+                fuzzy=self._fuzzy,
+                normalizers=self._normalizers.get(gt_path),
+            )
+            locations = eligible_evidence
         if self._value_cells is not None:
-            self._value_cells.append(ValueCell(gt_path, pred_path, matched))
+            self._value_cells.append(ValueCell(gt_path, pred_path, matched, eligible_evidence))
         paged = False
         boxed = False
         if matched:
             c.v_correct += 1
             if ground:
-                if self._box_match(gt_path, pred_path):
-                    boxed = True
-                    c.g_correct += 1
-                if self._page_match(gt_path, pred_path):
-                    paged = True
-                    c.p_correct += 1
+                boxed, paged = self._match_grounding(pred_path, locations)
+                c.g_correct += int(boxed)
+                c.p_correct += int(paged)
         if self._cells is not None and ground:
             cell = self._graded_cell(gt_path, pred_path, field, matched, paged, boxed)
             if cell is not None:
@@ -1030,6 +1113,121 @@ class Scorer:
             if in_side:
                 self._count_subtree(f"{base}.{s}", child_val, child_schema, c, expected=expected, ground=ground)
 
+    def _flat_ordered_weights(
+        self,
+        gt_field: str,
+        start: int,
+        expected: Sequence[Any],
+        predicted: Sequence[Any],
+        properties: Mapping[str, Any],
+    ) -> Iterator[np.ndarray]:
+        """Yield one vector of matched-field counts per expected row."""
+        columns = []
+        for key in properties:
+            exp = [_read_segments(row, segments=(key,), item_sch=properties) for row in expected]
+            act = [_read_segments(row, segments=(key,), item_sch=properties) for row in predicted]
+            leaf = path_leaf(key)
+            ids = None
+            if leaf not in self._fuzzy and not any(isinstance(v, float) and math.isnan(v) for v in chain(exp, act)):
+                ids = intern_cell_values(act, exp)
+            columns.append((key, leaf, exp, act, ids))
+
+        for i in range(len(expected)):
+            weights = np.zeros(len(predicted), dtype=np.int64)
+            for key, leaf, exp, act, ids in columns:
+                value = exp[i]
+                if value is ABSENT:
+                    continue
+                path = f"{gt_field}[{start + i}].{key}"
+                if (
+                    ids is not None
+                    and path not in self._normalizers
+                    and all(alt == value for alt in self._alt.get(path, ()))
+                ):
+                    actual_ids, expected_ids = ids
+                    weights += actual_ids == expected_ids[i]
+                else:
+                    # Fuzzy fields, alternative readings and normalizers keep the
+                    # same predicate as the final, per-field scoring pass.
+                    weights += np.fromiter(
+                        (v is not ABSENT and self._value_match(path, value, v, leaf) for v in act),
+                        dtype=np.bool_,
+                        count=len(act),
+                    )
+            yield weights
+
+    def _align_annotated_rows(
+        self,
+        gt_field: str,
+        pred_field: str,
+        exp_rows: Sequence[Any],
+        act_rows: Sequence[Any],
+        item_schema: Mapping[str, Any],
+    ) -> dict[int, int]:
+        """Align this array using value scores that include any ordered descendants."""
+        # Probe candidate pairs without emitting verdicts. Only selected pairs
+        # contribute to the score and diagnostics below.
+        probe = copy(self)
+        probe._value_cells = None
+        probe._cells = None
+
+        def matched_values(i: int, j: int) -> int:
+            counts = _Counts()
+            probe._score_node(
+                f"{gt_field}[{i}]", f"{pred_field}[{j}]", exp_rows[i], act_rows[j], item_schema, counts, ground=False
+            )
+            return counts.v_correct
+
+        if gt_field in self._ordered_arrays:
+            # An identical edge pair earns every leaf on both rows. A monotone
+            # alignment can pair at most one of those rows elsewhere, so fixing
+            # the edge pair preserves the optimal score.
+            exp_end, act_end = len(exp_rows), len(act_rows)
+            start = 0
+            pairs: dict[int, int] = {}
+            while start < min(exp_end, act_end) and exp_rows[start] == act_rows[start]:
+                pairs[start] = start
+                start += 1
+            while start < min(exp_end, act_end) and exp_rows[exp_end - 1] == act_rows[act_end - 1]:
+                exp_end -= 1
+                act_end -= 1
+                pairs[exp_end] = act_end
+            if start < min(exp_end, act_end):
+                properties = schema_properties(item_schema)
+                if len(properties) > 0 and all(
+                    not is_object_schema(child) and not is_object_array_schema(child) for child in properties.values()
+                ):
+                    weight_rows = self._flat_ordered_weights(
+                        gt_field,
+                        start,
+                        exp_rows[start:exp_end],
+                        act_rows[start:act_end],
+                        properties,
+                    )
+                else:
+                    weight_rows = (
+                        np.fromiter(
+                            (matched_values(i, j) for j in range(start, act_end)),
+                            dtype=np.int64,
+                            count=act_end - start,
+                        )
+                        for i in range(start, exp_end)
+                    )
+                middle = _align_ordered_rows(exp_end - start, act_end - start, weight_rows)
+                pairs.update({i + start: j + start for i, j in middle.items()})
+            return pairs
+
+        # An unordered parent still uses Hungarian assignment, with row
+        # weights that reflect sequence alignment at the annotated child paths.
+        shape = (len(exp_rows), len(act_rows))
+        weights = np.fromiter(
+            (matched_values(i, j) for i in range(shape[0]) for j in range(shape[1])),
+            dtype=np.int32,
+            count=shape[0] * shape[1],
+        ).reshape(shape)
+        expected_indices, predicted_indices = linear_sum_assignment(weights, maximize=True)
+        return {int(i): int(j) for i, j in zip(expected_indices, predicted_indices, strict=True)}
+
     def _score_array(
         self,
         gt_field: str,
@@ -1051,7 +1249,8 @@ class Scorer:
         if len(subfield_names) == 0:
             return
         item_sch = array_item_properties(schema)
-        # List-of-objects subfields recurse with another Hungarian pass.
+        uses_ordered_paths = gt_field in self._ordered_arrays or gt_field in self._ordered_array_ancestors
+        # List-of-objects subfields recurse with their own alignment.
         # Dict-valued subfields recurse via ``_score_node`` (same as root).
         # Scalars and scalar lists stay opaque cells.
         object_array_names = [s for s in subfield_names if is_object_array_subfield(item_sch.get(s, {}))]
@@ -1063,88 +1262,32 @@ class Scorer:
         # ``_score_pair`` below (omit with no ``default`` is not a cell).
         c.expected_rows += len(exp_rows)
         c.predicted_rows += len(act_rows)
-        # A flat array whose full grounded matrix would be multi-GB: skip its
-        # grounding-family scoring (bbox AND page). Leaving has_ev_page/
-        # has_pred_page False routes the value score to the exact-row peel below
-        # (value-identical for opaque cells), and not counting
-        # g_expected/g_claims/p_expected/p_claims here keeps the grounded and
-        # page denominators consistent with the skipped g_correct/p_correct.
-        # ``len(object_array_names) == 0 and len(object_names) == 0`` guarantees
-        # no nested recursion, so the peel cannot
-        # shift nested TP. The memory win only lands on the plain peel path: an
-        # array with genuine alternate values (``multi``) or field normalizers
-        # still builds the full candidate matrix below regardless of ``giant`` --
-        # there grounding is withheld but the allocation is unchanged. The
-        # threshold bounds the FULL matrix; the peel's residual matrix over
-        # unmatched rows can still grow if few rows match exactly, so treat it as
-        # a heuristic, not a hard ceiling.
+        # Oversized flat arrays use the value scorer's exact-row pairing for
+        # citations too. Duplicate values inherit that pairing's tie-break.
         giant = (
-            len(exp_rows) > 0
+            not uses_ordered_paths
+            and len(exp_rows) > 0
             and len(act_rows) > 0
             and len(cell_names) > 0
             and len(object_array_names) == 0
             and len(object_names) == 0
             and len(exp_rows) * len(act_rows) > _GROUNDED_MAX_CELLS
         )
-        score_ground = ground and not giant
-        # Page presence drives both the grounded-family denominators and the
-        # pairing-sensitive branch selection below. It is a SUPERSET of bbox
-        # presence (every bbox-bearing evidence/citation also carries a page), so
-        # probing pages alone detects any dropped grounding -- bbox or page-only.
-        has_ev_page = False
-        has_pred_page = False
-        if giant:
-            # Existence-only probe (early-exit) so we still know whether any
-            # grounding-family scoring was actually dropped -- only then is the
-            # document's grounded/page score incomplete and must be withheld
-            # entirely. Pages are the superset, so this covers dropped bboxes too.
-            dropped_grounding = False
-            for i in range(len(exp_rows)):
-                for s in cell_names:
-                    pages = self._ev_pages.get(f"{gt_field}[{i}].{s}")
-                    if pages is not None and len(pages) > 0:
-                        dropped_grounding = True
-                        break
-                if dropped_grounding:
-                    break
-            if not dropped_grounding:
-                for j in range(len(act_rows)):
-                    for s in cell_names:
-                        pages = self._pred_pages.get(f"{pred_field}[{j}].{s}")
-                        if pages is not None and len(pages) > 0:
-                            dropped_grounding = True
-                            break
-                    if dropped_grounding:
-                        break
-            if dropped_grounding:
-                c.grounded_incomplete = True
-        else:
-            for i in range(len(exp_rows)):
-                for s in cell_names:
-                    gt_path = f"{gt_field}[{i}].{s}"
-                    pages = self._ev_pages.get(gt_path)
-                    if pages is not None and len(pages) > 0:
-                        has_ev_page = True
-                        break
-                if has_ev_page:
-                    break
-            # Flag-only scan: g_claims/p_claims are counted per aligned pair
-            # below, and only for cells whose GT side carries a bbox/page
-            # (ungradeable claims stay out of the precision denominator). The flag
-            # reflects ANY predicted page (the superset of any predicted bbox) so
-            # the pairing-sensitive branch selection below covers both families.
-            for j in range(len(act_rows)):
-                for s in cell_names:
-                    pages = self._pred_pages.get(f"{pred_field}[{j}].{s}")
-                    if pages is not None and len(pages) > 0:
-                        has_pred_page = True
-                        break
-                if has_pred_page:
-                    break
+        score_ground = ground
+        has_ev_page = any(f"{gt_field}[{i}].{s}" in self._ev_pages for i in range(len(exp_rows)) for s in cell_names)
+        has_pred_page = (
+            has_ev_page
+            and not giant
+            and any(f"{pred_field}[{j}].{s}" in self._pred_pages for j in range(len(act_rows)) for s in cell_names)
+        )
         # Object-array subfields are counted by the recursion below, per matched
         # pair (and as one-sided misses for unmatched rows).
         match_for_exp: dict[int, int] = {}
-        if len(exp_rows) > 0 and len(act_rows) > 0:
+        if len(exp_rows) > 0 and len(act_rows) > 0 and uses_ordered_paths:
+            match_for_exp = self._align_annotated_rows(
+                gt_field, pred_field, exp_rows, act_rows, {"type": "object", "properties": item_sch}
+            )
+        elif len(exp_rows) > 0 and len(act_rows) > 0:
             # Align on the same leaves F1 scores: opaque cells plus nested-object
             # children (not a 0/1 ``==`` on the whole object). Object-arrays add
             # their nested Hungarian cost. Scalar arrays stay one opaque cell.
@@ -1166,7 +1309,7 @@ class Scorer:
                 )
                 row_ind, col_ind = linear_sum_assignment(cost)
                 match_for_exp = {int(i): int(j) for j, i in zip(row_ind, col_ind, strict=True)}
-            elif len(object_array_names) > 0 or len(object_names) > 0 or (has_ev_page and has_pred_page):
+            elif len(object_array_names) > 0 or len(object_names) > 0 or has_pred_page:
                 # Pairing-sensitive scoring: nested object arrays and in-row objects
                 # recurse on the matched predicted index, and per-cell grounding +
                 # page grading key off it too. Among equal-cost optima the exact-row peel could
@@ -1186,9 +1329,7 @@ class Scorer:
                 row_ind, col_ind = linear_sum_assignment(cost)
                 match_for_exp = {int(i): int(j) for j, i in zip(row_ind, col_ind, strict=True)}
             else:
-                # Opaque-cell-only, un-grounded: the value score is pairing-
-                # independent (n_pairs*k - total_cost), so peeling exact rows is
-                # safe. Flatten through ``lookup`` so omit/default/null match F1.
+                # Match flat rows on their values, including schema defaults.
                 flat_act = list(_flatten_pairing_rows(act_rows, paths=pairing_paths, item_sch=item_sch))
                 flat_exp = list(_flatten_pairing_rows(exp_rows, paths=pairing_paths, item_sch=item_sch))
                 assignment = peel_exact_row_matches(
@@ -1213,6 +1354,9 @@ class Scorer:
                     # flagged ``value_incomplete`` -- a lower bound, not a crash.
                     if len(residual_actual) * len(residual_expected) > _GROUNDED_MAX_CELLS:
                         c.value_incomplete = True
+                        if ground and has_ev_page:
+                            c.grounded_incomplete = True
+                            score_ground = False
                     else:
                         cost = mismatch_cost_matrix(
                             residual_actual,
@@ -1408,7 +1552,7 @@ def build_rule_indexes(
 
 
 def build_evidence_targets(field_rules: Sequence[ExtractFieldTestRule]) -> TargetIndex:
-    """field_path -> evidence targets for ``bbox_match_mode="envelope"``.
+    """Map field paths to their evidence targets.
 
     Per rule and page, a ``coarse`` entry is an envelope whose parts are the
     precise entries with at least ENVELOPE_PART_CONTAINMENT of their area
@@ -1416,8 +1560,7 @@ def build_evidence_targets(field_rules: Sequence[ExtractFieldTestRule]) -> Targe
     entry enclosed by no envelope is a target of its own with no parts. A
     precise entry that is essentially the envelope itself (IoU >=
     ENVELOPE_DUPLICATE_IOU) is folded into it. Every path indexed by
-    ``build_rule_indexes`` gets at least one target, so the grounded
-    denominators do not depend on the mode.
+    ``build_rule_indexes`` with box evidence gets at least one target.
     """
     items: dict[str, list[tuple[int, BBox, bool]]] = {}
     for rule in field_rules:
@@ -1431,7 +1574,88 @@ def build_evidence_targets(field_rules: Sequence[ExtractFieldTestRule]) -> Targe
     return {path: group_evidence_targets(entries) for path, entries in items.items()}
 
 
-def group_evidence_targets(entries: Sequence[tuple[int, BBox, bool]]) -> Sequence[EvidenceTarget]:
+def build_value_evidence(
+    field_rules: Sequence[ExtractFieldTestRule],
+    *,
+    normalize_dates: bool,
+) -> dict[str, Sequence[ValueEvidence]]:
+    """Use explicit value locations when the field locates at least two different answers.
+
+    Older rules give some alternatives no page or box. Keep field-wide grounding
+    when there is only one located answer. Untagged locations can provide shared
+    evidence or lines for the tagged envelopes that contain them.
+    """
+    result: dict[str, Sequence[ValueEvidence]] = {}
+    for rule in field_rules:
+        entries = iter_rule_evidence(rule)
+        if len(entries) < 2:
+            continue
+        entries_by_value: list[tuple[Any, set[int], list[LocatedBox]]] = []
+        for entry in entries:
+            page = entry.page
+            if page is None:
+                continue
+            value = normalize_dates_deep(entry.value) if normalize_dates else entry.value
+            for group_value, group_pages, group_boxes in entries_by_value:
+                if group_value == value:
+                    pages, boxes = group_pages, group_boxes
+                    break
+            else:
+                pages, boxes = set(), []
+                entries_by_value.append((value, pages, boxes))
+            box = _validated_bbox(entry.bbox) if entry.bbox is not None else None
+            if box is None:
+                pages.add(page)
+            else:
+                boxes.append(LocatedBox(page, box, entry.coarse, entry.layer))
+        if sum(value is not None for value, _, _ in entries_by_value) < 2:
+            continue
+
+        shared_boxes = next((boxes for value, _, boxes in entries_by_value if value is None), [])
+        shared_geometry = [box.geometry for box in shared_boxes]
+        value_targets: list[ValueEvidence] = []
+        for value, pages, boxes in entries_by_value:
+            geometry = [box.geometry for box in boxes]
+            if value is None:
+                # Group both sets to detect shared lines inside tagged envelopes
+                # and shared envelopes that would absorb tagged lines. Keep only
+                # the shared targets whose geometry is independent.
+                all_boxes = [box.geometry for _, _, group_boxes in entries_by_value for box in group_boxes]
+                all_targets = {(page, box, frozenset(parts)) for page, box, parts in group_evidence_targets(all_boxes)}
+                targets = tuple(
+                    (page, box, parts)
+                    for page, box, parts in group_evidence_targets(geometry)
+                    if (page, box, frozenset(parts)) in all_targets
+                )
+                anchors = {(page, box) for page, box, _ in targets}
+                owned = [box for box in boxes if (box.page, box.box) in anchors]
+            else:
+                targets = tuple(group_evidence_targets(geometry, parts_only=shared_geometry))
+                owned = list(boxes)
+            # Keep precise boxes folded into a coarse target, including near-
+            # duplicates. A layer may grade the ink and the envelope separately.
+            envelopes = [box for box in owned if box.coarse]
+            owned.extend(
+                box
+                for box in shared_boxes
+                if not box.coarse
+                and box not in owned
+                and any(
+                    box.page == outer.page and contained_fraction_xywh(box.box, outer.box) >= ENVELOPE_PART_CONTAINMENT
+                    for outer in envelopes
+                )
+            )
+            target_pages = pages | {page for page, _, _ in targets}
+            value_targets.append(ValueEvidence(value, frozenset(target_pages), targets, tuple(owned)))
+        result[rule.field_path] = tuple(value_targets)
+    return result
+
+
+def group_evidence_targets(
+    entries: Sequence[_EvidenceBox],
+    *,
+    parts_only: Sequence[_EvidenceBox] = (),
+) -> Sequence[EvidenceTarget]:
     """Group coarse/precise evidence boxes on a page into envelope targets.
 
     Per page, a ``coarse`` entry is an envelope whose parts are the precise
@@ -1443,12 +1667,13 @@ def group_evidence_targets(entries: Sequence[tuple[int, BBox, bool]]) -> Sequenc
     out: list[EvidenceTarget] = []
     for page in dict.fromkeys(p for p, _, _ in entries):
         precise = [b for p, b, coarse in entries if p == page and not coarse]
+        parts_candidates = [*precise, *(b for p, b, coarse in parts_only if p == page and not coarse)]
         enclosed: set[int] = set()
         for p, box, coarse in entries:
             if p != page or not coarse:
                 continue
             parts: list[BBox] = []
-            for i, pb in enumerate(precise):
+            for i, pb in enumerate(parts_candidates):
                 if contained_fraction_xywh(pb, box) < ENVELOPE_PART_CONTAINMENT:
                     continue
                 enclosed.add(i)
@@ -1460,16 +1685,12 @@ def group_evidence_targets(entries: Sequence[tuple[int, BBox, bool]]) -> Sequenc
 
 
 def evidence_target_hit(target: EvidenceTarget, pred: Sequence[PageBBox], *, iou_threshold: float) -> bool:
-    """One evidence target against citation boxes (``envelope`` mode).
+    """Match one evidence target against citation boxes.
 
-    A target with no parts (a single-line value; a coarse box enclosing no
-    precise entry) is hit by one citation box at IoU >= threshold, exactly
-    as in ``any`` mode. An envelope with parts is hit when the citation
-    covers it -- one box at IoU >= threshold, or several boxes (one per
-    line) whose union is -- AND every part is touched by some citation box
-    (>= ENVELOPE_PART_COVERAGE of the part's area). A citation of one line
-    of a value printed on several lines therefore never hits its envelope,
-    even when that line alone reaches IoU 0.5 (two equally wide rows).
+    A target with no parts matches one citation box at IoU >= threshold.
+    For an envelope with parts, one citation box or the union of several
+    boxes must meet the IoU threshold. Each part must also have at least
+    ENVELOPE_PART_COVERAGE of its area covered by some citation box.
     """
     page, box, parts = target
     boxes = [pb for pp, pb in pred if pp == page]
@@ -1529,15 +1750,10 @@ def compute_unified_evidence_metrics(
     fuzzy_field_thresholds: Mapping[str, float] | None = None,
     normalize_dates: bool = True,
     bbox_iou_threshold: float = 0.5,
-    bbox_match_mode: str = DEFAULT_BBOX_MATCH_MODE,
     graded_cells: list[GradedCell] | None = None,
     value_cells: MutableSequence[ValueCell] | None = None,
 ) -> list[MetricValue]:
-    """Value + grounded precision/recall/F1 under keyless Hungarian alignment.
-
-    ``bbox_match_mode`` selects how a citation is graded against a cell's
-    evidence boxes: ``"envelope"`` (default; a coarse entry must be covered
-    whole, see the module docstring) or ``"any"`` (any box against any box).
+    """Value + grounded precision/recall/F1 with per-array row alignment.
 
     Returns an empty list when either side is not a dict (no array structure to
     score), matching ``array_record``'s ``counts is None`` guard.
@@ -1549,8 +1765,6 @@ def compute_unified_evidence_metrics(
     ``value_cells`` collects every Value-F1 leaf, including one-sided misses
     and cells with no citations. Paths address the normalized scoring inputs.
     """
-    if bbox_match_mode not in BBOX_MATCH_MODES:
-        raise ValueError(f"unknown bbox_match_mode {bbox_match_mode!r}; supported: {sorted(BBOX_MATCH_MODES)}")
     expected = unwrap_value(expected_output)
     actual = unwrap_value(extracted_data)
     if not isinstance(expected, Mapping) or not isinstance(actual, Mapping):
@@ -1561,7 +1775,20 @@ def compute_unified_evidence_metrics(
 
     fuzzy = dict(DEFAULT_FUZZY_FIELD_THRESHOLDS if fuzzy_field_thresholds is None else fuzzy_field_thresholds)
     alt, ev_boxes, ev_pages, normalizers = build_rule_indexes(field_rules)
-    ev_targets = build_evidence_targets(field_rules) if bbox_match_mode == "envelope" else {}
+    ev_targets = build_value_evidence(
+        field_rules,
+        normalize_dates=normalize_dates,
+    )
+    field_targets = build_evidence_targets([rule for rule in field_rules if rule.field_path not in ev_targets])
+    for path, pages in ev_pages.items():
+        if path not in ev_targets:
+            ev_targets[path] = (
+                ValueEvidence(
+                    value=None,
+                    pages=frozenset(pages),
+                    targets=field_targets.get(path, ()),
+                ),
+            )
     if normalize_dates:
         alt = {p: normalize_dates_deep(v) for p, v in alt.items()}
     pred_boxes, pred_pages = index_citations(field_citations or [])
@@ -1580,8 +1807,8 @@ def compute_unified_evidence_metrics(
         iou_threshold=bbox_iou_threshold,
         graded_cells=graded_cells,
         value_cells=value_cells,
-        evidence_targets=ev_targets if bbox_match_mode == "envelope" else None,
-        bbox_match_mode=bbox_match_mode,
+        evidence_targets=ev_targets,
+        ordered_arrays=_ordered_record_paths(field_rules, resolved),
     ).score_root(expected, actual, schema_props)
     if c.expected == 0 and c.predicted == 0:
         return []
@@ -1600,7 +1827,6 @@ def compute_unified_evidence_metrics(
         "expected_rows": c.expected_rows,
         "predicted_rows": c.predicted_rows,
         "bbox_iou_threshold": bbox_iou_threshold,
-        "bbox_match_mode": bbox_match_mode,
         "grounded_incomplete": c.grounded_incomplete,
         "value_incomplete": c.value_incomplete,
     }

@@ -163,8 +163,20 @@ def test_evaluator_derives_confidence_rows_from_expected_output_without_rules() 
     assert metrics["confidence_scoped_precision_at_0_99"].value == 1.0
 
 
-def test_confidence_scoped_metrics_expand_structured_array_rules_to_leaves() -> None:
+def test_confidence_scoped_metrics_follow_value_f1_for_reordered_array_rows() -> None:
     tc = _make_test_case(
+        data_schema={
+            "type": "object",
+            "properties": {
+                "line_items": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {"sku": {"type": "string"}, "amount": {"type": "number"}},
+                    },
+                },
+            },
+        },
         expected_output={
             "line_items": [
                 {"sku": "A", "amount": 100},
@@ -187,8 +199,8 @@ def test_confidence_scoped_metrics_expand_structured_array_rules_to_leaves() -> 
     ir = _make_inference_result(
         {
             "line_items": [
-                {"sku": "A", "amount": 200},
-                {"sku": "B", "amount": 100},
+                {"sku": "B", "amount": 200},
+                {"sku": "A", "amount": 999},
             ]
         },
         field_citations=[
@@ -204,14 +216,14 @@ def test_confidence_scoped_metrics_expand_structured_array_rules_to_leaves() -> 
 
     assert metrics["confidence_scoped_auc"].metadata["total_fields"] == 4
     assert metrics["confidence_scoped_auc"].metadata["fields_with_confidence"] == 4
-    assert metrics["confidence_scoped_precision_at_0_95"].value == 0.5
+    assert metrics["confidence_scoped_precision_at_0_95"].value == metrics["extract_unified_value_f1"].value == 0.75
     assert metrics["confidence_scoped_coverage_at_0_95"].value == 1.0
     rows = metrics["confidence_scoped_auc"].metadata["field_rows_sample"]
-    assert {row["field_path"] for row in rows} == {
-        "line_items[0].sku",
-        "line_items[0].amount",
-        "line_items[1].sku",
-        "line_items[1].amount",
+    assert {row["predicted_path"]: (row["matched_gt_path"], row["correct"]) for row in rows} == {
+        "line_items[0].sku": ("line_items[1].sku", True),
+        "line_items[0].amount": ("line_items[1].amount", True),
+        "line_items[1].sku": ("line_items[0].sku", True),
+        "line_items[1].amount": ("line_items[0].amount", False),
     }
 
 

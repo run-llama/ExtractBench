@@ -27,6 +27,10 @@ from extract_bench.evaluation.runner import (
     _eval_stall_timeout_seconds,
     _largest_selected_gt_file_bytes,
 )
+from extract_bench.inference.cost_contract import (
+    COST_USD,
+    KNOWN_COST_USD,
+)
 from extract_bench.schemas.pipeline_io import InferenceRequest, InferenceResult
 from extract_bench.schemas.product import ProductType
 
@@ -327,3 +331,41 @@ def test_documents_queued_behind_a_stall_are_retried_before_being_blamed(
     # once, not once per attempt.
     assert out.count("FAILED (worker timed out after 0.5s)") == 1
     assert f"{hung_id}: FAILED (worker timed out after 0.5s)" in out
+
+
+@pytest.mark.parametrize("raises", [True, False])
+def test_evaluation_failure_keeps_paid_inference_cost(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    raises: bool,
+) -> None:
+    gt_dir = tmp_path / "gt"
+    out_dir = tmp_path / "out"
+    test_id = _write_case(gt_dir, out_dir, "paid")
+    result_path = out_dir / "test-pipe" / f"{test_id}.result.json"
+    raw = json.loads(result_path.read_text(encoding="utf-8"))
+    raw["raw_output"][COST_USD] = 4
+    result_path.write_text(json.dumps(raw), encoding="utf-8")
+
+    def failed_worker(*task: Any) -> dict[str, Any]:
+        if raises:
+            raise ValueError("bad scorer")
+        return runner_mod.EvaluationResult(
+            test_id=test_id,
+            example_id=test_id,
+            pipeline_name="test-pipe",
+            product_type="extract",
+            success=False,
+            error="bad scorer",
+        ).model_dump()
+
+    monkeypatch.setattr(runner_mod, "_evaluate_single_worker", failed_worker)
+    monkeypatch.setattr(runner_mod, "ProcessPoolExecutor", ThreadPoolExecutor)
+    summary = EvaluationRunner(output_dir=out_dir, test_cases_dir=gt_dir).run_evaluation(
+        product_type="extract",
+        use_rich=False,
+        max_workers=1,
+    )
+    assert summary.failed == 1
+    assert summary.aggregate_stats[COST_USD]["total"] == 4
+    assert {stat.name: stat.value for stat in summary.per_example_results[0].stats}[KNOWN_COST_USD] == 4

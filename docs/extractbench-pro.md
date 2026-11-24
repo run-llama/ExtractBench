@@ -73,6 +73,9 @@ Pro has no `--test` subset. To try a pipeline on a smaller slice, run a single c
 | `extend_extract_operator` | Extend Operator |
 | `claude_code_extract_sonnet_5_5_evidence` | Claude Code Sonnet 5.5 |
 | `gemini_cli_extract_gemini_4_argon_medium_thinking_vision_evidence` | Gemini CLI (Gemini 4 Argon Medium) |
+| `gemini_cli_extract_gemini_4_hydrogen_high_thinking_vision_evidence` | Gemini CLI (Gemini 4 Hydrogen) |
+| `pi_extract_hy4_vision_evidence` | Pi (Tencent Hy4) |
+| `codebuddy_extract_hy4_flash_evidence` | CodeBuddy Code (Tencent Hy4 Flash) |
 | `llamaextract_agentic` | LlamaExtract Agentic |
 | `pulse_schema_effort` | Pulse Effort |
 | `codex_code_extract_gpt_6_1_sol_low_evidence` | Codex GPT-6.1 Sol |
@@ -106,6 +109,6 @@ Add seven rows per system to [leaderboard-pro.csv](../leaderboard-pro.csv): the 
 | Grounding F1 | `Word_Grounding` | `Word_Grounding_No_Time_Limit` |
 | Page-level grounding F1 | `Page_Grounding` | `Page_Grounding_No_Time_Limit` |
 
-Score columns above are percentages. `Confidence_AUGRC` stores raw AUGRC (lower is better), with the website displaying its reciprocal. Use an empty cell for an unreported metric; zero means a measured zero. Then follow the shared steps in [Submitting results](../README.md#submitting-results).
+Score columns above are percentages. Report [confidence metrics](extractbench.md#confidence-metrics) for the 30-minute view. Follow the shared steps in [Submitting results](../README.md#submitting-results).
 
-New inference runs use a three-hour execution limit per document, shared by ExtractBench and Pro. Timeout retries are disabled; transient retries stay inside that budget. Job-status polling defaults to three seconds, with backoff for rate limits and transient errors.
+Inference runs use a three-hour execution limit per document. Job-status polling defaults to three seconds, with backoff for rate limits and transient errors.

@@ -17,6 +17,15 @@ from extend_ai import Extend
 from extend_ai.core.api_error import ApiError
 from extend_ai.core.request_options import RequestOptions
 
+from extract_bench.inference.cost_accounting import record_response_cost
+from extract_bench.inference.cost_contract import (
+    COMPLETE,
+    COST_ACCOUNTING,
+    COST_PER_PAGE_USD,
+    COST_USD,
+    KNOWN_COST_USD,
+    RAW_COST_COMPLETE,
+)
 from extract_bench.inference.events import emit_provider_event
 from extract_bench.inference.limits import DEFAULT_POLL_INTERVAL_S, ExecutionBudget, execution_budget
 from extract_bench.inference.providers.base import (
@@ -356,6 +365,7 @@ def _attach_cost_stats(raw_output: dict[str, Any], pipeline_config: dict[str, An
     total_credits_from_usage = _coerce_nonnegative_float(usage.get("totalCredits"))
     if total_credits_from_usage is None:
         total_credits_from_usage = _coerce_nonnegative_float(usage.get("total_credits"))
+    raw_output[RAW_COST_COMPLETE] = total_credits_from_usage is not None or (credits_used is not None and num_pages > 0)
     if credits_used is None and total_credits_from_usage is None:
         return
     if credits_used is not None:
@@ -376,10 +386,10 @@ def _attach_cost_stats(raw_output: dict[str, Any], pipeline_config: dict[str, An
     rate = float(pipeline_config.get("usd_per_credit", USD_PER_CREDIT))
     raw_output["usd_per_credit"] = rate
     cost_usd = total_credits * rate
-    raw_output["cost_usd"] = cost_usd
+    raw_output[COST_USD] = cost_usd
     if num_pages:
         raw_output["credits_per_page"] = total_credits / num_pages
-        raw_output["cost_per_page_usd"] = cost_usd / num_pages
+        raw_output[COST_PER_PAGE_USD] = cost_usd / num_pages
 
 
 @register_provider("extend")
@@ -742,7 +752,42 @@ class ExtendProvider(Provider):
                     result[attr] = value
         return result
 
-    def _run_processor(self, processor_id: str, file_id: str) -> dict[str, Any]:
+    def _record_run_cost(
+        self,
+        payload: dict[str, Any],
+        config: dict[str, Any],
+        previous: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        self._attach_cost_stats(payload, config)
+        run = payload.get("processor_run", {})
+        cost = payload.get(COST_USD)
+        complete = payload.get(RAW_COST_COMPLETE, cost is not None) and run.get("status") in (
+            "PROCESSED",
+            "FAILED",
+            "CANCELLED",
+        )
+        # A response without billing cannot erase charges from an earlier poll.
+        if cost is None and previous is not None:
+            cost = previous[KNOWN_COST_USD]
+            payload[COST_USD] = cost
+        payload[RAW_COST_COMPLETE] = complete
+        snapshot = {KNOWN_COST_USD: cost, COMPLETE: complete}
+        if cost is not None:
+            usage = run.get("usage")
+            record_response_cost(
+                cost,
+                usage if usage is not None else {},
+                complete=complete,
+                component_id=f"extend/{run['id']}",
+            )
+        return snapshot
+
+    def _run_processor(
+        self,
+        processor_id: str,
+        file_id: str,
+        pipeline_config: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """
         Run a processor on a file synchronously.
 
@@ -759,6 +804,7 @@ class ExtendProvider(Provider):
                 request_options=self._request_options(),
             )
             payload = self._run_response_to_dict(run_response)
+            self._record_run_cost(payload, self.base_config if pipeline_config is None else pipeline_config)
             emit_provider_event(
                 "stage.completed",
                 provider="extend",
@@ -789,8 +835,14 @@ class ExtendProvider(Provider):
                 return str(run_obj["id"])
         return None
 
-    def _run_processor_async(self, processor_id: str, file_id: str) -> dict[str, Any]:
+    def _run_processor_async(
+        self,
+        processor_id: str,
+        file_id: str,
+        pipeline_config: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """Poll one billed run within the document budget and retain its diagnostics."""
+        config = self.base_config if pipeline_config is None else pipeline_config
         budget = execution_budget()
         try:
             create_response = self._client.processor_run.create(
@@ -822,6 +874,7 @@ class ExtendProvider(Provider):
             "create_response": self._run_response_to_dict(create_response),
             "poll_history": poll_history,
         }
+        execution[COST_ACCOUNTING] = self._record_run_cost(execution["create_response"], config)
         consecutive_poll_errors = 0
         try:
             while True:
@@ -845,11 +898,19 @@ class ExtendProvider(Provider):
                         raise ProviderPermanentError(
                             f"Cannot poll Extend processor run {run_id}: {error}",
                             job_id=run_id,
-                            debug_payload={"_extend_execution": execution},
+                            debug_payload={
+                                "_extend_execution": execution,
+                                COST_ACCOUNTING: execution.get(
+                                    COST_ACCOUNTING, {KNOWN_COST_USD: None, COMPLETE: False}
+                                ),
+                            },
                         ) from error
                     budget.wait(self._poll_interval * 2)
                     continue
 
+                payload = self._run_response_to_dict(get_response)
+                execution["last_response"] = dict(payload)
+                execution[COST_ACCOUNTING] = self._record_run_cost(payload, config, execution[COST_ACCOUNTING])
                 # Record returned terminal data even when the scoring deadline has passed.
                 if getattr(getattr(get_response, "processor_run", None), "status", None) == "PROCESSED":
                     emit_provider_event(
@@ -865,7 +926,8 @@ class ExtendProvider(Provider):
                 status = str(getattr(run, "status", "") or "")
                 poll_history.append({"at": datetime.now(UTC).isoformat(), "status": status})
                 if status in ("PROCESSED", "FAILED", "CANCELLED"):
-                    terminal_payload = self._run_response_to_dict(get_response)
+                    terminal_payload = payload
+                    terminal_payload[COST_ACCOUNTING] = execution[COST_ACCOUNTING]
                     terminal_payload["_extend_execution"] = execution
                     if status == "PROCESSED":
                         return terminal_payload
@@ -890,6 +952,10 @@ class ExtendProvider(Provider):
                     ),
                 )
                 execution["cancel_response"] = self._run_response_to_dict(response)
+                if execution["cancel_response"].get("processor_run", {}).get("usage") is not None:
+                    execution[COST_ACCOUNTING] = self._record_run_cost(
+                        execution["cancel_response"], config, execution[COST_ACCOUNTING]
+                    )
             except Exception as cancel_error:
                 execution["cancel_error"] = str(cancel_error)
                 emit_provider_event(
@@ -908,7 +974,10 @@ class ExtendProvider(Provider):
             raise ProviderPermanentError(
                 f"Extend processor run {run_id} cancelled or exceeded its deadline",
                 job_id=run_id,
-                debug_payload={"_extend_execution": execution},
+                debug_payload={
+                    "_extend_execution": execution,
+                    COST_ACCOUNTING: execution.get(COST_ACCOUNTING, {KNOWN_COST_USD: None, COMPLETE: False}),
+                },
             ) from error
 
     def _extract_document(
@@ -949,9 +1018,9 @@ class ExtendProvider(Provider):
         }
         try:
             if self._async_run:
-                result = self._run_processor_async(processor_id, file_id)
+                result = self._run_processor_async(processor_id, file_id, pipeline_config)
             else:
-                result = self._run_processor(processor_id, file_id)
+                result = self._run_processor(processor_id, file_id, pipeline_config)
         except ProviderError as error:
             if error.debug_payload is None:
                 error.debug_payload = {}

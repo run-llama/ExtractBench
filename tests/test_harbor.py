@@ -41,7 +41,6 @@ def snapshot(tmp_path):
             "data_schema": json.dumps(schema),
             "expected_output": json.dumps({"rows": [{"id": "A", "value": 1}, {"id": "B", "value": 2}]}),
             "field_rules": json.dumps({"rows[0].value": {"evidence": [{"value": 7}]}}),
-            "repeated_structure": "{}",
             "tags": ["public"],
         }
         (root / f"{split}.jsonl").write_text(json.dumps(row) + "\n")
@@ -259,6 +258,57 @@ def test_publish_opens_pr_without_overwriting_source_data_and_refuses_modified_t
         api.reset_mock()
         next((output / "tasks").glob("*/instruction.md")).write_text("changed")
         with pytest.raises(ValueError, match="changed after generation"):
+            publish(output)
+        api.assert_not_called()
+
+
+@pytest.mark.parametrize("legacy_rules", [False, True])
+def test_release_strips_unknown_keys_from_jsonl_and_harbor(tmp_path: Path, snapshot: Path, legacy_rules: bool) -> None:
+    split = snapshot / "short.jsonl"
+    row = json.loads(split.read_text(encoding="utf-8"))
+    row["internal_note"] = "private"
+    hints = {"rows": ["id"]}
+    row["_identity_hints"] = json.dumps(hints)
+    box = {"page": 1, "bbox": [0, 0, 1, 1]}
+    rule = {
+        "verified": True,
+        "verified_by": "internal reviewer label",
+        "evidence": [{"value": 7, "_adjudication": "private"}],
+        "bboxes": [box | {"internal_note": "private"}],
+    }
+    if legacy_rules:
+        rule |= {"type": "extract_field", "field_path": "rows[0].value"}
+        row["field_rules"] = json.dumps([rule])
+    else:
+        row["field_rules"] = json.dumps({"rows[0].value": rule})
+    split.write_text(json.dumps(row) + "\n", encoding="utf-8")
+
+    output = tmp_path / "export"
+    export_snapshot(snapshot, output, "extractbench", "a" * 40, "b" * 40)
+    published_split = output / split.name
+    published_row = json.loads(published_split.read_text(encoding="utf-8"))
+    rules = json.loads(published_row["field_rules"])
+    expected_rule = {"verified": True, "evidence": [{"value": 7}], "bboxes": [box]}
+    if legacy_rules:
+        expected_rule |= {"type": "extract_field", "field_path": "rows[0].value"}
+    assert published_row == {key: value for key, value in row.items() if key != "internal_note"} | {
+        "field_rules": published_row["field_rules"],
+    }
+    assert rules == ([expected_rule] if legacy_rules else {"rows[0].value": expected_rule})
+    assert json.loads(split.read_text(encoding="utf-8")) == row
+    task = next((output / "tasks").glob("short--*"))
+    reference = json.loads((task / "tests/reference.test.json").read_text(encoding="utf-8"))
+    assert reference["test_rules" if legacy_rules else "_field_rules"] == rules
+    assert reference["_identity_hints"] == hints
+
+    with patch("extract_bench.harbor.publish.HfApi") as api:
+        api.return_value.upload_folder.return_value = SimpleNamespace(pr_url="https://hf.example/pr/1")
+        assert publish(output) == "https://hf.example/pr/1"
+        patterns = api.return_value.upload_folder.call_args.kwargs["allow_patterns"]
+        assert [pattern for pattern in patterns if pattern.endswith(".jsonl")] == ["short.jsonl"]
+        api.reset_mock()
+        shutil.copyfile(split, published_split)
+        with pytest.raises(ValueError, match="Sanitized split changed after generation"):
             publish(output)
         api.assert_not_called()
 

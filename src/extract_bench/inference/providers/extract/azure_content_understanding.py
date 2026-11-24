@@ -14,6 +14,11 @@ from urllib.parse import urlencode, urlparse, urlunparse
 
 import requests
 
+from extract_bench.inference.cost_accounting import preserve_cost_on_error, record_response_cost
+from extract_bench.inference.cost_contract import (
+    COST_USD,
+    USAGE,
+)
 from extract_bench.inference.limits import EXTRACT_HARD_TIMEOUT_S, execution_budget
 from extract_bench.inference.providers.base import (
     Provider,
@@ -22,6 +27,7 @@ from extract_bench.inference.providers.base import (
     ProviderRateLimitError,
     ProviderTransientError,
 )
+from extract_bench.inference.providers.extract.citations import confidence_only_citation
 from extract_bench.inference.providers.registry import register_provider
 from extract_bench.schemas.extract_output import ExtractOutput, FieldCitation
 from extract_bench.schemas.pipeline import PipelineSpec
@@ -215,16 +221,37 @@ class AzureContentUnderstandingProvider(Provider):
 
     def _poll_operation(self, operation_url: str, *, context: str) -> dict[str, Any]:
         budget = execution_budget()
+        body: dict[str, Any] = {}
         for _ in range(self._max_polls):
             response = self._request("GET", operation_url, context=context)
             body = _response_json(response)
+            _apply_usage_cost_fields(body, self.base_config)
             status = str(body.get("status", "")).lower()
+            if body.get(COST_USD) is not None:
+                body.update(
+                    record_response_cost(
+                        body[COST_USD],
+                        body[USAGE],
+                        component_id=f"azure/{operation_url}",
+                        complete=status == "succeeded",
+                    )
+                )
             if status in _TERMINAL_STATUSES:
                 if status == "succeeded":
                     return body
-                raise ProviderPermanentError(f"Azure Content Understanding {context} failed: {body}")
+                with preserve_cost_on_error(body):
+                    raise ProviderPermanentError(
+                        f"Azure Content Understanding {context} failed: {body}",
+                        job_id=operation_url,
+                        debug_payload=body,
+                    )
             budget.wait(self._poll_interval)
-        raise ProviderTransientError(f"Timed out waiting for Azure Content Understanding {context}")
+        with preserve_cost_on_error(body):
+            raise ProviderTransientError(
+                f"Timed out waiting for Azure Content Understanding {context}",
+                job_id=operation_url,
+                debug_payload=body,
+            )
 
     def _url(self, path: str, extra_params: Mapping[str, str] | None = None) -> str:
         params = {"api-version": self._api_version}
@@ -273,7 +300,27 @@ def _content_understanding_endpoint(endpoint: str) -> str:
 
 def _apply_usage_cost_fields(raw_output: dict[str, Any], config: Mapping[str, Any]) -> None:
     usage = raw_output.get("usage")
-    if not isinstance(usage, Mapping):
+    if not isinstance(usage, Mapping) or len(usage) == 0:
+        return
+    quantities = [
+        usage.get(key)
+        for key in (
+            "documentPagesStandard",
+            "documentPagesBasic",
+            "documentPagesMinimal",
+            "contextualizationTokens",
+            "contextualizationToken",
+        )
+    ]
+    tokens = usage.get("tokens")
+    if isinstance(tokens, Mapping):
+        quantities.extend(
+            value
+            for key, value in tokens.items()
+            if str(key).endswith(("-input", "-output"))
+            and any(rate > 0 for rate in _completion_model_rates(str(key).rsplit("-", 1)[0], config))
+        )
+    if not any(isinstance(value, (int, float)) for value in quantities):
         return
 
     breakdown = _usage_cost_breakdown(usage, config)
@@ -669,9 +716,15 @@ def _citation_from_field(
     *,
     document_text: str | None = None,
 ) -> FieldCitation | None:
+    raw_confidence = field.get("confidence")
+    confidence = (
+        float(raw_confidence)
+        if isinstance(raw_confidence, (int, float)) and not isinstance(raw_confidence, bool)
+        else None
+    )
     source = field.get("source")
-    if not isinstance(source, str) or not source:
-        return None
+    if not isinstance(source, str) or len(source) == 0:
+        return confidence_only_citation(field_path, source="azure_content_understanding", confidence=confidence)
     selected_region_indexes, reference_text = _selected_source_region_indexes(field, document_text)
     page, bbox = _parse_source_bbox(source, page_sizes, selected_region_indexes=selected_region_indexes)
     return FieldCitation(
@@ -679,7 +732,7 @@ def _citation_from_field(
         page=page,
         bbox=bbox,
         reference_text=reference_text or _reference_text(field),
-        confidence=float(field["confidence"]) if isinstance(field.get("confidence"), (int, float)) else None,
+        confidence=confidence,
         source="azure_content_understanding",
         metadata={"source": source, "spans": field.get("spans")},
     )

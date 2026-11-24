@@ -9,8 +9,10 @@ same data the headline numbers did.
 
 from __future__ import annotations
 
+import json
 from datetime import datetime
 from enum import Enum
+from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel
@@ -21,9 +23,11 @@ from extract_bench.evaluation.evaluators.extract import (
     ExtractScoringInputs,
     is_extract_test_case,
 )
-from extract_bench.schemas.extract_output import ExtractOutput
+from extract_bench.evaluation.grounded_confidence_payloads import build_doc_payload
+from extract_bench.schemas.extract_output import ExtractOutput, FieldCitation
 from extract_bench.schemas.pipeline_io import InferenceRequest, InferenceResult
 from extract_bench.schemas.product import ProductType
+from extract_bench.test_cases.loader import load_test_case
 from extract_bench.test_cases.schema import ExtractFieldTestRule, ExtractTestCase
 
 
@@ -148,7 +152,6 @@ class ForeignExtractTestCase(BaseModel):
 
     test_id: str
     data_schema: dict[str, Any]
-    eval_data_schema: dict[str, Any]
     expected_output: dict[str, Any] | None
     test_rules: list[dict[str, Any]] | None
 
@@ -161,7 +164,6 @@ def test_structural_guard_accepts_a_foreign_test_case() -> None:
     test_case = ForeignExtractTestCase(
         test_id="group/doc",
         data_schema=schema,
-        eval_data_schema=schema,
         expected_output={"po_number": "PO-1"},
         test_rules=[
             {
@@ -184,3 +186,74 @@ def test_structural_guard_rejects_a_non_extract_case() -> None:
         test_id: str = "group/doc"
 
     assert not is_extract_test_case(ParseLikeCase())
+
+
+def test_confidence_and_viewer_use_value_f1_after_layout_normalization(tmp_path: Path) -> None:
+    pdf_path = tmp_path / "doc.pdf"
+    test_json = tmp_path / "doc.test.json"
+    result_json = tmp_path / "doc.result.json"
+    claim_path = "claims[0].claim_number"
+    test_json.write_text(
+        json.dumps(
+            {
+                "data_schema": {
+                    "type": "object",
+                    "properties": {
+                        "claims": {
+                            "type": "array",
+                            "items": {"type": "object", "properties": {"claim_number": {"type": "string"}}},
+                        },
+                        "payment_details": {
+                            "type": "array",
+                            "items": {"type": "object", "properties": {"amount": {"type": "number"}}},
+                        },
+                    },
+                },
+                "expected_output": {
+                    "payment_details": [{"amount": 10, "claims": [{"claim_number": "AB123"}]}],
+                },
+                "test_rules": [
+                    {"type": "extract_field", "field_path": claim_path, "evidence": [{"value": "XYZ-456"}]},
+                ],
+            },
+        ),
+        encoding="utf-8",
+    )
+    case = load_test_case(pdf_path, test_json)
+    assert isinstance(case, ExtractTestCase)
+    inference = _inference_result({"payment_details": [{"amount": 10}], "claims": [{"claim_number": "XYZ-456"}]})
+    assert isinstance(inference.output, ExtractOutput)
+    inference.output.field_citations = [FieldCitation(field_path=claim_path, page=1, confidence=0.9)]
+    result_json.write_text(inference.model_dump_json(), encoding="utf-8")
+
+    metrics = {metric.metric_name: metric for metric in ExtractEvaluator().compute_metrics(inference, case).metrics}
+    assert metrics["extract_unified_value_f1"].value == 1.0
+    carrier = metrics["confidence_scoped_auc"]
+    assert carrier.metadata["correct_fields"] == 1
+    assert carrier.metadata["field_rows_sample"][0]["matched_gt_path"] == claim_path
+
+    payload = build_doc_payload(
+        {
+            "id": "doc",
+            "description": "",
+            "domain": "",
+            "source": "",
+            "notes": "",
+            "phi_present": False,
+            "schema_leaves": 2,
+            "gt_leaves": 2,
+            "pages": 1,
+            "paths": {
+                "dataset_dir": str(tmp_path),
+                "pdf": str(pdf_path),
+                "test_json": str(test_json),
+                "result_json": str(result_json),
+                "pdf_url": None,
+                "markdown": None,
+            },
+            "metrics_from_report": {},
+        },
+        include_details=True,
+    )
+    (row,) = payload["field_rows"]
+    assert (row["matched_gt_path"], row["expected_value"], row["correct"]) == (claim_path, "AB123", True)

@@ -28,6 +28,7 @@ spend backstop, so the loop is bounded by dollars rather than turn count.
 from __future__ import annotations
 
 import json
+import math
 import os
 import shutil
 import subprocess
@@ -37,6 +38,12 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from extract_bench.inference.cost_accounting import preserve_cost_on_error, record_response_cost
+from extract_bench.inference.cost_contract import (
+    COST_PER_PAGE_USD,
+    TOTAL_COST_USD,
+    USAGE,
+)
 from extract_bench.inference.limits import execution_budget
 from extract_bench.inference.providers.base import (
     Provider,
@@ -56,7 +63,6 @@ from extract_bench.inference.providers.extract.direct_model_utils import (
     add_additional_properties_false,
     normalize_extract_result,
     page_count,
-    promote_repeated_structure,
 )
 from extract_bench.inference.providers.registry import register_provider
 from extract_bench.schemas.pipeline import PipelineSpec
@@ -120,9 +126,6 @@ class ClaudeCodeExtractProvider(Provider):
         # docs within the wall-clock timeout; "low" makes it converge. None → omit
         # the flag (use the CLI default, which is what Opus runs at).
         self._effort: str | None = self.base_config.get("effort")
-        # Schema-prep toggles (reuse direct_model_utils), default to the
-        # anthropic_direct-proven combination.
-        self._promote_repeated: bool = bool(self.base_config.get("promote_repeated_structure", True))
         self._additional_properties_false: bool = bool(self.base_config.get("additional_properties_false", True))
         self._evidence_mode: bool = bool(self.base_config.get("evidence_mode", False))
         # Track live subprocesses for cancel(): example_id -> Popen
@@ -148,8 +151,6 @@ class ClaudeCodeExtractProvider(Provider):
     # Schema + prompt + command construction
     # ------------------------------------------------------------------
     def _prepare_schema(self, schema: dict[str, Any]) -> dict[str, Any]:
-        if self._promote_repeated:
-            schema = promote_repeated_structure(schema)
         if self._additional_properties_false:
             schema = add_additional_properties_false(schema)
         return schema
@@ -367,7 +368,7 @@ class ClaudeCodeExtractProvider(Provider):
             return None, None
         event_type = event.get("type")
         event_type = event_type if isinstance(event_type, str) else None
-        cost = event.get("total_cost_usd")
+        cost = event.get(TOTAL_COST_USD)
         if isinstance(cost, (int, float)):
             return float(cost), event_type
         return None, event_type
@@ -482,7 +483,6 @@ class ClaudeCodeExtractProvider(Provider):
             "bare": self._bare,
             "non_zdr": self._non_zdr,
             "effort": self._effort,
-            "promote_repeated_structure": self._promote_repeated,
             "additional_properties_false": self._additional_properties_false,
             "evidence_mode": self._evidence_mode,
         }
@@ -529,24 +529,36 @@ class ClaudeCodeExtractProvider(Provider):
             lines: list[str] = []
             returncode, stderr_tail = self._run_cli(cmd, workdir, request.example_id, lines)
             result_event = self._parse_result_event(lines)
-            self._raise_for_status(returncode, result_event, lines, stderr_tail)
-            data = self._read_output_json(workdir)
-            agent_citations = read_agent_citations_file(workdir / "citations.json") if self._evidence_mode else None
+            usage = result_event.get(USAGE, {}) if result_event is not None else {}
+            if not isinstance(usage, dict):
+                usage = {}
+            terminal_cost = result_event.get(TOTAL_COST_USD) if result_event is not None else None
+            cost_usd = (
+                float(terminal_cost)
+                if isinstance(terminal_cost, (int, float))
+                and not isinstance(terminal_cost, bool)
+                and math.isfinite(terminal_cost)
+                and terminal_cost >= 0
+                else None
+            )
+            accounting = record_response_cost(cost_usd, usage)
+            with preserve_cost_on_error({**accounting, USAGE: usage}):
+                self._raise_for_status(returncode, result_event, lines, stderr_tail)
+                data = self._read_output_json(workdir)
+                agent_citations = read_agent_citations_file(workdir / "citations.json") if self._evidence_mode else None
 
         completed_at = datetime.now()
         latency_ms = int((completed_at - started_at).total_seconds() * 1000)
 
-        usage = (result_event or {}).get("usage", {}) or {}
-        cost_usd = (result_event or {}).get("total_cost_usd")
         raw_output: dict[str, Any] = {
             "data": data,
             "harness": harness,
             "model": self._model,
-            "usage": usage,
+            USAGE: usage,
             "num_pages": num_pages,
             "schema_delivery": schema_delivery,
-            "cost_usd": cost_usd,
-            "cost_per_page_usd": (cost_usd / num_pages) if (cost_usd and num_pages) else None,
+            **accounting,
+            COST_PER_PAGE_USD: (cost_usd / num_pages) if cost_usd is not None and num_pages else None,
             "cost_exceeded_budget": (
                 self._max_cost_usd is not None and cost_usd is not None and cost_usd > self._max_cost_usd
             ),

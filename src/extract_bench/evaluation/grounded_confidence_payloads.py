@@ -14,8 +14,12 @@ from pathlib import Path
 from typing import Any, TypedDict, cast
 from urllib.parse import quote
 
-from extract_bench.evaluation.metrics.extract.confidence_scoped.paths import iter_leaf_values
-from extract_bench.evaluation.metrics.extract.confidence_scoped.scoring import build_confidence_field_rows
+from extract_bench.evaluation.evaluators.extract import is_extract_test_case, prepare_extract_scoring_inputs
+from extract_bench.evaluation.metrics.extract.confidence_scoped.scoring import (
+    build_confidence_field_rows,
+    clamp_confidence,
+    value_path_prefix,
+)
 from extract_bench.evaluation.metrics.extract.confidence_scoped.summary import (
     DEFAULT_CONFIDENCE_THRESHOLDS,
     compute_confidence_threshold_rows,
@@ -23,9 +27,9 @@ from extract_bench.evaluation.metrics.extract.confidence_scoped.summary import (
     summarize_confidence_rows,
 )
 from extract_bench.evaluation.metrics.extract.confidence_scoped.types import ConfidenceFieldRow
+from extract_bench.evaluation.metrics.extract.unified_evidence_metric import ValueCell
 from extract_bench.schemas.extract_output import FieldCitation
 from extract_bench.test_cases.loader import load_test_case, load_test_cases
-from extract_bench.test_cases.schema import ExtractFieldTestRule
 
 logger = logging.getLogger(__name__)
 
@@ -390,41 +394,6 @@ def doc_records_with_skips(
     return records, skipped
 
 
-def confidence_field_rules(test_case: Any) -> list[Any]:
-    """Return explicit extract_field rules, or derive leaf rules from expected_output.
-
-    Older extract benchmarks often carry only ``expected_output`` sidecars. The
-    confidence sweep needs per-leaf rows, so we derive temporary value-only
-    rules when curated ``extract_field`` rules are absent.
-
-    Note: derived rules have no ``comparator`` / ``structural`` / ``evidence``,
-    so the typed comparator path collapses to ``case_insensitive`` for every
-    leaf — dates compared as strings, numbers as strings, no ``match_by:`` for
-    arrays. The bench loader converts v0.2 ``_field_rules`` dicts to
-    ``test_rules``, so this branch only fires for legacy datasets that ship
-    only ``expected_output``. We warn so the loss of comparator nuance shows
-    up in run logs.
-    """
-    rules = list(test_case.get_extract_field_rules())
-    if rules or getattr(test_case, "expected_output", None) is None:
-        return rules
-    logger.warning(
-        "Confidence sweep deriving rules from expected_output for %s — "
-        "typed comparators (date/number/enum/match_by) are not applied. "
-        "Add explicit test_rules or _field_rules to recover them.",
-        getattr(test_case, "test_id", "<unknown test case>"),
-    )
-    return [
-        ExtractFieldTestRule(
-            field_path=field_path,
-            expected_value=expected_value,
-            verified=False,
-            evidence_required=False,
-        )
-        for field_path, expected_value in iter_leaf_values(test_case.expected_output)
-    ]
-
-
 def serialize_citation(citation: Any) -> dict[str, Any]:
     if hasattr(citation, "model_dump"):
         data = citation.model_dump(mode="json")
@@ -434,11 +403,11 @@ def serialize_citation(citation: Any) -> dict[str, Any]:
     return {}
 
 
-def field_citation_lookup(citations: list[Any]) -> dict[str, dict[str, Any]]:
+def field_citation_lookup(citations: list[Any], path_prefix: str = "") -> dict[str, dict[str, Any]]:
     """Highest-confidence citation per field path.
 
-    Row confidence is the max citation confidence for the path, so the
-    citation shown next to a row must be the one that produced that number.
+    Direct confidence uses the highest score at its path. Derived confidence
+    can have a different source, while displayed evidence stays at the cell path.
     """
     out: dict[str, dict[str, Any]] = {}
     for citation in citations:
@@ -446,13 +415,12 @@ def field_citation_lookup(citations: list[Any]) -> dict[str, dict[str, Any]]:
         field_path = data.get("field_path")
         if not isinstance(field_path, str):
             continue
+        field_path = path_prefix + field_path.removeprefix(path_prefix)
         current = out.get(field_path)
-        confidence = data.get("confidence")
-        current_confidence = current.get("confidence") if current else None
+        confidence = clamp_confidence(data.get("confidence"))
+        current_confidence = clamp_confidence(current.get("confidence")) if current is not None else None
         if current is None or (
-            isinstance(confidence, (int, float))
-            and not isinstance(confidence, bool)
-            and (not isinstance(current_confidence, (int, float)) or confidence > current_confidence)
+            confidence is not None and (current_confidence is None or confidence > current_confidence)
         ):
             out[field_path] = data
     return out
@@ -461,7 +429,9 @@ def field_citation_lookup(citations: list[Any]) -> dict[str, dict[str, Any]]:
 def serialize_confidence_row(
     doc_id: str, index: int, row: ConfidenceFieldRow, citations_by_path: dict[str, dict[str, Any]]
 ) -> SerializedConfidenceRow:
-    citation = citations_by_path.get(row.predicted_path or "") or citations_by_path.get(row.field_path or "")
+    # A matched GT index may belong to a different predicted row after alignment.
+    citation_path = row.predicted_path if row.predicted_path is not None else row.field_path
+    citation = citations_by_path.get(citation_path)
     return {
         "id": f"{doc_id}:{index}",
         "document_id": doc_id,
@@ -507,34 +477,29 @@ def build_doc_payload(
         if isinstance(citation, dict)
     ]
     test_case = load_test_case(file_path, test_json_path)
-    if test_case is None or not hasattr(test_case, "get_extract_field_rules"):
+    if not is_extract_test_case(test_case):
         raise ValueError(f"Could not load extract test case from {test_json_path}")
-    field_rules = confidence_field_rules(test_case)
-
-    # `eval_data_schema`, not `data_schema`: this lane shares the alignment code
-    # with ExtractEvaluator, and a schema-declared identity_key is authoritative
-    # while the `match_by:` rule path is gated on global uniqueness. Reading the
-    # plain schema here would silently score migrated GT with gated-only
-    # alignment and diverge from the main evaluator on duplicate-identity rows.
-    eval_schema = getattr(test_case, "eval_data_schema", None) or getattr(test_case, "data_schema", None)
+    inputs = prepare_extract_scoring_inputs(test_case, output.get("extracted_data", {}), field_citations)
+    value_cells: list[ValueCell] = []
+    inputs.compute_unified_metrics(value_cells)
     rows = build_confidence_field_rows(
-        extracted_data=output.get("extracted_data", {}),
-        field_rules=field_rules,
-        field_citations=field_citations,
-        data_schema=eval_schema,
-        expected_output=getattr(test_case, "expected_output", None),
+        extracted_data=inputs.extracted_data,
+        expected_output=inputs.expected_output,
+        field_rules=inputs.field_rules,
+        field_citations=inputs.field_citations,
+        data_schema=test_case.data_schema,
+        value_cells=value_cells,
     )
-    citations_by_path = field_citation_lookup(field_citations)
+    citations_by_path = field_citation_lookup(field_citations, value_path_prefix(inputs.extracted_data))
     serialized_rows: list[SerializedConfidenceRow] = [
         serialize_confidence_row(record["id"], index, row, citations_by_path) for index, row in enumerate(rows)
     ]
     summary = summarize_confidence_rows(
         rows,
         thresholds=DEFAULT_CONFIDENCE_THRESHOLDS,
-        expected_output=getattr(test_case, "expected_output", None),
-        data_schema=eval_schema,
+        value_cells=value_cells,
     )
-    signal_coverage = confidence_signal_coverage_summary(output.get("extracted_data", {}), field_citations)
+    signal_coverage = confidence_signal_coverage_summary(inputs.extracted_data, inputs.field_citations, value_cells)
     signal_coverage_metrics = {
         key: signal_coverage[key]
         for key in (
@@ -572,9 +537,9 @@ def build_doc_payload(
         markdown = record_paths["markdown"]
         payload["parsed_markdown"] = safe_read_text(Path(markdown)) if markdown else None
         payload["test_json"] = test_json
-        payload["ground_truth"] = test_json.get("expected_output")
+        payload["ground_truth"] = inputs.expected_output
         payload["data_schema"] = test_json.get("data_schema")
-        payload["extracted_data"] = output.get("extracted_data", {})
+        payload["extracted_data"] = inputs.extracted_data
         payload["field_citations"] = [serialize_citation(citation) for citation in field_citations]
         payload["field_rows"] = serialized_rows
         payload["pdf_url"] = record_paths["pdf_url"] or (pdf_api_url if record_paths["pdf"] else None)

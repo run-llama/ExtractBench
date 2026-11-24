@@ -5,12 +5,15 @@ import pytest
 pytest.importorskip("pypdf", reason="dev and runners extras required; run: uv sync --extra dev --extra runners")
 pytest.importorskip("datalab_sdk", reason="dev and runners extras required; run: uv sync --extra dev --extra runners")
 
+from extract_bench.evaluation.metrics.extract.unified_evidence_metric import compute_unified_evidence_metrics
 from extract_bench.inference.providers.extract.datalab import (
     _attach_datalab_extract_pricing,
+    _build_block_lookup,
     _build_field_citations,
     _promote_api_cost_breakdown,
     _strip_citation_and_score_keys,
 )
+from extract_bench.test_cases.schema import ExtractFieldTestRule, FieldEvidence
 
 
 def _meta() -> dict:
@@ -57,10 +60,13 @@ def test_strip_removes_nested_meta_keys() -> None:
     }
 
 
-def test_meta_sidecar_produces_no_citations() -> None:
+def test_meta_sidecar_recovers_citation_and_verification() -> None:
     payload = {"invoice_number": "NF67652", "invoice_number_meta": _meta()}
 
-    assert _build_field_citations(payload, block_lookup={}) == []
+    citations = _build_field_citations(payload, block_lookup={})
+    assert len(citations) == 1
+    assert citations[0].metadata["block_id"] == "/page/0/Table/7"
+    assert citations[0].confidence == 1.0
 
 
 @pytest.mark.parametrize(
@@ -143,3 +149,105 @@ def test_sdk_poll_allowance_uses_remaining_time_and_keeps_fractional_interval(
     assert kwargs["poll_interval"] == cadence
     assert 3.25 <= kwargs["max_polls"] * cadence < 3.25 + cadence
     assert result["extraction_schema_json"] == "{}"
+
+
+@pytest.mark.parametrize("multiline", [False, True])
+def test_phrase_citations_use_tight_boxes_and_keep_verification_separate(multiline: bool) -> None:
+    block_id = "/page/0/Text/3"
+    phrase = {
+        "block": block_id,
+        "page": 0,
+        "text": "Invoice number",
+        "offset": 16,
+        "length": 14,
+        "score": 0.7,
+        "bbox": [20, 40, 80, 120],
+    }
+    if multiline:
+        phrase["bboxes"] = [[20, 40, 80, 60], [20, 100, 60, 120]]
+    payload = {
+        "items": [
+            {
+                "number": "Invoice number",
+                "number_citations": [phrase],
+                "number_meta": {"citations": [block_id], "verification": {"status": "FAIL_CITATIONS"}},
+            }
+        ],
+    }
+    lookup = {
+        block_id: {
+            "page_number": 1,
+            "page_w": 200,
+            "page_h": 400,
+            "bbox": [0, 0, 200, 400],
+            "html": "whole block",
+            "block_type": "Text",
+        }
+    }
+
+    citations = _build_field_citations(payload, lookup)
+
+    envelope = [0.1, 0.1, 0.3, 0.2]
+    data = {"items": [{"number": "Invoice number"}]}
+    metrics = compute_unified_evidence_metrics(
+        data,
+        data,
+        [ExtractFieldTestRule(field_path="items[0].number", evidence=[FieldEvidence(page=1, bbox=envelope)])],
+        field_citations=citations,
+        data_schema={
+            "properties": {"items": {"type": "array", "items": {"properties": {"number": {"type": "string"}}}}}
+        },
+    )
+    assert next(m.value for m in metrics if m.metric_name == "extract_unified_grounded_f1") == 1.0
+    expected = [envelope]
+    if multiline:
+        expected.extend([[0.1, 0.1, 0.3, 0.05], [0.1, 0.25, 0.2, 0.05]])
+    assert [citation.bbox for citation in citations] == expected
+    for citation in citations:
+        assert citation.field_path == "items[0].number"
+        assert citation.page == 1
+        assert citation.reference_text == "Invoice number"
+        assert citation.confidence == 1.0
+        assert citation.metadata["native_verification_status"] == "FAIL_CITATIONS"
+        assert citation.metadata["datalab_phrase"] == phrase
+
+
+@pytest.mark.parametrize("known_block", [False, True])
+def test_phrase_without_word_box_keeps_available_block_or_page_evidence(known_block: bool) -> None:
+    block_id = "/page/1/Text/2"
+    phrase = {"block": block_id, "page": 1, "value_index": 0}
+    payload = {"names": ["Alice"], "names_citations": [phrase]}
+    lookup = (
+        {
+            block_id: {
+                "page_number": 2,
+                "page_w": 200,
+                "page_h": 400,
+                "bbox": [20, 40, 80, 120],
+            }
+        }
+        if known_block
+        else {}
+    )
+
+    citations = _build_field_citations(payload, lookup)
+
+    assert len(citations) == 1
+    assert citations[0].field_path == "names"
+    assert citations[0].page == 2
+    assert citations[0].bbox == ([0.1, 0.1, 0.3, 0.2] if known_block else None)
+    assert citations[0].confidence is None
+    assert citations[0].metadata["datalab_phrase"]["value_index"] == 0
+
+
+@pytest.mark.parametrize("numbers", [[0, 1], [1, 2], [8, 9], [None, None]])
+def test_legacy_block_citations_preserve_distinct_document_pages(numbers: list[int | None]) -> None:
+    tree = {
+        "children": [
+            {"block_type": "Page", "page_number": number, "children": [{"id": f"block-{i}"}]}
+            for i, number in enumerate(numbers)
+        ]
+    }
+    lookup = _build_block_lookup(tree)
+    citations = _build_field_citations({"name": "A", "name_citations": ["block-0", "block-1"]}, lookup)
+    assert [c.page for c in citations] == ([8, 9] if numbers == [8, 9] else [1, 2])

@@ -7,7 +7,6 @@ hypothetical ones.
 
 from __future__ import annotations
 
-import copy
 from typing import Any
 
 from extract_bench.test_cases.extract_gt_lint import LintFinding, lint_extract_sidecar
@@ -47,7 +46,6 @@ def _payload() -> dict[str, Any]:
             "holdings[0].cusip": {"evidence": [{"page": 2, "value": "A1"}]},
             "holdings[0].amount": {"evidence": [{"page": 2, "value": 1}]},
         },
-        "_eval_row_identity": {"holdings": {"identity_key": "cusip"}},
     }
 
 
@@ -176,44 +174,7 @@ def test_non_extract_rule_type_is_flagged() -> None:
 def test_no_rule_container_at_all_is_legal() -> None:
     payload = _payload()
     del payload["_field_rules"]
-    del payload["_eval_row_identity"]
     assert lint_extract_sidecar(payload) == []
-
-
-# --- row identity placement ---------------------------------------------
-
-
-def test_identity_inside_data_schema_is_flagged() -> None:
-    payload = _payload()
-    payload["data_schema"]["repeated_structure"] = {"holdings": {"identity_key": "cusip"}}
-    findings = lint_extract_sidecar(payload)
-    assert [(f.code, f.path) for f in findings] == [("identity.in_schema", "data_schema.repeated_structure")]
-
-
-def test_a_property_named_repeated_structure_is_not_identity() -> None:
-    payload = _payload()
-    payload["data_schema"]["properties"]["repeated_structure"] = {"anyOf": [{"type": "string"}, {"type": "null"}]}
-    assert lint_extract_sidecar(payload) == []
-
-
-def test_legacy_identity_key_is_flagged() -> None:
-    payload = _payload()
-    payload["_repeated_structure"] = copy.deepcopy(payload["_eval_row_identity"])
-    assert _codes(lint_extract_sidecar(payload)) == ["identity.legacy_key"]
-
-
-def test_identity_key_must_be_a_row_property() -> None:
-    payload = _payload()
-    payload["_eval_row_identity"] = {"holdings": {"identity_key": ["cusip", "isin"]}}
-    findings = lint_extract_sidecar(payload)
-    assert _codes(findings) == ["identity.key_missing"]
-    assert "'isin'" in findings[0].message
-
-
-def test_identity_path_must_be_an_array() -> None:
-    payload = _payload()
-    payload["_eval_row_identity"] = {"fund_name": {"identity_key": "x"}, "nope": {"identity_key": "x"}}
-    assert _codes(lint_extract_sidecar(payload)) == ["identity.not_array", "identity.array_missing"]
 
 
 def test_findings_render_as_one_line_each() -> None:

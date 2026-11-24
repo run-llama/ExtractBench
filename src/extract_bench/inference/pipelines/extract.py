@@ -9,6 +9,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from extract_bench.inference.limits import EXTRACT_HARD_TIMEOUT_S
+from extract_bench.inference.providers.extract.citations import REDUCTO_CONFIDENCE_SIGNAL_TYPE
 from extract_bench.schemas.pipeline import PipelineSpec
 from extract_bench.schemas.product import ProductType
 
@@ -297,6 +298,22 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
     )
     register_fn(
         _pipeline_spec(
+            pipeline_name="gemini_cli_extract_gemini_4_hydrogen_high_thinking_vision_evidence",
+            provider_name="gemini_cli_extract",
+            config={"model": "gemini-4-hydrogen", "thinking_level": "high", "evidence_mode": True},
+        )
+    )
+    # Antigravity CLI (`agy`), Google's other coding agent, on the Gemini API through
+    # the same recorder and prompt as Gemini CLI. agy's model ID carries the thinking level.
+    register_fn(
+        _pipeline_spec(
+            pipeline_name="agy_extract_gemini_4_hydrogen_high_thinking_vision_evidence",
+            provider_name="agy_extract",
+            config={"model": "gemini-4-hydrogen-high", "evidence_mode": True},
+        )
+    )
+    register_fn(
+        _pipeline_spec(
             pipeline_name="claude_code_extract_opus_4_8",
             provider_name="claude_code_extract",
             config={"model": "claude-opus-4-8", "bare": True},
@@ -433,42 +450,88 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
             )
         )
 
+    # Tencent Hy4 in the pi coding agent, on TokenHub's OpenAI-compatible
+    # endpoint. Reasoning is pinned to "high" (Hy4's default). Prices are
+    # TokenHub's list rates in USD per million tokens; context is Hy4's input cap.
+    register_fn(
+        _pipeline_spec(
+            pipeline_name="pi_extract_hy4_vision_evidence",
+            provider_name="pi_extract",
+            config={
+                "model": "hy4",
+                "base_url": "https://tokenhub-intl.tencentcloudmaas.com/v1",
+                "provider_label": "tencent-tokenhub",
+                "api_key_env": "TENCENT_TOKENHUB_API_KEY",
+                "context_window": 960000,
+                "max_tokens": 32768,
+                "max_cost_usd": None,
+                "input_price_per_1m": 0.834,
+                "output_price_per_1m": 2.501,
+                "cache_read_price_per_1m": 0.042,
+                "sampling_params": {"reasoning_effort": "high"},
+                "enable_vision": True,
+                "evidence_mode": True,
+                "extra_instructions": (
+                    "Note: this model CAN see images. If the text layer is missing, garbled, or a region is an "
+                    "image (scanned page, table rendered as a picture), render that page or region to PNG "
+                    "(pdftoppm or PyMuPDF) and use the read tool on the PNG file to view it, then extract from "
+                    "what you see. Prefer text tools (pdftotext -layout / PyMuPDF) first when a usable text "
+                    "layer exists. Work decisively: batch work into scripts instead of many small commands, and "
+                    "never re-run a command that already succeeded."
+                ),
+            },
+        )
+    )
+
+    # Tencent Hy4 Flash in the CodeBuddy Code CLI, on TokenHub's OpenAI-compatible
+    # chat-completions endpoint, with vision and page/box citations. Prices are
+    # TokenHub's list rates in USD per million tokens.
+    register_fn(
+        _pipeline_spec(
+            pipeline_name="codebuddy_extract_hy4_flash_evidence",
+            provider_name="codebuddy_extract",
+            config={
+                "model": "hy4-flash",
+                "url": "https://tokenhub-intl.tencentcloudmaas.com/v1/chat/completions",
+                "api_key_env": "TENCENT_TOKENHUB_API_KEY",
+                "max_cost_usd": None,
+                "input_price_per_1m": 0.07,
+                "output_price_per_1m": 0.281,
+                "cache_read_price_per_1m": 0.003,
+                "enable_vision": True,
+                "evidence_mode": True,
+            },
+        )
+    )
+
     # =========================================================================
     # Commercial extraction APIs
     # =========================================================================
 
+    reducto_config = {
+        "citations": True,
+        "array_extract": False,
+        REDUCTO_CONFIDENCE_SIGNAL_TYPE: "continuous",
+    }
     register_fn(
         _pipeline_spec(
             pipeline_name="reducto_extract",
             provider_name="reducto_extract",
-            config={
-                "citations": True,
-                "array_extract": False,
-            },
+            config=reducto_config,
         )
     )
-
     register_fn(
         _pipeline_spec(
             pipeline_name="reducto_extract_v4",
             provider_name="reducto_extract",
-            config={
-                "citations": True,
-                "array_extract": False,
-                "extract_model": "v4",
-            },
+            config={**reducto_config, "extract_model": "v4"},
         )
     )
-
     register_fn(
         _pipeline_spec(
             pipeline_name="reducto_deep_extract",
             provider_name="reducto_extract",
-            config={
-                "citations": True,
-                "array_extract": False,
-                "deep_extract": True,
-            },
+            config={**reducto_config, "deep_extract": True},
         )
     )
 
@@ -539,6 +602,21 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
         _pipeline_spec(
             pipeline_name="landingai_extract",
             provider_name="landingai_extract",
+        )
+    )
+
+    # LandingAI ADE v2: DPT-3 Pro Parse Jobs + v2 Extract Jobs, pinned snapshots,
+    # grounding on (the API default) so extraction ranges map to page boxes.
+    register_fn(
+        _pipeline_spec(
+            pipeline_name="landingai_ade_v2_extract",
+            provider_name="landingai_ade_v2_extract",
+            config={
+                "parse_model": "dpt-3-pro-20261111",
+                "model": "extract-20261111",
+                "grounding": True,
+                "service_tier": "standard",
+            },
         )
     )
 

@@ -26,6 +26,10 @@ import os
 from pathlib import Path
 from typing import Any
 
+from extract_bench.inference.cost_accounting import preserve_cost_on_error
+from extract_bench.inference.cost_contract import (
+    USAGE,
+)
 from extract_bench.inference.providers.base import (
     ProviderConfigError,
     ProviderPermanentError,
@@ -132,7 +136,7 @@ class DeepSeekOneshotExtractProvider(GLMZaiExtractProvider):
         # the base class reads. Prefer the native field when present so the
         # cache-hit credit in _estimate_cost_usd is applied on either shape.
         usage_dict = GLMZaiExtractProvider._extract_usage(response)
-        usage = getattr(response, "usage", None)
+        usage = getattr(response, USAGE, None)
         hit = getattr(usage, "prompt_cache_hit_tokens", None) if usage is not None else None
         if hit is not None:
             usage_dict["cached_input_tokens"] = int(hit or 0)
@@ -140,7 +144,8 @@ class DeepSeekOneshotExtractProvider(GLMZaiExtractProvider):
 
     def _call_api(self, schema: dict[str, Any], source_path: Path) -> dict[str, Any]:
         result = super()._call_api(schema, source_path)
-        self._reject_degenerate_json(result.get("data"), schema)
+        with preserve_cost_on_error(result):
+            self._reject_degenerate_json(result.get("data"), schema)
         result["_config"].update(
             {
                 "provider": "deepseek",

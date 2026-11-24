@@ -10,6 +10,14 @@ from typing import Any
 
 from extend_ai.core.api_error import ApiError
 
+from extract_bench.inference.cost_contract import (
+    COMPLETE,
+    COST_ACCOUNTING,
+    COST_PER_PAGE_USD,
+    COST_USD,
+    KNOWN_COST_USD,
+    RAW_COST_COMPLETE,
+)
 from extract_bench.inference.events import emit_provider_event
 from extract_bench.inference.providers.base import ProviderPermanentError
 from extract_bench.inference.providers.extract.extend import (
@@ -48,7 +56,7 @@ def _attach_operator_cost_stats(raw_output: dict[str, Any], pipeline_config: dic
     raw_output.update(credits_used=total, total_credits=total, cost_usd=total * rate)
     if num_pages:
         raw_output["credits_per_page"] = total / num_pages
-        raw_output["cost_per_page_usd"] = total * rate / num_pages
+        raw_output[COST_PER_PAGE_USD] = total * rate / num_pages
 
     charges = [charge for entry in usage.get("breakdown") or [] for charge in entry.get("charges") or []]
     # Keep every original charge in the run payload. Surface components only
@@ -110,13 +118,15 @@ class ExtendOperatorProvider(ExtendProvider):
     ) -> dict[str, Any]:
         cancelled = self._cancel_event.get()
         run_id: str | None = None
+        run: dict[str, Any] = {}
+        accounting: dict[str, Any] = {KNOWN_COST_USD: None, COMPLETE: False}
 
         def check_cancelled() -> None:
             if cancelled.is_set():
                 raise ProviderPermanentError(
                     f"Operator run {run_id} cancelled" if run_id is not None else "Operator extraction cancelled",
                     job_id=run_id,
-                    debug_payload={"operator_run_id": run_id} if run_id is not None else None,
+                    debug_payload={"operator_run_id": run_id, "processor_run": run, COST_ACCOUNTING: accounting},
                 )
 
         check_cancelled()
@@ -162,6 +172,7 @@ class ExtendOperatorProvider(ExtendProvider):
 
         run = response.model_dump(mode="json", by_alias=True)
         run_id = run["id"]
+        accounting = self._record_run_cost({"processor_run": run}, pipeline_config, accounting)
         emit_provider_event(
             "vendor.job_created",
             provider="extend_operator",
@@ -175,6 +186,7 @@ class ExtendOperatorProvider(ExtendProvider):
             try:
                 response = self._client.extract_runs.retrieve(run_id, request_options={"max_retries": 0})
                 run = response.model_dump(mode="json", by_alias=True)
+                accounting = self._record_run_cost({"processor_run": run}, pipeline_config, accounting)
                 consecutive_poll_errors = 0
             except Exception as error:
                 consecutive_poll_errors += 1
@@ -183,7 +195,11 @@ class ExtendOperatorProvider(ExtendProvider):
                 ) or consecutive_poll_errors > self._async_max_poll_errors:
                     # The harness must not create a new billed run after a
                     # polling failure. Include the existing ID for recovery.
-                    raise ProviderPermanentError(f"Cannot poll Operator run {run_id}: {error}") from error
+                    raise ProviderPermanentError(
+                        f"Cannot poll Operator run {run_id}: {error}",
+                        job_id=run_id,
+                        debug_payload={"processor_run": run, COST_ACCOUNTING: accounting},
+                    ) from error
 
         if run.get("status") == "PROCESSED":
             emit_provider_event(
@@ -197,12 +213,16 @@ class ExtendOperatorProvider(ExtendProvider):
         if run.get("status") != "PROCESSED":
             raise ProviderPermanentError(
                 f"Operator run {run_id} ended with {run.get('status')}: "
-                f"{run.get('failureReason')} {run.get('failureMessage')}"
+                f"{run.get('failureReason')} {run.get('failureMessage')}",
+                job_id=run_id,
+                debug_payload={"processor_run": run, COST_ACCOUNTING: accounting},
             )
 
         # Keep the shared Extend envelope for schema/citation normalization.
         return {
             "processor_run": run,
+            COST_USD: accounting[KNOWN_COST_USD],
+            RAW_COST_COMPLETE: accounting[COMPLETE],
             "_extend_metadata": {
                 "file_id": file_id,
                 "api_version": "2026-02-09",

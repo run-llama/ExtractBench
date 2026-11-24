@@ -1577,6 +1577,67 @@ def test_lenient_date_normalizer_joins_split_preprinted_years() -> None:
     assert _val(wrong_day, "extract_unified_value_f1") == 0.0
 
 
+@pytest.mark.parametrize(
+    ("expected", "prediction", "lenient", "score"),
+    [
+        ("July 13th, 1955", "July 13th 1955", True, 1.0),
+        ("July 13th, 1955", "July 13th, 19 55", True, 1.0),
+        ("July 1, 1955", "July 1th, 1955", True, 0.0),
+        ("July 2, 1955", "July 2th, 1955", True, 0.0),
+        ("July 3, 1955", "July 3th, 1955", True, 0.0),
+        ("July 4, 1955", "July 4rd, 1955", True, 0.0),
+        ("July 11, 1955", "July 11th, 1955", True, 1.0),
+        ("July 21, 1955", "July 21st, 1955", True, 1.0),
+        ("July 13th, 1955", "July 14th, 1955", True, 0.0),
+        ("July 13th, 1955", "July 13th", True, 0.0),
+        ("Permit 13th, 1955", "Permit 13, 1955", True, 0.0),
+        ("July 13th, 1955", "July 13th 1955", False, 0.0),
+    ],
+)
+def test_lenient_date_normalizer_parses_ordinal_days(
+    expected: str,
+    prediction: str,
+    lenient: bool,
+    score: float,
+) -> None:
+    rules = [_rule("date", expected, normalizers=["lenient_date"] if lenient else None)]
+    metrics = compute_unified_evidence_metrics(
+        {"date": expected},
+        {"date": prediction},
+        rules,
+        [],
+        _scalar_schema("date"),
+    )
+
+    assert _val(metrics, "extract_unified_value_f1") == score
+
+
+@pytest.mark.parametrize(
+    ("prediction", "normalizers", "score"),
+    [
+        ("4 - 3 - 98", ["lenient_date"], 1.0),
+        ("4 - 3 - 98", None, 0.0),
+        ("4 - 4 - 98", ["lenient_date"], 0.0),
+    ],
+)
+def test_lenient_date_normalizer_accepts_spaces_around_numeric_hyphens(
+    prediction: str,
+    normalizers: list[str] | None,
+    score: float,
+) -> None:
+    field = "date"
+    expected = "4-3-98"
+    metrics = compute_unified_evidence_metrics(
+        {field: expected},
+        {field: prediction},
+        [_rule(field, expected, normalizers=normalizers)],
+        [],
+        _scalar_schema(field),
+    )
+
+    assert _val(metrics, "extract_unified_value_f1") == score
+
+
 def test_lenient_date_normalizer_does_not_equate_different_values() -> None:
     """Rewrites are guarded: no century expansion without a day, no split-year
     join without a preceding day, and unparseable rewrites never match."""
@@ -1883,12 +1944,7 @@ def test_supported_normalizers_match_schema_vocabulary() -> None:
     assert unified_evidence_metric.SUPPORTED_NORMALIZERS == EXTRACT_FIELD_NORMALIZERS
 
 
-def test_giant_grounded_array_skips_grounding_value_exact_and_peels(monkeypatch: Any) -> None:
-    """A grounded flat array over the cell threshold: value stays bit-exact, the
-    grounded metrics are withheld (grounded_incomplete), and it takes the peel
-    instead of building the multi-GB grounded matrix. Nothing below the
-    threshold changes. This is the memory escape hatch for oklahoma-scale docs.
-    """
+def test_large_array_grades_citations_when_residual_assignment_fits(monkeypatch: Any) -> None:
     box = [0.0, 0.0, 10.0, 10.0]
     expected = {
         "as_of": None,
@@ -1910,27 +1966,23 @@ def test_giant_grounded_array_skips_grounding_value_exact_and_peels(monkeypatch:
     full = compute_unified_evidence_metrics(expected, actual, rules, cits, _schema())
     assert _val(full, "extract_unified_grounded_f1") is not None
 
-    # Force the skip by lowering the threshold below this array's cell count
-    # (6 GT x 6 pred = 36), and confirm it takes the peel, not the full matrix.
     monkeypatch.setattr(unified_evidence_metric, "_GROUNDED_MAX_CELLS", 1)
     calls = _spy_on_peel(monkeypatch)
-    skipped = compute_unified_evidence_metrics(expected, actual, rules, cits, _schema())
+    bounded = compute_unified_evidence_metrics(expected, actual, rules, cits, _schema())
 
-    assert [("security",), ("coupon",), ("note",)] in calls, "giant grounded array falls back to the peel"
-    # Value metrics identical to the full-matrix reference.
-    for name in (
-        "extract_unified_value_precision",
-        "extract_unified_value_recall",
-        "extract_unified_value_f1",
-    ):
-        assert _val(skipped, name) == _val(full, name), name
-    # Grounded metrics withheld entirely for the document.
-    assert _val(skipped, "extract_unified_grounded_f1") is None
-    assert _val(skipped, "extract_unified_grounded_precision") is None
-    assert _val(skipped, "extract_unified_grounded_recall") is None
-    # And the value metadata records why.
-    vf1 = next(m for m in skipped if m.metric_name == "extract_unified_value_f1")
-    assert vf1.metadata["grounded_incomplete"] is True
+    assert len(calls) == 1
+    assert {metric.metric_name: metric.value for metric in bounded} == {
+        metric.metric_name: metric.value for metric in full
+    }
+    assert bounded[0].metadata["grounded_incomplete"] is False
+
+    # A second changed row leaves four candidate pairs, above the one-pair budget.
+    actual["holdings"][3]["coupon"] = 998.0
+    partial = compute_unified_evidence_metrics(expected, actual, rules, cits, _schema())
+    assert partial[0].metadata["value_incomplete"] is True
+    assert partial[0].metadata["grounded_incomplete"] is True
+    assert _val(partial, "extract_unified_page_f1") is None
+    assert _val(partial, "extract_unified_grounded_f1") is None
 
 
 def test_giant_threshold_does_not_touch_nested_or_below_threshold(monkeypatch: Any) -> None:
@@ -1973,7 +2025,7 @@ def _is_headline_unified(name: str) -> bool:
     return name.startswith(_HEADLINE_UNIFIED_PREFIXES) and "_word_" not in name and "_structural_" not in name
 
 
-# --- bbox_match_mode="envelope": a value printed on several lines ---------------
+# --- Grounding for values printed on several lines --------------------------
 
 _L1 = [0.1, 0.10, 0.5, 0.02]
 _L2 = [0.1, 0.12, 0.5, 0.02]
@@ -1985,11 +2037,11 @@ def _wrapped_rules(*entries: FieldEvidence) -> list[ExtractFieldTestRule]:
     return [ExtractFieldTestRule(field_path="as_of", evidence=list(entries))]
 
 
-def _grounded(rules: list[ExtractFieldTestRule], boxes: list[list[float]], mode: str, page: int = 1) -> float | None:
+def _grounded(rules: list[ExtractFieldTestRule], boxes: list[list[float]], page: int = 1) -> float | None:
     expected = {"as_of": "n", "holdings": []}
     cits = [{"field_path": "as_of", "page": page, "bbox": b} for b in boxes]
     return _val(
-        compute_unified_evidence_metrics(expected, expected, rules, cits, _schema(), bbox_match_mode=mode),
+        compute_unified_evidence_metrics(expected, expected, rules, cits, _schema()),
         "extract_unified_grounded_recall",
     )
 
@@ -2003,30 +2055,19 @@ def _three_line_rules() -> list[ExtractFieldTestRule]:
     )
 
 
-def test_envelope_mode_requires_the_whole_wrapped_value() -> None:
+def test_envelope_requires_the_whole_wrapped_value() -> None:
     """Per-line entries plus a coarse envelope are an AND: a citation of one
     line, or of two of three lines, is not grounded; one box around the value
     or one box per line is."""
     rules = _three_line_rules()
-    assert _grounded(rules, [_L1], "envelope") == 0.0
-    assert _grounded(rules, [[0.1, 0.10, 0.5, 0.04]], "envelope") == 0.0  # lines 1-2 (IoU 2/3 with the envelope)
-    assert _grounded(rules, [_ENV3], "envelope") == 1.0
-    assert _grounded(rules, [_L1, _L2, _L3], "envelope") == 1.0
-    assert _grounded(rules, [[0.1, 0.10, 0.5, 0.04], _L3], "envelope") == 1.0  # lines 1-2 merged, line 3 alone
-    assert _grounded(rules, [_L1], "any") == 1.0
-    assert _grounded(rules, [[0.1, 0.10, 0.5, 0.04]], "any") == 1.0
+    assert _grounded(rules, [_L1]) == 0.0
+    assert _grounded(rules, [[0.1, 0.10, 0.5, 0.04]]) == 0.0  # lines 1-2 (IoU 2/3 with the envelope)
+    assert _grounded(rules, [_ENV3]) == 1.0
+    assert _grounded(rules, [_L1, _L2, _L3]) == 1.0
+    assert _grounded(rules, [[0.1, 0.10, 0.5, 0.04], _L3]) == 1.0  # lines 1-2 merged, line 3 alone
 
 
-def test_envelope_mode_is_the_default_and_recorded_in_metadata() -> None:
-    expected = {"as_of": "n", "holdings": []}
-    cits = [{"field_path": "as_of", "page": 1, "bbox": _L1}]
-    metrics = compute_unified_evidence_metrics(expected, expected, _three_line_rules(), cits, _schema())
-    assert _val(metrics, "extract_unified_grounded_recall") == 0.0
-    f1 = next(m for m in metrics if m.metric_name == "extract_unified_grounded_f1")
-    assert f1.metadata["bbox_match_mode"] == "envelope"
-
-
-def test_envelope_mode_rejects_a_single_row_even_at_iou_one_half() -> None:
+def test_envelope_rejects_a_single_row_even_at_iou_one_half() -> None:
     """Two equally wide rows: the first row alone has IoU exactly 0.5 with the
     envelope, which the threshold would accept. The uncovered second line
     still fails it."""
@@ -2036,12 +2077,11 @@ def test_envelope_mode_rejects_a_single_row_even_at_iou_one_half() -> None:
         FieldEvidence(page=1, bbox=[0.1, 0.10, 0.5, 0.04], value="n", coarse=True),
     )
     assert abs(unified_evidence_metric.iou_xywh(tuple(_L1), (0.1, 0.10, 0.5, 0.04)) - 0.5) < 1e-9  # type: ignore[arg-type]
-    assert _grounded(rules, [_L1], "envelope") == 0.0
-    assert _grounded(rules, [_L1], "any") == 1.0
-    assert _grounded(rules, [_L1, _L2], "envelope") == 1.0
+    assert _grounded(rules, [_L1]) == 0.0
+    assert _grounded(rules, [_L1, _L2]) == 1.0
 
 
-def test_envelope_mode_keeps_a_separate_occurrence_as_its_own_alternative() -> None:
+def test_envelope_keeps_a_separate_occurrence_as_its_own_alternative() -> None:
     """A precise entry outside every envelope on its page is still an OR
     alternative: the same value printed once more as a single line."""
     solo = [0.1, 0.50, 0.5, 0.02]
@@ -2051,35 +2091,30 @@ def test_envelope_mode_keeps_a_separate_occurrence_as_its_own_alternative() -> N
         FieldEvidence(page=1, bbox=[0.1, 0.10, 0.5, 0.04], value="n", coarse=True),
         FieldEvidence(page=1, bbox=solo, value="n"),
     )
-    assert _grounded(rules, [solo], "envelope") == 1.0
-    assert _grounded(rules, [_L1], "envelope") == 0.0
+    assert _grounded(rules, [solo]) == 1.0
+    assert _grounded(rules, [_L1]) == 0.0
 
 
-def test_envelope_mode_equals_any_mode_without_coarse_entries() -> None:
-    """GT with no coarse entry grades identically under both modes: any line is
-    an accepted alternative."""
+def test_precise_entries_without_an_envelope_are_alternative_locations() -> None:
     rules = _wrapped_rules(
         FieldEvidence(page=1, bbox=_L1, value="n"),
         FieldEvidence(page=1, bbox=_L2, value="n"),
         FieldEvidence(page=1, bbox=_L3, value="n"),
     )
-    for boxes in ([_L1], [_L2], [_ENV3], [[0.1, 0.10, 0.5, 0.04]]):
-        assert _grounded(rules, boxes, "envelope") == _grounded(rules, boxes, "any")
-    assert _grounded(rules, [_L2], "envelope") == 1.0
-    assert _grounded(rules, [_ENV3], "envelope") == 0.0  # IoU 1/3 with every line, in both modes
+    assert _grounded(rules, [_L2]) == 1.0
+    assert _grounded(rules, [_ENV3]) == 0.0  # IoU 1/3 with every line
 
 
-def test_envelope_mode_coarse_entry_without_parts_is_a_plain_iou_target() -> None:
+def test_envelope_coarse_entry_without_parts_is_a_plain_iou_target() -> None:
     """A coarse box enclosing no precise entry (a block-level or row-level
-    cite) matches one citation box at IoU >= threshold, as in ``any`` mode."""
+    cite) matches one citation box at IoU >= threshold."""
     rules = _wrapped_rules(FieldEvidence(page=1, bbox=_ENV3, value="n", coarse=True))
-    assert _grounded(rules, [_ENV3], "envelope") == 1.0
-    assert _grounded(rules, [_L1], "envelope") == 0.0
-    assert _grounded(rules, [_L1, _L2, _L3], "envelope") == 0.0  # no parts: no union of boxes either
-    assert _grounded(rules, [_L1], "any") == 0.0
+    assert _grounded(rules, [_ENV3]) == 1.0
+    assert _grounded(rules, [_L1]) == 0.0
+    assert _grounded(rules, [_L1, _L2, _L3]) == 0.0  # no parts: no union of boxes either
 
 
-def test_envelope_mode_folds_a_precise_duplicate_of_the_envelope() -> None:
+def test_envelope_folds_a_precise_duplicate_of_the_envelope() -> None:
     """The envelope annotated twice (precise and coarse) is one target whose
     parts are the lines, not a part that a per-line citation could never cover."""
     rules = _wrapped_rules(
@@ -2089,12 +2124,12 @@ def test_envelope_mode_folds_a_precise_duplicate_of_the_envelope() -> None:
         FieldEvidence(page=1, bbox=_ENV3, value="n"),
         FieldEvidence(page=1, bbox=_ENV3, value="n", coarse=True),
     )
-    assert _grounded(rules, [_L1, _L2, _L3], "envelope") == 1.0
-    assert _grounded(rules, [_ENV3], "envelope") == 1.0
-    assert _grounded(rules, [_L1], "envelope") == 0.0
+    assert _grounded(rules, [_L1, _L2, _L3]) == 1.0
+    assert _grounded(rules, [_ENV3]) == 1.0
+    assert _grounded(rules, [_L1]) == 0.0
 
 
-def test_envelope_mode_cross_page_value_accepts_each_page_envelope() -> None:
+def test_envelope_cross_page_value_accepts_each_page_envelope() -> None:
     """A value that continues on the next page carries one envelope per page;
     each is an alternative, and each demands its own lines."""
     p2_l1 = [0.1, 0.10, 0.5, 0.02]
@@ -2107,8 +2142,8 @@ def test_envelope_mode_cross_page_value_accepts_each_page_envelope() -> None:
         FieldEvidence(page=2, bbox=p2_l2, value="n"),
         FieldEvidence(page=2, bbox=[0.1, 0.10, 0.5, 0.04], value="n", coarse=True),
     )
-    assert _grounded(rules, [[0.1, 0.10, 0.5, 0.04]], "envelope", page=2) == 1.0
-    assert _grounded(rules, [p2_l1], "envelope", page=2) == 0.0
+    assert _grounded(rules, [[0.1, 0.10, 0.5, 0.04]], page=2) == 1.0
+    assert _grounded(rules, [p2_l1], page=2) == 0.0
 
 
 def test_build_evidence_targets_groups_lines_under_their_envelope() -> None:
@@ -2126,14 +2161,6 @@ def test_build_evidence_targets_groups_lines_under_their_envelope() -> None:
     assert targets["as_of"][0][2] == (tuple(_L1), tuple(_L2))
 
 
-def test_unknown_bbox_match_mode_is_rejected_even_when_nothing_is_scored() -> None:
-    expected = {"as_of": "n", "holdings": []}
-    with pytest.raises(ValueError, match="bbox_match_mode"):
-        compute_unified_evidence_metrics(expected, expected, _three_line_rules(), [], _schema(), bbox_match_mode="all")
-    with pytest.raises(ValueError, match="bbox_match_mode"):
-        compute_unified_evidence_metrics("not a dict", expected, [], [], _schema(), bbox_match_mode="all")
-
-
 def test_geometry_helpers_are_nan_safe() -> None:
     nan = float("nan")
     good = (0.1, 0.1, 0.5, 0.02)
@@ -2145,3 +2172,180 @@ def test_geometry_helpers_are_nan_safe() -> None:
     assert union is not None and all(abs(u - g) < 1e-12 for u, g in zip(union, good, strict=True))
     assert unified_evidence_metric.union_xywh([bad]) is None
     assert unified_evidence_metric.union_xywh([]) is None
+
+
+@pytest.mark.parametrize(
+    ("value", "slide", "correct"),
+    [(7700, 5, True), (7681, 39, True), (7700, 39, False), (7681, 5, False)],
+)
+def test_alternate_values_require_their_own_citations(
+    value: int,
+    slide: int,
+    correct: bool,
+) -> None:
+    field = "adjusted_ebitda"
+    box = [0.2, 0.3, 0.1, 0.07]
+    rules = [
+        ExtractFieldTestRule(
+            field_path=field,
+            evidence=[
+                FieldEvidence(page=39, bbox=box, value=7681),
+                FieldEvidence(page=5, bbox=box, value=7700),
+            ],
+        ),
+    ]
+    cells: list[unified_evidence_metric.ValueCell] = []
+    metrics = compute_unified_evidence_metrics(
+        {field: 7681},
+        {field: value},
+        rules,
+        [{"field_path": field, "page": slide, "bbox": box}],
+        value_cells=cells,
+    )
+    assert len(cells) == 1 and cells[0].eligible_evidence is not None
+    assert [group.value for group in cells[0].eligible_evidence] == [value]
+    assert _val(metrics, "extract_unified_value_f1") == 1.0
+    assert _val(metrics, "extract_unified_page_f1") == float(correct)
+    assert _val(metrics, "extract_unified_grounded_f1") == float(correct)
+
+
+def test_alternate_values_on_same_page_keep_separate_envelopes() -> None:
+    rules = _wrapped_rules(
+        FieldEvidence(page=1, bbox=_L1, value="n"),
+        FieldEvidence(page=1, bbox=_L2, value="n"),
+        FieldEvidence(page=1, bbox=_ENV3, value="n", coarse=True),
+        FieldEvidence(page=1, bbox=_L3, value="alternate"),
+    )
+    metrics = compute_unified_evidence_metrics(
+        {"as_of": "n"},
+        {"as_of": "n"},
+        rules,
+        [{"field_path": "as_of", "page": 1, "bbox": box} for box in (_L1, _L2)],
+        _schema(),
+    )
+    assert _val(metrics, "extract_unified_grounded_f1") == 1.0
+
+
+def test_value_only_alternate_retains_existing_grounding() -> None:
+    rules = _wrapped_rules(
+        FieldEvidence(page=1, bbox=_L1, value="canonical"),
+        FieldEvidence(value="alternate"),
+    )
+    metrics = compute_unified_evidence_metrics(
+        {"as_of": "canonical"},
+        {"as_of": "alternate"},
+        rules,
+        [{"field_path": "as_of", "page": 1, "bbox": _L1}],
+        _schema(),
+    )
+    assert _val(metrics, "extract_unified_grounded_f1") == 1.0
+
+
+@pytest.mark.parametrize(
+    ("predicted", "correct", "expected_cells", "predicted_cells"),
+    [
+        (["A", "B", "C", "D"], 4, 4, 4),
+        (["D", "C", "B", "A"], 1, 4, 4),
+        (["A", "C", "D"], 3, 4, 3),
+        (["A", "X", "B", "C", "D"], 4, 4, 5),
+    ],
+)
+def test_ordered_array_scores_only_monotone_pairs(
+    predicted: list[str], correct: int, expected_cells: int, predicted_cells: int
+) -> None:
+    rules = [ExtractFieldTestRule(field_path="holdings", structural="ordered")]
+    expected = {"holdings": [{"security": security} for security in ["A", "B", "C", "D"]]}
+    actual = {"holdings": [{"security": security} for security in predicted]}
+    results = compute_unified_evidence_metrics(expected, actual, rules, data_schema=_schema())
+    metric = next(result for result in results if result.metric_name == "extract_unified_value_f1")
+    assert metric.value == pytest.approx(2 * correct / (expected_cells + predicted_cells))
+    assert metric.metadata is not None
+    assert metric.metadata["v_correct"] == correct
+    assert metric.metadata["expected_cells"] == expected_cells
+    assert metric.metadata["predicted_cells"] == predicted_cells
+
+
+def test_ordered_row_alignment_uses_scored_values_and_emits_only_selected_paths() -> None:
+    expected = {"holdings": [{"security": "A", "coupon": 1, "note": "x"}, {"security": "B"}]}
+    actual = {"holdings": [{"security": "B"}, {"security": "A alt", "coupon": 1, "note": "x"}]}
+    rules = [
+        ExtractFieldTestRule(field_path="holdings", structural="ordered"),
+        _rule("holdings[0].security", "A alt"),
+    ]
+    cells: list[unified_evidence_metric.ValueCell] = []
+    results = compute_unified_evidence_metrics(expected, actual, rules, data_schema=_schema(), value_cells=cells)
+    assert _val(results, "extract_unified_value_f1") == 0.75
+    assert [(cell.gt_path, cell.pred_path) for cell in cells if cell.value_correct] == [
+        ("holdings[0].security", "holdings[1].security"),
+        ("holdings[0].coupon", "holdings[1].coupon"),
+        ("holdings[0].note", "holdings[1].note"),
+    ]
+    assert len(cells) == 5
+
+
+@pytest.mark.parametrize("index_width", [1, 2])
+def test_ordered_children_influence_unordered_parent_pairing(index_width: int) -> None:
+    schema = _schema()
+    child_schema = schema["properties"]["holdings"]
+    schema["properties"]["groups"] = {
+        "type": "array",
+        "items": {"type": "object", "properties": {"holdings": child_schema}},
+    }
+    forward = {"holdings": [{"security": "A"}, {"security": "B"}]}
+    backward = {"holdings": list(reversed(forward["holdings"]))}
+    expected = {"groups": [forward, backward]}
+    actual = {"groups": [backward, forward]}
+    rules = [
+        ExtractFieldTestRule(field_path=f"groups[{i:0{index_width}d}].holdings", structural="ordered") for i in range(2)
+    ]
+    cells: list[unified_evidence_metric.ValueCell] = []
+    results = compute_unified_evidence_metrics(expected, actual, rules, data_schema=schema, value_cells=cells)
+    assert _val(results, "extract_unified_value_f1") == 1.0
+    assert len(cells) == 4
+    assert cells[0].gt_path == "groups[0].holdings[0].security"
+    assert cells[0].pred_path == "groups[1].holdings[0].security"
+
+
+def test_ordered_replacement_keeps_aligned_cell_paths() -> None:
+    expected = {"holdings": [{"security": "A"}, {"security": "B"}]}
+    actual = {"holdings": [{"security": "A"}, {"security": "Z"}]}
+    rules = [ExtractFieldTestRule(field_path="holdings", structural="ordered")]
+    cells: list[unified_evidence_metric.ValueCell] = []
+    results = compute_unified_evidence_metrics(expected, actual, rules, data_schema=_schema(), value_cells=cells)
+    assert _val(results, "extract_unified_value_f1") == 0.5
+    assert cells == [
+        unified_evidence_metric.ValueCell("holdings[0].security", "holdings[0].security", True),
+        unified_evidence_metric.ValueCell("holdings[1].security", "holdings[1].security", False),
+    ]
+
+
+def test_ordered_pairing_credits_configured_matches_and_skips_absent_fields() -> None:
+    expected = {"holdings": [{"security": "Acme"}]}
+    # With absent == absent counted as a match, the last candidate would win
+    # on coupon and note even though it misses the only field being scored.
+    actual = {"holdings": [{"security": "ACME", "coupon": 5, "note": None}, {"security": "unrelated"}]}
+    rules = [
+        ExtractFieldTestRule(field_path="holdings", structural="ordered"),
+        _rule("holdings[0].security", normalizers=["case_insensitive"]),
+    ]
+    cells: list[unified_evidence_metric.ValueCell] = []
+    compute_unified_evidence_metrics(expected, actual, rules, data_schema=_schema(), value_cells=cells)
+    assert [(cell.gt_path, cell.pred_path) for cell in cells if cell.value_correct] == [
+        ("holdings[0].security", "holdings[0].security"),
+    ]
+
+
+def test_ordered_tied_value_matches_keep_the_same_citation_path() -> None:
+    expected = {"holdings": [{"security": "Acme"}]}
+    actual = {"holdings": [{"security": " Acme"}, {"security": "Acme "}]}
+    cells: list[unified_evidence_metric.ValueCell] = []
+    compute_unified_evidence_metrics(
+        expected,
+        actual,
+        [ExtractFieldTestRule(field_path="holdings", structural="ordered")],
+        data_schema=_schema(),
+        value_cells=cells,
+    )
+    assert [(cell.gt_path, cell.pred_path) for cell in cells if cell.value_correct] == [
+        ("holdings[0].security", "holdings[1].security"),
+    ]

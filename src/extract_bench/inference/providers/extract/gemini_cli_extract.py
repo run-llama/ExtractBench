@@ -54,7 +54,6 @@ from extract_bench.inference.providers.extract.direct_model_utils import (
     add_additional_properties_false,
     normalize_extract_result,
     page_count,
-    promote_repeated_structure,
 )
 from extract_bench.inference.providers.extract.gemini_cli_trace import GeminiCliTrace
 from extract_bench.inference.providers.extract.gemini_cli_transport import GeminiCliTransport
@@ -82,6 +81,9 @@ class GeminiCliExtractProvider(Provider):
 
     DEFAULT_MODEL = "gemini-4-argon"
     retries_transient_errors = False  # one run per document, like claude_code_extract
+    # Gemini CLI on Node 22 aborts a request whose headers take over 60 s (see gemini_cli_transport).
+    # Subclasses whose CLI stream parser rejects the heartbeat newline set this to False.
+    EARLY_STREAM_HEADERS = True
 
     def __init__(self, provider_name: str, base_config: dict[str, Any] | None = None):
         super().__init__(provider_name, base_config)
@@ -90,7 +92,6 @@ class GeminiCliExtractProvider(Provider):
         self._max_cost_usd: float | None = self.base_config.get("max_cost_usd")
         self._gemini_bin: str = self.base_config.get("gemini_bin", "gemini")
         self._harness = CliHarness("gemini_cli_extract", self._gemini_bin, self.base_config.get(HARNESS_VERSION))
-        self._promote_repeated: bool = bool(self.base_config.get("promote_repeated_structure", True))
         self._additional_properties_false: bool = bool(self.base_config.get("additional_properties_false", True))
         self._evidence_mode: bool = bool(self.base_config.get("evidence_mode", False))
         self._base_url = os.environ.get("GOOGLE_GEMINI_BASE_URL", "https://generativelanguage.googleapis.com").rstrip(
@@ -131,8 +132,6 @@ class GeminiCliExtractProvider(Provider):
         self._procs_lock = threading.Lock()
 
     def _prepare_schema(self, schema: dict[str, Any]) -> dict[str, Any]:
-        if self._promote_repeated:
-            schema = promote_repeated_structure(schema)
         if self._additional_properties_false:
             schema = add_additional_properties_false(schema)
         return schema
@@ -192,6 +191,22 @@ class GeminiCliExtractProvider(Provider):
             "",
         ]
 
+    def _cli_env(self, home: Path, base_url: str) -> dict[str, str]:
+        """Point the CLI at its private home and the recorder; the real key stays in the recorder."""
+        return {"GEMINI_CLI_HOME": str(home), "GEMINI_API_KEY": "local-recorder", "GOOGLE_GEMINI_BASE_URL": base_url}
+
+    def _stdin_payload(self, prompt: str) -> str:
+        return prompt
+
+    def _prepare_home(self, home: Path) -> None:
+        (home / ".gemini").mkdir(parents=True)
+        (home / ".gemini" / "settings.json").write_text(json.dumps(self._build_settings()), encoding="utf-8")
+
+    @staticmethod
+    def _result_event(events: Sequence[dict[str, Any]]) -> dict[str, Any] | None:
+        """The terminal event as ``{"status": "success" | ..., "error": ..., "stats": ...}``."""
+        return next((e for e in reversed(events) if e.get("type") == "result"), None)
+
     def _run_cli(
         self,
         cmd: list[str],
@@ -219,9 +234,7 @@ class GeminiCliExtractProvider(Provider):
             "GEMINI_API_KEY_AUTH_MECHANISM",
         }
         env = {k: v for k, v in os.environ.items() if k not in excluded}
-        env.update(
-            {"GEMINI_CLI_HOME": str(home), "GEMINI_API_KEY": "local-recorder", "GOOGLE_GEMINI_BASE_URL": base_url}
-        )
+        env.update(self._cli_env(home, base_url))
 
         for name in ("NO_PROXY", "no_proxy"):
             env[name] = ",".join(filter(None, [env.get(name), "127.0.0.1", "localhost"]))
@@ -254,7 +267,7 @@ class GeminiCliExtractProvider(Provider):
             try:
                 assert proc.stdin is not None and proc.stdout is not None
                 try:
-                    proc.stdin.write(prompt)
+                    proc.stdin.write(self._stdin_payload(prompt))
                 except BrokenPipeError:
                     pass  # the CLI died early; the exit code reports it
                 finally:
@@ -379,7 +392,6 @@ class GeminiCliExtractProvider(Provider):
             "base_url": self._base_url,
             "thinking_level": self._thinking_level,
             "max_cost_usd": self._max_cost_usd,
-            "promote_repeated_structure": self._promote_repeated,
             "additional_properties_false": self._additional_properties_false,
             "evidence_mode": self._evidence_mode,
         }
@@ -441,9 +453,8 @@ class GeminiCliExtractProvider(Provider):
         with tempfile.TemporaryDirectory() as tmp:
             workdir = Path(tmp) / "work"
             home = Path(tmp) / "home"
-            (home / ".gemini").mkdir(parents=True)
+            self._prepare_home(home)
             workdir.mkdir()
-            (home / ".gemini" / "settings.json").write_text(json.dumps(self._build_settings()), encoding="utf-8")
             staged_name = f"input{ext}"
             shutil.copy2(src, workdir / staged_name)
 
@@ -464,6 +475,7 @@ class GeminiCliExtractProvider(Provider):
                 lambda: self.cancel(request.example_id),
                 api_key=self._api_key,
                 headers=self._headers,
+                early_stream_headers=self.EARLY_STREAM_HEADERS,
             ) as transport:
                 try:
                     returncode, stderr_tail = self._run_cli(
@@ -481,7 +493,7 @@ class GeminiCliExtractProvider(Provider):
                     with (home / "gemini_stderr.log").open(encoding="utf-8", errors="replace") as stderr:
                         request_retry_observed = any(_REQUEST_RETRY_PATTERN.search(line) is not None for line in stderr)
                     events = self._events(lines)
-                    result_event = next((e for e in reversed(events) if e.get("type") == "result"), None)
+                    result_event = self._result_event(events)
                     self._raise_for_status(returncode, result_event, stderr_tail)
                     data = self._read_output_json(workdir)
                     if self._evidence_mode:
