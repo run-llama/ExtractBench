@@ -50,6 +50,7 @@ uv run extract-bench run <pipeline_name>
 | `extend_extract_max` | Extend Max Context + Review Agent | same settings as Performance, with `large_array_max_context` |
 | `extend_extract_operator` | Extend | Operator extraction on the 2026-02-09 API with word-level citations; cost from the run's reported usage (`EXTEND_API_KEY`) |
 | `landingai_extract` | LandingAI ADE | |
+| `landingai_ade_v2_extract` | LandingAI ADE v2 | DPT-3 Pro parse (`dpt-3-pro-20261111`) and v2 extract (`extract-20261111`) as async jobs at the standard tier; word-level citations from extraction ranges (atomic grounding) (`LANDING_AI_API_KEY`) |
 | `parseur_extract_v3_vision` | Parseur | AI Vision engine v3; no citations (`PARSEUR_API_KEY`) |
 | `datalab_extract_turbo` | Datalab Turbo | Image-only extraction; no parsing, citations, or confidence scores |
 | `datalab_extract_fast` | Datalab Fast | Fast extraction with source citations; a separate, free confidence step runs afterward |

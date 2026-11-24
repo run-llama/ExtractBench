@@ -67,7 +67,7 @@ runners = [
     "google-genai>=1.0.0",
     "httpx>=0.28.0",
     "infinity-parser2>=0.3.0",
-    "landingai-ade>=1.4.0",
+    "landingai-ade>=1.13.0",
     "llama-cloud>=1.4.1",
     "openai>=1.0.0",
     "pdf2image>=1.16.0",
@@ -89,7 +89,7 @@ openweights = ["openai>=1.0.0", "pdf2image>=1.16.0", "pillow>=10.0.0", "pymupdf>
 reducto = ["reductoai>=0.13.0"]
 extend = ["extend-ai>=1.16.0"]
 datalab = ["datalab-python-sdk>=0.10.0"]
-landingai = ["landingai-ade>=1.4.0"]
+landingai = ["landingai-ade>=1.13.0"]
 azure = ["azure-ai-documentintelligence>=1.0.0", "httpx>=0.28.0"]
 aws = ["boto3>=1.34.0", "amazon-textract-textractor>=1.7.0"]
 local = ["pymupdf>=1.24.0", "pypdf>=6.4.0", "pytesseract>=0.3.10", "pdf2image>=1.16.0", "pillow>=10.0.0"]

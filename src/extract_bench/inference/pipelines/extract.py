@@ -605,6 +605,21 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
         )
     )
 
+    # LandingAI ADE v2: DPT-3 Pro Parse Jobs + v2 Extract Jobs, pinned snapshots,
+    # grounding on (the API default) so extraction ranges map to page boxes.
+    register_fn(
+        _pipeline_spec(
+            pipeline_name="landingai_ade_v2_extract",
+            provider_name="landingai_ade_v2_extract",
+            config={
+                "parse_model": "dpt-3-pro-20261111",
+                "model": "extract-20261111",
+                "grounding": True,
+                "service_tier": "standard",
+            },
+        )
+    )
+
     # Parseur (REST API, one mailbox per schema, upload + poll).
     register_fn(
         _pipeline_spec(

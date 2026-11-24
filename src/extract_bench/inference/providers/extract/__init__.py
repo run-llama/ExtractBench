@@ -30,6 +30,7 @@ _PROVIDER_MODULES = [
     "glm_zai_extract",
     "kimi_extract",
     "landingai",
+    "landingai_v2",
     "lift",
     "llamaextract_v2_api",
     "nuextract3_extract",
