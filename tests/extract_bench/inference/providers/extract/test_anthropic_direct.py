@@ -8,8 +8,10 @@ import pytest
 
 pytest.importorskip("pypdf", reason="dev and runners extras required; run: uv sync --extra dev --extra runners")
 
+from extract_bench.inference.limits import ExecutionBudget
 from extract_bench.inference.providers.base import (
     ProviderConfigError,
+    ProviderError,
     ProviderPermanentError,
     ProviderTransientError,
 )
@@ -212,6 +214,30 @@ def test_anthropic_direct_pdfs_use_beta_messages_api(
     assert raw.raw_output["data"] == {"invoice_number": "INV-001"}
     assert messages.calls == []
     assert beta_messages.calls[0]["betas"] == ["pdfs-2024-09-25"]
+
+
+@pytest.mark.parametrize("suffix", [".png", ".pdf"], ids=["messages", "pdf-beta"])
+def test_anthropic_request_uses_document_budget_and_stops_after_cancellation(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    suffix: str,
+) -> None:
+    source = tmp_path / f"invoice{suffix}"
+    source.write_bytes(b"document fixture")
+    messages = _FakeMessages()
+    _patch_client(monkeypatch, messages, messages)
+    provider = anthropic_direct.AnthropicDirectExtractProvider("anthropic_extract", {"api_key": "test-key"})
+
+    budget = ExecutionBudget(30)
+    with budget.activate():
+        provider.run_inference(_pipeline(), _request(str(source)))
+        budget.cancel()
+        with pytest.raises(ProviderError, match="Document execution deadline exceeded"):
+            provider.run_inference(_pipeline(), _request(str(source)))
+
+    (call,) = messages.calls
+    assert 0 < call["timeout"].read <= 30
+    assert 0 < call["timeout"].connect <= 5
 
 
 def test_anthropic_direct_provider_model_pricing() -> None:

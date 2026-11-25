@@ -44,12 +44,14 @@ uv run extract-bench run <pipeline_name>
 | `codex_code_extract_gpt_6_astra_xhigh_evidence` / `codex_code_extract_gpt_6_1_sol_{low,medium,high,xhigh}_evidence` / `codex_code_extract_gpt_6_1_terra_{low,medium}_evidence` | Codex CLI | GPT-6 Astra, GPT-6.1 Sol and GPT-6.1 Terra extraction with page and box citations at the effort in the name; unrestricted shell, no cost cap |
 | `codex_code_extract_gpt_6_luna_{low,medium,high,xhigh}_evidence_prompt_opt` | Codex CLI | GPT-6 Luna evidence extraction plus a short prompt addendum: always write the output files, the documents are authorized for extraction, no field needs web access |
 | `pi_extract_hy4_vision_evidence` | pi 0.84.1 | Tencent Hy4 on TokenHub, reasoning high, vision, page/box citations; uses `TENCENT_TOKENHUB_API_KEY`; [setup](#pi) |
+| `codebuddy_extract_hy4_flash_evidence` | CodeBuddy Code 2.185.0 | Tencent Hy4 Flash on TokenHub, vision, page/box citations; uses `TENCENT_TOKENHUB_API_KEY`; [setup](#codebuddy-code) |
 | `reducto_extract` / `reducto_extract_v4` / `reducto_deep_extract` | Reducto | `_v4` uses Reducto's v4 extract model |
 | `extend_extract` | Extend Performance + Review Agent | latest stable model, Review Agent scores, line/property citations; async API 2026-02-09 |
 | `extend_extract_max` | Extend Max Context + Review Agent | same settings as Performance, with `large_array_max_context` |
 | `extend_extract_operator` | Extend | Operator extraction on the 2026-02-09 API with word-level citations; cost from the run's reported usage (`EXTEND_API_KEY`) |
 | `landingai_extract` | LandingAI ADE | |
 | `pageindex_extract_standard` | PageIndex Page Extract | Standard tier; the PDF sent with its extraction job; page citations; cost from the job's reported usage (`PAGEINDEX_API_KEY`) |
+| `landingai_ade_v2_extract` | LandingAI ADE v2 | DPT-3 Pro parse (`dpt-3-pro-20261111`) and v2 extract (`extract-20261111`) as async jobs at the standard tier; word-level citations from extraction ranges (atomic grounding) (`LANDING_AI_API_KEY`) |
 | `parseur_extract_v3_vision` | Parseur | AI Vision engine v3; no citations (`PARSEUR_API_KEY`) |
 | `datalab_extract_turbo` | Datalab Turbo | Image-only extraction; no parsing, citations, or confidence scores |
 | `datalab_extract_fast` | Datalab Fast | Fast extraction with source citations; a separate, free confidence step runs afterward |
@@ -179,6 +181,21 @@ uv run extract-bench run pi_extract_hy4_vision_evidence \
 ```
 
 Each request gets its own pi `models.json` (endpoint, key and prices) outside the agent's working directory, and pi runs without skills, extensions, prompt templates or context files. The pipeline pins reasoning to `high`, lets the model read rendered pages as images and writes `citations.json` evidence. It calls TokenHub's OpenAI-compatible endpoint, set by `base_url` in the pipeline config. Cost is pi's reported cost at TokenHub's list rates; `max_cost_usd` is a post-hoc flag, not a spending limit.
+
+#### CodeBuddy Code
+
+Install Tencent's [CodeBuddy Code CLI](https://www.npmjs.com/package/@tencent-ai/codebuddy-code) and set a Tencent TokenHub API key with access to Hy4 Flash:
+
+```bash
+uv sync --extra local
+npm install -g @tencent-ai/codebuddy-code@X.Y.Z
+codebuddy --version
+export TENCENT_TOKENHUB_API_KEY="your-tokenhub-api-key"
+uv run extract-bench run codebuddy_extract_hy4_flash_evidence \
+  --max_concurrent 1 --harness_version X.Y.Z
+```
+
+Each request gets a private `HOME` outside the agent's working directory, holding a CodeBuddy `models.json` that points at TokenHub's chat-completions endpoint (`url` in the pipeline config) and refers to the key by environment variable. The run uses no MCP servers and no project settings, blocks web search and fetch, and lets the model read rendered pages as images. The schema is in `./schema.json` and, unless it is too large, also inline in the prompt. Cost is computed from CodeBuddy's reported token usage at TokenHub's list rates; set `max_cost_usd` to stop a run once its running cost passes that amount.
 
 ---
 
