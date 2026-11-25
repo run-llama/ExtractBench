@@ -686,3 +686,27 @@ def test_over_cap_identity_bucket_still_skips(monkeypatch: pytest.MonkeyPatch) -
     }
     monkeypatch.setattr(array_record_match_metric, "_MAX_RESIDUAL_ASSIGNMENT_CELLS", 1)
     assert _record_correct(expected, actual, identity_keys_by_field={"holdings": ["security"]}) == 1
+
+
+@pytest.mark.parametrize(
+    ("expected", "actual", "matches"),
+    [
+        ("-65", "–65", True),
+        ("-40", "−40", True),
+        ("-.5", "﹣.5", True),
+        ("-1.25e-3", "－1.25e-3", True),
+        (" -65\n", " –65 ", True),
+        ("65", "–65", False),
+        ("-65", "–55", False),
+        ("10-20", "10–20", False),
+        ("part-65", "part–65", False),
+        ("-65 °C", "–65 °C", False),
+    ],
+)
+def test_numeric_minus_glyphs_match_without_changing_ranges_or_identifiers(
+    expected: str,
+    actual: str,
+    matches: bool,
+) -> None:
+    assert cell_match(expected, actual, "min", fuzzy_field_thresholds={}) is matches
+    assert (_cell_key(expected) == _cell_key(actual)) is matches

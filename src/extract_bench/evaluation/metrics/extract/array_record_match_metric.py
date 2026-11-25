@@ -34,6 +34,9 @@ _MAX_RESIDUAL_ASSIGNMENT_CELLS = 100_000_000
 
 _PUNCT_RE = re.compile(r"[^\w\s]", re.U)
 _WS_RE = re.compile(r"\s+", re.U)
+# Sign variants used in printed numeric cells. Match the whole number so ranges
+# and identifiers keep their punctuation, and preserve the remaining number text.
+_NUMERIC_MINUS_RE = re.compile(r"[–−﹣－](?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?")
 
 # Reserved output keys that carry attribution metadata, not schema content, and must
 # NEVER be scored as extracted cells. Kept in sync with the codegen provider's
@@ -108,19 +111,15 @@ def normalize_dates_deep(value: Any) -> Any:
 
 
 def normalize_ws(value: str) -> str:
-    """Collapse internal whitespace runs so only inter-word spacing matters.
+    """Normalize whitespace and the leading minus glyph of numeric strings.
 
-    Multi-line cells (postal addresses, wrapped headers) carry hard line breaks
-    whose position depends on render column width, not content, so a prediction
-    that re-wraps the same text is correct.
-
-    Deliberately whitespace-RUN-only: whitespace hugging punctuation ("3, 4" vs
-    "3,4") stays significant here because this helper defines the default cell
-    equality (and ``_cell_key`` interning) for EVERY extract dataset. Datasets
-    that want punctuation-spacing leniency opt in per field via the
-    ``punctuation_spacing`` normalizer (unified_evidence_metric).
+    The whole-string numeric pattern confines sign normalization to numeric
+    cells. This shared normalization also defines row-assignment intern keys.
     """
-    return _WS_RE.sub(" ", value).strip()
+    normalized = _WS_RE.sub(" ", value).strip()
+    if _NUMERIC_MINUS_RE.fullmatch(normalized) is not None:
+        return "-" + normalized[1:]
+    return normalized
 
 
 def cell_match[K: CellKey](
@@ -193,7 +192,7 @@ def _cell_key(
     """Hashable interning key that mirrors ``cell_match`` for non-fuzzy fields.
 
     Two cells share a key iff ``cell_match`` returns True (strings compared
-    whitespace-insensitively, everything else by ``==``). Strings are tagged
+    with ``normalize_ws``, everything else by ``==``). Strings are tagged
     apart from non-strings so a normalized string can never collide with a
     look-alike scalar, exactly as ``cell_match`` keeps its str/str branch
     distinct from the ``==`` fallback. List and dict cells freeze to tagged
@@ -202,7 +201,7 @@ def _cell_key(
     cannot be interned -> caller scores that column pairwise.
 
     ``field_schema`` matches ``cell_match``'s keyword; intern keys come from
-    the value (whitespace-folded strings, tagged scalars, frozen JSON).
+    the value (normalized strings, tagged scalars, frozen JSON).
     """
     if isinstance(value, str):
         return ("s", normalize_ws(value))
