@@ -634,14 +634,15 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
         )
     )
 
-    # PageIndex Page Extract (REST API: a job started with the PDF, then polled), Standard tier.
-    register_fn(
-        _pipeline_spec(
-            pipeline_name="pageindex_extract_standard",
-            provider_name="pageindex",
-            config={"tier": "standard"},
+    # PageIndex Page Extract (REST API: a job started with the PDF, then polled), one pipeline per tier.
+    for _tier in ("standard", "pro"):
+        register_fn(
+            _pipeline_spec(
+                pipeline_name=f"pageindex_extract_{_tier}",
+                provider_name="pageindex",
+                config={"tier": _tier},
+            )
         )
-    )
 
     # Bypass Datalab's server cache: a cached result returns at once and bills
     # $0, so a rerun would report neither the real cost nor the real latency.

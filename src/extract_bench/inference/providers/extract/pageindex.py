@@ -154,12 +154,14 @@ class PageIndexExtractProvider(Provider):
                 timeout=UPLOAD_TIMEOUT_S,
             )
         except _ApiError as exc:
-            # Turned away before a job was started: safe for the runner to retry.
+            # Safe for the runner to retry: a 429 comes before a job is made, and a 503
+            # when none could be queued (what it reserved is given back).
             if exc.status == 429:
                 raise ProviderRateLimitError(f"Rate limited starting the job: {exc}") from exc
-            if exc.status in (502, 503):
+            if exc.status == 503:
                 raise ProviderTransientError(f"Transient error starting the job: {exc}") from exc
-            # A job may have started (and would be billed twice by a retry).
+            # A job may have started (and would be billed twice by a retry): a 502 from
+            # the load balancer, for one, can come after the job was queued.
             raise ProviderPermanentError(f"Starting the job failed, not retried: {exc}") from exc
 
     def _cancel_job(self, job_id: str) -> None:

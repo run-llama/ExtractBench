@@ -122,10 +122,11 @@ def _request(tmp_path: Path) -> tuple[PipelineSpec, InferenceRequest]:
     return pipeline, request
 
 
-def test_registered_pipeline() -> None:
-    pipeline = get_pipeline("pageindex_extract_standard")
+@pytest.mark.parametrize("tier", ["standard", "pro"])
+def test_registered_pipeline(tier: str) -> None:
+    pipeline = get_pipeline(f"pageindex_extract_{tier}")
     assert pipeline.provider_name == "pageindex"
-    assert pipeline.config == {"tier": "standard"}
+    assert pipeline.config == {"tier": tier}
 
 
 def test_unknown_tier_is_a_config_error(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -213,9 +214,9 @@ def test_cancelled_job_is_permanent(provider: tuple[PageIndexExtractProvider, _F
     ("response", "error"),
     [
         (_FakeResponse(503, {"detail": "The job could not be queued. Try again."}), ProviderTransientError),
-        (_FakeResponse(502), ProviderTransientError),
         (_FakeResponse(429), ProviderRateLimitError),
         # The job may have started: a retry would bill a second one.
+        (_FakeResponse(502), ProviderPermanentError),
         (_FakeResponse(500), ProviderPermanentError),
         (requests.ReadTimeout("slow"), ProviderPermanentError),
         (requests.ConnectionError("reset"), ProviderPermanentError),
