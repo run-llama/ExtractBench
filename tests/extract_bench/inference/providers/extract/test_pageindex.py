@@ -122,10 +122,11 @@ def _request(tmp_path: Path) -> tuple[PipelineSpec, InferenceRequest]:
     return pipeline, request
 
 
-def test_registered_pipeline() -> None:
-    pipeline = get_pipeline("pageindex_extract_standard")
+@pytest.mark.parametrize("tier", ["standard", "pro"])
+def test_registered_pipeline(tier: str) -> None:
+    pipeline = get_pipeline(f"pageindex_extract_{tier}")
     assert pipeline.provider_name == "pageindex"
-    assert pipeline.config == {"tier": "standard"}
+    assert pipeline.config == {"tier": tier}
 
 
 def test_unknown_tier_is_a_config_error(monkeypatch: pytest.MonkeyPatch) -> None:
