@@ -63,7 +63,8 @@ def test_string_annotations_and_nullable_enums_use_supported_template_leaves() -
             "quote": {"type": "string", "x-verbatim": True},
             "issued": {"type": "string", "description": "date"},
             "contact": {"type": "string", "format": "email"},
-            "status": {"type": ["string", "null"], "enum": ["Paid", None]},
+            "status": {"type": ["string", "null"], "enum": ["Paid", "Open", None]},
+            "currency": {"type": ["string", "null"], "enum": ["USD", None]},
         },
     }
 
@@ -73,7 +74,8 @@ def test_string_annotations_and_nullable_enums_use_supported_template_leaves() -
         "quote": "verbatim-string",
         "issued": "date",
         "contact": "email-address",
-        "status": "string",
+        "status": ["Paid", "Open"],
+        "currency": "string",
     }
 
 
