@@ -213,9 +213,9 @@ def test_cancelled_job_is_permanent(provider: tuple[PageIndexExtractProvider, _F
     ("response", "error"),
     [
         (_FakeResponse(503, {"detail": "The job could not be queued. Try again."}), ProviderTransientError),
-        (_FakeResponse(502), ProviderTransientError),
         (_FakeResponse(429), ProviderRateLimitError),
         # The job may have started: a retry would bill a second one.
+        (_FakeResponse(502), ProviderPermanentError),
         (_FakeResponse(500), ProviderPermanentError),
         (requests.ReadTimeout("slow"), ProviderPermanentError),
         (requests.ConnectionError("reset"), ProviderPermanentError),
