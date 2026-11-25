@@ -3,10 +3,11 @@
 import base64
 import hashlib
 import json
+import math
 import mimetypes
 import os
 import re
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -95,12 +96,11 @@ class AzureContentUnderstandingProvider(Provider):
         started_at = datetime.now()
         try:
             analyzer_id, analyzer_payload, field_name_map = self._ensure_analyzer(pipeline, request.schema_override)
-            raw_output = self._analyze_binary(analyzer_id, file_path)
+            raw_output = self._analyze_binary(analyzer_id, file_path, pipeline.config)
             raw_output["_analyzer_id"] = analyzer_id
             raw_output["_analyzer_payload"] = analyzer_payload
             raw_output["_field_name_map"] = field_name_map
             raw_output["_config"] = _public_config(pipeline.config)
-            _apply_usage_cost_fields(raw_output, pipeline.config)
 
             completed_at = datetime.now()
             return RawInferenceResult(
@@ -180,7 +180,7 @@ class AzureContentUnderstandingProvider(Provider):
 
         return analyzer_id, analyzer_payload, field_name_map
 
-    def _analyze_binary(self, analyzer_id: str, file_path: Path) -> dict[str, Any]:
+    def _analyze_binary(self, analyzer_id: str, file_path: Path, config: Mapping[str, Any]) -> dict[str, Any]:
         mime_type = mimetypes.guess_type(file_path.name)[0] or "application/octet-stream"
         url = self._url(f"/contentunderstanding/analyzers/{analyzer_id}:analyze")
         payload = {
@@ -200,10 +200,31 @@ class AzureContentUnderstandingProvider(Provider):
             context="analyze",
         )
         operation_url = response.headers.get("Operation-Location")
-        body = _response_json(response)
-        if not operation_url:
-            return body
-        return self._poll_operation(operation_url, context=f"analyze {file_path.name}")
+        body = (
+            self._poll_operation(operation_url, context=f"analyze {file_path.name}")
+            if operation_url
+            else _response_json(response)
+        )
+        _apply_usage_cost_fields(body, config)
+        status = str(body.get("status", "")).lower()
+        content = _first_document_content(_analysis_result(body))
+        with preserve_cost_on_error(body):
+            if status in {"failed", "canceled"}:
+                raise ProviderPermanentError(
+                    f"Azure Content Understanding analyze {file_path.name} {status}",
+                    debug_payload=body,
+                )
+            if (
+                status not in {"", "succeeded"}
+                or content.get("kind", "document") != "document"
+                or not isinstance(content.get("fields"), Mapping)
+            ):
+                raise ProviderTransientError(
+                    "Azure Content Understanding analyze returned an incomplete or malformed result",
+                    job_id=operation_url,
+                    debug_payload=body,
+                )
+        return body
 
     def _poll_analyzer_ready(self, analyzer_id: str) -> None:
         url = self._url(f"/contentunderstanding/analyzers/{analyzer_id}")
@@ -657,7 +678,13 @@ def _page_sizes(content: Mapping[str, Any]) -> dict[int, tuple[float, float]]:
         page_number = page.get("pageNumber")
         width = page.get("width")
         height = page.get("height")
-        if isinstance(page_number, int) and isinstance(width, (int, float)) and isinstance(height, (int, float)):
+        if (
+            isinstance(page_number, int)
+            and isinstance(width, (int, float))
+            and isinstance(height, (int, float))
+            and 0 < width < math.inf
+            and 0 < height < math.inf
+        ):
             sizes[page_number] = (float(width), float(height))
     return sizes
 
@@ -705,17 +732,16 @@ def _field_citations_for_field(
                 _field_citations_for_field(f"{field_path}[{index}]", item, page_sizes, document_text=document_text)
             )
         return citations
-    citation = _citation_from_field(field_path, field, page_sizes, document_text=document_text)
-    return [citation] if citation is not None else []
+    return _citations_from_field(field_path, field, page_sizes, document_text=document_text)
 
 
-def _citation_from_field(
+def _citations_from_field(
     field_path: str,
     field: Mapping[str, Any],
     page_sizes: Mapping[int, tuple[float, float]],
     *,
     document_text: str | None = None,
-) -> FieldCitation | None:
+) -> list[FieldCitation]:
     raw_confidence = field.get("confidence")
     confidence = (
         float(raw_confidence)
@@ -724,18 +750,54 @@ def _citation_from_field(
     )
     source = field.get("source")
     if not isinstance(source, str) or len(source) == 0:
-        return confidence_only_citation(field_path, source="azure_content_understanding", confidence=confidence)
-    selected_region_indexes, reference_text = _selected_source_region_indexes(field, document_text)
-    page, bbox = _parse_source_bbox(source, page_sizes, selected_region_indexes=selected_region_indexes)
-    return FieldCitation(
-        field_path=field_path,
-        page=page,
-        bbox=bbox,
-        reference_text=reference_text or _reference_text(field),
-        confidence=confidence,
-        source="azure_content_understanding",
-        metadata={"source": source, "spans": field.get("spans")},
-    )
+        citation = confidence_only_citation(field_path, source="azure_content_understanding", confidence=confidence)
+        return [citation] if citation is not None else []
+
+    encoded_regions = _SOURCE_REGION_RE.findall(source)
+    regions = {
+        index: region
+        for index, encoded in enumerate(encoded_regions or [source])
+        if (region := _source_region_bbox(encoded)) is not None
+    }
+    value = _field_value(field)
+    value_text = _reference_text(field)
+    # Match value spans by source region index before combining boxes on each page.
+    matched_texts = {
+        index: text.strip()
+        for index, text in _field_span_texts(field, document_text)
+        if index in regions and _span_matches_value(text, value, value_text)
+    }
+    boxes_by_page: dict[int, list[tuple[float, float, float, float]]] = {}
+    texts_by_page: dict[int, list[str]] = {}
+    for index, (page, x0, y0, x1, y1) in regions.items():
+        if len(matched_texts) > 0 and index not in matched_texts:
+            continue
+        boxes_by_page.setdefault(page, []).append((x0, y0, x1, y1))
+        if index in matched_texts:
+            texts_by_page.setdefault(page, []).append(matched_texts[index])
+
+    locations: list[tuple[int | None, list[float] | None, str | None]] = [
+        (
+            page,
+            _normalize_source_boxes(boxes, page_sizes.get(page, (1.0, 1.0))),
+            " ".join(texts_by_page.get(page, [])) or value_text,
+        )
+        for page, boxes in boxes_by_page.items()
+    ]
+    if len(locations) == 0:
+        locations.append((None, None, value_text))
+    return [
+        FieldCitation(
+            field_path=field_path,
+            page=page,
+            bbox=bbox,
+            reference_text=reference_text,
+            confidence=confidence,
+            source="azure_content_understanding",
+            metadata={"source": source, "spans": field.get("spans")},
+        )
+        for page, bbox, reference_text in locations
+    ]
 
 
 def _reference_text(field: Mapping[str, Any]) -> str | None:
@@ -747,63 +809,16 @@ def _reference_text(field: Mapping[str, Any]) -> str | None:
     return json.dumps(value, ensure_ascii=False)
 
 
-def _parse_source_bbox(
-    source: str,
-    page_sizes: Mapping[int, tuple[float, float]],
-    *,
-    selected_region_indexes: set[int] | None = None,
-) -> tuple[int | None, list[float] | None]:
-    regions: list[tuple[int, float, float, float, float]] = []
-    for index, match in enumerate(_SOURCE_REGION_RE.finditer(source)):
-        if selected_region_indexes is not None and index not in selected_region_indexes:
-            continue
-        region = _source_region_bbox(match.group(1))
-        if region is not None:
-            regions.append(region)
-    if not regions:
-        region = _source_region_bbox(source)
-        if region is not None:
-            regions.append(region)
-    if not regions:
-        return None, None
-
-    page = regions[0][0]
-    same_page_regions = [region for region in regions if region[0] == page]
-    x0 = min(region[1] for region in same_page_regions)
-    y0 = min(region[2] for region in same_page_regions)
-    x1 = max(region[3] for region in same_page_regions)
-    y1 = max(region[4] for region in same_page_regions)
-    width, height = page_sizes.get(page, (1.0, 1.0))
-    if width > 0 and height > 0 and (x1 > 1.0 or y1 > 1.0):
-        x0, x1 = x0 / width, x1 / width
-        y0, y1 = y0 / height, y1 / height
-    x0 = min(1.0, max(0.0, x0))
-    y0 = min(1.0, max(0.0, y0))
-    x1 = min(1.0, max(0.0, x1))
-    y1 = min(1.0, max(0.0, y1))
-    return page, [x0, y0, max(0.0, x1 - x0), max(0.0, y1 - y0)]
-
-
-def _selected_source_region_indexes(
-    field: Mapping[str, Any], document_text: str | None
-) -> tuple[set[int] | None, str | None]:
-    span_texts = _field_span_texts(field, document_text)
-    if not span_texts:
-        return None, None
-
-    value = _field_value(field)
-    value_text = _reference_text(field)
-    selected: set[int] = set()
-    selected_texts: list[str] = []
-    for index, text in span_texts:
-        if _span_matches_value(text, value, value_text):
-            selected.add(index)
-            selected_texts.append(text.strip())
-
-    if not selected:
-        return None, None
-    reference_text = " ".join(text for text in selected_texts if text)
-    return selected, reference_text or None
+def _normalize_source_boxes(
+    boxes: Sequence[tuple[float, float, float, float]], page_size: tuple[float, float]
+) -> list[float]:
+    # Azure reports source coordinates in the same unit as the page dimensions.
+    width, height = page_size
+    x0 = min(1.0, max(0.0, min(box[0] for box in boxes) / width))
+    y0 = min(1.0, max(0.0, min(box[1] for box in boxes) / height))
+    x1 = min(1.0, max(0.0, max(box[2] for box in boxes) / width))
+    y1 = min(1.0, max(0.0, max(box[3] for box in boxes) / height))
+    return [x0, y0, max(0.0, x1 - x0), max(0.0, y1 - y0)]
 
 
 def _field_span_texts(field: Mapping[str, Any], document_text: str | None) -> list[tuple[int, str]]:
@@ -855,5 +870,5 @@ def _source_region_bbox(source_region: str) -> tuple[int, float, float, float, f
         xs = coords[0::2]
         ys = coords[1::2]
         return page, min(xs), min(ys), max(xs), max(ys)
-    x0, y0, x1, y1 = coords[:4]
-    return page, x0, y0, x1, y1
+    left, top, width, height = coords[:4]
+    return page, left, top, left + width, top + height

@@ -335,10 +335,9 @@ def test_landingai_only_converts_explicit_nonnegative_page_indexes(page_index: i
 
 @pytest.mark.parametrize("source", [None, "", "D(unknown)"])
 def test_azure_unresolved_source_preserves_confidence_without_claiming_page_one(source: str | None) -> None:
-    from extract_bench.inference.providers.extract.azure_content_understanding import _citation_from_field
+    from extract_bench.inference.providers.extract.azure_content_understanding import _citations_from_field
 
-    citation = _citation_from_field("amount", {"source": source, "confidence": 0.8}, {})
-    assert citation is not None
+    (citation,) = _citations_from_field("amount", {"source": source, "confidence": 0.8}, {})
     assert citation.page is None
     assert citation.bbox is None
     assert citation.confidence == 0.8
