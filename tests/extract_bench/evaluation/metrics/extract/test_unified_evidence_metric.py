@@ -2349,3 +2349,26 @@ def test_ordered_tied_value_matches_keep_the_same_citation_path() -> None:
     assert [(cell.gt_path, cell.pred_path) for cell in cells if cell.value_correct] == [
         ("holdings[0].security", "holdings[1].security"),
     ]
+
+
+def test_numeric_minus_glyphs_preserve_value_and_page_credit_in_reordered_rows() -> None:
+    schema = {
+        "type": "object",
+        "properties": {
+            "limits": {
+                "type": "array",
+                "items": {"type": "object", "properties": {"min": {"type": "string"}}},
+            },
+        },
+    }
+    rules = [_rule("limits[0].min", "-65", page=1), _rule("limits[1].min", "-40", page=2)]
+    citations = [{"field_path": "limits[0].min", "page": 2}, {"field_path": "limits[1].min", "page": 1}]
+    metrics = compute_unified_evidence_metrics(
+        {"limits": [{"min": "-65"}, {"min": "-40"}]},
+        {"limits": [{"min": "–40"}, {"min": "−65"}]},
+        rules,
+        citations,
+        schema,
+    )
+    assert _val(metrics, "extract_unified_value_f1") == 1.0
+    assert _val(metrics, "extract_unified_page_f1") == 1.0

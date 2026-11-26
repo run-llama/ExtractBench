@@ -8,6 +8,8 @@ Notable changes to `llama-extract-bench`. This project follows
 
 ### Evaluation
 
+- Value, page, and grounding metrics accept equivalent leading minus glyphs in numeric strings. Rescore cached predictions with the same scorer version when comparing results across this change.
+
 - Removed support for the legacy `repeated_structure` schema and dataset metadata, along with `_eval_row_identity` and the provider promotion toggle. Declare arrays under JSON Schema `properties` and use `_identity_hints` for array-record matching hints.
 - Confidence scoring uses Value F1’s row assignments and field verdicts, including accepted alternative values. Confidence precision, recall, and signal coverage use Value F1 cells, including primitive arrays scored as a unit. Rescore cached predictions to compare confidence results across this change.
 - Grounding checks citations against the accepted value that matched and always uses envelope matching. Remove the `bbox_match_mode` argument from calls to `compute_unified_evidence_metrics`. [#148](https://github.com/run-llama/ExtractBench/pull/148)
