@@ -41,6 +41,7 @@ _PROVIDER_MODULES = [
     "pi_extract",
     "pulse",
     "reducto",
+    "sarvam",
     "table_codegen_extract",
     "text_only",
     "vllm_extract",
