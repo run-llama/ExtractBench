@@ -49,6 +49,7 @@ uv run extract-bench run <pipeline_name>
 | `extend_extract` | Extend Performance + Review Agent | latest stable model, Review Agent scores, line/property citations; async API 2026-02-09 |
 | `extend_extract_max` | Extend Max Context + Review Agent | same settings as Performance, with `large_array_max_context` |
 | `extend_extract_operator` | Extend | Operator extraction on the 2026-02-09 API with word-level citations; cost from the run's reported usage (`EXTEND_API_KEY`) |
+| `sarvam_extract_basic` / `sarvam_extract_advanced` | Sarvam Extract | Document AI Extract API (`/doc-ai/v1/job/extract`), job-poll; Basic reads page by page, Advanced adds a whole-document pass; page citations with boxes and confidence; flat per-page price (`SARVAM_API_KEY`) |
 | `landingai_extract` | LandingAI ADE | |
 | `pageindex_extract_standard` / `pageindex_extract_pro` | PageIndex Page Extract | Standard or Pro tier; the PDF sent with its extraction job; page citations; cost from the job's reported usage (`PAGEINDEX_API_KEY`) |
 | `landingai_ade_v2_extract` | LandingAI ADE v2 | DPT-3 Pro parse (`dpt-3-pro-20261111`) and v2 extract (`extract-20261111`) as async jobs at the standard tier; word-level citations from extraction ranges (atomic grounding) (`LANDING_AI_API_KEY`) |

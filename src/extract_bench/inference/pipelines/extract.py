@@ -644,6 +644,18 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
             )
         )
 
+    # Sarvam Extract (REST API: a job started with the file, then polled), one pipeline per mode.
+    # price_per_page_usd is the list price per processed page (Basic Rs 1, Advanced Rs 2.50;
+    # about $10 and $25 per 1,000 pages at Rs 95/USD).
+    for _mode, _price in (("basic", 0.010), ("advanced", 0.025)):
+        register_fn(
+            _pipeline_spec(
+                pipeline_name=f"sarvam_extract_{_mode}",
+                provider_name="sarvam_extract",
+                config={"mode": _mode, "language": "en-IN", "price_per_page_usd": _price},
+            )
+        )
+
     # Bypass Datalab's server cache: a cached result returns at once and bills
     # $0, so a rerun would report neither the real cost nor the real latency.
     for _extraction_mode in ("turbo", "fast", "balanced", "accurate"):

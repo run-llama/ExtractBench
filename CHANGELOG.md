@@ -32,6 +32,7 @@ Notable changes to `llama-extract-bench`. This project follows
 - LlamaExtract leaderboard pipelines use Extract 2.6. The Cost Effective and Agentic `_standard_bbox` variants were removed. [#86](https://github.com/run-llama/ExtractBench/pull/86) [#87](https://github.com/run-llama/ExtractBench/pull/87)
 - LlamaExtract results retain API latency and state transitions. Agentic Plus Max Effort uses reported billing when available. [#76](https://github.com/run-llama/ExtractBench/pull/76) [#114](https://github.com/run-llama/ExtractBench/pull/114)
 - Added Parseur AI Vision, Extend Operator, Gemini 4 Argon, and more Codex pipelines. The Extend Performance and Max Context pipelines now use Review Agent. [#85](https://github.com/run-llama/ExtractBench/pull/85) [#90](https://github.com/run-llama/ExtractBench/pull/90) [#98](https://github.com/run-llama/ExtractBench/pull/98) [#104](https://github.com/run-llama/ExtractBench/pull/104) [#124](https://github.com/run-llama/ExtractBench/pull/124)
+- Added Sarvam Extract pipelines (`sarvam_extract_basic`, `sarvam_extract_advanced`).
 - Layout average precision uses ParseBench, removing the direct scikit-learn dependency. [#116](https://github.com/run-llama/ExtractBench/pull/116)
 
 ### Leaderboards
